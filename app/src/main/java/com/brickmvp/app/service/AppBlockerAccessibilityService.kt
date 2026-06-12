@@ -8,15 +8,30 @@ import com.brickmvp.app.ui.BlockActivity
 
 class AppBlockerAccessibilityService : AccessibilityService() {
 
+    private val ignoredPackages = setOf(
+        "com.android.systemui",
+        "com.android.launcher3",
+        "com.google.android.apps.nexuslauncher",
+        "com.sec.android.app.launcher",
+        "com.miui.home",
+        "com.huawei.android.launcher",
+        "com.oppo.launcher",
+        "com.android.settings",
+        "com.android.dialer",
+        "com.android.contacts",
+        "com.google.android.dialer",
+        "com.android.emergency",
+        "com.android.phone",
+        "com.google.android.apps.messaging",
+        "com.android.mms"
+    )
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
 
-        // Don't block ourselves or system UI
         if (packageName == this.packageName) return
-        if (packageName == "com.android.systemui") return
-        if (packageName == "com.android.launcher3") return
-        if (packageName == "com.google.android.apps.nexuslauncher") return
+        if (packageName in ignoredPackages) return
 
         val sessionManager = BrickApp.get(this).container.sessionManager
         if (sessionManager.isAppBlocked(packageName)) {

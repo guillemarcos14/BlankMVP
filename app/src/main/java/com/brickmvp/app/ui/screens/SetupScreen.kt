@@ -26,7 +26,14 @@ fun SetupScreen(
 ) {
     val context = LocalContext.current
     val blockedPackages by sessionManager.blockedPackages.collectAsState()
+    val nfcTagUid by sessionManager.nfcTagUid.collectAsState()
     var currentStep by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(nfcTagUid) {
+        if (currentStep == 0 && nfcTagUid != null) {
+            currentStep = 1
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -53,7 +60,6 @@ fun SetupScreen(
                     if (adapter != null && !adapter.isEnabled) {
                         context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS))
                     }
-                    currentStep = 1
                 }
             )
             1 -> SetupStep(

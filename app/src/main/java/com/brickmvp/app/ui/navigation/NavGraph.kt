@@ -41,6 +41,12 @@ fun NavGraph(
                 sessionManager = sessionManager,
                 onEditApps = {
                     navController.navigate(Routes.APP_SELECTOR)
+                },
+                onForgetTag = {
+                    sessionManager.forgetNfcTag()
+                    navController.navigate(Routes.SETUP) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
                 }
             )
         }

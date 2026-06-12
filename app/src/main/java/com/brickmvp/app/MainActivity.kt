@@ -72,7 +72,8 @@ class MainActivity : ComponentActivity() {
             SessionManager.NfcResult.TAG_REGISTERED -> R.string.nfc_tag_registered
             SessionManager.NfcResult.BRICKED -> R.string.session_activated
             SessionManager.NfcResult.UNBRICKED -> R.string.session_deactivated
-            SessionManager.NfcResult.WRONG_TAG -> return // silently ignore wrong tags
+            SessionManager.NfcResult.WRONG_TAG -> R.string.nfc_wrong_tag
+            SessionManager.NfcResult.NO_APPS_SELECTED -> R.string.nfc_no_apps_selected
         }
         Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
     }

@@ -29,6 +29,7 @@
     <string name="home_bricked_since">Bricked since %1$s</string>
     <string name="home_blocked_apps">%1$d apps blocked</string>
     <string name="home_edit_apps">Edit Apps</string>
+    <string name="home_forget_tag">Forget NFC tag</string>
     <string name="home_no_apps_selected">No apps selected. Tap to select apps to block.</string>
 
     <!-- App Selector Screen -->
@@ -40,11 +41,12 @@
     <!-- Block Screen -->
     <string name="block_title">APP BLOCKED</string>
     <string name="block_message">This app is blocked by Brick.\nTap your NFC tag to unblock.</string>
-    <string name="block_go_home">Go Home</string>
 
     <!-- General -->
     <string name="nfc_not_available">NFC is not available on this device</string>
     <string name="nfc_tag_registered">NFC tag registered</string>
+    <string name="nfc_wrong_tag">Tag not recognized. Use your paired Brick.</string>
+    <string name="nfc_no_apps_selected">Select at least one app to block first.</string>
     <string name="session_activated">Brick mode activated</string>
     <string name="session_deactivated">Brick mode deactivated</string>
 </resources>

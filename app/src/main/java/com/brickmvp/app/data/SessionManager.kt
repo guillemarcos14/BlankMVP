@@ -65,6 +65,10 @@ class SessionManager(private val dataStore: DataStore<Preferences>) {
             return NfcResult.WRONG_TAG
         }
 
+        if (!_isBricked.value && _blockedPackages.value.isEmpty()) {
+            return NfcResult.NO_APPS_SELECTED
+        }
+
         // Toggle brick mode
         val newState = !_isBricked.value
         scope.launch {
@@ -88,6 +92,17 @@ class SessionManager(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    fun forgetNfcTag() {
+        scope.launch {
+            dataStore.edit { prefs ->
+                prefs.remove(PrefsKeys.NFC_TAG_UID)
+                prefs[PrefsKeys.IS_BRICKED] = false
+                prefs[PrefsKeys.BRICKED_SINCE] = 0L
+                prefs[PrefsKeys.SETUP_COMPLETE] = false
+            }
+        }
+    }
+
     fun setSetupComplete() {
         scope.launch {
             dataStore.edit { prefs ->
@@ -100,6 +115,7 @@ class SessionManager(private val dataStore: DataStore<Preferences>) {
         TAG_REGISTERED,
         BRICKED,
         UNBRICKED,
-        WRONG_TAG
+        WRONG_TAG,
+        NO_APPS_SELECTED
     }
 }

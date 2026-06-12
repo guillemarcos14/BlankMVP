@@ -14,6 +14,17 @@ data class AppInfo(
 
 object PackageHelper {
 
+    private val neverBlockPackages = setOf(
+        "com.android.settings",
+        "com.android.dialer",
+        "com.android.contacts",
+        "com.google.android.dialer",
+        "com.android.emergency",
+        "com.android.phone",
+        "com.google.android.apps.messaging",
+        "com.android.mms"
+    )
+
     fun getInstalledApps(context: Context): List<AppInfo> {
         val pm = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN).apply {
@@ -26,6 +37,7 @@ object PackageHelper {
             .mapNotNull { resolveInfo ->
                 val pkgName = resolveInfo.activityInfo.packageName
                 if (pkgName == ownPackage) return@mapNotNull null
+                if (pkgName in neverBlockPackages) return@mapNotNull null
                 try {
                     val appInfo = pm.getApplicationInfo(pkgName, 0)
                     AppInfo(

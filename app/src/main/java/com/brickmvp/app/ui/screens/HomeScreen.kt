@@ -19,7 +19,8 @@ import java.util.*
 @Composable
 fun HomeScreen(
     sessionManager: SessionManager,
-    onEditApps: () -> Unit
+    onEditApps: () -> Unit,
+    onForgetTag: () -> Unit
 ) {
     val isBricked by sessionManager.isBricked.collectAsState()
     val brickedSince by sessionManager.brickedSince.collectAsState()
@@ -102,6 +103,15 @@ fun HomeScreen(
                         stringResource(R.string.home_no_apps_selected)
                     else
                         stringResource(R.string.home_edit_apps)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            TextButton(onClick = onForgetTag) {
+                Text(
+                    text = stringResource(R.string.home_forget_tag),
+                    color = BrickOnSurface.copy(alpha = 0.8f)
                 )
             }
         }

@@ -1,9 +1,12 @@
 package com.brickmvp.app.ui
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -14,10 +17,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.brickmvp.app.R
+import com.brickmvp.app.BrickApp
 import com.brickmvp.app.ui.theme.BrickBlockBackground
 import com.brickmvp.app.ui.theme.BrickOnSurface
 import com.brickmvp.app.ui.theme.BrickRed
 import com.brickmvp.app.ui.theme.BrickTheme
+import kotlinx.coroutines.launch
 
 class BlockActivity : ComponentActivity() {
 
@@ -27,36 +32,35 @@ class BlockActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        val sessionManager = BrickApp.get(this).container.sessionManager
+        lifecycleScope.launch {
+            sessionManager.isBricked.collect { isBricked ->
+                if (!isBricked) finish()
+            }
+        }
+
         setContent {
             BrickTheme {
-                BlockScreen(
-                    onGoHome = {
-                        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                            addCategory(Intent.CATEGORY_HOME)
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        startActivity(homeIntent)
-                        finish()
-                    }
-                )
+                BlockScreen()
             }
         }
     }
 
     @Deprecated("Use OnBackPressedDispatcher")
     override fun onBackPressed() {
-        // Go to home screen instead of back to the blocked app
-        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_HOME)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        startActivity(homeIntent)
-        finish()
+        // Stay on the blocking screen until the paired NFC tag ends the session.
     }
 }
 
 @Composable
-private fun BlockScreen(onGoHome: () -> Unit) {
+private fun BlockScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -80,16 +84,5 @@ private fun BlockScreen(onGoHome: () -> Unit) {
             color = BrickOnSurface.copy(alpha = 0.7f),
             textAlign = TextAlign.Center
         )
-
-        Spacer(modifier = Modifier.height(48.dp))
-
-        OutlinedButton(
-            onClick = onGoHome,
-            colors = ButtonDefaults.outlinedButtonColors(
-                contentColor = BrickOnSurface
-            )
-        ) {
-            Text(stringResource(R.string.block_go_home))
-        }
     }
 }

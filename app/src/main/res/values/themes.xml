@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BrickMVP" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/brick_background</item>
+        <item name="android:navigationBarColor">@color/brick_background</item>
+    </style>
+
+    <style name="Theme.BrickMVP.Fullscreen" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@color/brick_block_background</item>
+        <item name="android:navigationBarColor">@color/brick_block_background</item>
+    </style>
+</resources>

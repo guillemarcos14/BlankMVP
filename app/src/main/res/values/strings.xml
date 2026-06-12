@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Brick</string>
+
+    <!-- Accessibility Service -->
+    <string name="accessibility_service_description">Brick uses this service to detect when a blocked app is opened and show a block screen instead.</string>
+
+    <!-- Setup Screen -->
+    <string name="setup_title">Setup Brick</string>
+    <string name="setup_step_nfc">Enable NFC</string>
+    <string name="setup_step_nfc_desc">NFC is required to activate and deactivate brick mode with your physical tag.</string>
+    <string name="setup_step_accessibility">Enable Accessibility Service</string>
+    <string name="setup_step_accessibility_desc">Brick needs the accessibility service to detect and block distracting apps.</string>
+    <string name="setup_step_battery">Disable Battery Optimization</string>
+    <string name="setup_step_battery_desc">This ensures Brick keeps running in the background without being killed by the system.</string>
+    <string name="setup_step_apps">Select Apps to Block</string>
+    <string name="setup_step_apps_desc">Choose which apps you want to block when brick mode is active.</string>
+    <string name="setup_enable">Enable</string>
+    <string name="setup_done">Done</string>
+    <string name="setup_select_apps">Select Apps</string>
+    <string name="setup_complete">Setup Complete</string>
+    <string name="setup_finish">Finish Setup</string>
+
+    <!-- Home Screen -->
+    <string name="home_unbricked">UNBRICKED</string>
+    <string name="home_bricked">BRICKED</string>
+    <string name="home_tap_to_brick">Tap your NFC tag to activate brick mode</string>
+    <string name="home_tap_to_unbrick">Tap your NFC tag to deactivate brick mode</string>
+    <string name="home_bricked_since">Bricked since %1$s</string>
+    <string name="home_blocked_apps">%1$d apps blocked</string>
+    <string name="home_edit_apps">Edit Apps</string>
+    <string name="home_no_apps_selected">No apps selected. Tap to select apps to block.</string>
+
+    <!-- App Selector Screen -->
+    <string name="app_selector_title">Select Apps to Block</string>
+    <string name="app_selector_search">Search apps…</string>
+    <string name="app_selector_selected">%1$d selected</string>
+    <string name="app_selector_save">Save</string>
+
+    <!-- Block Screen -->
+    <string name="block_title">APP BLOCKED</string>
+    <string name="block_message">This app is blocked by Brick.\nTap your NFC tag to unblock.</string>
+    <string name="block_go_home">Go Home</string>
+
+    <!-- General -->
+    <string name="nfc_not_available">NFC is not available on this device</string>
+    <string name="nfc_tag_registered">NFC tag registered</string>
+    <string name="session_activated">Brick mode activated</string>
+    <string name="session_deactivated">Brick mode deactivated</string>
+</resources>

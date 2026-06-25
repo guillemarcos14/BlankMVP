@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BrickMVP"
+rootProject.name = "Blank"
 include(":app")

@@ -1,23 +1,57 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
 
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+fun releaseSecret(name: String): String? {
+    return (keystoreProperties[name] as String?)
+        ?: System.getenv("BLANK_RELEASE_${name.uppercase()}")
+}
+
+val releaseStoreFile = releaseSecret("storeFile")
+val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() &&
+    !releaseSecret("storePassword").isNullOrBlank() &&
+    !releaseSecret("keyAlias").isNullOrBlank() &&
+    !releaseSecret("keyPassword").isNullOrBlank()
+
 android {
-    namespace = "com.brickmvp.app"
-    compileSdk = 34
+    namespace = "com.blanknfc.app"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.brickmvp.app"
+        applicationId = "com.blanknfc.app"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        setProperty("archivesBaseName", "Blank-$versionName")
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseSecret("storePassword")
+                keyAlias = releaseSecret("keyAlias")
+                keyPassword = releaseSecret("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -75,4 +109,8 @@ dependencies {
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Tests
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }

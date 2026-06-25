@@ -2,7 +2,19 @@
 build/
 app/build/
 local.properties
+keystore.properties
 *.iml
 .idea/
 *.keystore
 *.jks
+
+# Local Netlify folder
+.netlify
+
+# Generated deploy artifacts
+/web/*.zip
+
+# Local screenshot/debug dumps
+/blank-*.png
+/screenshots/*.xml
+/screenshots/*.preferences_pb

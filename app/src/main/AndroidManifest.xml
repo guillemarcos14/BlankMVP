@@ -6,18 +6,22 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
-        tools:ignore="QueryAllPackagesPermission" />
-
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
-        android:name=".BrickApp"
+        android:name=".BlankApp"
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.BrickMVP">
+        android:theme="@style/Theme.Blank">
 
         <activity
             android:name=".MainActivity"
@@ -38,8 +42,8 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.BrickMVP.Fullscreen"
-            android:taskAffinity="com.brickmvp.app.block" />
+            android:theme="@style/Theme.Blank.Fullscreen"
+            android:taskAffinity="com.blanknfc.app.block" />
 
         <service
             android:name=".service.AppBlockerAccessibilityService"

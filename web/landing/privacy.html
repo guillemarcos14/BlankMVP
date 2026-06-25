@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Politica de privacidad - Blank</title>
+    <meta name="description" content="Politica de privacidad de Blank, una app de bloqueo de distracciones controlada con NFC.">
+    <link rel="canonical" href="https://incandescent-baklava-7af657.netlify.app/privacy.html">
+    <meta name="robots" content="index,follow">
+    <meta name="theme-color" content="#e9e9e7">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260623-privacy-1">
+  </head>
+  <body>
+    <main class="legal-page">
+      <a class="legal-back" href="/">Blank</a>
+
+      <article class="legal-content">
+        <p class="legal-kicker">Ultima actualizacion: 23 de junio de 2026</p>
+        <h1>Politica de privacidad</h1>
+
+        <p>Blank es una app de bloqueo de distracciones controlada por una etiqueta NFC vinculada por el usuario.</p>
+
+        <h2>Datos que guarda Blank</h2>
+        <p>Blank guarda los siguientes datos localmente en tu dispositivo:</p>
+        <ul>
+          <li>El identificador de la etiqueta NFC vinculada con Blank.</li>
+          <li>Los nombres de paquete de las apps que eliges bloquear.</li>
+          <li>Si el modo Blank esta activo.</li>
+          <li>La hora en la que se activo el modo Blank.</li>
+          <li>Si la configuracion inicial se ha completado.</li>
+        </ul>
+
+        <h2>Uso de Accesibilidad</h2>
+        <p>Blank usa eventos de Accesibilidad de Android para detectar cuando cambia la app en primer plano. Si el modo Blank esta activo y la app en primer plano esta en tu lista de bloqueo, Blank abre su pantalla de bloqueo.</p>
+        <p>Blank no usa Accesibilidad para leer texto de pantalla, contrasenas, mensajes, notificaciones, contenido de formularios, contactos, historial de navegacion ni archivos multimedia.</p>
+
+        <h2>Analitica e informes de fallos</h2>
+        <p>La beta actual no incluye un SDK de analitica ni de informes de fallos en produccion. Durante pruebas locales, Blank puede escribir eventos tecnicos en los registros del dispositivo para depurar la configuracion y el comportamiento de bloqueo.</p>
+        <p>Si en el futuro se anade Firebase, Sentry u otro proveedor de analitica o errores, esta politica y las declaraciones de privacidad de las tiendas se actualizaran antes de publicar esa version.</p>
+
+        <h2>Envio y uso compartido de datos</h2>
+        <p>Esta beta no envia tus datos de Blank a un servidor y no los comparte con terceros.</p>
+
+        <h2>Permisos</h2>
+        <p>Blank requiere NFC para vincular y leer tu etiqueta fisica. Blank requiere Accesibilidad para detectar las apps bloqueadas. Blank puede solicitar exclusion de optimizacion de bateria para que Android no detenga la app mientras el modo Blank esta activo.</p>
+
+        <h2>Version para iPhone</h2>
+        <p>En iPhone, Blank no puede usar Accesibilidad de Android. La version para iPhone usa APIs de Tiempo de Uso de Apple, como FamilyControls y ManagedSettings, para que los usuarios puedan seleccionar apps o categorias y Blank pueda protegerlas mientras el modo Blank esta activo. Apple puede requerir aprobacion de permisos antes de que esta funcionalidad este disponible en builds distribuidas.</p>
+
+        <h2>Contacto</h2>
+        <p>Para consultas sobre privacidad, usa el correo de contacto publicado en la ficha de Google Play de Blank.</p>
+      </article>
+    </main>
+
+    <footer>
+      <span>Beta v.0</span>
+      <a href="/privacy.html">Privacidad</a>
+    </footer>
+  </body>
+</html>

@@ -1,52 +1,111 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Brick</string>
+    <string name="app_name">Blank</string>
 
-    <!-- Accessibility Service -->
-    <string name="accessibility_service_description">Brick uses this service to detect when a blocked app is opened and show a block screen instead.</string>
+    <string name="accessibility_service_description">Blank usa este servicio para detectar cuando se abre una app bloqueada y mostrar una pantalla de bloqueo.</string>
 
-    <!-- Setup Screen -->
-    <string name="setup_title">Setup Brick</string>
-    <string name="setup_step_nfc">Enable NFC</string>
-    <string name="setup_step_nfc_desc">NFC is required to activate and deactivate brick mode with your physical tag.</string>
-    <string name="setup_step_accessibility">Enable Accessibility Service</string>
-    <string name="setup_step_accessibility_desc">Brick needs the accessibility service to detect and block distracting apps.</string>
-    <string name="setup_step_battery">Disable Battery Optimization</string>
-    <string name="setup_step_battery_desc">This ensures Brick keeps running in the background without being killed by the system.</string>
-    <string name="setup_step_apps">Select Apps to Block</string>
-    <string name="setup_step_apps_desc">Choose which apps you want to block when brick mode is active.</string>
-    <string name="setup_enable">Enable</string>
-    <string name="setup_done">Done</string>
-    <string name="setup_select_apps">Select Apps</string>
-    <string name="setup_complete">Setup Complete</string>
-    <string name="setup_finish">Finish Setup</string>
+    <!-- Setup -->
+    <string name="setup_title">Configura Blank</string>
+    <string name="setup_welcome_title">Deja el móvil. De verdad.</string>
+    <string name="setup_welcome_desc">Blank crea una barrera física entre tú y las apps que te atrapan. Acercas tu etiqueta NFC y las distracciones quedan fuera.</string>
+    <string name="setup_step_nfc">Vincula tu NFC</string>
+    <string name="setup_step_nfc_desc">Acerca tu etiqueta Blank para usarla como llave física. La necesitarás para desbloquear cuando Blank esté activo.</string>
+    <string name="setup_step_nfc_ready">NFC está activado. Acerca tu etiqueta Blank para vincularla.</string>
+    <string name="setup_nfc_not_available">Este dispositivo no tiene NFC, así que Blank no puede usarse aquí.</string>
+    <string name="setup_nfc_error_title">No hemos detectado la etiqueta</string>
+    <string name="setup_nfc_error_desc">Vuelve a acercar la etiqueta a la parte trasera del móvil. Si el problema continúa, comprueba que NFC esté activado y que la etiqueta sea compatible.</string>
+    <string name="setup_nfc_enable_desc">Activa NFC en los ajustes del móvil y vuelve a Blank. Después mantén esta pantalla abierta y acerca la etiqueta a la parte trasera.</string>
+    <string name="setup_nfc_waiting_desc">No tienes que abrir otra pantalla. Mantén Blank abierto en este paso y acerca la etiqueta NFC a la parte trasera del móvil.</string>
+    <string name="setup_permissions_title">Permisos del sistema</string>
+    <string name="setup_permissions_desc">Activa Accesibilidad para que Blank pueda detectar apps protegidas. La bater&#237;a ayuda a mantener el bloqueo estable en segundo plano.</string>
+    <string name="setup_accessibility_label">Accesibilidad</string>
+    <string name="setup_accessibility_desc">Pulsa aqu&#237; y activa Blank en Accesibilidad. Si Android muestra ajustes restringidos, abre Info de la app, men&#250; de tres puntos y permite ajustes restringidos.</string>
+    <string name="setup_battery_label">Batería</string>
+    <string name="setup_battery_desc">Permite que Android mantenga Blank disponible en segundo plano para que el bloqueo siga activo.</string>
+    <string name="setup_permission_error_title">Falta un permiso</string>
+    <string name="setup_accessibility_error_desc">Accesibilidad es necesaria para saber cuándo abres una app protegida. Abre Ajustes, activa Blank y vuelve para reintentar.</string>
+    <string name="setup_battery_error_desc">La optimización de batería puede cortar el bloqueo en segundo plano. Abre Ajustes, permite que Blank siga funcionando y reintenta.</string>
+    <string name="setup_complete_title">¡Todo listo!</string>
+    <string name="setup_complete_desc">Blank ya est&#225; preparado. Para empezar una sesi&#243;n pulsa Iniciar Blank. Para salir, acerca tu etiqueta NFC.</string>
+    <string name="setup_required">Obligatorio</string>
+    <string name="setup_recommended">Recomendado</string>
+    <string name="setup_enter_blank">Entrar en Blank</string>
+    <string name="setup_open_accessibility">Abrir Accesibilidad</string>
+    <string name="setup_open_battery">Abrir ajustes de batería</string>
+    <string name="setup_open_nfc">Abrir ajustes de NFC</string>
+    <string name="setup_retry">Reintentar</string>
+    <string name="setup_continue">Continuar</string>
+    <string name="setup_select_apps">Elegir apps</string>
+    <string name="setup_waiting_nfc">Esperando etiqueta NFC</string>
+    <string name="setup_finish">Ir al Home</string>
 
-    <!-- Home Screen -->
-    <string name="home_unbricked">UNBRICKED</string>
-    <string name="home_bricked">BRICKED</string>
-    <string name="home_tap_to_brick">Tap your NFC tag to activate brick mode</string>
-    <string name="home_tap_to_unbrick">Tap your NFC tag to deactivate brick mode</string>
-    <string name="home_bricked_since">Bricked since %1$s</string>
-    <string name="home_blocked_apps">%1$d apps blocked</string>
-    <string name="home_edit_apps">Edit Apps</string>
-    <string name="home_forget_tag">Forget NFC tag</string>
-    <string name="home_no_apps_selected">No apps selected. Tap to select apps to block.</string>
+    <!-- Home -->
+    <string name="home_state_off">Blank desactivado</string>
+    <string name="home_state_on">Blank activo</string>
+    <string name="home_state_on_count">Blank activo (%1$d apps bloqueadas)</string>
+    <string name="home_tap_to_activate">Pulsa el botón para activar el bloqueo. Para desbloquear necesitarás tu etiqueta NFC.</string>
+    <string name="home_tap_to_deactivate">Acerca tu etiqueta NFC para desactivar Blank.</string>
+    <string name="home_BLANK_ACTIVE_SINCE">Activo desde las %1$s</string>
+    <string name="home_blocked_apps">Apps bloqueadas: %1$d</string>
+    <string name="home_apps_section">Apps protegidas</string>
+    <string name="home_apps_section_desc">Elige apps una a una o agrúpalas por categoría para bloquear varias de golpe.</string>
+    <string name="home_no_apps_selected">Aún no has elegido apps.</string>
+    <string name="home_nfc_missing">No hemos detectado la etiqueta NFC. Vuelve a acercarla para intentarlo de nuevo.</string>
+    <string name="home_activate_button">Activar Blank</string>
+    <string name="home_select_category">Seleccionar categoría</string>
+    <string name="home_clear_category">Quitar categoría</string>
+    <string name="home_summary_title">Resumen</string>
+    <string name="home_summary_body">Esta semana Blank te protegió %1$d veces.</string>
+    <string name="home_menu_title">Más opciones</string>
+    <string name="home_privacy">Privacidad</string>
+    <string name="home_relink_tag">Vincular nueva etiqueta</string>
+    <string name="home_forget_tag">Olvidar NFC</string>
+    <string name="home_settings">Ajustes</string>
+    <string name="home_settings_coming">Ajustes avanzados próximamente.</string>
 
-    <!-- App Selector Screen -->
-    <string name="app_selector_title">Select Apps to Block</string>
-    <string name="app_selector_search">Search apps…</string>
-    <string name="app_selector_selected">%1$d selected</string>
-    <string name="app_selector_save">Save</string>
+    <!-- App config -->
+    <string name="app_selector_title">Elige apps</string>
+    <string name="app_selector_search">Buscar apps...</string>
+    <string name="app_selector_selected">%1$d seleccionadas</string>
+    <string name="app_selector_save">Guardar</string>
 
-    <!-- Block Screen -->
-    <string name="block_title">APP BLOCKED</string>
-    <string name="block_message">This app is blocked by Brick.\nTap your NFC tag to unblock.</string>
+    <!-- Relink -->
+    <string name="relink_title">Vincular nueva etiqueta</string>
+    <string name="relink_desc">Acerca una nueva etiqueta NFC. Blank mantendrá tus apps bloqueadas y el resto de la configuración.</string>
+    <string name="relink_waiting">Esperando nueva etiqueta</string>
+    <string name="relink_done_title">Etiqueta actualizada</string>
+    <string name="relink_done_desc">Tu nueva etiqueta ya está vinculada. Tus apps protegidas siguen igual.</string>
+
+    <!-- Privacy -->
+    <string name="privacy_title">Privacidad</string>
+    <string name="privacy_open">Leer detalles de privacidad</string>
+    <string name="privacy_accessibility_heading">Uso de Accesibilidad</string>
+    <string name="privacy_accessibility_body">Blank usa eventos de Accesibilidad de Android para saber cuándo cambia la app en primer plano. Si esa app está en tu lista de bloqueo y Blank está activo, Blank abre la pantalla de bloqueo.</string>
+    <string name="privacy_data_heading">Datos observados</string>
+    <string name="privacy_data_body">Blank comprueba nombres de paquetes de apps a partir de eventos de cambio de ventana. No lee contenido de pantalla, texto escrito, contraseñas, notificaciones, contactos, mensajes, historial de navegación ni archivos multimedia.</string>
+    <string name="privacy_storage_heading">Almacenamiento y uso compartido</string>
+    <string name="privacy_storage_body">Blank guarda localmente en este dispositivo la etiqueta NFC vinculada, las apps bloqueadas, el estado de configuración y la sesión activa. Este MVP no envía esos datos a ningún servidor.</string>
+    <string name="nav_back">Volver</string>
+
+    <!-- Block / emergency -->
+    <string name="block_title">App bloqueada</string>
+    <string name="block_message">Blank está haciendo su trabajo. Acerca tu etiqueta NFC para desbloquear.</string>
+    <string name="block_reinforcement">Llevas tiempo sin abrir esta app. Sigue así.</string>
+    <string name="emergency_start">No tengo mi etiqueta</string>
+    <string name="emergency_title">Desbloqueo de emergencia</string>
+    <string name="emergency_desc">Esto desactivará Blank por completo. Para mantener la fricción, escribe la frase exacta antes de continuar.</string>
+    <string name="emergency_phrase">quiero desactivar blank aunque sea una mala idea</string>
+    <string name="emergency_phrase_label">Escribe la frase completa</string>
+    <string name="emergency_unlock">Desactivar Blank</string>
+    <string name="emergency_done">Blank se ha desactivado. Para volver a protegerte, reactívalo con NFC.</string>
 
     <!-- General -->
-    <string name="nfc_not_available">NFC is not available on this device</string>
-    <string name="nfc_tag_registered">NFC tag registered</string>
-    <string name="nfc_wrong_tag">Tag not recognized. Use your paired Brick.</string>
-    <string name="nfc_no_apps_selected">Select at least one app to block first.</string>
-    <string name="session_activated">Brick mode activated</string>
-    <string name="session_deactivated">Brick mode deactivated</string>
+    <string name="nfc_not_available">NFC no está disponible en este dispositivo</string>
+    <string name="nfc_tag_registered">Etiqueta NFC vinculada</string>
+    <string name="nfc_wrong_tag">Etiqueta no reconocida. Usa tu Blank vinculado.</string>
+    <string name="nfc_no_apps_selected">Elige al menos una app para bloquear.</string>
+    <string name="session_activated">Blank activado</string>
+    <string name="session_deactivated">Blank desactivado</string>
+    <string name="nfc_not_active">Blank ya está desactivado.</string>
 </resources>
+

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blank App Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="preview-shell">
+      <section class="preview-controls" aria-label="Controles de preview">
+        <p class="eyebrow">Preview local</p>
+        <h1>Blank app UI</h1>
+        <div class="control-group" role="tablist" aria-label="Pantallas de preview">
+          <button class="control-button" type="button" data-preview="onboarding" role="tab" aria-selected="false">Onboarding</button>
+          <button class="control-button is-active" type="button" data-preview="home" role="tab" aria-selected="true">Home</button>
+        </div>
+      </section>
+
+      <section class="phone-stage" aria-label="Mockup de la app">
+        <div class="phone-frame">
+          <div class="status-bar">
+            <span>9:41</span>
+            <span class="status-icons">5G 100%</span>
+          </div>
+
+          <article class="screen onboarding-screen" id="screen-onboarding" data-preview-panel="onboarding">
+            <header class="onboarding-top">
+              <span>Blank</span>
+              <div class="onboarding-dots" aria-hidden="true">
+                <span class="is-current"></span>
+                <span></span>
+                <span></span>
+              </div>
+            </header>
+
+            <section class="onboarding-panel is-active" data-onboarding-step="0">
+              <div class="center-message onboarding-message">
+                <p class="state-label">Paso 1 de 3</p>
+                <h2>Elige qu&eacute; quieres dejar fuera.</h2>
+                <p>Selecciona las apps que suelen romper tu foco. Blank solo necesita saber cu&aacute;les proteger.</p>
+              </div>
+
+              <div class="setup-preview-card">
+                <div>
+                  <span class="panel-kicker">Apps iniciales</span>
+                  <strong>Instagram, TikTok, YouTube</strong>
+                </div>
+                <button type="button" data-preview-target="apps" data-return-screen="onboarding">Editar</button>
+              </div>
+            </section>
+
+            <section class="onboarding-panel" data-onboarding-step="1" hidden>
+              <div class="center-message onboarding-message">
+                <p class="state-label">Paso 2 de 3</p>
+                <h2>Vincula tu pieza f&iacute;sica.</h2>
+                <p>Acerca tu etiqueta NFC. Esa etiqueta ser&aacute; la llave para pausar o recuperar el acceso.</p>
+              </div>
+
+              <div class="nfc-card" aria-hidden="true">
+                <div class="nfc-disc"></div>
+                <span>NFC listo para escanear</span>
+              </div>
+            </section>
+
+            <section class="onboarding-panel" data-onboarding-step="2" hidden>
+              <div class="center-message onboarding-message">
+                <p class="state-label">Paso 3 de 3</p>
+                <h2>Permite que Blank bloquee.</h2>
+                <p>Activa el servicio de accesibilidad para detectar cuando abres una app protegida.</p>
+              </div>
+
+              <div class="permission-stack">
+                <div>
+                  <span class="check-dot is-done"></span>
+                  <strong>NFC vinculado</strong>
+                </div>
+                <div>
+                  <span class="check-dot"></span>
+                  <strong>Accesibilidad pendiente</strong>
+                </div>
+              </div>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-onboarding-next>Continuar</button>
+            </section>
+          </article>
+
+          <article class="screen home-screen is-active" id="screen-home" data-preview-panel="home">
+            <header class="app-top">
+              <button class="mode-chip" type="button" data-preview-target="modes" aria-label="Cambiar modo">
+                <strong data-current-mode-name>Rutina diaria</strong>
+              </button>
+              <button class="profile-button" type="button" aria-label="Ajustes" data-preview-target="profile">&#8942;</button>
+            </header>
+
+            <section class="center-message" aria-live="polite">
+              <h2 data-main-message>Hoy ya elegiste estar fuera del bucle.</h2>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-main-action>Usa tu NFC para salir</button>
+            </section>
+          </article>
+
+          <article class="screen profile-screen" id="screen-profile" data-preview-panel="profile">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="home">Volver</button>
+              <span>Ajustes</span>
+            </header>
+
+            <section class="profile-hero">
+              <h2>Ajustes</h2>
+              <p>Gestiona NFC, privacidad y bloqueo.</p>
+            </section>
+
+            <section class="menu-list">
+              <button type="button" data-preview-target="privacy">
+                <span>Privacidad</span>
+                <strong>Ver</strong>
+              </button>
+              <button type="button" data-preview-target="relink">
+                <span>Vincular nueva etiqueta</span>
+                <strong>NFC</strong>
+              </button>
+              <button type="button" data-preview-target="forget">
+                <span>Olvidar NFC</span>
+                <strong>Reset</strong>
+              </button>
+            </section>
+          </article>
+
+          <article class="screen modes-screen" id="screen-modes" data-preview-panel="modes">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="home">Volver</button>
+              <span>Modos</span>
+            </header>
+
+            <section class="apps-hero">
+              <h2>Elige un modo</h2>
+              <p>Cada modo puede tener sus propias apps protegidas.</p>
+            </section>
+
+            <section class="mode-list" data-mode-list></section>
+
+            <section class="new-mode-form">
+              <button class="main-action" type="button" data-open-create-mode>Crear modo</button>
+            </section>
+
+            <section class="mode-setup-window" data-create-mode-window hidden>
+              <div class="mode-setup-panel">
+                <div class="mode-setup-header">
+                  <span>Configurar modo</span>
+                  <button type="button" aria-label="Cerrar" data-cancel-create-mode>&times;</button>
+                </div>
+                <label class="mode-setup-name">
+                  <span>Nombre</span>
+                  <input type="text" data-new-mode-input placeholder="Trabajo profundo" />
+                </label>
+                <div class="mode-setup-apps" aria-label="Apps del nuevo modo">
+                  <label>
+                    <span>Instagram</span>
+                    <input type="checkbox" data-new-mode-app checked />
+                  </label>
+                  <label>
+                    <span>TikTok</span>
+                    <input type="checkbox" data-new-mode-app checked />
+                  </label>
+                  <label>
+                    <span>YouTube</span>
+                    <input type="checkbox" data-new-mode-app />
+                  </label>
+                  <label>
+                    <span>Reddit</span>
+                    <input type="checkbox" data-new-mode-app />
+                  </label>
+                  <label>
+                    <span>X</span>
+                    <input type="checkbox" data-new-mode-app />
+                  </label>
+                </div>
+                <button class="main-action" type="button" data-create-mode>Guardar modo</button>
+              </div>
+            </section>
+          </article>
+
+          <article class="screen apps-screen" id="screen-apps" data-preview-panel="apps">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>Apps</span>
+            </header>
+
+            <section class="apps-hero">
+              <h2>Apps protegidas</h2>
+              <p>Elige las apps que Blank bloquear&aacute; cuando est&eacute; activo.</p>
+            </section>
+
+            <section class="app-picker-list">
+              <label>
+                <span>Instagram</span>
+                <input type="checkbox" data-app-checkbox checked />
+              </label>
+              <label>
+                <span>TikTok</span>
+                <input type="checkbox" data-app-checkbox checked />
+              </label>
+              <label>
+                <span>YouTube</span>
+                <input type="checkbox" data-app-checkbox checked />
+              </label>
+              <label>
+                <span>Reddit</span>
+                <input type="checkbox" data-app-checkbox />
+              </label>
+              <label>
+                <span>X</span>
+                <input type="checkbox" data-app-checkbox />
+              </label>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-save-apps>Guardar apps</button>
+            </section>
+          </article>
+
+          <article class="screen privacy-screen" id="screen-privacy" data-preview-panel="privacy">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>Privacidad</span>
+            </header>
+
+            <section class="text-stack">
+              <div>
+                <h2>Uso de Accesibilidad</h2>
+                <p>Blank usa eventos de Accesibilidad para detectar cu&aacute;ndo una app bloqueada pasa a primer plano y mostrar la pantalla de bloqueo.</p>
+              </div>
+              <div>
+                <h2>Datos observados</h2>
+                <p>No lee textos, contrase&ntilde;as, mensajes, contactos, notificaciones ni contenido de pantalla.</p>
+              </div>
+              <div>
+                <h2>Almacenamiento</h2>
+                <p>La etiqueta NFC, apps protegidas y estado de Blank se guardan localmente en este dispositivo.</p>
+              </div>
+            </section>
+          </article>
+
+          <article class="screen relink-screen" id="screen-relink" data-preview-panel="relink">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>NFC</span>
+            </header>
+
+            <section class="center-message">
+              <p class="state-label">Nueva etiqueta</p>
+              <h2 data-relink-title>Vincula una nueva pieza.</h2>
+              <p data-relink-copy>Blank mantendr&aacute; tus apps protegidas y cambiar&aacute; solo la llave f&iacute;sica.</p>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-complete-relink>Etiqueta vinculada</button>
+            </section>
+          </article>
+
+          <article class="screen forget-screen" id="screen-forget" data-preview-panel="forget">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>Reset NFC</span>
+            </header>
+
+            <section class="center-message">
+              <p class="state-label">Confirmaci&oacute;n</p>
+              <h2>Olvidar la etiqueta NFC.</h2>
+              <p>Esto desactivar&aacute; Blank y reiniciar&aacute; el onboarding. Tus apps protegidas se mantienen.</p>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-forget-nfc>Confirmar reset</button>
+            </section>
+          </article>
+
+          <article class="screen block-screen" id="screen-block" data-preview-panel="block">
+            <section class="center-message block-message">
+              <h2>App bloqueada</h2>
+              <p>Est&aacute;s protegiendo el tiempo que quer&iacute;as recuperar.</p>
+            </section>
+
+            <section class="bottom-action">
+              <button class="report-link" type="button" data-emergency-start>
+                Volver al inicio
+              </button>
+            </section>
+          </article>
+
+          <article class="screen emergency-screen" id="screen-emergency" data-preview-panel="emergency">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="block">Volver</button>
+              <span>Emergencia</span>
+            </header>
+
+            <section class="center-message emergency-message">
+              <p class="state-label">Desbloqueo</p>
+              <h2>Escribe la frase completa.</h2>
+              <p>quiero desactivar blank aunque sea una mala idea</p>
+              <textarea data-emergency-input aria-label="Frase de emergencia"></textarea>
+            </section>
+
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-emergency-unlock disabled>Desactivar Blank</button>
+            </section>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script src="./preview.js"></script>
+  </body>
+</html>

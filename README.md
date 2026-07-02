@@ -1,4 +1,4 @@
-# Blank MVP
+# BlankMVP
 
 Blank is a physical NFC-controlled app blocker.
 

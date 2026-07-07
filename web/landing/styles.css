@@ -386,12 +386,8 @@ footer a {
 }
 
 .life-counter {
-  background: #f5f5f5;
-  border-radius: 28px;
-  box-shadow: var(--soft-shadow);
   color: var(--ink);
   min-height: calc(100svh - 154px);
-  overflow: hidden;
   padding: clamp(44px, 5vw, 68px) clamp(28px, 4vw, 48px) clamp(34px, 4vw, 52px);
   position: relative;
 }
@@ -918,7 +914,6 @@ footer a {
   }
 
   .life-counter {
-    border-radius: 20px;
     min-height: 0;
     padding: 44px 18px 26px;
   }

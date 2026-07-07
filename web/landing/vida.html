@@ -108,19 +108,38 @@
         }
       }
 
+      function allocateByRemainder(exactValues, total) {
+        const baseValues = exactValues.map((value) => Math.floor(value));
+        let remaining = total - baseValues.reduce((sum, value) => sum + value, 0);
+        const remainders = exactValues
+          .map((value, index) => ({ index, remainder: value - Math.floor(value) }))
+          .sort((a, b) => b.remainder - a.remainder);
+
+        for (let i = 0; i < remaining; i += 1) {
+          baseValues[remainders[i % remainders.length].index] += 1;
+        }
+
+        return baseValues;
+      }
+
       function update() {
         const age = Number(ageRange.value);
         const phoneHours = Number(phoneRange.value);
         const remainingYears = Math.max(0, maxAge - age);
         const lostYears = remainingYears * phoneHours / 24;
         const livedYears = Math.round(age);
-        const sleepYears = Math.round(remainingYears * 8 / 24);
-        const routineYears = Math.round(remainingYears * 8 / 24);
-        const phoneYears = Math.min(
-          maxAge - livedYears - sleepYears - routineYears,
-          Math.round(lostYears)
+        const freeWeight = Math.max(0, 8 - phoneHours);
+        const totalWeight = 8 + 8 + phoneHours + freeWeight;
+        const freeYears = Math.floor(remainingYears * freeWeight / totalWeight);
+        const occupiedYears = remainingYears - freeYears;
+        const [sleepYears, routineYears, phoneYears] = allocateByRemainder(
+          [
+            remainingYears * 8 / totalWeight,
+            remainingYears * 8 / totalWeight,
+            remainingYears * phoneHours / totalWeight
+          ],
+          occupiedYears
         );
-        const freeYears = Math.max(0, maxAge - livedYears - sleepYears - routineYears - phoneYears);
 
         ageOutput.textContent = `${age} a\u00f1os`;
         phoneOutput.textContent = `${formatter.format(phoneHours)} h`;

@@ -392,7 +392,7 @@ footer a {
   color: var(--ink);
   min-height: calc(100svh - 154px);
   overflow: hidden;
-  padding: clamp(28px, 4vw, 48px);
+  padding: clamp(44px, 5vw, 68px) clamp(28px, 4vw, 48px) clamp(34px, 4vw, 52px);
   position: relative;
 }
 
@@ -411,7 +411,7 @@ footer a {
   font-weight: 400;
   letter-spacing: 0;
   line-height: 0.9;
-  margin: 0 auto clamp(28px, 4vw, 38px);
+  margin: 0 auto clamp(36px, 5vw, 56px);
   max-width: 900px;
   text-align: center;
 }
@@ -427,7 +427,7 @@ footer a {
 .life-layout {
   align-items: start;
   display: grid;
-  gap: clamp(26px, 3.5vw, 38px);
+  gap: clamp(34px, 5vw, 58px);
   grid-template-columns: minmax(420px, 1.08fr) minmax(340px, 0.92fr);
   margin: 0 auto;
   max-width: 1090px;
@@ -582,7 +582,7 @@ footer a {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
-  margin: 22px auto 0;
+  margin: 30px auto 0;
   max-width: 1090px;
   text-align: center;
 }
@@ -605,7 +605,7 @@ footer a {
 .life-cta {
   display: flex;
   justify-content: center;
-  margin-top: 26px;
+  margin-top: 34px;
 }
 
 .legal-page {
@@ -920,7 +920,7 @@ footer a {
   .life-counter {
     border-radius: 20px;
     min-height: 0;
-    padding: 28px 14px 16px;
+    padding: 44px 18px 26px;
   }
 
   .life-back {
@@ -931,11 +931,11 @@ footer a {
   .life-counter h1 {
     font-size: clamp(34px, 10.8vw, 45px);
     line-height: 0.86;
-    margin-bottom: 16px;
+    margin-bottom: 26px;
   }
 
   .life-layout {
-    gap: 16px;
+    gap: 24px;
   }
 
   .life-dot-grid {
@@ -946,12 +946,12 @@ footer a {
   .life-card {
     border-radius: 16px;
     order: -1;
-    padding: 16px;
+    padding: 20px;
   }
 
   .life-result {
     gap: 10px;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
   }
 
   .life-result strong {
@@ -963,7 +963,7 @@ footer a {
   }
 
   .life-control {
-    margin-top: 14px;
+    margin-top: 18px;
   }
 
   .life-control > span {
@@ -978,7 +978,7 @@ footer a {
 
   .life-control input[type="range"] {
     height: 6px;
-    margin: 12px 0 8px;
+    margin: 16px 0 10px;
   }
 
   .life-control input[type="range"]::-webkit-slider-thumb {
@@ -995,13 +995,13 @@ footer a {
   .life-legend {
     gap: 8px 14px;
     justify-content: flex-start;
-    margin-top: 10px;
-    padding-top: 12px;
+    margin-top: 16px;
+    padding-top: 16px;
   }
 
   .life-scale {
     font-size: 12px;
-    margin-top: 10px;
+    margin-top: 16px;
   }
 
   .life-legend i {
@@ -1010,7 +1010,7 @@ footer a {
   }
 
   .life-cta {
-    margin-top: 14px;
+    margin-top: 22px;
   }
 
   .life-cta .button {

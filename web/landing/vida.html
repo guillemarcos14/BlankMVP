@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calculadora de vida y movil - Blank</title>
+    <meta name="description" content="Calcula cuantos anos de vida se van en el movil segun tu edad y tu uso diario.">
+    <link rel="canonical" href="https://getblank.netlify.app/vida.html">
+    <meta name="robots" content="index,follow">
+    <meta name="theme-color" content="#e9e9e7">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260707-life-1">
+    <script async src="https://tally.so/widgets/embed.js"></script>
+  </head>
+  <body class="life-body">
+    <main class="life-page">
+      <section class="life-counter" aria-labelledby="life-title">
+        <h1 id="life-title">&iquest;Cu&aacute;nto tiempo de <span>vida</span> te quita el m&oacute;vil?</h1>
+
+        <div class="life-layout">
+          <div>
+            <div class="life-dot-grid" id="life-dot-grid" aria-hidden="true"></div>
+          </div>
+
+          <form class="life-card" aria-label="Calculadora de tiempo perdido">
+            <div class="life-result">
+              <strong id="life-years">12,5</strong>
+              <span>a&ntilde;os de tu vida<br><em>a la m*****</em></span>
+            </div>
+
+            <label class="life-control">
+              <span>
+                <b>&iquest;Cu&aacute;ntos a&ntilde;os tienes?</b>
+                <output id="age-output" for="age-range">25 a&ntilde;os</output>
+              </span>
+              <input id="age-range" type="range" min="10" max="85" value="25" step="1">
+              <small><span>10</span><span>85</span></small>
+            </label>
+
+            <label class="life-control">
+              <span>
+                <b>&iquest;Cu&aacute;ntas horas al d&iacute;a usas el m&oacute;vil?</b>
+                <output id="phone-output" for="phone-range">5,0 h</output>
+              </span>
+              <input id="phone-range" type="range" min="1" max="10" value="5" step="0.1">
+              <small><span>1h</span><span>10h</span></small>
+            </label>
+          </form>
+        </div>
+
+        <p class="life-scale">1 c&iacute;rculo = 1 a&ntilde;o de tu vida</p>
+
+        <div class="life-legend" aria-label="Leyenda del contador">
+          <span><i class="life-lived"></i>Tiempo vivido</span>
+          <span><i class="life-sleep"></i>Dormir</span>
+          <span><i class="life-routine"></i>Trabajo, clases, rutina</span>
+          <span><i class="life-phone"></i>M&oacute;vil</span>
+          <span><i class="life-free"></i>Lo que te queda libre</span>
+        </div>
+
+        <div class="life-cta">
+          <a
+            class="button primary"
+            href="https://tally.so/r/jaE5gR"
+            data-tally-open="jaE5gR"
+            data-tally-layout="modal"
+            data-tally-width="720"
+          >Quiero recuperar mi tiempo</a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Beta v.0</span>
+      <a href="/vida.html">Calculadora</a>
+      <a href="/nfc.html">NFC compatible</a>
+      <a href="/privacy.html">Privacidad</a>
+    </footer>
+
+    <script>
+      const maxAge = 85;
+      const ageRange = document.querySelector("#age-range");
+      const phoneRange = document.querySelector("#phone-range");
+      const ageOutput = document.querySelector("#age-output");
+      const phoneOutput = document.querySelector("#phone-output");
+      const lifeYears = document.querySelector("#life-years");
+      const dotGrid = document.querySelector("#life-dot-grid");
+      const formatter = new Intl.NumberFormat("es-ES", {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+      });
+
+      function setRangeFill(input) {
+        const min = Number(input.min);
+        const max = Number(input.max);
+        const value = Number(input.value);
+        const percent = ((value - min) / (max - min)) * 100;
+        input.style.setProperty("--range-fill", `${percent}%`);
+      }
+
+      function addDots(className, count) {
+        for (let i = 0; i < count; i += 1) {
+          const dot = document.createElement("span");
+          dot.className = `life-dot ${className}`;
+          dotGrid.appendChild(dot);
+        }
+      }
+
+      function update() {
+        const age = Number(ageRange.value);
+        const phoneHours = Number(phoneRange.value);
+        const remainingYears = Math.max(0, maxAge - age);
+        const lostYears = remainingYears * phoneHours / 24;
+        const livedYears = Math.round(age);
+        const sleepYears = Math.round(remainingYears * 8 / 24);
+        const routineYears = Math.round(remainingYears * 8 / 24);
+        const phoneYears = Math.min(
+          maxAge - livedYears - sleepYears - routineYears,
+          Math.round(lostYears)
+        );
+        const freeYears = Math.max(0, maxAge - livedYears - sleepYears - routineYears - phoneYears);
+
+        ageOutput.textContent = `${age} a\u00f1os`;
+        phoneOutput.textContent = `${formatter.format(phoneHours)} h`;
+        lifeYears.textContent = formatter.format(lostYears);
+        setRangeFill(ageRange);
+        setRangeFill(phoneRange);
+
+        dotGrid.replaceChildren();
+        addDots("life-lived", livedYears);
+        addDots("life-sleep", sleepYears);
+        addDots("life-routine", routineYears);
+        addDots("life-phone", phoneYears);
+        addDots("life-free", freeYears);
+      }
+
+      ageRange.addEventListener("input", update);
+      phoneRange.addEventListener("input", update);
+      update();
+    </script>
+  </body>
+</html>

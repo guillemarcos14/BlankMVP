@@ -364,6 +364,7 @@ footer {
   align-items: center;
   background: var(--panel);
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   justify-content: space-between;
   padding: 32px clamp(22px, 9vw, 132px) 46px;
@@ -373,6 +374,238 @@ footer a {
   color: var(--ink);
   font-weight: 750;
   text-decoration: none;
+}
+
+.life-body {
+  background: var(--bg);
+}
+
+.life-page {
+  min-height: calc(100svh - 94px);
+  padding: clamp(18px, 3vw, 30px);
+}
+
+.life-counter {
+  background: #f5f5f5;
+  border-radius: 28px;
+  box-shadow: var(--soft-shadow);
+  color: var(--ink);
+  min-height: calc(100svh - 154px);
+  overflow: hidden;
+  padding: clamp(28px, 4vw, 48px);
+  position: relative;
+}
+
+.life-back {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  position: absolute;
+  text-decoration: none;
+  top: 24px;
+}
+
+.life-counter h1 {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: clamp(58px, 7vw, 96px);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 0.9;
+  margin: 0 auto clamp(28px, 4vw, 38px);
+  max-width: 900px;
+  text-align: center;
+}
+
+.life-counter h1 span {
+  background: var(--ink);
+  color: #ffffff;
+  display: inline-block;
+  line-height: 0.96;
+  padding: 0 8px 3px;
+}
+
+.life-layout {
+  align-items: start;
+  display: grid;
+  gap: clamp(26px, 3.5vw, 38px);
+  grid-template-columns: minmax(420px, 1.08fr) minmax(340px, 0.92fr);
+  margin: 0 auto;
+  max-width: 1090px;
+}
+
+.life-dot-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(17, 1fr);
+  max-width: 560px;
+}
+
+.life-dot {
+  aspect-ratio: 1;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  min-width: 0;
+}
+
+.life-lived {
+  background: #05060a;
+}
+
+.life-sleep {
+  background: #4a4a4a;
+}
+
+.life-routine {
+  background: #8a8a84;
+}
+
+.life-phone {
+  background: #8f241c;
+}
+
+.life-free {
+  background: #f7f5d8;
+  border-color: rgba(32, 33, 36, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.life-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(32, 33, 36, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 26px 54px rgba(52, 68, 84, 0.22);
+  padding: clamp(22px, 3vw, 28px);
+}
+
+.life-result {
+  align-items: start;
+  color: var(--ink);
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.life-result strong {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: clamp(68px, 8vw, 82px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.78;
+}
+
+.life-result span {
+  font-size: clamp(26px, 3vw, 32px);
+  font-weight: 800;
+  line-height: 0.98;
+}
+
+.life-result em {
+  font-style: italic;
+}
+
+.life-control {
+  display: block;
+  margin-top: 22px;
+}
+
+.life-control > span,
+.life-control small {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.life-control b {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.life-control output {
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.life-control output::first-letter {
+  letter-spacing: 0;
+}
+
+.life-control input[type="range"] {
+  --range-fill: 50%;
+  appearance: none;
+  background: linear-gradient(to right, var(--ink) 0 var(--range-fill), rgba(32, 33, 36, 0.12) var(--range-fill) 100%);
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  margin: 20px 0 14px;
+  width: 100%;
+}
+
+.life-control input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  background: #f1f1ef;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(25, 31, 42, 0.36);
+  height: 28px;
+  width: 28px;
+}
+
+.life-control input[type="range"]::-moz-range-thumb {
+  background: #f1f1ef;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 3px 10px rgba(25, 31, 42, 0.36);
+  height: 24px;
+  width: 24px;
+}
+
+.life-control small {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.life-legend {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  justify-content: center;
+  margin: clamp(28px, 4vw, 38px) auto 0;
+  max-width: 1090px;
+  padding-top: 24px;
+}
+
+.life-scale {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  margin: 22px auto 0;
+  max-width: 1090px;
+  text-align: center;
+}
+
+.life-legend span {
+  align-items: center;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 650;
+  gap: 10px;
+}
+
+.life-legend i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+.life-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 26px;
 }
 
 .legal-page {
@@ -443,6 +676,10 @@ footer a {
 
   h1 {
     white-space: nowrap;
+  }
+
+  .life-counter h1 {
+    white-space: normal;
   }
 
   .hero-copy {
@@ -555,6 +792,16 @@ footer a {
     left: 42%;
     width: min(48vw, 320px);
   }
+
+  .life-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .life-dot-grid {
+    grid-template-columns: repeat(17, 1fr);
+    margin: 0 auto;
+    max-width: 620px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -662,5 +909,111 @@ footer a {
     align-items: center;
     flex-direction: row;
     gap: 8px;
+    justify-content: center;
+  }
+
+  .life-page {
+    min-height: 100svh;
+    padding: 8px;
+  }
+
+  .life-counter {
+    border-radius: 20px;
+    min-height: 0;
+    padding: 28px 14px 16px;
+  }
+
+  .life-back {
+    left: 16px;
+    top: 16px;
+  }
+
+  .life-counter h1 {
+    font-size: clamp(34px, 10.8vw, 45px);
+    line-height: 0.86;
+    margin-bottom: 16px;
+  }
+
+  .life-layout {
+    gap: 16px;
+  }
+
+  .life-dot-grid {
+    gap: 5px;
+    grid-template-columns: repeat(17, 1fr);
+  }
+
+  .life-card {
+    border-radius: 16px;
+    order: -1;
+    padding: 16px;
+  }
+
+  .life-result {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .life-result strong {
+    font-size: 50px;
+  }
+
+  .life-result span {
+    font-size: 19px;
+  }
+
+  .life-control {
+    margin-top: 14px;
+  }
+
+  .life-control > span {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .life-control output {
+    font-size: 18px;
+    white-space: nowrap;
+  }
+
+  .life-control input[type="range"] {
+    height: 6px;
+    margin: 12px 0 8px;
+  }
+
+  .life-control input[type="range"]::-webkit-slider-thumb {
+    height: 24px;
+    width: 24px;
+  }
+
+  .life-control b,
+  .life-control small,
+  .life-legend span {
+    font-size: 12px;
+  }
+
+  .life-legend {
+    gap: 8px 14px;
+    justify-content: flex-start;
+    margin-top: 10px;
+    padding-top: 12px;
+  }
+
+  .life-scale {
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  .life-legend i {
+    height: 11px;
+    width: 11px;
+  }
+
+  .life-cta {
+    margin-top: 14px;
+  }
+
+  .life-cta .button {
+    min-height: 48px;
   }
 }

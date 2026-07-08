@@ -17,7 +17,34 @@
 		8A0000010000000000000008 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000018 /* HomeView.swift */; };
 		8A0000010000000000000009 /* BlankDomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001B /* BlankDomainModels.swift */; };
 		8A000001000000000000000A /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001C /* ReportView.swift */; };
+		8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */; };
+		8A0000020000000000000001 /* DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000020000000000000011 /* DeviceActivityMonitorExtension.swift */; };
+		8A0000020000000000000002 /* BlankDeviceActivityMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8A0000020000000000000042 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A0000010000000000000070 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8A0000020000000000000040;
+			remoteInfo = BlankDeviceActivityMonitor;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8A0000020000000000000061 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8A0000020000000000000002 /* BlankDeviceActivityMonitor.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		8A0000010000000000000010 /* Brick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Brick.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -33,10 +60,22 @@
 		8A000001000000000000001A /* Brick.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Brick.entitlements; sourceTree = "<group>"; };
 		8A000001000000000000001B /* BlankDomainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankDomainModels.swift; sourceTree = "<group>"; };
 		8A000001000000000000001C /* ReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportView.swift; sourceTree = "<group>"; };
+		8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityTimerScheduler.swift; sourceTree = "<group>"; };
+		8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlankDeviceActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0000020000000000000011 /* DeviceActivityMonitorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension.swift; sourceTree = "<group>"; };
+		8A0000020000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8A0000020000000000000013 /* BlankDeviceActivityMonitor.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BlankDeviceActivityMonitor.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		8A0000010000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000020000000000000020 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -50,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				8A0000010000000000000031 /* Brick */,
+				8A0000020000000000000031 /* BlankDeviceActivityMonitor */,
 				8A0000010000000000000032 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -67,16 +107,28 @@
 				8A0000010000000000000018 /* HomeView.swift */,
 				8A000001000000000000001B /* BlankDomainModels.swift */,
 				8A000001000000000000001C /* ReportView.swift */,
+				8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */,
 				8A0000010000000000000019 /* Info.plist */,
 				8A000001000000000000001A /* Brick.entitlements */,
 			);
 			path = Brick;
 			sourceTree = "<group>";
 		};
+		8A0000020000000000000031 /* BlankDeviceActivityMonitor */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000020000000000000011 /* DeviceActivityMonitorExtension.swift */,
+				8A0000020000000000000012 /* Info.plist */,
+				8A0000020000000000000013 /* BlankDeviceActivityMonitor.entitlements */,
+			);
+			path = BlankDeviceActivityMonitor;
+			sourceTree = "<group>";
+		};
 		8A0000010000000000000032 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				8A0000010000000000000010 /* Brick.app */,
+				8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -91,15 +143,34 @@
 				8A0000010000000000000050 /* Sources */,
 				8A0000010000000000000020 /* Frameworks */,
 				8A0000010000000000000060 /* Resources */,
+				8A0000020000000000000061 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8A0000020000000000000041 /* PBXTargetDependency */,
 			);
 			name = Brick;
 			productName = Brick;
 			productReference = 8A0000010000000000000010 /* Brick.app */;
 			productType = "com.apple.product-type.application";
+		};
+		8A0000020000000000000040 /* BlankDeviceActivityMonitor */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0000020000000000000080 /* Build configuration list for PBXNativeTarget "BlankDeviceActivityMonitor" */;
+			buildPhases = (
+				8A0000020000000000000050 /* Sources */,
+				8A0000020000000000000020 /* Frameworks */,
+				8A0000020000000000000060 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BlankDeviceActivityMonitor;
+			productName = BlankDeviceActivityMonitor;
+			productReference = 8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -112,6 +183,9 @@
 				LastUpgradeCheck = 1520;
 				TargetAttributes = {
 					8A0000010000000000000040 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					8A0000020000000000000040 = {
 						CreatedOnToolsVersion = 15.2;
 					};
 				};
@@ -130,12 +204,20 @@
 			projectRoot = "";
 			targets = (
 				8A0000010000000000000040 /* Brick */,
+				8A0000020000000000000040 /* BlankDeviceActivityMonitor */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		8A0000010000000000000060 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000020000000000000060 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -159,10 +241,27 @@
 				8A0000010000000000000008 /* HomeView.swift in Sources */,
 				8A0000010000000000000009 /* BlankDomainModels.swift in Sources */,
 				8A000001000000000000000A /* ReportView.swift in Sources */,
+				8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000020000000000000050 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0000020000000000000001 /* DeviceActivityMonitorExtension.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8A0000020000000000000041 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8A0000020000000000000040 /* BlankDeviceActivityMonitor */;
+			targetProxy = 8A0000020000000000000042 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		8A0000010000000000000090 /* Debug */ = {
@@ -339,6 +438,64 @@
 			};
 			name = Release;
 		};
+		8A0000020000000000000092 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.deviceactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8A0000020000000000000093 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.deviceactivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -356,6 +513,15 @@
 			buildConfigurations = (
 				8A0000010000000000000092 /* Debug */,
 				8A0000010000000000000093 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0000020000000000000080 /* Build configuration list for PBXNativeTarget "BlankDeviceActivityMonitor" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0000020000000000000092 /* Debug */,
+				8A0000020000000000000093 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

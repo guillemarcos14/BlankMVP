@@ -64,6 +64,8 @@ import com.blanknfc.app.util.BatteryHelper
 import com.blanknfc.app.util.NfcHelper
 import com.blanknfc.app.util.findActivity
 
+private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
+
 private enum class SetupError {
     NFC,
     ACCESSIBILITY,
@@ -95,6 +97,10 @@ fun SetupScreen(
         nfcEnabled = activity?.let { NfcHelper.isNfcEnabled(it) } ?: false
         accessibilityEnabled = AccessibilityHelper.isServiceEnabled(context)
         batteryOptimizedIgnored = BatteryHelper.isIgnoringBatteryOptimizations(context)
+    }
+
+    fun openNfcOptions() {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(NfcOptionsUrl)))
     }
 
     LaunchedEffect(currentStep, nfcTagUid) {
@@ -195,6 +201,7 @@ fun SetupScreen(
                                         else -> stringResource(R.string.setup_waiting_nfc)
                                     },
                                     primaryEnabled = !nfcAvailable || !nfcEnabled,
+                                    secondaryText = "Ver opciones NFC",
                                     onPrimary = {
                                         if (!nfcAvailable) {
                                             setupError = SetupError.NFC
@@ -203,7 +210,8 @@ fun SetupScreen(
                                         } else {
                                             refreshSystemState()
                                         }
-                                    }
+                                    },
+                                    onSecondary = ::openNfcOptions
                                 )
                             }
                             2 -> PermissionsStep(

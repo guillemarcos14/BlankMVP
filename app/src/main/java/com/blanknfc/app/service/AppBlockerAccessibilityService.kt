@@ -34,7 +34,9 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun showBlockScreen(packageName: String) {
-        BlankApp.get(this).container.analyticsTracker.track(
+        val app = BlankApp.get(this)
+        app.container.sessionManager.recordBlockedAttempt()
+        app.container.analyticsTracker.track(
             BlankEvent(BlankEvents.BLOCK_SCREEN_SHOWN)
         )
         val intent = Intent(this, BlockActivity::class.java).apply {

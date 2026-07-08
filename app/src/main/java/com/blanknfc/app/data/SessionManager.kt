@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import com.blanknfc.app.analytics.AnalyticsTracker
 import com.blanknfc.app.analytics.BlankEvent
 import com.blanknfc.app.analytics.BlankEvents
+import java.util.Calendar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,18 @@ data class BlankMode(
     val id: String,
     val name: String,
     val packages: Set<String>
+)
+
+data class FocusStats(
+    val sessionsThisWeek: Int = 0,
+    val protectedMsThisWeek: Long = 0L,
+    val blockedAttemptsThisWeek: Int = 0
+)
+
+data class FocusSchedule(
+    val enabled: Boolean = false,
+    val startMinute: Int = 23 * 60 + 30,
+    val endMinute: Int = 8 * 60
 )
 
 class SessionManager(
@@ -61,13 +74,19 @@ class SessionManager(
     private val _nfcRelinkCompleted = MutableStateFlow(false)
     val nfcRelinkCompleted: StateFlow<Boolean> = _nfcRelinkCompleted.asStateFlow()
 
+    private val _stats = MutableStateFlow(FocusStats())
+    val stats: StateFlow<FocusStats> = _stats.asStateFlow()
+
+    private val _schedule = MutableStateFlow(FocusSchedule())
+    val schedule: StateFlow<FocusSchedule> = _schedule.asStateFlow()
+
     init {
         scope.launch {
             dataStore.data.collect { prefs ->
                 _isBlankActive.value = prefs[PrefsKeys.IS_BLANK_ACTIVE] ?: false
                 _blankActiveSince.value = prefs[PrefsKeys.BLANK_ACTIVE_SINCE] ?: 0L
                 val legacyPackages = prefs[PrefsKeys.BLOCKED_PACKAGES] ?: emptySet()
-                val parsedModes = parseModes(prefs[PrefsKeys.FOCUS_MODES], legacyPackages)
+                val parsedModes = ensurePresetModes(parseModes(prefs[PrefsKeys.FOCUS_MODES], legacyPackages))
                 val currentId = prefs[PrefsKeys.CURRENT_MODE_ID]
                     ?.takeIf { id -> parsedModes.any { it.id == id } }
                     ?: parsedModes.first().id
@@ -77,6 +96,22 @@ class SessionManager(
                 _nfcTagUid.value = prefs[PrefsKeys.NFC_TAG_UID]
                 _setupComplete.value = prefs[PrefsKeys.SETUP_COMPLETE] ?: false
                 _backgroundThemeId.value = prefs[PrefsKeys.BACKGROUND_THEME_ID] ?: DEFAULT_BACKGROUND_THEME_ID
+                val currentWeekKey = currentWeekKey()
+                val storedWeekKey = prefs[PrefsKeys.STATS_WEEK_KEY] ?: currentWeekKey
+                _stats.value = if (storedWeekKey == currentWeekKey) {
+                    FocusStats(
+                        sessionsThisWeek = prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] ?: 0,
+                        protectedMsThisWeek = prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] ?: 0L,
+                        blockedAttemptsThisWeek = prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] ?: 0
+                    )
+                } else {
+                    FocusStats()
+                }
+                _schedule.value = FocusSchedule(
+                    enabled = prefs[PrefsKeys.SCHEDULE_ENABLED] ?: false,
+                    startMinute = prefs[PrefsKeys.SCHEDULE_START_MINUTE] ?: (23 * 60 + 30),
+                    endMinute = prefs[PrefsKeys.SCHEDULE_END_MINUTE] ?: (8 * 60)
+                )
                 _stateLoaded.value = true
             }
         }
@@ -116,8 +151,10 @@ class SessionManager(
             return NfcResult.NOT_ACTIVE
         }
 
+        val savedStart = _blankActiveSince.value
         _isBlankActive.value = false
         _blankActiveSince.value = 0L
+        recordSessionCompleted(savedStart = savedStart)
         scope.launch {
             dataStore.edit { prefs ->
                 prefs[PrefsKeys.IS_BLANK_ACTIVE] = false
@@ -270,8 +307,10 @@ class SessionManager(
     }
 
     fun deactivateForEmergency() {
+        val savedStart = _blankActiveSince.value
         _isBlankActive.value = false
         _blankActiveSince.value = 0L
+        recordSessionCompleted(savedStart = savedStart)
         scope.launch {
             dataStore.edit { prefs ->
                 prefs[PrefsKeys.IS_BLANK_ACTIVE] = false
@@ -321,6 +360,48 @@ class SessionManager(
         }
     }
 
+    fun recordBlockedAttempt() {
+        val updated = _stats.value.copy(blockedAttemptsThisWeek = _stats.value.blockedAttemptsThisWeek + 1)
+        _stats.value = updated
+        scope.launch {
+            persistStats(updated)
+        }
+    }
+
+    fun updateSchedule(schedule: FocusSchedule) {
+        val cleanSchedule = schedule.copy(
+            startMinute = schedule.startMinute.coerceIn(0, MINUTES_PER_DAY - 1),
+            endMinute = schedule.endMinute.coerceIn(0, MINUTES_PER_DAY - 1)
+        )
+        _schedule.value = cleanSchedule
+        scope.launch {
+            dataStore.edit { prefs ->
+                prefs[PrefsKeys.SCHEDULE_ENABLED] = cleanSchedule.enabled
+                prefs[PrefsKeys.SCHEDULE_START_MINUTE] = cleanSchedule.startMinute
+                prefs[PrefsKeys.SCHEDULE_END_MINUTE] = cleanSchedule.endMinute
+            }
+        }
+    }
+
+    fun applyScheduleWindow(nowMillis: Long = System.currentTimeMillis()) {
+        val schedule = _schedule.value
+        if (!schedule.enabled) return
+        if (isMinuteInWindow(minuteOfDay(nowMillis), schedule.startMinute, schedule.endMinute)) {
+            activateBlank()
+        } else if (_isBlankActive.value) {
+            val savedStart = _blankActiveSince.value
+            _isBlankActive.value = false
+            _blankActiveSince.value = 0L
+            recordSessionCompleted(savedStart = savedStart)
+            scope.launch {
+                dataStore.edit { prefs ->
+                    prefs[PrefsKeys.IS_BLANK_ACTIVE] = false
+                    prefs[PrefsKeys.BLANK_ACTIVE_SINCE] = 0L
+                }
+            }
+        }
+    }
+
     enum class NfcResult {
         TAG_REGISTERED,
         BRICKED,
@@ -342,7 +423,7 @@ class SessionManager(
 
     private fun parseModes(serialized: String?, legacyPackages: Set<String>): List<BlankMode> {
         if (serialized.isNullOrBlank()) {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", legacyPackages))
+            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", legacyPackages)) + presetModes()
         }
 
         val modes = serialized.split(MODE_SEPARATOR).mapNotNull { rawMode ->
@@ -356,6 +437,33 @@ class SessionManager(
         }
 
         return modes.ifEmpty { listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", legacyPackages)) }
+    }
+
+    private fun ensurePresetModes(modes: List<BlankMode>): List<BlankMode> {
+        val existingIds = modes.map { it.id }.toSet()
+        return modes + presetModes().filterNot { it.id in existingIds }
+    }
+
+    private fun recordSessionCompleted(savedStart: Long) {
+        if (savedStart <= 0L) return
+        val elapsed = (System.currentTimeMillis() - savedStart).coerceAtLeast(0L)
+        val updated = _stats.value.copy(
+            sessionsThisWeek = _stats.value.sessionsThisWeek + 1,
+            protectedMsThisWeek = _stats.value.protectedMsThisWeek + elapsed
+        )
+        _stats.value = updated
+        scope.launch {
+            persistStats(updated)
+        }
+    }
+
+    private suspend fun persistStats(stats: FocusStats) {
+        dataStore.edit { prefs ->
+            prefs[PrefsKeys.STATS_WEEK_KEY] = currentWeekKey()
+            prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] = stats.sessionsThisWeek
+            prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] = stats.protectedMsThisWeek
+            prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] = stats.blockedAttemptsThisWeek
+        }
     }
 
     private fun serializeModes(modes: List<BlankMode>): String {
@@ -388,12 +496,41 @@ class SessionManager(
         const val DEFAULT_BACKGROUND_THEME_ID = "grey"
 
         private const val DEFAULT_MODE_ID = "daily"
+        private const val STUDY_MODE_ID = "study"
+        private const val MINUTES_PER_DAY = 24 * 60
         private const val MODE_SEPARATOR = ";"
         private const val FIELD_SEPARATOR = "|"
         private const val PACKAGE_SEPARATOR = ","
 
         private fun defaultModes(): List<BlankMode> {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", emptySet()))
+            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", emptySet())) + presetModes()
+        }
+
+        private fun presetModes(): List<BlankMode> {
+            return listOf(
+                BlankMode(STUDY_MODE_ID, "Estudio", emptySet()),
+                BlankMode("sleep", "Dormir", emptySet())
+            )
+        }
+
+        private fun currentWeekKey(): String {
+            val calendar = Calendar.getInstance()
+            val year = calendar.get(Calendar.YEAR)
+            val week = calendar.get(Calendar.WEEK_OF_YEAR)
+            return "$year-$week"
+        }
+
+        private fun minuteOfDay(nowMillis: Long): Int {
+            val calendar = Calendar.getInstance().apply { timeInMillis = nowMillis }
+            return calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        }
+
+        private fun isMinuteInWindow(minute: Int, start: Int, end: Int): Boolean {
+            return if (start < end) {
+                minute in start until end
+            } else {
+                minute >= start || minute < end
+            }
         }
     }
 }

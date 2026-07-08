@@ -1,6 +1,7 @@
-package com.blanknfc.app.ui.screens
+﻿package com.blanknfc.app.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,7 +71,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.blanknfc.app.R
 import com.blanknfc.app.data.BlankMode
+import com.blanknfc.app.data.FocusSchedule
+import com.blanknfc.app.data.FocusStats
 import com.blanknfc.app.data.SessionManager
+import com.blanknfc.app.service.BlankSchedule
 import com.blanknfc.app.ui.theme.BlankBackground
 import com.blanknfc.app.ui.theme.BlankGray
 import com.blanknfc.app.ui.theme.BlankOnSurface
@@ -85,7 +90,8 @@ private enum class HomePanel {
     HOME,
     SETTINGS,
     MODES,
-    PRIVACY,
+    STATS,
+    SCHEDULE,
     RELINK,
     FORGET,
     BACKGROUND,
@@ -121,6 +127,7 @@ private val BackgroundThemes = listOf(
 )
 
 private const val BackgroundImageAlpha = 0.62f
+private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
 
 private val LightModeMessages = listOf(
     "Ya sé que solo querías mirar un par de stories.",
@@ -160,6 +167,8 @@ fun HomeScreen(
     val modes by sessionManager.modes.collectAsState()
     val currentModeId by sessionManager.currentModeId.collectAsState()
     val backgroundThemeId by sessionManager.backgroundThemeId.collectAsState()
+    val stats by sessionManager.stats.collectAsState()
+    val schedule by sessionManager.schedule.collectAsState()
     val currentMode = modes.firstOrNull { it.id == currentModeId } ?: modes.first()
     val backgroundTheme = BackgroundThemes.firstOrNull { it.id == backgroundThemeId }
         ?: BackgroundThemes.first { it.id == SessionManager.DEFAULT_BACKGROUND_THEME_ID }
@@ -180,6 +189,10 @@ fun HomeScreen(
         nfcEnabled = NfcHelper.isNfcEnabled(context)
     }
 
+    fun openNfcOptions() {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(NfcOptionsUrl)))
+    }
+
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -198,7 +211,8 @@ fun HomeScreen(
                 ConfigIssue(
                     title = "NFC no disponible",
                     body = "Este móvil no tiene NFC compatible. Blank necesita NFC para desbloquear.",
-                    action = null
+                    action = "Ver opciones NFC",
+                    onAction = ::openNfcOptions
                 )
             )
         } else if (!nfcEnabled) {
@@ -266,8 +280,12 @@ fun HomeScreen(
             HomePanel.SETTINGS -> SettingsPanel(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
-                onPrivacy = {
-                    panel = HomePanel.PRIVACY
+                onBuyNfc = ::openNfcOptions,
+                onStats = {
+                    panel = HomePanel.STATS
+                },
+                onSchedule = {
+                    panel = HomePanel.SCHEDULE
                 },
                 onRelink = {
                     panel = HomePanel.RELINK
@@ -290,17 +308,6 @@ fun HomeScreen(
                 onRename = sessionManager::renameMode,
                 onEditApps = { modeBeingEdited = it },
                 onDelete = sessionManager::deleteMode
-            )
-
-            HomePanel.PRIVACY -> TextPanel(
-                title = "Privacidad",
-                backLabel = "Volver",
-                onBack = { panel = HomePanel.SETTINGS },
-                blocks = listOf(
-                    "Uso de Accesibilidad" to "Blank usa eventos de Accesibilidad para detectar cuando una app bloqueada pasa a primer plano y mostrar la pantalla de bloqueo.",
-                    "Datos observados" to "No lee textos, contraseñas, mensajes, contactos, notificaciones ni contenido de pantalla.",
-                    "Almacenamiento" to "La etiqueta NFC, apps protegidas y estado de Blank se guardan localmente en este dispositivo."
-                )
             )
 
             HomePanel.RELINK -> CenterActionPanel(
@@ -330,6 +337,24 @@ fun HomeScreen(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.SETTINGS },
                 onSelect = sessionManager::selectBackgroundTheme
+            )
+
+            HomePanel.STATS -> StatsPanel(
+                stats = stats,
+                buttonLight = buttonLight,
+                onBack = { panel = HomePanel.SETTINGS }
+            )
+
+            HomePanel.SCHEDULE -> SchedulePanel(
+                schedule = schedule,
+                buttonLight = buttonLight,
+                onBack = { panel = HomePanel.SETTINGS },
+                onSave = { updatedSchedule ->
+                    sessionManager.updateSchedule(updatedSchedule)
+                    BlankSchedule.schedule(context, updatedSchedule)
+                    sessionManager.applyScheduleWindow()
+                    panel = HomePanel.SETTINGS
+                }
             )
 
             HomePanel.BLOCK -> BlockPanel(
@@ -629,7 +654,9 @@ private fun IconDots(onClick: () -> Unit) {
 private fun SettingsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit,
-    onPrivacy: () -> Unit,
+    onBuyNfc: () -> Unit,
+    onStats: () -> Unit,
+    onSchedule: () -> Unit,
     onRelink: () -> Unit,
     onForget: () -> Unit,
     onBackground: () -> Unit
@@ -640,10 +667,12 @@ private fun SettingsPanel(
         Text(text = "Ajustes", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Privacidad", "Ver", onPrivacy))
-            add(MenuItem("Vincular nueva etiqueta", "NFC", onRelink))
-            add(MenuItem("Olvidar NFC", "Reset", onForget))
-            add(MenuItem("Fondo de pantalla", "Color", onBackground))
+            add(MenuItem("Progreso", "Semana", onStats))
+            add(MenuItem("Programar mi Blank", "Diario", onSchedule))
+            add(MenuItem("Comprar NFC", "Amazon", onBuyNfc))
+            add(MenuItem("Cambiar fondo", "Color", onBackground))
+            add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
+            add(MenuItem("He olvidado mi Blank", "Reset", onForget))
         }
         MenuList(
             buttonLight = buttonLight,
@@ -667,7 +696,7 @@ private fun BackgroundPanel(
         Text(text = "Elige un fondo", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Blank usarÃ¡ la variante clara en reposo y la variante intensa cuando estÃ© activo.",
+            text = "Blank usará la variante clara en reposo y la variante intensa cuando esté activo.",
             style = MaterialTheme.typography.bodyLarge,
             color = BlankOnSurface
         )
@@ -772,6 +801,152 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
             }
         }
     }
+}
+
+@Composable
+private fun StatsPanel(
+    stats: FocusStats,
+    buttonLight: Boolean,
+    onBack: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHeader(title = "Progreso", onBack = onBack)
+        Spacer(modifier = Modifier.height(46.dp))
+        Text(text = "Esta semana", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Sin rachas ni premios. Solo señales útiles de que Blank está haciendo su trabajo.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = BlankOnSurface
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            StatRow(
+                label = "Sesiones completadas",
+                value = stats.sessionsThisWeek.toString(),
+                buttonLight = buttonLight
+            )
+            StatRow(
+                label = "Tiempo protegido",
+                value = formatProtectedTime(stats.protectedMsThisWeek),
+                buttonLight = buttonLight
+            )
+            StatRow(
+                label = "Intentos bloqueados",
+                value = stats.blockedAttemptsThisWeek.toString(),
+                buttonLight = buttonLight
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatRow(label: String, value: String, buttonLight: Boolean) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = if (buttonLight) Color.Black else Color.White
+    val metaColor = textColor.copy(alpha = 0.64f)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = metaColor, modifier = Modifier.weight(1f))
+            Text(text = value, color = textColor, style = MaterialTheme.typography.titleLarge)
+        }
+    }
+}
+
+@Composable
+private fun SchedulePanel(
+    schedule: FocusSchedule,
+    buttonLight: Boolean,
+    onBack: () -> Unit,
+    onSave: (FocusSchedule) -> Unit
+) {
+    var enabled by remember(schedule) { mutableStateOf(schedule.enabled) }
+    var startTime by remember(schedule) { mutableStateOf(formatMinute(schedule.startMinute)) }
+    var endTime by remember(schedule) { mutableStateOf(formatMinute(schedule.endMinute)) }
+    val parsedStart = parseMinute(startTime)
+    val parsedEnd = parseMinute(endTime)
+    val canSave = parsedStart != null && parsedEnd != null
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHeader(title = "Programar mi Blank", onBack = onBack)
+        Spacer(modifier = Modifier.height(46.dp))
+        Text(text = "Ventana diaria", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Blank se activa solo en esa franja. Para salir antes, sigues necesitando el NFC.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = BlankOnSurface
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        ToggleRow(
+            label = "Activar horario diario",
+            checked = enabled,
+            buttonLight = buttonLight,
+            onCheckedChange = { enabled = it }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        TimeField(label = "Inicio", value = startTime, onValueChange = { startTime = it })
+        Spacer(modifier = Modifier.height(10.dp))
+        TimeField(label = "Fin", value = endTime, onValueChange = { endTime = it })
+        Spacer(modifier = Modifier.weight(1f))
+        MainActionButton(
+            text = "Guardar horario",
+            enabled = canSave,
+            light = buttonLight,
+            onClick = {
+                onSave(
+                    FocusSchedule(
+                        enabled = enabled,
+                        startMinute = parsedStart ?: schedule.startMinute,
+                        endMinute = parsedEnd ?: schedule.endMinute
+                    )
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    buttonLight: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = if (buttonLight) Color.Black else Color.White
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = textColor, modifier = Modifier.weight(1f))
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
+    }
+}
+
+@Composable
+private fun TimeField(label: String, value: String, onValueChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = { Text("23:30") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
 }
 
 @Composable
@@ -1184,4 +1359,30 @@ private fun MainActionButton(
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium))
     }
+}
+
+private fun formatProtectedTime(ms: Long): String {
+    val totalMinutes = (ms / 60000L).coerceAtLeast(0L)
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return when {
+        hours > 0L && minutes > 0L -> "${hours}h ${minutes}m"
+        hours > 0L -> "${hours}h"
+        else -> "${minutes}m"
+    }
+}
+
+private fun formatMinute(minuteOfDay: Int): String {
+    val hour = (minuteOfDay / 60).coerceIn(0, 23)
+    val minute = (minuteOfDay % 60).coerceIn(0, 59)
+    return hour.toString().padStart(2, '0') + ":" + minute.toString().padStart(2, '0')
+}
+
+private fun parseMinute(value: String): Int? {
+    val parts = value.trim().split(":")
+    if (parts.size != 2) return null
+    val hour = parts[0].toIntOrNull() ?: return null
+    val minute = parts[1].toIntOrNull() ?: return null
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return hour * 60 + minute
 }

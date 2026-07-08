@@ -1,5 +1,6 @@
 package com.blanknfc.app.ui
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -81,6 +82,7 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
+    @SuppressLint("MissingSuperCall")
     @Deprecated("Use OnBackPressedDispatcher")
     override fun onBackPressed() {
         // Stay on the blocking screen until the paired NFC tag ends the session.

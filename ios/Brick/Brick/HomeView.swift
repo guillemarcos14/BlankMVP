@@ -91,7 +91,7 @@ struct HomeView: View {
             now = date
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
-        .onChange(of: sessionStore.selection) { _, newSelection in
+        .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
     }

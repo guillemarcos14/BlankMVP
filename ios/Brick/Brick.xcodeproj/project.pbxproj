@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		8A0000010000000000000001 /* BlankApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000011 /* BlankApp.swift */; };
+		8A0000010000000000000001 /* BrickApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000011 /* BrickApp.swift */; };
 		8A0000010000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000012 /* ContentView.swift */; };
 		8A0000010000000000000003 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000013 /* SessionStore.swift */; };
 		8A0000010000000000000004 /* NFCReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000014 /* NFCReader.swift */; };
@@ -48,7 +48,7 @@
 
 /* Begin PBXFileReference section */
 		8A0000010000000000000010 /* Brick.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Brick.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		8A0000010000000000000011 /* BlankApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankApp.swift; sourceTree = "<group>"; };
+		8A0000010000000000000011 /* BrickApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrickApp.swift; sourceTree = "<group>"; };
 		8A0000010000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		8A0000010000000000000013 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		8A0000010000000000000014 /* NFCReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NFCReader.swift; sourceTree = "<group>"; };
@@ -97,7 +97,7 @@
 		8A0000010000000000000031 /* Brick */ = {
 			isa = PBXGroup;
 			children = (
-				8A0000010000000000000011 /* BlankApp.swift */,
+				8A0000010000000000000011 /* BrickApp.swift */,
 				8A0000010000000000000012 /* ContentView.swift */,
 				8A0000010000000000000013 /* SessionStore.swift */,
 				8A0000010000000000000014 /* NFCReader.swift */,
@@ -231,7 +231,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8A0000010000000000000001 /* BlankApp.swift in Sources */,
+				8A0000010000000000000001 /* BrickApp.swift in Sources */,
 				8A0000010000000000000002 /* ContentView.swift in Sources */,
 				8A0000010000000000000003 /* SessionStore.swift in Sources */,
 				8A0000010000000000000004 /* NFCReader.swift in Sources */,

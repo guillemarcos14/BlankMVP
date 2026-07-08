@@ -13,15 +13,19 @@ enum DeviceActivityTimerScheduler {
         #if canImport(DeviceActivity)
         let center = DeviceActivityCenter()
         let activityName = DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(modeId.uuidString)")
-        let endComponents = endDateComponents(durationMinutes: durationMinutes)
+        let timerInterval = makeTimerInterval(durationMinutes: durationMinutes)
+        guard timerInterval.start != timerInterval.end else {
+            return false
+        }
+
+        center.stopMonitoring([activityName])
         let schedule = DeviceActivitySchedule(
-            intervalStart: DateComponents(hour: 0, minute: 0),
-            intervalEnd: endComponents,
+            intervalStart: timerInterval.start,
+            intervalEnd: timerInterval.end,
             repeats: false
         )
 
         do {
-            center.stopMonitoring([activityName])
             try center.startMonitoring(activityName, during: schedule)
             return true
         } catch {
@@ -39,9 +43,14 @@ enum DeviceActivityTimerScheduler {
         #endif
     }
 
-    private static func endDateComponents(durationMinutes: Int) -> DateComponents {
+    private static func makeTimerInterval(durationMinutes: Int) -> (start: DateComponents, end: DateComponents) {
+        let startDate = Date().addingTimeInterval(1)
         let endDate = Date().addingTimeInterval(TimeInterval(durationMinutes * 60))
-        let components = Calendar.current.dateComponents([.hour, .minute], from: endDate)
-        return DateComponents(hour: components.hour, minute: components.minute)
+        let components: Set<Calendar.Component> = [.calendar, .timeZone, .year, .month, .day, .hour, .minute, .second]
+        let calendar = Calendar.current
+        return (
+            start: calendar.dateComponents(components, from: startDate),
+            end: calendar.dateComponents(components, from: endDate)
+        )
     }
 }

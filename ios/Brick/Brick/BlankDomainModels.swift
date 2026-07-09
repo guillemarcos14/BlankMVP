@@ -5,8 +5,6 @@ enum BlankStrategyKind: String, Codable, CaseIterable, Identifiable {
     case nfc
     case manualStartNfcStop
     case nfcTimer
-    case qr
-    case qrTimer
 
     var id: String { rawValue }
 
@@ -20,10 +18,6 @@ enum BlankStrategyKind: String, Codable, CaseIterable, Identifiable {
             return "Manual + NFC"
         case .nfcTimer:
             return "NFC + Timer"
-        case .qr:
-            return "QR"
-        case .qrTimer:
-            return "QR + Timer"
         }
     }
 
@@ -31,25 +25,16 @@ enum BlankStrategyKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .nfc, .manualStartNfcStop, .nfcTimer:
             return true
-        case .manual, .qr, .qrTimer:
-            return false
-        }
-    }
-
-    var usesQR: Bool {
-        switch self {
-        case .qr, .qrTimer:
-            return true
-        case .manual, .nfc, .manualStartNfcStop, .nfcTimer:
+        case .manual:
             return false
         }
     }
 
     var hasTimer: Bool {
         switch self {
-        case .nfcTimer, .qrTimer:
+        case .nfcTimer:
             return true
-        case .manual, .nfc, .manualStartNfcStop, .qr:
+        case .manual, .nfc, .manualStartNfcStop:
             return false
         }
     }
@@ -83,10 +68,53 @@ struct BlankProfile: Codable, Identifiable, Equatable {
     }
 }
 
+struct BlankFocusMode: Codable, Identifiable, Equatable {
+    var id: UUID
+    var name: String
+    var selectionData: Data?
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        selectionData: Data? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Modo"
+            : name.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.selectionData = selectionData
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+struct BlankFocusSchedule: Codable, Equatable {
+    var enabled: Bool
+    var startMinute: Int
+    var endMinute: Int
+
+    init(enabled: Bool = false, startMinute: Int = 23 * 60 + 30, endMinute: Int = 8 * 60) {
+        self.enabled = enabled
+        self.startMinute = min(max(startMinute, 0), 1439)
+        self.endMinute = min(max(endMinute, 0), 1439)
+    }
+
+    func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        if startMinute < endMinute {
+            return minute >= startMinute && minute < endMinute
+        }
+        return minute >= startMinute || minute < endMinute
+    }
+}
+
 struct PhysicalUnlockItem: Codable, Identifiable, Hashable {
     enum Kind: String, Codable {
         case nfc
-        case qr
     }
 
     var id: UUID
@@ -104,21 +132,7 @@ struct PhysicalUnlockItem: Codable, Identifiable, Hashable {
     static func normalized(_ value: String, kind: Kind) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard kind == .qr,
-              var components = URLComponents(string: trimmed),
-              components.scheme != nil,
-              components.host != nil else {
-            return trimmed
-        }
-
-        components.scheme = components.scheme?.lowercased()
-        components.host = components.host?.lowercased()
-
-        if components.path == "/" && components.query == nil && components.fragment == nil {
-            components.path = ""
-        }
-
-        return components.string ?? trimmed
+        return trimmed
     }
 }
 

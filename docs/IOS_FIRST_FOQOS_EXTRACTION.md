@@ -10,6 +10,18 @@ License: MIT. Any copied or substantially derived source must preserve the Foqos
 
 Do not copy Foqos brand assets, name, icons, screenshots, App Store copy, or visual identity. Use it as a functional and architectural reference for Blank.
 
+## Usage in Blank
+
+Current usage:
+
+- Foqos has been used as a technical reference for Screen Time architecture, NFC physical unlock strategies, timers, schedules, and extensions.
+- Blank has not imported Foqos assets, visual identity, App Store copy, or bundled source files.
+- QR/barcode support was intentionally removed from Blank after product review; NFC remains the only physical unlock path.
+- Blank's first timer flow stores the end date locally and now attempts to schedule a DeviceActivity timer from the app target. A DeviceActivityMonitor extension target is wired into the Xcode project and still needs to be built and validated on a physical iPhone. Foqos remains the reference for the complete runtime behavior.
+- App Store Connect prep values, Family Controls request text, and first iOS asset status are tracked in `docs/IOS_APP_STORE_PREP.md`.
+
+If future work copies or substantially adapts Foqos source, add the MIT notice to the relevant file header or a dedicated third-party notices file before shipping.
+
 ## Why iOS first
 
 - Foqos is primarily an iOS app built with SwiftUI, SwiftData, FamilyControls, ManagedSettings, DeviceActivity, CoreNFC, WidgetKit, Live Activities, and App Intents.
@@ -23,21 +35,25 @@ Implemented:
 
 - NFC tag reading with Core NFC.
 - Paired-tag activation/deactivation.
+- Timer-based sessions with local automatic end, an initial DeviceActivity scheduling helper, and a DeviceActivityMonitor scaffold.
 - Screen Time authorization request.
 - FamilyActivityPicker app/category/web-domain selection.
 - ManagedSettings shields while Blank is active.
 - Local setup state in UserDefaults.
-- Basic session history foundation added in `BlankDomainModels.swift`.
-- Initial weekly report view added in `ReportView.swift`.
+- Session history and weekly report.
+- Multiple focus modes with separate Screen Time selections.
+- Daily schedule persistence and activation window.
+- Timer end persistence.
+- Emergency unlock phrase.
+- NFC relink/reset flows.
+- Background theme selection.
 
 Missing:
 
-- Multiple profiles.
 - Strategy picker.
-- QR flows.
-- Timer and pause strategies.
-- Schedules.
-- Polished report UI and charts.
+- Background timer completion validation on device.
+- Pause strategies.
+- Polished report charts.
 - Emergency unlock limits.
 - Data export.
 - Widget/Live Activity equivalents.
@@ -48,17 +64,12 @@ Missing:
 
 Goal: a polished Blank iPhone app with one default profile, physical NFC control, and an honest report.
 
-- Redesign `HomeView` to match the new Blank visual structure.
-- Keep one default profile behind the scenes.
-- Record `BlankSession` on every activation/deactivation.
-- Add report screen:
-  - total protected time this week
-  - estimated time saved
-  - completed sessions
-  - best day
-- Keep app/category/web-domain selection via FamilyActivityPicker.
-- Keep paired NFC tag as the primary unlock.
-- Add clear Family Controls entitlement and TestFlight checklist.
+- Done: `HomeView` uses the Blank visual structure and exposes the main Android-equivalent controls.
+- Done: records `BlankSession` on activation/deactivation.
+- Done: report screen shows total protected time, estimated time saved, completed sessions, and best day.
+- Done: app/category/web-domain selection via FamilyActivityPicker.
+- Done: paired NFC tag is the normal unlock path.
+- Done: Family Controls entitlement and TestFlight checklist documented.
 
 ### Phase 2: Foqos-style profiles
 
@@ -84,8 +95,6 @@ Implement in this order:
 2. NFC.
 3. Manual start + NFC stop.
 4. NFC + timer.
-5. QR.
-6. QR + timer.
 
 Strategy model is seeded as `BlankStrategyKind`.
 
@@ -94,8 +103,6 @@ Strategy model is seeded as `BlankStrategyKind`.
 Goal: go beyond one NFC tag.
 
 - Multiple NFC tags per profile.
-- QR unlock codes per profile.
-- Code normalization for QR URLs.
 - Rename/revoke unlock items.
 
 Model is seeded as `PhysicalUnlockItem`.

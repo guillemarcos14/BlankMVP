@@ -11,48 +11,48 @@ struct SetupView: View {
     @State private var nfcReader = NFCReader()
 
     var body: some View {
-        VStack(spacing: 32) {
-            Text("Setup Blank")
-                .font(.largeTitle.weight(.bold))
+        VStack(spacing: 0) {
+            header
 
-            Spacer()
+            Spacer(minLength: 48)
 
-            switch currentStep {
-            case 0:
-                setupStep(
-                    title: "Authorize Screen Time",
-                    description: screenTimeDescription,
-                    buttonTitle: "Authorize",
-                    action: authorizeScreenTime
-                )
-            case 1:
-                setupStep(
-                    title: "Pair NFC Tag",
-                    description: sessionStore.nfcTagUid == nil
-                        ? "Scan your physical Blank NFC tag to pair it with this iPhone."
-                        : "NFC tag registered. Continue to app selection.",
-                    buttonTitle: sessionStore.nfcTagUid == nil ? "Scan Tag" : "Continue",
-                    action: scanOrContinue
-                )
-            case 2:
-                setupStep(
-                    title: "Select Apps",
-                    description: sessionStore.hasSelectedApps
-                        ? "\(selectionCount) selected"
-                        : "Choose the apps, categories, or web domains to shield when Blank mode is active.",
-                    buttonTitle: sessionStore.hasSelectedApps ? "Continue" : "Select Apps",
-                    action: selectAppsOrContinue
-                )
-            default:
-                setupStep(
-                    title: "Setup Complete",
-                    description: "Blank is ready on this iPhone.",
-                    buttonTitle: "Finish Setup",
-                    action: {
-                        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-                        sessionStore.finishSetup()
-                    }
-                )
+            Group {
+                switch currentStep {
+                case 0:
+                    stepContent(
+                        eyebrow: "Paso 1 de 3",
+                        title: "Permite que Blank bloquee.",
+                        body: screenTimeDescription,
+                        primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continuar" : "Autorizar Screen Time",
+                        secondaryTitle: nil,
+                        primaryAction: authorizeScreenTime
+                    )
+                case 1:
+                    stepContent(
+                        eyebrow: "Paso 2 de 3",
+                        title: "Elige que quieres dejar fuera.",
+                        body: sessionStore.hasSelectedApps
+                            ? "\(sessionStore.selectionCount) selecciones protegidas en \(sessionStore.currentMode.name)."
+                            : "Selecciona apps, categorias o dominios. En iOS Apple entrega tokens privados, no nombres de paquetes.",
+                        primaryTitle: sessionStore.hasSelectedApps ? "Continuar" : "Seleccionar apps",
+                        secondaryTitle: sessionStore.hasSelectedApps ? "Editar seleccion" : nil,
+                        primaryAction: selectAppsOrContinue,
+                        secondaryAction: { showingPicker = true }
+                    )
+                case 2:
+                    stepContent(
+                        eyebrow: "Paso 3 de 3",
+                        title: "Vincula tu pieza fisica.",
+                        body: sessionStore.nfcTagUid == nil
+                            ? "Escanea el NFC que activara y desactivara Blank en este iPhone."
+                            : "NFC registrado. Blank ya puede usar tu pieza fisica.",
+                        primaryTitle: sessionStore.nfcTagUid == nil ? "Escanear NFC" : "Entrar en Blank",
+                        secondaryTitle: nil,
+                        primaryAction: scanOrFinish
+                    )
+                default:
+                    EmptyView()
+                }
             }
 
             if let message {
@@ -60,86 +60,118 @@ struct SetupView: View {
                     .font(.footnote)
                     .foregroundStyle(BrickColors.secondaryText)
                     .multilineTextAlignment(.center)
+                    .padding(.top, 18)
             }
 
-            Spacer()
-
+            Spacer(minLength: 48)
             stepIndicator
         }
-        .padding(24)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 42)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(BrickColors.background)
-        .foregroundStyle(BrickColors.text)
+        .background(BrickColors.warmBackground)
+        .foregroundStyle(BrickColors.ink)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
     }
 
-    private var screenTimeDescription: String {
-        if screenTimeBlocker.authorizationStatus == .approved {
-            return "Screen Time authorization is approved."
+    private var header: some View {
+        HStack {
+            Text("Blank")
+                .font(.headline)
+            Spacer()
+            HStack(spacing: 7) {
+                ForEach(0..<3, id: \.self) { index in
+                    Capsule()
+                        .fill(index == currentStep ? BrickColors.ink : BrickColors.line)
+                        .frame(width: index == currentStep ? 22 : 8, height: 8)
+                }
+            }
         }
-        return "Blank needs Screen Time access to shield the apps you choose. This replaces Android Accessibility on iOS."
     }
 
-    private var selectionCount: Int {
-        sessionStore.selection.applicationTokens.count +
-        sessionStore.selection.categoryTokens.count +
-        sessionStore.selection.webDomainTokens.count
+    private var screenTimeDescription: String {
+        if screenTimeBlocker.authorizationStatus == .approved {
+            return "Screen Time esta autorizado. Blank usara FamilyControls y ManagedSettings, el equivalente permitido por Apple."
+        }
+        return "Blank necesita acceso a Screen Time para proteger las apps que elijas. Esto sustituye al servicio de Accesibilidad de Android."
     }
 
     private var stepIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(0..<4, id: \.self) { index in
-                Circle()
-                    .fill(index <= currentStep ? BrickColors.green : BrickColors.surface)
-                    .frame(width: 8, height: 8)
+            ForEach(0..<3, id: \.self) { index in
+                Capsule()
+                    .fill(index <= currentStep ? BrickColors.ink : BrickColors.line)
+                    .frame(width: index == currentStep ? 22 : 8, height: 8)
             }
         }
     }
 
-    private func setupStep(
+    private func stepContent(
+        eyebrow: String,
         title: String,
-        description: String,
-        buttonTitle: String,
-        action: @escaping () -> Void
+        body: String,
+        primaryTitle: String,
+        secondaryTitle: String?,
+        primaryAction: @escaping () -> Void,
+        secondaryAction: (() -> Void)? = nil
     ) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
+            Text(eyebrow)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(BrickColors.mutedInk)
             Text(title)
-                .font(.title2.weight(.semibold))
+                .font(.system(size: 34, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
-
-            Text(description)
+            Text(body)
                 .font(.body)
-                .foregroundStyle(BrickColors.secondaryText)
+                .foregroundStyle(BrickColors.mutedInk)
                 .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 340)
+                .padding(.top, 2)
+            Button(primaryTitle, action: primaryAction)
+                .buttonStyle(BlankPrimaryButtonStyle())
+                .padding(.top, 14)
 
-            Button(action: action) {
-                Text(buttonTitle)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+            if let secondaryTitle, let secondaryAction {
+                Button(secondaryTitle, action: secondaryAction)
+                    .buttonStyle(BlankSecondaryButtonStyle())
             }
-            .buttonStyle(.borderedProminent)
-            .tint(BrickColors.green)
         }
     }
 
     private func authorizeScreenTime() {
+        if screenTimeBlocker.authorizationStatus == .approved {
+            currentStep = 1
+            message = nil
+            return
+        }
+
         Task {
             if await screenTimeBlocker.requestAuthorization() {
                 currentStep = 1
                 message = nil
             } else {
-                message = screenTimeBlocker.lastErrorMessage ?? "Screen Time authorization was not approved."
+                message = screenTimeBlocker.lastErrorMessage ?? "Screen Time no ha quedado autorizado."
             }
         }
     }
 
-    private func scanOrContinue() {
-        if sessionStore.nfcTagUid != nil {
+    private func selectAppsOrContinue() {
+        if sessionStore.hasSelectedApps {
             currentStep = 2
+        } else {
+            showingPicker = true
+        }
+    }
+
+    private func scanOrFinish() {
+        if sessionStore.nfcTagUid != nil {
+            screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+            sessionStore.finishSetup()
             return
         }
 
@@ -148,20 +180,11 @@ struct SetupView: View {
                 switch result {
                 case .success(let uid):
                     _ = sessionStore.handleNfcTag(uid: uid)
-                    currentStep = 2
-                    message = "NFC tag registered."
+                    message = "NFC registrado."
                 case .failure(let error):
                     message = error.localizedDescription
                 }
             }
-        }
-    }
-
-    private func selectAppsOrContinue() {
-        if sessionStore.hasSelectedApps {
-            currentStep = 3
-        } else {
-            showingPicker = true
         }
     }
 }

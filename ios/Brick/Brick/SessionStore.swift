@@ -1,46 +1,62 @@
-import Foundation
 import FamilyControls
+import Foundation
 
 @MainActor
 final class SessionStore: ObservableObject {
+    static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
+
     @Published var isBlankActive: Bool {
-        didSet {
-            defaults.set(isBlankActive, forKey: Keys.isBlankActive)
-        }
+        didSet { defaults.set(isBlankActive, forKey: Keys.isBlankActive) }
     }
 
     @Published var blankActiveSince: Date? {
-        didSet {
-            defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince)
-        }
+        didSet { defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince) }
+    }
+
+    @Published var blankActiveUntil: Date? {
+        didSet { defaults.set(blankActiveUntil?.timeIntervalSince1970, forKey: Keys.blankActiveUntil) }
     }
 
     @Published var nfcTagUid: String? {
-        didSet {
-            defaults.set(nfcTagUid, forKey: Keys.nfcTagUid)
-        }
+        didSet { defaults.set(nfcTagUid, forKey: Keys.nfcTagUid) }
     }
 
     @Published var setupComplete: Bool {
-        didSet {
-            defaults.set(setupComplete, forKey: Keys.setupComplete)
-        }
+        didSet { defaults.set(setupComplete, forKey: Keys.setupComplete) }
     }
 
     @Published var selection: FamilyActivitySelection {
         didSet {
             saveSelection(selection)
+            updateCurrentModeSelection(selection)
         }
     }
 
     @Published var sessions: [BlankSession] {
-        didSet {
-            saveSessions(sessions)
-        }
+        didSet { saveSessions(sessions) }
+    }
+
+    @Published var focusModes: [BlankFocusMode] {
+        didSet { saveFocusModes(focusModes) }
+    }
+
+    @Published var currentModeId: UUID {
+        didSet { defaults.set(currentModeId.uuidString, forKey: Keys.currentModeId) }
+    }
+
+    @Published var schedule: BlankFocusSchedule {
+        didSet { saveSchedule(schedule) }
+    }
+
+    @Published var backgroundThemeId: String {
+        didSet { defaults.set(backgroundThemeId, forKey: Keys.backgroundThemeId) }
+    }
+
+    @Published private(set) var deviceActivityTimerScheduled: Bool {
+        didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
 
     private let defaults = UserDefaults.standard
-    private let defaultProfileId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
 
     init() {
         isBlankActive = defaults.bool(forKey: Keys.isBlankActive)
@@ -49,16 +65,43 @@ final class SessionStore: ObservableObject {
         } else {
             blankActiveSince = nil
         }
+        if let timestamp = defaults.object(forKey: Keys.blankActiveUntil) as? TimeInterval, timestamp > 0 {
+            blankActiveUntil = Date(timeIntervalSince1970: timestamp)
+        } else {
+            blankActiveUntil = nil
+        }
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
         selection = Self.loadSelection(from: defaults)
         sessions = Self.loadSessions(from: defaults)
+        focusModes = Self.loadFocusModes(from: defaults, fallbackSelection: selection)
+        let storedModeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:))
+        currentModeId = storedModeId.flatMap { id in focusModes.first(where: { $0.id == id })?.id }
+            ?? focusModes.first?.id
+            ?? Self.defaultModeId
+        schedule = Self.loadSchedule(from: defaults)
+        backgroundThemeId = defaults.string(forKey: Keys.backgroundThemeId) ?? "grey"
+        deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
+
+        if let currentSelection = Self.selection(from: currentMode.selectionData) {
+            selection = currentSelection
+        }
+    }
+
+    var currentMode: BlankFocusMode {
+        focusModes.first { $0.id == currentModeId }
+            ?? focusModes.first
+            ?? BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria")
     }
 
     var hasSelectedApps: Bool {
-        !selection.applicationTokens.isEmpty ||
-        !selection.categoryTokens.isEmpty ||
-        !selection.webDomainTokens.isEmpty
+        selectionCount > 0
+    }
+
+    var selectionCount: Int {
+        selection.applicationTokens.count +
+            selection.categoryTokens.count +
+            selection.webDomainTokens.count
     }
 
     var activeSession: BlankSession? {
@@ -80,18 +123,63 @@ final class SessionStore: ObservableObject {
             return .wrongTag
         }
 
-        guard isBlankActive || hasSelectedApps else {
-            return .noAppsSelected
+        if isBlankActive {
+            return deactivateBlank()
         }
 
-        isBlankActive.toggle()
-        blankActiveSince = isBlankActive ? Date() : nil
-        if isBlankActive {
-            startSession(tag: uid)
-        } else {
-            endActiveSession()
+        return activateBlank()
+    }
+
+    func activateBlank(forceStarted: Bool = false, durationMinutes: Int? = nil) -> NfcResult {
+        guard hasSelectedApps else {
+            return .noAppsSelected
         }
-        return isBlankActive ? .bricked : .unbricked
+        guard !isBlankActive else {
+            return .bricked
+        }
+
+        isBlankActive = true
+        blankActiveSince = Date()
+        if let durationMinutes, durationMinutes > 0 {
+            blankActiveUntil = Date().addingTimeInterval(TimeInterval(durationMinutes * 60))
+            deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
+                modeId: currentModeId,
+                durationMinutes: durationMinutes
+            )
+        } else {
+            blankActiveUntil = nil
+            deviceActivityTimerScheduled = false
+        }
+        startSession(tag: nfcTagUid, forceStarted: forceStarted)
+        return .bricked
+    }
+
+    func deactivateBlank() -> NfcResult {
+        guard isBlankActive else {
+            return .unbricked
+        }
+
+        isBlankActive = false
+        blankActiveSince = nil
+        blankActiveUntil = nil
+        DeviceActivityTimerScheduler.stop(modeId: currentModeId)
+        deviceActivityTimerScheduled = false
+        endActiveSession()
+        return .unbricked
+    }
+
+    func applyScheduleWindow(at date: Date = Date()) {
+        if let blankActiveUntil, isBlankActive, date >= blankActiveUntil {
+            _ = deactivateBlank()
+            return
+        }
+
+        guard schedule.enabled else { return }
+        if schedule.contains(date) {
+            _ = activateBlank(forceStarted: true)
+        } else if isBlankActive {
+            _ = deactivateBlank()
+        }
     }
 
     func forgetNfcTag() {
@@ -99,6 +187,9 @@ final class SessionStore: ObservableObject {
         nfcTagUid = nil
         isBlankActive = false
         blankActiveSince = nil
+        blankActiveUntil = nil
+        DeviceActivityTimerScheduler.stop(modeId: currentModeId)
+        deviceActivityTimerScheduled = false
         setupComplete = false
     }
 
@@ -106,21 +197,57 @@ final class SessionStore: ObservableObject {
         setupComplete = true
     }
 
+    func selectMode(_ modeId: UUID) {
+        guard let mode = focusModes.first(where: { $0.id == modeId }) else { return }
+        currentModeId = mode.id
+        selection = Self.selection(from: mode.selectionData) ?? FamilyActivitySelection()
+    }
+
+    func createMode(named name: String) {
+        let mode = BlankFocusMode(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Nuevo modo" : name,
+            selectionData: Self.encodedSelection(selection)
+        )
+        focusModes.append(mode)
+        selectMode(mode.id)
+    }
+
+    func renameMode(_ modeId: UUID, name: String) {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanName.isEmpty else { return }
+        focusModes = focusModes.map { mode in
+            guard mode.id == modeId else { return mode }
+            var updated = mode
+            updated.name = cleanName
+            updated.updatedAt = Date()
+            return updated
+        }
+    }
+
+    func deleteMode(_ modeId: UUID) {
+        guard focusModes.count > 1 else { return }
+        focusModes.removeAll { $0.id == modeId }
+        if currentModeId == modeId, let firstMode = focusModes.first {
+            selectMode(firstMode.id)
+        }
+    }
+
     private func saveSelection(_ selection: FamilyActivitySelection) {
-        if let data = try? JSONEncoder().encode(selection) {
+        if let data = Self.encodedSelection(selection) {
             defaults.set(data, forKey: Keys.selection)
         }
     }
 
-    private func startSession(tag: String) {
+    private func startSession(tag: String?, forceStarted: Bool = false) {
         if activeSession != nil {
             endActiveSession()
         }
 
         let session = BlankSession(
-            profileId: defaultProfileId,
+            profileId: currentModeId,
             strategy: .nfc,
-            startTag: tag
+            startTag: tag,
+            forceStarted: forceStarted
         )
         sessions.append(session)
     }
@@ -133,9 +260,33 @@ final class SessionStore: ObservableObject {
         sessions[index].end()
     }
 
+    private func updateCurrentModeSelection(_ selection: FamilyActivitySelection) {
+        guard !focusModes.isEmpty else { return }
+        let encodedSelection = Self.encodedSelection(selection)
+        focusModes = focusModes.map { mode in
+            guard mode.id == currentModeId else { return mode }
+            var updated = mode
+            updated.selectionData = encodedSelection
+            updated.updatedAt = Date()
+            return updated
+        }
+    }
+
     private func saveSessions(_ sessions: [BlankSession]) {
         if let data = try? JSONEncoder().encode(sessions) {
             defaults.set(data, forKey: Keys.sessions)
+        }
+    }
+
+    private func saveFocusModes(_ modes: [BlankFocusMode]) {
+        if let data = try? JSONEncoder().encode(modes) {
+            defaults.set(data, forKey: Keys.focusModes)
+        }
+    }
+
+    private func saveSchedule(_ schedule: BlankFocusSchedule) {
+        if let data = try? JSONEncoder().encode(schedule) {
+            defaults.set(data, forKey: Keys.schedule)
         }
     }
 
@@ -155,6 +306,37 @@ final class SessionStore: ObservableObject {
         return decoded
     }
 
+    private static func loadFocusModes(from defaults: UserDefaults, fallbackSelection: FamilyActivitySelection) -> [BlankFocusMode] {
+        if let data = defaults.data(forKey: Keys.focusModes),
+           let decoded = try? JSONDecoder().decode([BlankFocusMode].self, from: data),
+           !decoded.isEmpty {
+            return decoded
+        }
+
+        return [
+            BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria", selectionData: encodedSelection(fallbackSelection)),
+            BlankFocusMode(name: "Estudio"),
+            BlankFocusMode(name: "Dormir")
+        ]
+    }
+
+    private static func loadSchedule(from defaults: UserDefaults) -> BlankFocusSchedule {
+        guard let data = defaults.data(forKey: Keys.schedule),
+              let decoded = try? JSONDecoder().decode(BlankFocusSchedule.self, from: data) else {
+            return BlankFocusSchedule()
+        }
+        return decoded
+    }
+
+    private static func encodedSelection(_ selection: FamilyActivitySelection) -> Data? {
+        try? JSONEncoder().encode(selection)
+    }
+
+    private static func selection(from data: Data?) -> FamilyActivitySelection? {
+        guard let data else { return nil }
+        return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
+    }
+
     enum NfcResult {
         case tagRegistered
         case bricked
@@ -166,9 +348,15 @@ final class SessionStore: ObservableObject {
     private enum Keys {
         static let isBlankActive = "isBlankActive"
         static let blankActiveSince = "blankActiveSince"
+        static let blankActiveUntil = "blankActiveUntil"
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
+        static let focusModes = "blankFocusModes"
+        static let currentModeId = "blankCurrentModeId"
+        static let schedule = "blankFocusSchedule"
+        static let backgroundThemeId = "blankBackgroundThemeId"
+        static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
     }
 }

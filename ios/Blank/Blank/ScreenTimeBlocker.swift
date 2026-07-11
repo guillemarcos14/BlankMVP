@@ -10,17 +10,45 @@ final class ScreenTimeBlocker: ObservableObject {
     private let store = ManagedSettingsStore()
     private var selection = FamilyActivitySelection()
 
+    var authorizationStatusLabel: String {
+        switch authorizationStatus {
+        case .notDetermined:
+            return "notDetermined"
+        case .denied:
+            return "denied"
+        case .approved:
+            return "approved"
+        @unknown default:
+            return "unknown"
+        }
+    }
+
+    func refreshAuthorizationStatus() {
+        authorizationStatus = AuthorizationCenter.shared.authorizationStatus
+    }
+
     func requestAuthorization() async -> Bool {
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-            authorizationStatus = AuthorizationCenter.shared.authorizationStatus
+            await refreshAuthorizationStatusUntilSettled()
             lastErrorMessage = nil
             return authorizationStatus == .approved
         } catch {
-            authorizationStatus = AuthorizationCenter.shared.authorizationStatus
+            await refreshAuthorizationStatusUntilSettled()
             lastErrorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func refreshAuthorizationStatusUntilSettled() async {
+        for _ in 0..<10 {
+            refreshAuthorizationStatus()
+            if authorizationStatus == .approved {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        refreshAuthorizationStatus()
     }
 
     func restore(selection: FamilyActivitySelection) async {

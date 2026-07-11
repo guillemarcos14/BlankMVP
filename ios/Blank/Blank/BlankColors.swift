@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum BrickColors {
+enum BlankColors {
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
     static let redDark = Color(red: 0.718, green: 0.110, blue: 0.110)
     static let green = Color(red: 0.220, green: 0.557, blue: 0.235)
@@ -23,8 +23,8 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .frame(height: 48)
-            .background(light ? Color.white : BrickColors.ink)
-            .foregroundStyle(light ? BrickColors.ink : Color.white)
+            .background(light ? Color.white : BlankColors.ink)
+            .foregroundStyle(light ? BlankColors.ink : Color.white)
             .clipShape(Capsule())
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.03 : 0.08), radius: 10, y: 5)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
@@ -37,8 +37,8 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
             .font(.headline)
             .frame(maxWidth: .infinity)
             .frame(height: 46)
-            .foregroundStyle(BrickColors.ink)
-            .overlay(Capsule().stroke(BrickColors.ink.opacity(0.35), lineWidth: 1))
+            .foregroundStyle(BlankColors.ink)
+            .overlay(Capsule().stroke(BlankColors.ink.opacity(0.35), lineWidth: 1))
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }

@@ -72,16 +72,24 @@ final class SessionStore: ObservableObject {
         }
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
-        selection = Self.loadSelection(from: defaults)
-        sessions = Self.loadSessions(from: defaults)
-        focusModes = Self.loadFocusModes(from: defaults, fallbackSelection: selection)
+        let loadedSelection = Self.loadSelection(from: defaults)
+        let loadedFocusModes = Self.loadFocusModes(from: defaults, fallbackSelection: loadedSelection)
         let storedModeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:))
-        currentModeId = storedModeId.flatMap { id in focusModes.first(where: { $0.id == id })?.id }
-            ?? focusModes.first?.id
+        let loadedModeId = storedModeId.flatMap { id in loadedFocusModes.first(where: { $0.id == id })?.id }
+            ?? loadedFocusModes.first?.id
             ?? Self.defaultModeId
+
+        selection = loadedSelection
+        sessions = Self.loadSessions(from: defaults)
+        focusModes = loadedFocusModes
+        currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
         backgroundThemeId = defaults.string(forKey: Keys.backgroundThemeId) ?? "grey"
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
+
+        let currentMode = loadedFocusModes.first { $0.id == loadedModeId }
+            ?? loadedFocusModes.first
+            ?? BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria")
 
         if let currentSelection = Self.selection(from: currentMode.selectionData) {
             selection = currentSelection
@@ -135,7 +143,7 @@ final class SessionStore: ObservableObject {
             return .noAppsSelected
         }
         guard !isBlankActive else {
-            return .bricked
+            return .blanked
         }
 
         isBlankActive = true
@@ -151,12 +159,12 @@ final class SessionStore: ObservableObject {
             deviceActivityTimerScheduled = false
         }
         startSession(tag: nfcTagUid, forceStarted: forceStarted)
-        return .bricked
+        return .blanked
     }
 
     func deactivateBlank() -> NfcResult {
         guard isBlankActive else {
-            return .unbricked
+            return .unblanked
         }
 
         isBlankActive = false
@@ -165,7 +173,7 @@ final class SessionStore: ObservableObject {
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
         endActiveSession()
-        return .unbricked
+        return .unblanked
     }
 
     func applyScheduleWindow(at date: Date = Date()) {
@@ -339,8 +347,8 @@ final class SessionStore: ObservableObject {
 
     enum NfcResult {
         case tagRegistered
-        case bricked
-        case unbricked
+        case blanked
+        case unblanked
         case wrongTag
         case noAppsSelected
     }

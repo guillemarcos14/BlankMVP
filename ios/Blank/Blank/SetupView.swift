@@ -4,6 +4,7 @@ import SwiftUI
 struct SetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var currentStep = 0
     @State private var showingPicker = false
@@ -58,7 +59,7 @@ struct SetupView: View {
             if let message {
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(BrickColors.secondaryText)
+                    .foregroundStyle(BlankColors.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.top, 18)
             }
@@ -69,9 +70,18 @@ struct SetupView: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 42)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(BrickColors.warmBackground)
-        .foregroundStyle(BrickColors.ink)
+        .background(BlankColors.warmBackground)
+        .foregroundStyle(BlankColors.ink)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
+        .task {
+            await refreshScreenTimeAndContinueIfApproved()
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            Task {
+                await refreshScreenTimeAndContinueIfApproved()
+            }
+        }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
@@ -85,7 +95,7 @@ struct SetupView: View {
             HStack(spacing: 7) {
                 ForEach(0..<3, id: \.self) { index in
                     Capsule()
-                        .fill(index == currentStep ? BrickColors.ink : BrickColors.line)
+                        .fill(index == currentStep ? BlankColors.ink : BlankColors.line)
                         .frame(width: index == currentStep ? 22 : 8, height: 8)
                 }
             }
@@ -103,7 +113,7 @@ struct SetupView: View {
         HStack(spacing: 8) {
             ForEach(0..<3, id: \.self) { index in
                 Capsule()
-                    .fill(index <= currentStep ? BrickColors.ink : BrickColors.line)
+                    .fill(index <= currentStep ? BlankColors.ink : BlankColors.line)
                     .frame(width: index == currentStep ? 22 : 8, height: 8)
             }
         }
@@ -121,13 +131,13 @@ struct SetupView: View {
         VStack(spacing: 14) {
             Text(eyebrow)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(BrickColors.mutedInk)
+                .foregroundStyle(BlankColors.mutedInk)
             Text(title)
                 .font(.system(size: 34, weight: .semibold, design: .rounded))
                 .multilineTextAlignment(.center)
             Text(body)
                 .font(.body)
-                .foregroundStyle(BrickColors.mutedInk)
+                .foregroundStyle(BlankColors.mutedInk)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 340)
@@ -155,8 +165,21 @@ struct SetupView: View {
                 currentStep = 1
                 message = nil
             } else {
-                message = screenTimeBlocker.lastErrorMessage ?? "Screen Time no ha quedado autorizado."
+                let status = "Estado iOS: \(screenTimeBlocker.authorizationStatusLabel)."
+                if let lastErrorMessage = screenTimeBlocker.lastErrorMessage {
+                    message = "\(lastErrorMessage) \(status)"
+                } else {
+                    message = "Screen Time no ha quedado autorizado. \(status)"
+                }
             }
+        }
+    }
+
+    private func refreshScreenTimeAndContinueIfApproved() async {
+        await screenTimeBlocker.refreshAuthorizationStatusUntilSettled()
+        if screenTimeBlocker.authorizationStatus == .approved, currentStep == 0 {
+            currentStep = 1
+            message = nil
         }
     }
 

@@ -13,7 +13,7 @@ struct ReportView: View {
 
                 Text("Una lectura basica de lo que Blank ha protegido esta semana.")
                     .font(.body)
-                    .foregroundStyle(BrickColors.secondaryText)
+                    .foregroundStyle(BlankColors.secondaryText)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -23,11 +23,11 @@ struct ReportView: View {
 
                 Text("tiempo recuperado estimado")
                     .font(.headline)
-                    .foregroundStyle(BrickColors.secondaryText)
+                    .foregroundStyle(BlankColors.secondaryText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(22)
-            .background(BrickColors.surface)
+            .background(BlankColors.surface)
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
             VStack(spacing: 12) {
@@ -38,14 +38,14 @@ struct ReportView: View {
 
             Text("La estimacion usa una aproximacion conservadora de 15 minutos salvados por sesion completada. Se ajustara cuando Blank tenga mas datos reales.")
                 .font(.footnote)
-                .foregroundStyle(BrickColors.secondaryText)
+                .foregroundStyle(BlankColors.secondaryText)
 
             Spacer()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(BrickColors.background)
-        .foregroundStyle(BrickColors.text)
+        .background(BlankColors.background)
+        .foregroundStyle(BlankColors.text)
         .navigationTitle("Informe")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -53,13 +53,13 @@ struct ReportView: View {
     private func reportRow(title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .foregroundStyle(BrickColors.secondaryText)
+                .foregroundStyle(BlankColors.secondaryText)
             Spacer()
             Text(value)
                 .fontWeight(.semibold)
         }
         .padding(18)
-        .background(BrickColors.surface.opacity(0.72))
+        .background(BlankColors.surface.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 

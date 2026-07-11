@@ -4,6 +4,7 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var now = Date()
     @State private var message: String?
@@ -37,7 +38,7 @@ struct HomeView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 42)
         }
-        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BrickColors.ink)
+        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
@@ -46,9 +47,14 @@ struct HomeView: View {
         }
         .onAppear {
             displayedMessage = (sessionStore.isBlankActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
+            screenTimeBlocker.refreshAuthorizationStatus()
         }
-        .onChange(of: sessionStore.isBlankActive) { _, isActive in
+        .onChange(of: sessionStore.isBlankActive) { isActive in
             displayedMessage = (isActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
+        }
+        .onChange(of: scenePhase) { phase in
+            guard phase == .active else { return }
+            screenTimeBlocker.refreshAuthorizationStatus()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
@@ -124,7 +130,7 @@ struct HomeView: View {
                                 .font(.subheadline.weight(.semibold))
                             Text(issue.body)
                                 .font(.footnote)
-                                .foregroundStyle(BrickColors.mutedInk)
+                                .foregroundStyle(BlankColors.mutedInk)
                         }
                     }
                 }
@@ -158,13 +164,13 @@ struct HomeView: View {
             } else {
                 Text("\(sessionStore.selectionCount) selecciones protegidas")
                     .font(.body)
-                    .foregroundStyle(BrickColors.mutedInk)
+                    .foregroundStyle(BlankColors.mutedInk)
             }
 
             if let message {
                 Text(message)
                     .font(.footnote)
-                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BrickColors.mutedInk)
+                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.mutedInk)
                     .multilineTextAlignment(.center)
                     .padding(.top, 8)
             }
@@ -226,9 +232,9 @@ struct HomeView: View {
         switch result {
         case .tagRegistered:
             return "NFC registrado."
-        case .bricked:
+        case .blanked:
             return "Blank activado."
-        case .unbricked:
+        case .unblanked:
             return "Blank desactivado."
         case .wrongTag:
             return "Ese NFC no es tu pieza de Blank."
@@ -262,7 +268,7 @@ private struct AppBackground: View {
 
     var body: some View {
         LinearGradient(
-            colors: isActive ? [Color.black, BrickColors.redDark] : colors,
+            colors: isActive ? [Color.black, BlankColors.redDark] : colors,
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -279,25 +285,25 @@ private struct AppBackground: View {
     private var colors: [Color] {
         switch themeId {
         case "sage":
-            return [Color(red: 0.80, green: 0.84, blue: 0.75), BrickColors.warmBackground]
+            return [Color(red: 0.80, green: 0.84, blue: 0.75), BlankColors.warmBackground]
         case "mint":
-            return [Color(red: 0.76, green: 0.88, blue: 0.82), BrickColors.warmBackground]
+            return [Color(red: 0.76, green: 0.88, blue: 0.82), BlankColors.warmBackground]
         case "teal":
-            return [Color(red: 0.62, green: 0.80, blue: 0.78), BrickColors.warmBackground]
+            return [Color(red: 0.62, green: 0.80, blue: 0.78), BlankColors.warmBackground]
         case "blue":
-            return [Color(red: 0.75, green: 0.82, blue: 0.90), BrickColors.warmBackground]
+            return [Color(red: 0.75, green: 0.82, blue: 0.90), BlankColors.warmBackground]
         case "indigo":
-            return [Color(red: 0.68, green: 0.72, blue: 0.88), BrickColors.warmBackground]
+            return [Color(red: 0.68, green: 0.72, blue: 0.88), BlankColors.warmBackground]
         case "purple":
-            return [Color(red: 0.78, green: 0.70, blue: 0.88), BrickColors.warmBackground]
+            return [Color(red: 0.78, green: 0.70, blue: 0.88), BlankColors.warmBackground]
         case "rose":
-            return [Color(red: 0.91, green: 0.78, blue: 0.80), BrickColors.warmBackground]
+            return [Color(red: 0.91, green: 0.78, blue: 0.80), BlankColors.warmBackground]
         case "coral":
-            return [Color(red: 0.92, green: 0.70, blue: 0.64), BrickColors.warmBackground]
+            return [Color(red: 0.92, green: 0.70, blue: 0.64), BlankColors.warmBackground]
         case "amber":
-            return [Color(red: 0.92, green: 0.78, blue: 0.50), BrickColors.warmBackground]
+            return [Color(red: 0.92, green: 0.78, blue: 0.50), BlankColors.warmBackground]
         default:
-            return [BrickColors.warmBackground, Color(red: 0.82, green: 0.82, blue: 0.78)]
+            return [BlankColors.warmBackground, Color(red: 0.82, green: 0.82, blue: 0.78)]
         }
     }
 }
@@ -305,7 +311,7 @@ private struct AppBackground: View {
 private struct DotPattern: View {
     var body: some View {
         Canvas { context, size in
-            let color = BrickColors.mutedInk.opacity(0.35)
+            let color = BlankColors.mutedInk.opacity(0.35)
             let step: CGFloat = 13
             var y: CGFloat = 0
             while y < size.height {

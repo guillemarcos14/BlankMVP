@@ -19,6 +19,8 @@
 		8A000001000000000000000A /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001C /* ReportView.swift */; };
 		8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */; };
 		8A000001000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001F /* Assets.xcassets */; };
+		8A000001000000000000000E /* instrument_serif_regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000021 /* instrument_serif_regular.ttf */; };
+		8A000001000000000000000F /* inter_variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000022 /* inter_variable.ttf */; };
 		8A0000020000000000000001 /* DeviceActivityMonitorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000020000000000000011 /* DeviceActivityMonitorExtension.swift */; };
 		8A0000020000000000000002 /* BlankDeviceActivityMonitor.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -63,6 +65,8 @@
 		8A000001000000000000001C /* ReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportView.swift; sourceTree = "<group>"; };
 		8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityTimerScheduler.swift; sourceTree = "<group>"; };
 		8A000001000000000000001F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8A0000010000000000000021 /* instrument_serif_regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = instrument_serif_regular.ttf; sourceTree = "<group>"; };
+		8A0000010000000000000022 /* inter_variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = inter_variable.ttf; sourceTree = "<group>"; };
 		8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlankDeviceActivityMonitor.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A0000020000000000000011 /* DeviceActivityMonitorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityMonitorExtension.swift; sourceTree = "<group>"; };
 		8A0000020000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -111,10 +115,20 @@
 				8A000001000000000000001C /* ReportView.swift */,
 				8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */,
 				8A000001000000000000001F /* Assets.xcassets */,
+				8A0000010000000000000033 /* Fonts */,
 				8A0000010000000000000019 /* Info.plist */,
 				8A000001000000000000001A /* Blank.entitlements */,
 			);
 			path = Blank;
+			sourceTree = "<group>";
+		};
+		8A0000010000000000000033 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000010000000000000021 /* instrument_serif_regular.ttf */,
+				8A0000010000000000000022 /* inter_variable.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		8A0000020000000000000031 /* BlankDeviceActivityMonitor */ = {
@@ -218,6 +232,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				8A000001000000000000000D /* Assets.xcassets in Resources */,
+				8A000001000000000000000E /* instrument_serif_regular.ttf in Resources */,
+				8A000001000000000000000F /* inter_variable.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

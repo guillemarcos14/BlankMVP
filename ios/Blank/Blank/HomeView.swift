@@ -8,6 +8,7 @@ struct HomeView: View {
 
     @State private var now = Date()
     @State private var message: String?
+    @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
     @State private var showingModes = false
     @State private var showingSettings = false
@@ -81,18 +82,19 @@ struct HomeView: View {
                 _ = sessionStore.deactivateBlank()
                 screenTimeBlocker.clear()
                 message = "Blank desactivado por emergencia."
+                messageAction = nil
             }
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingRelink) {
-            RelinkSheet(message: $message)
+            RelinkSheet(message: $message, messageAction: $messageAction)
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingTimer) {
             TimerStartSheet { minutes in
                 let result = sessionStore.activateBlank(durationMinutes: minutes)
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                message = messageText(for: result)
+                setMessage(for: result)
             }
             .presentationDetents([.medium])
         }
@@ -122,17 +124,26 @@ struct HomeView: View {
         let issues = configIssues
         if !issues.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(issues, id: \.title) { issue in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "exclamationmark.circle")
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(issue.title)
-                                .font(.subheadline.weight(.semibold))
-                            Text(issue.body)
-                                .font(.footnote)
+                ForEach(issues) { issue in
+                    Button {
+                        resolve(issue.action)
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "exclamationmark.circle")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(issue.title)
+                                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                                Text(issue.body)
+                                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                                    .foregroundStyle(BlankColors.mutedInk)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(BlankColors.mutedInk)
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(14)
@@ -145,34 +156,52 @@ struct HomeView: View {
     private var centerMessage: some View {
         VStack(spacing: 14) {
             Text(displayedMessage)
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .font(.blankSerif(size: 40, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
                 .lineLimit(4)
                 .minimumScaleFactor(0.72)
 
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
                 Text(elapsedText(since: blankActiveSince))
-                    .font(.system(size: 30, weight: .semibold, design: .monospaced))
+                    .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title))
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
                     Text("Termina en \(remainingText(until: blankActiveUntil))")
-                        .font(.body)
+                        .font(.blankBody)
                         .foregroundStyle(Color.white.opacity(0.76))
                     Text(sessionStore.deviceActivityTimerScheduled ? "Timer del sistema activo" : "Timer interno activo")
-                        .font(.footnote)
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.58))
+                }
+                if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
+                    Text("Horario pausado \(remainingText(until: schedulePausedUntil))")
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
                         .foregroundStyle(Color.white.opacity(0.58))
                 }
             } else {
                 Text("\(sessionStore.selectionCount) selecciones protegidas")
-                    .font(.body)
+                    .font(.blankBody)
                     .foregroundStyle(BlankColors.mutedInk)
             }
 
             if let message {
-                Text(message)
-                    .font(.footnote)
+                if let messageAction {
+                    Button {
+                        resolve(messageAction)
+                    } label: {
+                        Text(message)
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 8)
+                    }
+                    .buttonStyle(.plain)
                     .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.mutedInk)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
+                } else {
+                    Text(message)
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.mutedInk)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
+                }
             }
         }
     }
@@ -185,7 +214,7 @@ struct HomeView: View {
                 } else {
                     let result = sessionStore.activateBlank()
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    message = messageText(for: result)
+                    setMessage(for: result)
                 }
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
@@ -199,18 +228,45 @@ struct HomeView: View {
         }
     }
 
-    private var configIssues: [(title: String, body: String)] {
-        var issues: [(String, String)] = []
+    private var configIssues: [ConfigIssue] {
+        var issues: [ConfigIssue] = []
         if screenTimeBlocker.authorizationStatus != .approved {
-            issues.append(("Screen Time pendiente", "Autoriza Screen Time para que iOS aplique los escudos."))
+            issues.append(ConfigIssue(
+                title: "Screen Time pendiente",
+                body: "Autoriza Screen Time para que iOS aplique los escudos.",
+                action: .screenTime
+            ))
         }
         if sessionStore.nfcTagUid == nil {
-            issues.append(("NFC sin vincular", "Escanea una pieza fisica para poder salir de Blank."))
+            issues.append(ConfigIssue(
+                title: "NFC sin vincular",
+                body: "Escanea una pieza fisica para poder salir de Blank.",
+                action: .relinkNfc
+            ))
         }
         if !sessionStore.hasSelectedApps {
-            issues.append(("Sin apps seleccionadas", "Elige apps, categorias o dominios antes de iniciar."))
+            issues.append(ConfigIssue(
+                title: "Sin apps seleccionadas",
+                body: "Elige apps, categorias o dominios antes de iniciar.",
+                action: .selectApps
+            ))
         }
         return issues
+    }
+
+    private func resolve(_ action: ConfigIssue.Action) {
+        switch action {
+        case .screenTime:
+            Task { @MainActor in
+                let approved = await screenTimeBlocker.requestAuthorization()
+                message = approved ? "Screen Time autorizado." : "Screen Time sigue pendiente."
+                messageAction = approved ? nil : .screenTime
+            }
+        case .relinkNfc:
+            showingRelink = true
+        case .selectApps:
+            showingPicker = true
+        }
     }
 
     private func scanTag() {
@@ -220,11 +276,22 @@ struct HomeView: View {
                 case .success(let uid):
                     let nfcResult = sessionStore.handleNfcTag(uid: uid)
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    message = messageText(for: nfcResult)
+                    setMessage(for: nfcResult)
                 case .failure(let error):
                     message = error.localizedDescription
+                    messageAction = nil
                 }
             }
+        }
+    }
+
+    private func setMessage(for result: SessionStore.NfcResult) {
+        message = messageText(for: result)
+        switch result {
+        case .noAppsSelected:
+            messageAction = .selectApps
+        case .tagRegistered, .blanked, .unblanked, .schedulePaused, .wrongTag:
+            messageAction = nil
         }
     }
 
@@ -236,10 +303,12 @@ struct HomeView: View {
             return "Blank activado."
         case .unblanked:
             return "Blank desactivado."
+        case .schedulePaused:
+            return "Apps desbloqueadas 5 minutos."
         case .wrongTag:
             return "Ese NFC no es tu pieza de Blank."
         case .noAppsSelected:
-            return "Selecciona al menos una app antes."
+            return "Sin apps seleccionadas"
         }
     }
 
@@ -262,16 +331,32 @@ struct HomeView: View {
     }
 }
 
+private struct ConfigIssue: Identifiable {
+    enum Action {
+        case screenTime
+        case relinkNfc
+        case selectApps
+    }
+
+    let title: String
+    let body: String
+    let action: Action
+
+    var id: String { title }
+}
+
 private struct AppBackground: View {
     let isActive: Bool
     let themeId: String
 
     var body: some View {
-        LinearGradient(
-            colors: isActive ? [Color.black, BlankColors.redDark] : colors,
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            (isActive ? BlankColors.ink : BlankColors.background)
+            Image(assetName)
+                .resizable()
+                .scaledToFill()
+                .opacity(0.94)
+        }
         .ignoresSafeArea()
         .overlay {
             if !isActive {
@@ -282,29 +367,11 @@ private struct AppBackground: View {
         }
     }
 
-    private var colors: [Color] {
-        switch themeId {
-        case "sage":
-            return [Color(red: 0.80, green: 0.84, blue: 0.75), BlankColors.warmBackground]
-        case "mint":
-            return [Color(red: 0.76, green: 0.88, blue: 0.82), BlankColors.warmBackground]
-        case "teal":
-            return [Color(red: 0.62, green: 0.80, blue: 0.78), BlankColors.warmBackground]
-        case "blue":
-            return [Color(red: 0.75, green: 0.82, blue: 0.90), BlankColors.warmBackground]
-        case "indigo":
-            return [Color(red: 0.68, green: 0.72, blue: 0.88), BlankColors.warmBackground]
-        case "purple":
-            return [Color(red: 0.78, green: 0.70, blue: 0.88), BlankColors.warmBackground]
-        case "rose":
-            return [Color(red: 0.91, green: 0.78, blue: 0.80), BlankColors.warmBackground]
-        case "coral":
-            return [Color(red: 0.92, green: 0.70, blue: 0.64), BlankColors.warmBackground]
-        case "amber":
-            return [Color(red: 0.92, green: 0.78, blue: 0.50), BlankColors.warmBackground]
-        default:
-            return [BlankColors.warmBackground, Color(red: 0.82, green: 0.82, blue: 0.78)]
-        }
+    private var assetName: String {
+        let theme = ["grey", "sage", "mint", "teal", "blue", "indigo", "purple", "rose", "coral", "amber"].contains(themeId)
+            ? themeId
+            : "grey"
+        return "bg_\(theme)_\(isActive ? "2" : "1")"
     }
 }
 
@@ -466,17 +533,23 @@ private struct ScheduleSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @State private var enabled = false
-    @State private var startTime = "23:30"
-    @State private var endTime = "08:00"
+    @State private var startDate = dateForMinute(23 * 60 + 30)
+    @State private var endDate = dateForMinute(8 * 60)
 
     var body: some View {
         NavigationStack {
             Form {
                 Toggle("Activar horario diario", isOn: $enabled)
-                TextField("Inicio", text: $startTime)
-                    .keyboardType(.numbersAndPunctuation)
-                TextField("Fin", text: $endTime)
-                    .keyboardType(.numbersAndPunctuation)
+                Section("Inicio") {
+                    DatePicker("Inicio", selection: $startDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                }
+                Section("Fin") {
+                    DatePicker("Fin", selection: $endDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                }
                 Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -487,8 +560,8 @@ private struct ScheduleSheet: View {
                     Button("Guardar") {
                         sessionStore.schedule = BlankFocusSchedule(
                             enabled: enabled,
-                            startMinute: parseMinute(startTime) ?? sessionStore.schedule.startMinute,
-                            endMinute: parseMinute(endTime) ?? sessionStore.schedule.endMinute
+                            startMinute: minuteOfDay(from: startDate),
+                            endMinute: minuteOfDay(from: endDate)
                         )
                         dismiss()
                     }
@@ -496,8 +569,8 @@ private struct ScheduleSheet: View {
             }
             .onAppear {
                 enabled = sessionStore.schedule.enabled
-                startTime = formatMinute(sessionStore.schedule.startMinute)
-                endTime = formatMinute(sessionStore.schedule.endMinute)
+                startDate = dateForMinute(sessionStore.schedule.startMinute)
+                endDate = dateForMinute(sessionStore.schedule.endMinute)
             }
         }
     }
@@ -535,6 +608,7 @@ private struct RelinkSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @Binding var message: String?
+    @Binding var messageAction: ConfigIssue.Action?
     @State private var nfcReader = NFCReader()
 
     var body: some View {
@@ -551,9 +625,11 @@ private struct RelinkSheet: View {
                         case .success(let uid):
                             sessionStore.nfcTagUid = uid
                             message = "Nueva pieza NFC vinculada."
+                            messageAction = nil
                             dismiss()
                         case .failure(let error):
                             message = error.localizedDescription
+                            messageAction = nil
                         }
                     }
                 }
@@ -573,7 +649,7 @@ private struct TimerStartSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
-                .font(.largeTitle.weight(.bold))
+                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
             Text("Blank se desactiva automaticamente al terminar. Si quieres salir antes, usa tu NFC o emergencia.")
                 .foregroundStyle(.secondary)
 
@@ -618,4 +694,21 @@ private func parseMinute(_ value: String) -> Int? {
         return nil
     }
     return hour * 60 + minute
+}
+
+private func dateForMinute(_ minuteOfDay: Int) -> Date {
+    let calendar = Calendar.current
+    let hour = max(0, min(23, minuteOfDay / 60))
+    let minute = max(0, min(59, minuteOfDay % 60))
+    return calendar.date(
+        bySettingHour: hour,
+        minute: minute,
+        second: 0,
+        of: Date()
+    ) ?? Date()
+}
+
+private func minuteOfDay(from date: Date) -> Int {
+    let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+    return (components.hour ?? 0) * 60 + (components.minute ?? 0)
 }

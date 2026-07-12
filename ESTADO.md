@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-11
+Ultima actualizacion: 2026-07-12
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -42,6 +42,13 @@ Ultima actualizacion: 2026-07-11
 - 2026-07-10: El iPhone muestra el mensaje `Screen Time no ha quedado autorizado` sin el sufijo nuevo `Estado iOS: ...`, lo que indica que el build instalado probablemente es anterior al diagnostico local; se endurecio el flujo para esperar hasta 2,5s el refresco de `AuthorizationCenter` y avanzar automaticamente al paso 2 si ya esta `approved`.
 - 2026-07-11: Se reviso el problema de Screen Time tras la instalacion en iPhone; el codigo local ya tenia diagnostico de `AuthorizationCenter`, y se anadio refresco al volver la app a `active` para que el onboarding avance si iOS concede el permiso desde el dialogo o desde Ajustes.
 - 2026-07-11: Se subio el build iOS local a `1.0 (2)` (`CURRENT_PROJECT_VERSION = 2` y `CFBundleVersion = 2`) para preparar una nueva subida a TestFlight con el arreglo de Screen Time.
+- 2026-07-11: En MacinCloud/Xcode, `Product > Archive` para `Blank 1.0 (2)` completo con `Build Succeeded` y aparece en Organizer; quedan dos warnings visibles (`Switch must be exhaustive` y falta `AccentColor`) que no bloquean la distribucion.
+- 2026-07-11: El usuario completo `Distribute App` -> `App Store Connect` -> `Upload` para `Blank 1.0 (2)` y Xcode termino con `Done`; queda esperar procesamiento en App Store Connect/TestFlight y actualizar en el iPhone.
+- 2026-07-12: El usuario confirma que `Blank 1.0 (2)` no aparecia en TestFlight porque faltaba informacion de exportacion en App Store Connect; esa informacion ya esta resuelta.
+- 2026-07-12: Tras probar la app descargada en iPhone, se corrigio en iOS la paridad visual con Android: fuentes `Instrument Serif` e `Inter`, fondos Android copiados al asset catalog y eliminacion del degradado negro/rojo en modo activo.
+- 2026-07-12: En iOS, los avisos de configuracion y el mensaje `Sin apps seleccionadas` pasan a ser accionables: Screen Time reintenta autorizacion, NFC abre vinculacion y apps abre el selector.
+- 2026-07-12: En iOS, el horario diario cambia de campos de texto a rueda `DatePicker` estilo iPhone para inicio y fin.
+- 2026-07-12: En iOS, si el horario diario esta activo y se escanea el NFC durante una ventana programada, Blank pausa el bloqueo 5 minutos, limpia los shields y luego deja que el horario vuelva a bloquear al expirar la pausa.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -56,16 +63,19 @@ Ultima actualizacion: 2026-07-11
 - En Windows y MacinCloud la ruta iOS ahora es `ios/Blank/Blank.xcodeproj`; Xcode carga el proyecto renombrado, pero falta validar con build iOS real tras resolver signing/provisioning.
 - Existe una convencion de repo para leer y actualizar `ESTADO.md` al inicio, durante y al final de cada bloque de trabajo.
 - Hay cambios no relacionados ya presentes en el arbol de trabajo; algunos ficheros que ya estaban modificados tambien recibieron reemplazos de texto del nombre anterior a `Blank`.
+- La app iOS ya tiene cambios locales para corregir diseno y friccion antes de produccion real; falta compilar/probar en MacinCloud/Xcode y subir un nuevo build si pasa.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
 - Si se quiere instalar en iPhone fisico, seleccionar el dispositivo registrado y ejecutar build/run de desarrollo.
 - No repetir solo el toggle de `Automatically manage signing`; ya se probo en `Release` con `Clean Build Folder` y el error persistio.
 - Resolver el archivo de provisioning de archive para `com.blanknfc.app.ios.deviceactivity` o esperar aprobacion de `Family Controls (Distribution)` antes de insistir con TestFlight/App Store.
-- En MacinCloud, actualizar `~/BlankMVP` con estos cambios y generar/subir un nuevo archive `Blank 1.0 (2)` a TestFlight.
+- Cuando TestFlight muestre `Blank 1.0 (2)`, actualizar la app en el iPhone.
 - En el iPhone, instalar `Blank 1.0 (2)` desde TestFlight y probar Screen Time sin cambiar mas ajustes antes: si iOS ya tiene el permiso concedido deberia avanzar al paso 2; si no, debe mostrar `Estado iOS: approved/denied/notDetermined`.
 - Si `1.0 (2)` sigue mostrando pendiente aunque Ajustes mantenga Blank activado, revisar en el propio iPhone el valor mostrado por `Estado iOS: ...` y usarlo como siguiente diagnostico.
 - Para pruebas externas, preparar la informacion de beta review si se quiere invitar a testers fuera del equipo.
+- En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
+- Si la compilacion iOS pasa, subir un nuevo build TestFlight incrementando `CFBundleVersion`/`CURRENT_PROJECT_VERSION`.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
@@ -73,6 +83,8 @@ Ultima actualizacion: 2026-07-11
 - [cerrada] 2026-07-09: El Team ID de Apple para el proyecto iOS es `GS54UV79RG`.
 - [cerrada] 2026-07-09: El proyecto usara `ESTADO.md` en la raiz como fuente de verdad incremental para continuidad entre sesiones.
 - [cerrada] 2026-07-09: Las instrucciones de gestion de estado viven en `AGENTS.md` para que los agentes las encuentren al abrir el repo.
+- [cerrada] 2026-07-12: La app iOS debe usar `Instrument Serif` e `Inter` como Android y tomar sus fondos desde los assets Android, no desde degradados aproximados.
+- [cerrada] 2026-07-12: Durante un horario diario activo, escanear el NFC debe dar 5 minutos de desbloqueo temporal y despues permitir que el horario vuelva a aplicar el bloqueo.
 
 ## Descartado
 - 2026-07-09: No se considera bloqueado por Swift/proyecto porque el build de simulador sin firma en Xcode 26.5 termino con `BUILD SUCCEEDED`.

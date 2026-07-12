@@ -2,17 +2,31 @@ import SwiftUI
 
 enum BlankColors {
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
-    static let redDark = Color(red: 0.718, green: 0.110, blue: 0.110)
-    static let green = Color(red: 0.220, green: 0.557, blue: 0.235)
-    static let background = Color(red: 0.071, green: 0.071, blue: 0.071)
-    static let surface = Color(red: 0.118, green: 0.118, blue: 0.118)
+    static let redDark = Color(red: 0.125, green: 0.129, blue: 0.141)
+    static let green = Color(red: 0.125, green: 0.129, blue: 0.141)
+    static let background = Color(red: 0.914, green: 0.914, blue: 0.906)
+    static let surface = Color(red: 0.961, green: 0.961, blue: 0.961)
     static let text = Color.white
     static let secondaryText = Color.white.opacity(0.70)
-    static let warmBackground = Color(red: 0.906, green: 0.902, blue: 0.878)
+    static let warmBackground = Color(red: 0.914, green: 0.914, blue: 0.906)
     static let warmSurface = Color.white.opacity(0.72)
-    static let ink = Color(red: 0.100, green: 0.098, blue: 0.090)
-    static let mutedInk = Color(red: 0.365, green: 0.357, blue: 0.325)
-    static let line = Color(red: 0.741, green: 0.733, blue: 0.690)
+    static let ink = Color(red: 0.125, green: 0.129, blue: 0.141)
+    static let mutedInk = Color(red: 0.400, green: 0.408, blue: 0.400)
+    static let line = Color(red: 0.125, green: 0.129, blue: 0.141).opacity(0.10)
+}
+
+extension Font {
+    static func blankSerif(size: CGFloat, relativeTo textStyle: TextStyle = .title) -> Font {
+        .custom("Instrument Serif", size: size, relativeTo: textStyle)
+    }
+
+    static func blankInter(size: CGFloat, weight: Weight = .regular, relativeTo textStyle: TextStyle = .body) -> Font {
+        .custom("Inter", size: size, relativeTo: textStyle).weight(weight)
+    }
+
+    static var blankBody: Font {
+        .blankInter(size: 16)
+    }
 }
 
 struct BlankPrimaryButtonStyle: ButtonStyle {
@@ -20,7 +34,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: .infinity)
             .frame(height: 48)
             .background(light ? Color.white : BlankColors.ink)
@@ -34,7 +48,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
 struct BlankSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.headline)
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: .infinity)
             .frame(height: 46)
             .foregroundStyle(BlankColors.ink)

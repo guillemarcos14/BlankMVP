@@ -48,6 +48,10 @@ final class SessionStore: ObservableObject {
         didSet { saveSchedule(schedule) }
     }
 
+    @Published var schedulePausedUntil: Date? {
+        didSet { defaults.set(schedulePausedUntil?.timeIntervalSince1970, forKey: Keys.schedulePausedUntil) }
+    }
+
     @Published var backgroundThemeId: String {
         didSet { defaults.set(backgroundThemeId, forKey: Keys.backgroundThemeId) }
     }
@@ -86,6 +90,11 @@ final class SessionStore: ObservableObject {
         schedule = Self.loadSchedule(from: defaults)
         backgroundThemeId = defaults.string(forKey: Keys.backgroundThemeId) ?? "grey"
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
+        if let timestamp = defaults.object(forKey: Keys.schedulePausedUntil) as? TimeInterval, timestamp > 0 {
+            schedulePausedUntil = Date(timeIntervalSince1970: timestamp)
+        } else {
+            schedulePausedUntil = nil
+        }
 
         let currentMode = loadedFocusModes.first { $0.id == loadedModeId }
             ?? loadedFocusModes.first
@@ -132,6 +141,9 @@ final class SessionStore: ObservableObject {
         }
 
         if isBlankActive {
+            if schedule.enabled, schedule.contains(Date()) {
+                return pauseScheduleWithNfc()
+            }
             return deactivateBlank()
         }
 
@@ -162,6 +174,12 @@ final class SessionStore: ObservableObject {
         return .blanked
     }
 
+    func pauseScheduleWithNfc(minutes: Int = 5) -> NfcResult {
+        schedulePausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        _ = deactivateBlank()
+        return .schedulePaused
+    }
+
     func deactivateBlank() -> NfcResult {
         guard isBlankActive else {
             return .unblanked
@@ -182,7 +200,21 @@ final class SessionStore: ObservableObject {
             return
         }
 
-        guard schedule.enabled else { return }
+        guard schedule.enabled else {
+            schedulePausedUntil = nil
+            return
+        }
+
+        if let schedulePausedUntil {
+            if date < schedulePausedUntil {
+                if isBlankActive {
+                    _ = deactivateBlank()
+                }
+                return
+            }
+            self.schedulePausedUntil = nil
+        }
+
         if schedule.contains(date) {
             _ = activateBlank(forceStarted: true)
         } else if isBlankActive {
@@ -198,6 +230,7 @@ final class SessionStore: ObservableObject {
         blankActiveUntil = nil
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
+        schedulePausedUntil = nil
         setupComplete = false
     }
 
@@ -349,6 +382,7 @@ final class SessionStore: ObservableObject {
         case tagRegistered
         case blanked
         case unblanked
+        case schedulePaused
         case wrongTag
         case noAppsSelected
     }
@@ -366,5 +400,6 @@ final class SessionStore: ObservableObject {
         static let schedule = "blankFocusSchedule"
         static let backgroundThemeId = "blankBackgroundThemeId"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
+        static let schedulePausedUntil = "blankSchedulePausedUntil"
     }
 }

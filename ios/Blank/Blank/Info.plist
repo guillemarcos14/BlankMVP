@@ -24,6 +24,11 @@
 	<true/>
 	<key>NFCReaderUsageDescription</key>
 	<string>Blank uses NFC to pair and scan your physical Blank tag.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>instrument_serif_regular.ttf</string>
+		<string>inter_variable.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

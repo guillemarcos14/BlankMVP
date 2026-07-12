@@ -11,6 +11,7 @@ struct BlankApp: App {
             ContentView()
                 .environmentObject(sessionStore)
                 .environmentObject(screenTimeBlocker)
+                .environment(\.font, .blankBody)
                 .task {
                     await screenTimeBlocker.restore(selection: sessionStore.selection)
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)

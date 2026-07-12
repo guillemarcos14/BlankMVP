@@ -49,6 +49,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: En iOS, los avisos de configuracion y el mensaje `Sin apps seleccionadas` pasan a ser accionables: Screen Time reintenta autorizacion, NFC abre vinculacion y apps abre el selector.
 - 2026-07-12: En iOS, el horario diario cambia de campos de texto a rueda `DatePicker` estilo iPhone para inicio y fin.
 - 2026-07-12: En iOS, si el horario diario esta activo y se escanea el NFC durante una ventana programada, Blank pausa el bloqueo 5 minutos, limpia los shields y luego deja que el horario vuelva a bloquear al expirar la pausa.
+- 2026-07-12: Se subio a GitHub la rama `codex/ios-device-activity-target` con las correcciones iOS de diseno/horario/NFC y se incremento el build iOS local a `1.0 (3)` para la siguiente subida a TestFlight.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -75,7 +76,7 @@ Ultima actualizacion: 2026-07-12
 - Si `1.0 (2)` sigue mostrando pendiente aunque Ajustes mantenga Blank activado, revisar en el propio iPhone el valor mostrado por `Estado iOS: ...` y usarlo como siguiente diagnostico.
 - Para pruebas externas, preparar la informacion de beta review si se quiere invitar a testers fuera del equipo.
 - En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
-- Si la compilacion iOS pasa, subir un nuevo build TestFlight incrementando `CFBundleVersion`/`CURRENT_PROJECT_VERSION`.
+- Si la compilacion iOS pasa, archivar y subir a TestFlight como `Blank 1.0 (3)`.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones

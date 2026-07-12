@@ -53,6 +53,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: Se anadio soporte `DEBUG` para iterar estetica con SwiftUI Previews de `HomeView`: home normal, fondo mint, sin apps, NFC pendiente, Blank activo, timer, horario pausado y permiso pendiente.
 - 2026-07-12: Se anadio el scheme compartido `Blank.xcscheme` al proyecto iOS para que Xcode muestre el target principal `Blank` en el selector de schemes y pueda compilar previews.
 - 2026-07-12: Se sustituyo el `PreviewProvider` de `HomeView` por macros explicitas `#Preview(...)` para que Xcode detecte mejor las variantes visuales en Canvas.
+- 2026-07-12: En MacinCloud se ejecuto desde Terminal el `git pull --ff-only origin codex/ios-device-activity-target` y se abrio `ios/Blank/Blank.xcodeproj` de nuevo.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.

@@ -126,7 +126,7 @@ final class SessionStore: ObservableObject {
             return previewSelectionCount
         }
         #endif
-        selection.applicationTokens.count +
+        return selection.applicationTokens.count +
             selection.categoryTokens.count +
             selection.webDomainTokens.count
     }

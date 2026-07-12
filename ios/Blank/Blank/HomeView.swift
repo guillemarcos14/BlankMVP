@@ -21,7 +21,7 @@ struct HomeView: View {
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let idleMessages = ["No estas perdiendote nada.", "El scroll puede esperar.", "Para un momento.", "Toca empezar."]
-    private let activeMessages = ["Bien. Ahora el movil espera.", "Sigue un poco mas.", "Blank esta activo.", "Nada urgente. Como siempre."]
+    private let activeMessages = ["Bien. Ahora el movil espera.", "Sigue un poco mas.", "Respira un poco.", "Nada urgente. Como siempre."]
 
     var body: some View {
         ZStack {
@@ -40,6 +40,7 @@ struct HomeView: View {
             .padding(.vertical, 42)
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
@@ -51,7 +52,9 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
         }
         .onChange(of: sessionStore.isBlankActive) { isActive in
-            displayedMessage = (isActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
+            withAnimation(.easeInOut(duration: 0.65)) {
+                displayedMessage = (isActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
+            }
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -79,9 +82,11 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet {
-                _ = sessionStore.deactivateBlank()
+                withAnimation(.easeInOut(duration: 0.65)) {
+                    _ = sessionStore.deactivateBlank()
+                }
                 screenTimeBlocker.clear()
-                message = "Blank desactivado por emergencia."
+                message = nil
                 messageAction = nil
             }
             .presentationDetents([.medium])
@@ -92,7 +97,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingTimer) {
             TimerStartSheet { minutes in
-                let result = sessionStore.activateBlank(durationMinutes: minutes)
+                let result = withAnimation(.easeInOut(duration: 0.65)) {
+                    sessionStore.activateBlank(durationMinutes: minutes)
+                }
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 setMessage(for: result)
             }
@@ -163,7 +170,7 @@ struct HomeView: View {
 
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
                 Text(elapsedText(since: blankActiveSince))
-                    .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title))
+                    .font(.blankSerif(size: 40, relativeTo: .largeTitle))
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
                     Text("Termina en \(remainingText(until: blankActiveUntil))")
                         .font(.blankBody)
@@ -177,10 +184,6 @@ struct HomeView: View {
                         .font(.blankInter(size: 13, relativeTo: .footnote))
                         .foregroundStyle(Color.white.opacity(0.58))
                 }
-            } else {
-                Text("\(sessionStore.selectionCount) selecciones protegidas")
-                    .font(.blankBody)
-                    .foregroundStyle(BlankColors.mutedInk)
             }
 
             if let message {
@@ -212,7 +215,9 @@ struct HomeView: View {
                 if sessionStore.isBlankActive {
                     scanTag()
                 } else {
-                    let result = sessionStore.activateBlank()
+                    let result = withAnimation(.easeInOut(duration: 0.65)) {
+                        sessionStore.activateBlank()
+                    }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
                 }
@@ -274,7 +279,9 @@ struct HomeView: View {
             Task { @MainActor in
                 switch result {
                 case .success(let uid):
-                    let nfcResult = sessionStore.handleNfcTag(uid: uid)
+                    let nfcResult = withAnimation(.easeInOut(duration: 0.65)) {
+                        sessionStore.handleNfcTag(uid: uid)
+                    }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: nfcResult)
                 case .failure(let error):
@@ -286,29 +293,22 @@ struct HomeView: View {
     }
 
     private func setMessage(for result: SessionStore.NfcResult) {
-        message = messageText(for: result)
-        switch result {
-        case .noAppsSelected:
-            messageAction = .selectApps
-        case .tagRegistered, .blanked, .unblanked, .schedulePaused, .wrongTag:
-            messageAction = nil
-        }
-    }
-
-    private func messageText(for result: SessionStore.NfcResult) -> String {
         switch result {
         case .tagRegistered:
-            return "NFC registrado."
-        case .blanked:
-            return "Blank activado."
-        case .unblanked:
-            return "Blank desactivado."
+            message = "NFC registrado."
+            messageAction = nil
+        case .blanked, .unblanked:
+            message = nil
+            messageAction = nil
         case .schedulePaused:
-            return "Apps desbloqueadas 5 minutos."
+            message = "Apps desbloqueadas 5 minutos."
+            messageAction = nil
         case .wrongTag:
-            return "Ese NFC no es tu pieza de Blank."
+            message = "Ese NFC no es tu pieza de Blank."
+            messageAction = nil
         case .noAppsSelected:
-            return "Sin apps seleccionadas"
+            message = "Sin apps seleccionadas"
+            messageAction = .selectApps
         }
     }
 
@@ -351,27 +351,39 @@ private struct AppBackground: View {
 
     var body: some View {
         ZStack {
-            (isActive ? BlankColors.ink : BlankColors.background)
-            Image(assetName)
+            BlankColors.background
+                .opacity(isActive ? 0 : 1)
+            BlankColors.ink
+                .opacity(isActive ? 1 : 0)
+            Image(inactiveAssetName)
                 .resizable()
                 .scaledToFill()
-                .opacity(0.94)
+                .opacity(isActive ? 0 : 0.94)
+            Image(activeAssetName)
+                .resizable()
+                .scaledToFill()
+                .opacity(isActive ? 0.94 : 0)
+            DotPattern()
+                .opacity(isActive ? 0 : 0.22)
+                .ignoresSafeArea()
         }
         .ignoresSafeArea()
-        .overlay {
-            if !isActive {
-                DotPattern()
-                    .opacity(0.22)
-                    .ignoresSafeArea()
-            }
-        }
+        .animation(.easeInOut(duration: 0.75), value: isActive)
     }
 
-    private var assetName: String {
+    private var inactiveAssetName: String {
+        "bg_\(theme)_1"
+    }
+
+    private var activeAssetName: String {
+        "bg_\(theme)_2"
+    }
+
+    private var theme: String {
         let theme = ["grey", "sage", "mint", "teal", "blue", "indigo", "purple", "rose", "coral", "amber"].contains(themeId)
             ? themeId
             : "grey"
-        return "bg_\(theme)_\(isActive ? "2" : "1")"
+        return theme
     }
 }
 
@@ -578,26 +590,24 @@ private struct ScheduleSheet: View {
 
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var phrase = ""
     let onUnlock: () -> Void
-    private let expected = "necesito salir de Blank"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Emergencia")
-                .font(.largeTitle.weight(.bold))
-            Text("Escribe la frase completa para desbloquear sin NFC.")
+                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
+            Text("Esto desactiva Blank sin usar tu NFC y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
                 .foregroundStyle(.secondary)
-            Text(expected)
-                .font(.headline)
-            TextField("Frase", text: $phrase)
-                .textFieldStyle(.roundedBorder)
-            Button("Desbloquear") {
+            Button("Confirmar emergencia") {
                 onUnlock()
                 dismiss()
             }
             .buttonStyle(BlankPrimaryButtonStyle())
-            .disabled(phrase.trimmingCharacters(in: .whitespacesAndNewlines) != expected)
+            Button("Cancelar") {
+                dismiss()
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
             Spacer()
         }
         .padding(24)

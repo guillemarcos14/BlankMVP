@@ -55,6 +55,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: Se sustituyo el `PreviewProvider` de `HomeView` por macros explicitas `#Preview(...)` para que Xcode detecte mejor las variantes visuales en Canvas.
 - 2026-07-12: En MacinCloud se ejecuto desde Terminal el `git pull --ff-only origin codex/ios-device-activity-target` y se abrio `ios/Blank/Blank.xcodeproj` de nuevo.
 - 2026-07-12: Se anadio en iOS un acceso `DEBUG` exclusivo de simulador para entrar al Home sin NFC real y revisar la estetica del proyecto actual ejecutandose como app.
+- 2026-07-12: En iOS `HomeView` se limpio la home eliminando el contador de selecciones protegidas y los mensajes de activacion/desactivacion, se puso el contador activo con `Instrument Serif`, se suavizo el cambio visual entre estados con crossfade de fondos y se cambio Emergencia a una confirmacion explicativa.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -72,6 +73,7 @@ Ultima actualizacion: 2026-07-12
 - La app iOS ya tiene cambios locales para corregir diseno y friccion antes de produccion real; falta compilar/probar en MacinCloud/Xcode y subir un nuevo build si pasa.
 - Para iteracion estetica rapida, `HomeView.swift` ya incluye una galeria de SwiftUI Previews con datos aislados de `UserDefaults` para no depender de TestFlight ni de tokens reales de FamilyControls.
 - Xcode debe usar el scheme `Blank`, no `BlankDeviceActivityMonitor`, para compilar previews de `HomeView`.
+- La home iOS ya tiene el ajuste solicitado de textos, contador, transicion visual y confirmacion de emergencia; en Windows solo se hizo validacion estatica (`git diff --check`) porque no hay toolchain Swift local.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -84,6 +86,7 @@ Ultima actualizacion: 2026-07-12
 - Para pruebas externas, preparar la informacion de beta review si se quiere invitar a testers fuera del equipo.
 - En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
 - En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
+- En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
 - Si la compilacion iOS pasa, archivar y subir a TestFlight como `Blank 1.0 (3)`.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 

@@ -54,6 +54,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: Se anadio el scheme compartido `Blank.xcscheme` al proyecto iOS para que Xcode muestre el target principal `Blank` en el selector de schemes y pueda compilar previews.
 - 2026-07-12: Se sustituyo el `PreviewProvider` de `HomeView` por macros explicitas `#Preview(...)` para que Xcode detecte mejor las variantes visuales en Canvas.
 - 2026-07-12: En MacinCloud se ejecuto desde Terminal el `git pull --ff-only origin codex/ios-device-activity-target` y se abrio `ios/Blank/Blank.xcodeproj` de nuevo.
+- 2026-07-12: Se anadio en iOS un acceso `DEBUG` exclusivo de simulador para entrar al Home sin NFC real y revisar la estetica del proyecto actual ejecutandose como app.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -94,6 +95,7 @@ Ultima actualizacion: 2026-07-12
 - [cerrada] 2026-07-12: La app iOS debe usar `Instrument Serif` e `Inter` como Android y tomar sus fondos desde los assets Android, no desde degradados aproximados.
 - [cerrada] 2026-07-12: Durante un horario diario activo, escanear el NFC debe dar 5 minutos de desbloqueo temporal y despues permitir que el horario vuelva a aplicar el bloqueo.
 - [cerrada] 2026-07-12: La iteracion estetica iOS se hara primero con SwiftUI Previews y simulador; TestFlight queda para validar NFC, Screen Time, firma y comportamiento real.
+- [cerrada] 2026-07-12: El bypass para entrar al Home sin NFC solo puede existir en `DEBUG` y `targetEnvironment(simulator)`, nunca en TestFlight ni produccion.
 
 ## Descartado
 - 2026-07-09: No se considera bloqueado por Swift/proyecto porque el build de simulador sin firma en Xcode 26.5 termino con `BUILD SUCCEEDED`.

@@ -64,6 +64,16 @@ struct SetupView: View {
                     .padding(.top, 18)
             }
 
+            #if DEBUG
+            #if targetEnvironment(simulator)
+            Button("Entrar al Home en simulador") {
+                enterSimulatorHome()
+            }
+            .buttonStyle(BlankSecondaryButtonStyle())
+            .padding(.top, message == nil ? 18 : 10)
+            #endif
+            #endif
+
             Spacer(minLength: 48)
             stepIndicator
         }
@@ -210,4 +220,14 @@ struct SetupView: View {
             }
         }
     }
+
+    #if DEBUG
+    #if targetEnvironment(simulator)
+    private func enterSimulatorHome() {
+        sessionStore.nfcTagUid = "simulator-nfc-tag"
+        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+        sessionStore.finishSetup()
+    }
+    #endif
+    #endif
 }

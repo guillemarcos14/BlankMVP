@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-12
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-12: Se aclaro el flujo para cambiar nombre e icono en App Store Connect: el nombre visible en la ficha se edita en la version/localizacion editable y el icono requiere cambiar assets en Xcode y subir una nueva version/build para revision.
 - 2026-07-09: Apple Developer Program confirmado activo con Team ID `GS54UV79RG`.
 - 2026-07-09: Creados los App IDs `com.blanknfc.app.ios` y `com.blanknfc.app.ios.deviceactivity` en Apple Developer.
 - 2026-07-09: Enviado a Apple el request de `Family Controls (Distribution)`; Apple confirmo recepcion y queda pendiente de revision.
@@ -57,6 +58,10 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: Se anadio en iOS un acceso `DEBUG` exclusivo de simulador para entrar al Home sin NFC real y revisar la estetica del proyecto actual ejecutandose como app.
 - 2026-07-12: En iOS `HomeView` se limpio la home eliminando el contador de selecciones protegidas y los mensajes de activacion/desactivacion, se puso el contador activo con `Instrument Serif`, se suavizo el cambio visual entre estados con crossfade de fondos y se cambio Emergencia a una confirmacion explicativa.
 - 2026-07-12: Se subio a GitHub `codex/ios-device-activity-target` con los ultimos cambios de `HomeView` para que MacinCloud pueda hacer pull y generar/subir `Blank 1.0 (3)` al iPhone via TestFlight.
+- 2026-07-12: En MacinCloud, desde Terminal, se ejecuto `git status`, `git pull --ff-only origin codex/ios-device-activity-target` y `open ios/Blank/Blank.xcodeproj`; el pull hizo fast-forward e incorporo `ESTADO.md` y `HomeView.swift`.
+- 2026-07-12: En MacinCloud se comprobo por Terminal que `ios/Blank/Blank.xcodeproj/project.pbxproj` ya tiene `CURRENT_PROJECT_VERSION = 4` en las cuatro entradas; Organizer seguia mostrando archives `1.0 (3)` porque eran archives anteriores o generados antes de tomar ese cambio.
+- 2026-07-12: Se resolvio el archive que seguia saliendo como `1.0 (3)`: se cerro Xcode en MacinCloud, se ejecuto `xcrun agvtool new-version -all 4` desde `ios/Blank`, se limpio DerivedData, se reabrio `Blank.xcodeproj`, se hizo `Product > Clean Build Folder` y el nuevo archive aparece en Organizer como `1.0 (4)`.
+- 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -76,6 +81,9 @@ Ultima actualizacion: 2026-07-12
 - Xcode debe usar el scheme `Blank`, no `BlankDeviceActivityMonitor`, para compilar previews de `HomeView`.
 - La home iOS ya tiene el ajuste solicitado de textos, contador, transicion visual y confirmacion de emergencia; en Windows solo se hizo validacion estatica (`git diff --check`) porque no hay toolchain Swift local.
 - La rama remota `codex/ios-device-activity-target` ya contiene la version iOS preparada para compilar y subir como `1.0 (3)`.
+- En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
+- En MacinCloud el build number efectivo del proyecto ya esta en `4` y Organizer muestra un archive nuevo `1.0 (4)` listo para distribuir.
+- El arreglo visual de la Home Grey esta validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -89,7 +97,8 @@ Ultima actualizacion: 2026-07-12
 - En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
 - En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
 - En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
-- Si la compilacion iOS pasa, archivar y subir a TestFlight como `Blank 1.0 (3)`.
+- Distribuir/subir a App Store Connect el archive nuevo `Blank 1.0 (4)` y despues actualizarlo desde TestFlight en el iPhone.
+- Antes de subir otro build, revisar la Home Grey en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, fondo correcto y CTA redondeado con margen lateral.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
@@ -109,6 +118,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-09: Se descarta seguir repitiendo `Automatically manage signing` + `Download Manual Profiles` + `Clean Build Folder` como solucion unica porque el archive mantiene el fallo de `.mobileprovision` inexistente para la extension.
 
 ## Notas para la proxima sesion
+- Si se cambia logo o nombre de App Store, distinguir entre metadata de App Store Connect, nombre instalado (`CFBundleDisplayName`) e icono empaquetado en el build.
 - Si se retoma iOS en MacinCloud, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj` y revisar Signing & Capabilities de los targets `Blank` y `BlankDeviceActivityMonitor`.
 - No perder el cambio manual actual: la extension debe usar `Blank Device Activity Monitor Development iPhone Guillem` si Xcode vuelve a fallar con un `.mobileprovision` generado automaticamente.
 - Si Xcode vuelve a mostrar `No Accounts`, revisar Apple Accounts; la cuenta usada fue `guillemarcos23@gmail.com`.

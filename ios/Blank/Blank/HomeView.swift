@@ -37,9 +37,11 @@ struct HomeView: View {
                 bottomAction
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 42)
+            .padding(.top, 22)
+            .padding(.bottom, 18)
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
@@ -109,21 +111,37 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack {
-            Button(sessionStore.currentMode.name) {
+            Button {
                 showingModes = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text(sessionStore.currentMode.name)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .opacity(0.72)
+                }
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .font(.body.weight(.semibold))
+            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
             .buttonStyle(.plain)
+
             Spacer()
+
             Button {
                 showingSettings = true
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.title3.weight(.bold))
                     .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
+            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
             .buttonStyle(.plain)
         }
+        .frame(height: 44)
     }
 
     @ViewBuilder
@@ -223,6 +241,7 @@ struct HomeView: View {
                 }
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
+            .frame(maxWidth: 342)
 
             if sessionStore.isBlankActive {
                 Button("Emergencia") {

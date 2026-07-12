@@ -52,6 +52,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: Se subio a GitHub la rama `codex/ios-device-activity-target` con las correcciones iOS de diseno/horario/NFC y se incremento el build iOS local a `1.0 (3)` para la siguiente subida a TestFlight.
 - 2026-07-12: Se anadio soporte `DEBUG` para iterar estetica con SwiftUI Previews de `HomeView`: home normal, fondo mint, sin apps, NFC pendiente, Blank activo, timer, horario pausado y permiso pendiente.
 - 2026-07-12: Se anadio el scheme compartido `Blank.xcscheme` al proyecto iOS para que Xcode muestre el target principal `Blank` en el selector de schemes y pueda compilar previews.
+- 2026-07-12: Se sustituyo el `PreviewProvider` de `HomeView` por macros explicitas `#Preview(...)` para que Xcode detecte mejor las variantes visuales en Canvas.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.

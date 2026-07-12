@@ -753,30 +753,46 @@ private struct HomePreviewScene: View {
     }
 }
 
-@MainActor
-private struct HomeView_Previews: PreviewProvider {
-    static var previews: some View {
-        Group {
-            HomePreviewScene("Home - Grey", backgroundThemeId: "grey")
-            HomePreviewScene("Home - Mint", backgroundThemeId: "mint")
-            HomePreviewScene("Home - Sin apps", protectedSelectionCount: 0)
-            HomePreviewScene("Home - NFC pendiente", nfcLinked: false)
-            HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "grey")
-            HomePreviewScene(
-                "Blank activo - Timer",
-                isBlankActive: true,
-                backgroundThemeId: "indigo",
-                timedUntil: Date().addingTimeInterval(38 * 60)
-            )
-            HomePreviewScene(
-                "Horario pausado",
-                isBlankActive: false,
-                backgroundThemeId: "teal",
-                schedule: BlankFocusSchedule(enabled: true, startMinute: 0, endMinute: 24 * 60 - 1),
-                schedulePausedUntil: Date().addingTimeInterval(5 * 60)
-            )
-            HomePreviewScene("Permiso pendiente", authorizationApproved: false)
-        }
-    }
+#Preview("Home - Grey") {
+    HomePreviewScene("Home - Grey", backgroundThemeId: "grey")
+}
+
+#Preview("Home - Mint") {
+    HomePreviewScene("Home - Mint", backgroundThemeId: "mint")
+}
+
+#Preview("Home - Sin apps") {
+    HomePreviewScene("Home - Sin apps", protectedSelectionCount: 0)
+}
+
+#Preview("Home - NFC pendiente") {
+    HomePreviewScene("Home - NFC pendiente", nfcLinked: false)
+}
+
+#Preview("Blank activo") {
+    HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "grey")
+}
+
+#Preview("Blank activo - Timer") {
+    HomePreviewScene(
+        "Blank activo - Timer",
+        isBlankActive: true,
+        backgroundThemeId: "indigo",
+        timedUntil: Date().addingTimeInterval(38 * 60)
+    )
+}
+
+#Preview("Horario pausado") {
+    HomePreviewScene(
+        "Horario pausado",
+        isBlankActive: false,
+        backgroundThemeId: "teal",
+        schedule: BlankFocusSchedule(enabled: true, startMinute: 0, endMinute: 24 * 60 - 1),
+        schedulePausedUntil: Date().addingTimeInterval(5 * 60)
+    )
+}
+
+#Preview("Permiso pendiente") {
+    HomePreviewScene("Permiso pendiente", authorizationApproved: false)
 }
 #endif

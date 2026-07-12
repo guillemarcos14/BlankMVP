@@ -60,9 +60,14 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
 
-    private let defaults = UserDefaults.standard
+    #if DEBUG
+    private var previewSelectionCount: Int?
+    #endif
 
-    init() {
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         isBlankActive = defaults.bool(forKey: Keys.isBlankActive)
         if let timestamp = defaults.object(forKey: Keys.blankActiveSince) as? TimeInterval, timestamp > 0 {
             blankActiveSince = Date(timeIntervalSince1970: timestamp)
@@ -116,6 +121,11 @@ final class SessionStore: ObservableObject {
     }
 
     var selectionCount: Int {
+        #if DEBUG
+        if let previewSelectionCount {
+            return previewSelectionCount
+        }
+        #endif
         selection.applicationTokens.count +
             selection.categoryTokens.count +
             selection.webDomainTokens.count
@@ -403,3 +413,34 @@ final class SessionStore: ObservableObject {
         static let schedulePausedUntil = "blankSchedulePausedUntil"
     }
 }
+
+#if DEBUG
+extension SessionStore {
+    static func preview(
+        isBlankActive: Bool = false,
+        protectedSelectionCount: Int = 3,
+        nfcLinked: Bool = true,
+        backgroundThemeId: String = "grey",
+        schedule: BlankFocusSchedule = BlankFocusSchedule(),
+        schedulePausedUntil: Date? = nil,
+        timedUntil: Date? = nil
+    ) -> SessionStore {
+        let suiteName = "BlankPreview-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName) ?? .standard
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let store = SessionStore(defaults: defaults)
+        store.previewSelectionCount = protectedSelectionCount
+        store.nfcTagUid = nfcLinked ? "preview-nfc-tag" : nil
+        store.backgroundThemeId = backgroundThemeId
+        store.schedule = schedule
+        store.schedulePausedUntil = schedulePausedUntil
+        store.isBlankActive = isBlankActive
+        store.blankActiveSince = isBlankActive ? Date().addingTimeInterval(-24 * 60) : nil
+        store.blankActiveUntil = timedUntil
+        store.deviceActivityTimerScheduled = timedUntil != nil
+        store.setupComplete = true
+        return store
+    }
+}
+#endif

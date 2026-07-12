@@ -50,6 +50,7 @@ Ultima actualizacion: 2026-07-12
 - 2026-07-12: En iOS, el horario diario cambia de campos de texto a rueda `DatePicker` estilo iPhone para inicio y fin.
 - 2026-07-12: En iOS, si el horario diario esta activo y se escanea el NFC durante una ventana programada, Blank pausa el bloqueo 5 minutos, limpia los shields y luego deja que el horario vuelva a bloquear al expirar la pausa.
 - 2026-07-12: Se subio a GitHub la rama `codex/ios-device-activity-target` con las correcciones iOS de diseno/horario/NFC y se incremento el build iOS local a `1.0 (3)` para la siguiente subida a TestFlight.
+- 2026-07-12: Se anadio soporte `DEBUG` para iterar estetica con SwiftUI Previews de `HomeView`: home normal, fondo mint, sin apps, NFC pendiente, Blank activo, timer, horario pausado y permiso pendiente.
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
@@ -65,6 +66,7 @@ Ultima actualizacion: 2026-07-12
 - Existe una convencion de repo para leer y actualizar `ESTADO.md` al inicio, durante y al final de cada bloque de trabajo.
 - Hay cambios no relacionados ya presentes en el arbol de trabajo; algunos ficheros que ya estaban modificados tambien recibieron reemplazos de texto del nombre anterior a `Blank`.
 - La app iOS ya tiene cambios locales para corregir diseno y friccion antes de produccion real; falta compilar/probar en MacinCloud/Xcode y subir un nuevo build si pasa.
+- Para iteracion estetica rapida, `HomeView.swift` ya incluye una galeria de SwiftUI Previews con datos aislados de `UserDefaults` para no depender de TestFlight ni de tokens reales de FamilyControls.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -76,6 +78,7 @@ Ultima actualizacion: 2026-07-12
 - Si `1.0 (2)` sigue mostrando pendiente aunque Ajustes mantenga Blank activado, revisar en el propio iPhone el valor mostrado por `Estado iOS: ...` y usarlo como siguiente diagnostico.
 - Para pruebas externas, preparar la informacion de beta review si se quiere invitar a testers fuera del equipo.
 - En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
+- En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
 - Si la compilacion iOS pasa, archivar y subir a TestFlight como `Blank 1.0 (3)`.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
@@ -86,6 +89,7 @@ Ultima actualizacion: 2026-07-12
 - [cerrada] 2026-07-09: Las instrucciones de gestion de estado viven en `AGENTS.md` para que los agentes las encuentren al abrir el repo.
 - [cerrada] 2026-07-12: La app iOS debe usar `Instrument Serif` e `Inter` como Android y tomar sus fondos desde los assets Android, no desde degradados aproximados.
 - [cerrada] 2026-07-12: Durante un horario diario activo, escanear el NFC debe dar 5 minutos de desbloqueo temporal y despues permitir que el horario vuelva a aplicar el bloqueo.
+- [cerrada] 2026-07-12: La iteracion estetica iOS se hara primero con SwiftUI Previews y simulador; TestFlight queda para validar NFC, Screen Time, firma y comportamiento real.
 
 ## Descartado
 - 2026-07-09: No se considera bloqueado por Swift/proyecto porque el build de simulador sin firma en Xcode 26.5 termino con `BUILD SUCCEEDED`.

@@ -712,3 +712,71 @@ private func minuteOfDay(from date: Date) -> Int {
     let components = Calendar.current.dateComponents([.hour, .minute], from: date)
     return (components.hour ?? 0) * 60 + (components.minute ?? 0)
 }
+
+#if DEBUG
+@MainActor
+private struct HomePreviewScene: View {
+    let name: String
+    let sessionStore: SessionStore
+    let screenTimeBlocker: ScreenTimeBlocker
+
+    init(
+        _ name: String,
+        isBlankActive: Bool = false,
+        protectedSelectionCount: Int = 3,
+        nfcLinked: Bool = true,
+        backgroundThemeId: String = "grey",
+        authorizationApproved: Bool = true,
+        schedule: BlankFocusSchedule = BlankFocusSchedule(),
+        schedulePausedUntil: Date? = nil,
+        timedUntil: Date? = nil
+    ) {
+        self.name = name
+        self.sessionStore = SessionStore.preview(
+            isBlankActive: isBlankActive,
+            protectedSelectionCount: protectedSelectionCount,
+            nfcLinked: nfcLinked,
+            backgroundThemeId: backgroundThemeId,
+            schedule: schedule,
+            schedulePausedUntil: schedulePausedUntil,
+            timedUntil: timedUntil
+        )
+        self.screenTimeBlocker = ScreenTimeBlocker.preview(authorizationApproved: authorizationApproved)
+    }
+
+    var body: some View {
+        HomeView()
+            .environmentObject(sessionStore)
+            .environmentObject(screenTimeBlocker)
+            .environment(\.font, .blankBody)
+            .previewDisplayName(name)
+    }
+}
+
+@MainActor
+private struct HomeView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            HomePreviewScene("Home - Grey", backgroundThemeId: "grey")
+            HomePreviewScene("Home - Mint", backgroundThemeId: "mint")
+            HomePreviewScene("Home - Sin apps", protectedSelectionCount: 0)
+            HomePreviewScene("Home - NFC pendiente", nfcLinked: false)
+            HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "grey")
+            HomePreviewScene(
+                "Blank activo - Timer",
+                isBlankActive: true,
+                backgroundThemeId: "indigo",
+                timedUntil: Date().addingTimeInterval(38 * 60)
+            )
+            HomePreviewScene(
+                "Horario pausado",
+                isBlankActive: false,
+                backgroundThemeId: "teal",
+                schedule: BlankFocusSchedule(enabled: true, startMinute: 0, endMinute: 24 * 60 - 1),
+                schedulePausedUntil: Date().addingTimeInterval(5 * 60)
+            )
+            HomePreviewScene("Permiso pendiente", authorizationApproved: false)
+        }
+    }
+}
+#endif

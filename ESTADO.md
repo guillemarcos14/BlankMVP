@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: En MacinCloud se ejecuto desde Terminal tecla a tecla `xcrun agvtool new-version -all 6` en `~/BlankMVP/ios/Blank`; `xcrun agvtool what-version -terse` devolvio `6`.
 - 2026-07-13: Tras comprobar en Organizer que ya existian archives `1.0 (5)`, se decidio que el siguiente archive iOS debe usar build `1.0 (6)`.
 - 2026-07-13: Tras `Build Failed` en Xcode por `'self' used in property access 'backgroundThemeId' before all stored properties are initialized`, se corrigio `SessionStore.init` para persistir el tema normalizado usando una constante local antes de terminar la inicializacion.
 - 2026-07-13: En MacinCloud se actualizo `~/BlankMVP` desde Terminal tecla a tecla con `git pull --ff-only origin codex/ios-device-activity-target`; quedo en `4690e7e Fix iOS home gray background` y se abrio `ios/Blank/Blank.xcodeproj` en Xcode.

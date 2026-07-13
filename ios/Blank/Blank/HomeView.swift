@@ -30,7 +30,7 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive, themeId: sessionStore.backgroundThemeId)
 
-                topCluster
+                topCluster(spacing: layout.topClusterSpacing)
                     .padding(.horizontal, layout.horizontalPadding)
                     .padding(.top, layout.topPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -113,8 +113,8 @@ struct HomeView: View {
         }
     }
 
-    private var topCluster: some View {
-        VStack(spacing: 18) {
+    private func topCluster(spacing: CGFloat) -> some View {
+        VStack(spacing: spacing) {
             topBar
             configCard
         }
@@ -366,6 +366,7 @@ struct HomeView: View {
 private struct HomeLayoutMetrics {
     let horizontalPadding: CGFloat
     let topPadding: CGFloat
+    let topClusterSpacing: CGFloat
     let bottomPadding: CGFloat
     let messageMaxWidth: CGFloat
     let actionWidth: CGFloat
@@ -376,12 +377,13 @@ private struct HomeLayoutMetrics {
         let width = max(size.width, 320)
         let height = max(size.height, 600)
         horizontalPadding = min(max(width * 0.075, 28), 36)
-        topPadding = safeAreaInsets.top + 10
+        topPadding = min(max(safeAreaInsets.top + 6, 48), 72)
+        topClusterSpacing = 14
         bottomPadding = max(safeAreaInsets.bottom + 24, 52)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
-        messageCenterY = height * 0.56
+        messageCenterY = height / 2
     }
 }
 

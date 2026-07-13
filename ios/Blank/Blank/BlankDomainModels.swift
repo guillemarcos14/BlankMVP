@@ -357,7 +357,7 @@ enum BlankProgressAggregator {
         return totals.map { entry in
             let modeId = entry.key
             let value = entry.value
-            BlankModeActivity(
+            return BlankModeActivity(
                 modeId: modeId,
                 name: namesById[modeId] ?? "Modo",
                 totalFocusTime: value.duration,

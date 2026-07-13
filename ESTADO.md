@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: En MacinCloud se hizo pull del commit `8c8440a` con Progreso estilo Foqos; `xcodebuild` fallo en `BlankDomainModels.swift` por un `missing return in closure expected to return 'BlankModeActivity'`, y se preparo la correccion local anadiendo el `return` explicito.
 - 2026-07-13: Se implemento en iOS un Progreso estilo Foqos sin copiar codigo fuente: `BlankProgressAggregator` deriva desde `BlankSession` el resumen semanal, actividad de 28 dias, actividad por modo, media de sesion, racha actual y mejor racha; `ReportView` ahora muestra esos datos como pantalla de Progreso.
 - 2026-07-13: Se reviso Foqos actual como referencia de progreso: usa historial de sesiones SwiftData por perfil, agregados semanales/mensuales por solape de tiempo, heatmap de 28 dias, media de sesion, rachas por dias con al menos una sesion completada e insights por perfil; no es solo un contador semanal plano.
 - 2026-07-13: Se reviso la implementacion actual de Progreso/stats: Android muestra `Sesiones completadas`, `Tiempo protegido` e `Intentos bloqueados` desde `FocusStats` semanal persistido en DataStore; iOS calcula un informe semanal desde `BlankSession` persistidas, con tiempo recuperado estimado como 15 minutos por sesion completada.

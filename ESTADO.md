@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` y se trajo el commit `68b248b` con el AppIcon blanco; `git status --short` mostro solo cambios locales de Xcode en `project.pbxproj`, `project.xcworkspace/` y `xcuserdata/`.
 - 2026-07-13: Se cambio el logo iOS/App Store a ausencia de logo: todos los PNG de `ios/Blank/Blank/Assets.xcassets/AppIcon.appiconset` son cuadrados blancos opacos `#ffffff`.
 - 2026-07-13: En MacinCloud se trajo el commit `466c820`, se verifico `xcrun agvtool what-version -terse = 7` y se dejo el arbol tracked limpio; solo quedan `xcsuserdata` no versionados de Xcode.
 - 2026-07-13: En MacinCloud se trajo `acc7856`, se compilo con `xcodebuild` para simulador con `BUILD SUCCEEDED`, se instalo el `.app` generado y se lanzo en iPhone 17; visualmente se ven modos, ajustes, textura y frase principal con ancho controlado.
@@ -103,6 +104,7 @@ Ultima actualizacion: 2026-07-13
 - El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 - La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, `HomeView` mide pantalla completa y el bloque superior se posiciona con `topSafeArea + 10`; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
 - El AppIcon iOS local ya esta regenerado como fondo blanco opaco `#ffffff`; falta compilar/archive y subir un nuevo build para que se vea en App Store/TestFlight.
+- MacinCloud ya tiene el commit `68b248b` con el AppIcon blanco; el siguiente paso de Xcode puede hacerse desde `~/BlankMVP/ios/Blank/Blank.xcodeproj`.
 
 ## Proximos pasos concretos
 - Para publicar el nuevo icono blanco en App Store, subir estos cambios a la rama iOS, hacer pull en MacinCloud, generar archive con el siguiente build y subirlo desde Xcode/App Store Connect.

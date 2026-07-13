@@ -188,6 +188,9 @@ struct BlankWeeklyReport: Equatable {
     var totalFocusTime: TimeInterval
     var completedSessionCount: Int
     var estimatedTimeSaved: TimeInterval
+    var averageSessionDuration: TimeInterval {
+        completedSessionCount > 0 ? totalFocusTime / Double(completedSessionCount) : 0
+    }
 }
 
 enum BlankWeeklySessionAggregator {
@@ -237,6 +240,200 @@ enum BlankWeeklySessionAggregator {
             totalFocusTime: dailyDurations.reduce(0, +),
             completedSessionCount: completedSessions.count,
             estimatedTimeSaved: TimeInterval(completedSessions.count * estimatedMinutesSavedPerSession * 60)
+        )
+    }
+}
+
+struct BlankActivityDay: Identifiable, Equatable {
+    var id: Date { date }
+    var date: Date
+    var totalFocusTime: TimeInterval
+    var sessionCount: Int
+}
+
+struct BlankModeActivity: Identifiable, Equatable {
+    var id: UUID { modeId }
+    var modeId: UUID
+    var name: String
+    var totalFocusTime: TimeInterval
+    var sessionCount: Int
+}
+
+struct BlankProgressReport: Equatable {
+    var weeklyReport: BlankWeeklyReport
+    var recentActivity: [BlankActivityDay]
+    var modeActivity: [BlankModeActivity]
+    var currentStreakDays: Int
+    var longestStreakDays: Int
+}
+
+enum BlankProgressAggregator {
+    static func aggregate(
+        sessions: [BlankSession],
+        modes: [BlankFocusMode],
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> BlankProgressReport {
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let weeklyReport = BlankWeeklySessionAggregator.aggregate(
+            sessions: sessions,
+            weekStart: weekStart,
+            calendar: calendar
+        )
+
+        return BlankProgressReport(
+            weeklyReport: weeklyReport,
+            recentActivity: activityDays(sessions: sessions, days: 28, endingOn: now, calendar: calendar),
+            modeActivity: modeActivity(sessions: sessions, modes: modes, weekStart: weekStart, calendar: calendar),
+            currentStreakDays: currentStreakDays(sessions: sessions, now: now, calendar: calendar),
+            longestStreakDays: longestStreakDays(sessions: sessions, days: 365, endingOn: now, calendar: calendar)
+        )
+    }
+
+    static func activityDays(
+        sessions: [BlankSession],
+        days: Int,
+        endingOn endDate: Date,
+        calendar: Calendar = .current
+    ) -> [BlankActivityDay] {
+        let endDay = calendar.startOfDay(for: endDate)
+        guard let startDay = calendar.date(byAdding: .day, value: -(days - 1), to: endDay) else {
+            return []
+        }
+
+        return (0..<days).compactMap { offset in
+            guard let dayStart = calendar.date(byAdding: .day, value: offset, to: startDay),
+                  let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+                return nil
+            }
+
+            let overlapping = sessions.compactMap { session -> TimeInterval? in
+                let sessionEnd = session.endedAt ?? endDate
+                let overlapStart = max(session.startedAt, dayStart)
+                let overlapEnd = min(sessionEnd, dayEnd)
+                guard overlapStart < overlapEnd else { return nil }
+                return overlapEnd.timeIntervalSince(overlapStart)
+            }
+
+            return BlankActivityDay(
+                date: dayStart,
+                totalFocusTime: overlapping.reduce(0, +),
+                sessionCount: overlapping.count
+            )
+        }
+    }
+
+    private static func modeActivity(
+        sessions: [BlankSession],
+        modes: [BlankFocusMode],
+        weekStart: Date,
+        calendar: Calendar
+    ) -> [BlankModeActivity] {
+        guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
+            return []
+        }
+
+        let namesById = Dictionary(uniqueKeysWithValues: modes.map { ($0.id, $0.name) })
+        var totals: [UUID: (duration: TimeInterval, count: Int)] = [:]
+
+        for session in sessions {
+            guard let endedAt = session.endedAt,
+                  session.startedAt < weekEnd,
+                  endedAt > weekStart else {
+                continue
+            }
+
+            let overlapStart = max(session.startedAt, weekStart)
+            let overlapEnd = min(endedAt, weekEnd)
+            guard overlapStart < overlapEnd else { continue }
+
+            let current = totals[session.profileId] ?? (0, 0)
+            totals[session.profileId] = (
+                current.duration + overlapEnd.timeIntervalSince(overlapStart),
+                current.count + 1
+            )
+        }
+
+        return totals.map { entry in
+            let modeId = entry.key
+            let value = entry.value
+            BlankModeActivity(
+                modeId: modeId,
+                name: namesById[modeId] ?? "Modo",
+                totalFocusTime: value.duration,
+                sessionCount: value.count
+            )
+        }
+        .sorted { lhs, rhs in
+            if lhs.totalFocusTime == rhs.totalFocusTime {
+                return lhs.sessionCount > rhs.sessionCount
+            }
+            return lhs.totalFocusTime > rhs.totalFocusTime
+        }
+    }
+
+    private static func currentStreakDays(
+        sessions: [BlankSession],
+        now: Date,
+        calendar: Calendar
+    ) -> Int {
+        let activeDays = completedSessionDays(sessions: sessions, calendar: calendar)
+        var expectedDay = calendar.startOfDay(for: now)
+        var streak = 0
+
+        while activeDays.contains(expectedDay) {
+            streak += 1
+            guard let previousDay = calendar.date(byAdding: .day, value: -1, to: expectedDay) else {
+                break
+            }
+            expectedDay = previousDay
+        }
+
+        return streak
+    }
+
+    private static func longestStreakDays(
+        sessions: [BlankSession],
+        days: Int,
+        endingOn endDate: Date,
+        calendar: Calendar
+    ) -> Int {
+        let activeDays = completedSessionDays(sessions: sessions, calendar: calendar)
+        let endDay = calendar.startOfDay(for: endDate)
+        guard let startDay = calendar.date(byAdding: .day, value: -(days - 1), to: endDay) else {
+            return 0
+        }
+
+        var currentDay = startDay
+        var currentStreak = 0
+        var longestStreak = 0
+
+        while currentDay <= endDay {
+            if activeDays.contains(currentDay) {
+                currentStreak += 1
+                longestStreak = max(longestStreak, currentStreak)
+            } else {
+                currentStreak = 0
+            }
+
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: currentDay) else {
+                break
+            }
+            currentDay = nextDay
+        }
+
+        return longestStreak
+    }
+
+    private static func completedSessionDays(
+        sessions: [BlankSession],
+        calendar: Calendar
+    ) -> Set<Date> {
+        Set(
+            sessions.compactMap { session in
+                guard let endedAt = session.endedAt else { return nil }
+                return calendar.startOfDay(for: endedAt)
+            }
         )
     }
 }

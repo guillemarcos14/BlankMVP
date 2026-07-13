@@ -8,6 +8,9 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Se implemento en iOS un Progreso estilo Foqos sin copiar codigo fuente: `BlankProgressAggregator` deriva desde `BlankSession` el resumen semanal, actividad de 28 dias, actividad por modo, media de sesion, racha actual y mejor racha; `ReportView` ahora muestra esos datos como pantalla de Progreso.
+- 2026-07-13: Se reviso Foqos actual como referencia de progreso: usa historial de sesiones SwiftData por perfil, agregados semanales/mensuales por solape de tiempo, heatmap de 28 dias, media de sesion, rachas por dias con al menos una sesion completada e insights por perfil; no es solo un contador semanal plano.
+- 2026-07-13: Se reviso la implementacion actual de Progreso/stats: Android muestra `Sesiones completadas`, `Tiempo protegido` e `Intentos bloqueados` desde `FocusStats` semanal persistido en DataStore; iOS calcula un informe semanal desde `BlankSession` persistidas, con tiempo recuperado estimado como 15 minutos por sesion completada.
 - 2026-07-13: En Xcode/MacinCloud, tras hacer Run en iPhone 17, la app quedo pausada en `Thread 1: signal SIGTERM` dentro de `mach_msg2_trap`; se interpreta como proceso terminado/interrumpido por Xcode/simulador, no como fallo de compilacion Swift. Queda pendiente relanzar con Stop + Run y revisar consola si se repite.
 - 2026-07-13: En MacinCloud se hizo `git pull` en `~/BlankMVP` y se trajo el commit `37f9ce9`; desde `ios/Blank` se ejecuto `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` y termino con `BUILD SUCCEEDED`.
 - 2026-07-13: Se ajustaron las hojas iOS de Modos y Ajustes para que los textos normales usen negro (`BlankColors.ink`) en vez del azul de acento de SwiftUI; se mantiene como excepcion visual el reset destructivo `He olvidado mi Blank` / `Reset`.
@@ -88,6 +91,10 @@ Ultima actualizacion: 2026-07-13
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Progreso iOS ya se basa en el enfoque conceptual de Foqos: las sesiones son la fuente de verdad y la pantalla muestra tiempo protegido semanal, sesiones, media, rachas, mapa de 28 dias, mejor dia, estimacion de tiempo recuperado y modos de la semana.
+- Foqos debe tratarse como referencia funcional para progreso avanzado: historial de sesiones, actividad visual 28 dias, insights por perfil y rachas; Blank puede copiar la logica conceptual, no la marca/UI/copy.
+- Progreso Android es una estadistica semanal simple y local: no usa rachas, puntuaciones ni servidor; se reinicia visualmente al cambiar la semana de calendario.
+- Progreso iOS no registra aun `Intentos bloqueados` como Android; esa metrica requeriria que la extension/Screen Time notificara intentos o eventos equivalentes.
 - iOS compila en Xcode 26.5 para simulador sin code signing.
 - Las frases principales de Home ya estan migradas de Android a iOS en `HomeView.swift`; en Windows solo se ha verificado el diff y queda pendiente compilar/probar en Xcode o TestFlight para confirmar que renderizan bien en pantalla.
 - El build iOS de desarrollo en MacinCloud/Xcode ya no muestra errores tras refrescar provisioning; queda pendiente distinguir si fue build para dispositivo, archive o solo build local de desarrollo.
@@ -118,6 +125,7 @@ Ultima actualizacion: 2026-07-13
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente `ReportView`/Progreso para confirmar que el mapa de 28 dias, las metricas y el texto caben bien en iPhone real/simulador.
 - En Xcode, pulsar Stop, volver a pulsar Run en `iPhone 17` y comprobar si la app abre; si vuelve a parar en `Thread 1: signal SIGTERM`, abrir la consola de debug y guardar el primer mensaje relevante anterior al SIGTERM.
 - En Xcode/MacinCloud, hacer Run del scheme `Blank` en un simulador iPhone y revisar visualmente frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, textura Gray, top bar visible y CTA con margen.
 - En la proxima entrada a MacinCloud, hacer `git pull --ff-only origin codex/ios-device-activity-target`, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj`, compilar el scheme `Blank` y revisar especificamente los ultimos cambios de `HomeView.swift`: frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, top bar visible, textura Gray y CTA con margen.

@@ -377,7 +377,7 @@ private struct HomeLayoutMetrics {
         let height = max(size.height, 600)
         horizontalPadding = min(max(width * 0.075, 28), 36)
         topPadding = safeAreaInsets.top + 10
-        bottomPadding = safeAreaInsets.bottom + 24
+        bottomPadding = max(safeAreaInsets.bottom + 24, 52)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2

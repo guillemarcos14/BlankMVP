@@ -102,7 +102,7 @@ struct ReportView: View {
     private func heroMetric(value: String, label: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(value)
-                .font(.system(size: 56, weight: .bold, design: .rounded))
+                .font(.blankInter(size: 56, weight: .bold, relativeTo: .largeTitle))
                 .minimumScaleFactor(0.62)
                 .lineLimit(1)
 
@@ -123,7 +123,7 @@ struct ReportView: View {
                 .foregroundStyle(reportSecondary)
 
             Text(value)
-                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .font(.blankInter(size: 30, weight: .bold, relativeTo: .title))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
@@ -184,7 +184,7 @@ struct ReportView: View {
     private func activitySquare(_ day: BlankActivityDay) -> some View {
         VStack(spacing: 3) {
             Text(dayNumber(day.date))
-                .font(.system(size: 10, weight: .medium))
+                .font(.blankInter(size: 10, weight: .medium, relativeTo: .caption2))
                 .foregroundStyle(reportSecondary)
                 .frame(height: 12)
 
@@ -206,7 +206,7 @@ struct ReportView: View {
                 .foregroundStyle(reportSecondary)
             Spacer()
             Text(value)
-                .fontWeight(.semibold)
+                .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
         }
         .padding(18)
         .background(reportSurface)
@@ -221,14 +221,14 @@ struct ReportView: View {
                     .lineLimit(1)
 
                 Text("\(activity.sessionCount) sesiones")
-                    .font(.caption)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
                     .foregroundStyle(reportSecondary)
             }
 
             Spacer()
 
             Text(formatDuration(activity.totalFocusTime))
-                .font(.body.weight(.semibold))
+                .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
         }
         .padding(16)
         .background(reportSurface)

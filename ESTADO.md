@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Se ajustaron los numeros de `ReportView`/Progreso iOS para que las metricas, duraciones, rachas, dias del mapa y recuentos usen `Inter` mediante `.blankInter(...)`, eliminando la fuente rounded del sistema en esos valores.
 - 2026-07-13: En MacinCloud se hizo pull del commit `0771037` con el contraste corregido de Progreso y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-13: Se corrigio el contraste de `ReportView`/Progreso iOS tras detectar fondo claro con texto blanco: la pantalla ahora usa `BlankColors.ink`/`mutedInk`, tarjetas claras opacas y fondo opaco a pantalla completa para evitar que se vea una capa visual anterior.
 - 2026-07-13: En MacinCloud se hizo pull del commit `4c5430e` con la correccion de Progreso y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
@@ -96,6 +97,7 @@ Ultima actualizacion: 2026-07-13
 
 ## Estado actual
 - Progreso iOS ya no hereda los colores blancos globales de Home y compila en MacinCloud con `BUILD SUCCEEDED`; queda pendiente relanzar desde Xcode/simulador y revisar visualmente que todo el texto sea negro/gris oscuro sobre fondo claro.
+- Los numeros principales de Progreso iOS ya usan Inter en codigo local; queda pendiente traer el commit a MacinCloud y recompilar.
 - MacinCloud ya tiene compilada correctamente la version de Progreso estilo Foqos en Debug; falta revision visual desde Xcode/simulador o dispositivo.
 - Progreso iOS ya se basa en el enfoque conceptual de Foqos: las sesiones son la fuente de verdad y la pantalla muestra tiempo protegido semanal, sesiones, media, rachas, mapa de 28 dias, mejor dia, estimacion de tiempo recuperado y modos de la semana.
 - Foqos debe tratarse como referencia funcional para progreso avanzado: historial de sesiones, actividad visual 28 dias, insights por perfil y rachas; Blank puede copiar la logica conceptual, no la marca/UI/copy.

@@ -9,6 +9,7 @@ Ultima actualizacion: 2026-07-13
 
 ## Hecho hoy
 - 2026-07-13: En MacinCloud se trajo el commit `466c820`, se verifico `xcrun agvtool what-version -terse = 7` y se dejo el arbol tracked limpio; solo quedan `xcsuserdata` no versionados de Xcode.
+- 2026-07-13: Se corrigio el layout responsive de la Home iOS para que modos, ajustes, frase principal y CTA usen margenes calculados desde `safeAreaInsets` y ancho real del dispositivo, evitando posiciones pegadas a bordes en iPhone 12 frente a simuladores grandes.
 - 2026-07-13: Tras captura de TestFlight `1.0 (6)` donde el CTA ya estaba corregido pero no se veian textura, modos ni ajustes, se bajo la top bar a una posicion visible bajo la zona de estado/TestFlight, se reforzo la textura del fondo con una capa procedural, se preparo el siguiente build como `1.0 (7)` y se corrigio `CFBundleVersion` de la app principal para usar `$(CURRENT_PROJECT_VERSION)`.
 - 2026-07-13: En MacinCloud se ejecuto desde Terminal tecla a tecla `xcrun agvtool new-version -all 6` en `~/BlankMVP/ios/Blank`; `xcrun agvtool what-version -terse` devolvio `6`.
 - 2026-07-13: Tras comprobar en Organizer que ya existian archives `1.0 (5)`, se decidio que el siguiente archive iOS debe usar build `1.0 (6)`.
@@ -92,6 +93,7 @@ Ultima actualizacion: 2026-07-13
 - En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
 - En MacinCloud el siguiente build/archive iOS debe quedar en `1.0 (7)` porque `1.0 (6)` ya se uso para validar la captura actual.
 - El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
+- La Home iOS ya no depende de paddings absolutos para top bar/CTA; falta compilarla en Xcode y revisarla en simulador iPhone 12 o dispositivo fisico antes de subir otro TestFlight.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -107,6 +109,7 @@ Ultima actualizacion: 2026-07-13
 - En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
 - En Xcode, revisar visualmente `HomeView` o ejecutar `Product > Archive` para generar un nuevo archive con el arreglo de Home y build `1.0 (7)`.
 - Antes de subir otro build, revisar la Home Gray en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, textura `bg_gray_*` cargada y CTA redondeado con margen lateral.
+- En MacinCloud, probar la Home con un simulador cercano al iPhone 12 ademas del iPhone 17 para confirmar que safe area, CTA y frase principal mantienen distancia visual suficiente.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones

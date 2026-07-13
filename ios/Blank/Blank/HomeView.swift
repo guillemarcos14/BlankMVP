@@ -24,21 +24,25 @@ struct HomeView: View {
     private let activeMessages = ["Bien. Ahora el movil espera.", "Sigue un poco mas.", "Respira un poco.", "Nada urgente. Como siempre."]
 
     var body: some View {
-        ZStack {
-            AppBackground(isActive: sessionStore.isBlankActive, themeId: sessionStore.backgroundThemeId)
+        GeometryReader { proxy in
+            let layout = HomeLayoutMetrics(size: proxy.size, safeAreaInsets: proxy.safeAreaInsets)
 
-            VStack(spacing: 0) {
-                topBar
-                configCard
-                    .padding(.top, 18)
-                Spacer()
-                centerMessage
-                Spacer()
-                bottomAction
+            ZStack {
+                AppBackground(isActive: sessionStore.isBlankActive, themeId: sessionStore.backgroundThemeId)
+
+                VStack(spacing: 0) {
+                    topBar
+                    configCard
+                        .padding(.top, 18)
+                    Spacer(minLength: layout.centerSpacerMinHeight)
+                    centerMessage(maxWidth: layout.messageMaxWidth)
+                    Spacer(minLength: layout.centerSpacerMinHeight)
+                    bottomAction(width: layout.actionWidth)
+                }
+                .padding(.horizontal, layout.horizontalPadding)
+                .padding(.top, layout.topPadding)
+                .padding(.bottom, layout.bottomPadding)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 74)
-            .padding(.bottom, 18)
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
         .toolbar(.hidden, for: .navigationBar)
@@ -180,7 +184,7 @@ struct HomeView: View {
         }
     }
 
-    private var centerMessage: some View {
+    private func centerMessage(maxWidth: CGFloat) -> some View {
         VStack(spacing: 14) {
             Text(displayedMessage)
                 .font(.blankSerif(size: 40, relativeTo: .largeTitle))
@@ -227,9 +231,10 @@ struct HomeView: View {
                 }
             }
         }
+        .frame(maxWidth: maxWidth)
     }
 
-    private var bottomAction: some View {
+    private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
             Button(sessionStore.isBlankActive ? "Escanear NFC para salir" : "Iniciar Blank") {
                 if sessionStore.isBlankActive {
@@ -243,8 +248,7 @@ struct HomeView: View {
                 }
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
-            .frame(maxWidth: 342)
-            .padding(.horizontal, 6)
+            .frame(width: width)
 
             if sessionStore.isBlankActive {
                 Button("Emergencia") {
@@ -350,6 +354,25 @@ struct HomeView: View {
             return "\(hours)h \(minutes)m"
         }
         return "\(minutes)m"
+    }
+}
+
+private struct HomeLayoutMetrics {
+    let horizontalPadding: CGFloat
+    let topPadding: CGFloat
+    let bottomPadding: CGFloat
+    let messageMaxWidth: CGFloat
+    let actionWidth: CGFloat
+    let centerSpacerMinHeight: CGFloat
+
+    init(size: CGSize, safeAreaInsets: EdgeInsets) {
+        let width = max(size.width, 320)
+        horizontalPadding = min(max(width * 0.075, 28), 36)
+        topPadding = safeAreaInsets.top + 26
+        bottomPadding = safeAreaInsets.bottom + 28
+        messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
+        actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
+        centerSpacerMinHeight = 24
     }
 }
 

@@ -3,6 +3,11 @@ import SwiftUI
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
 
+    private let reportBackground = BlankColors.background
+    private let reportSurface = BlankColors.surface
+    private let reportPrimary = BlankColors.ink
+    private let reportSecondary = BlankColors.mutedInk
+
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
             sessions: sessionStore.sessions,
@@ -22,7 +27,7 @@ struct ReportView: View {
 
                     Text("Actividad real de tus sesiones. Sin premios ni ruido.")
                         .font(.body)
-                        .foregroundStyle(BlankColors.secondaryText)
+                        .foregroundStyle(reportSecondary)
                 }
 
                 heroMetric(
@@ -81,14 +86,17 @@ struct ReportView: View {
 
                 Text("La estimacion usa 15 minutos recuperados por sesion completada. El mapa de actividad reparte el tiempo por dia cuando una sesion cruza medianoche.")
                     .font(.footnote)
-                    .foregroundStyle(BlankColors.secondaryText)
+                    .foregroundStyle(reportSecondary)
             }
             .padding(24)
         }
-        .background(BlankColors.background)
-        .foregroundStyle(BlankColors.text)
+        .background(reportBackground.ignoresSafeArea())
+        .foregroundStyle(reportPrimary)
         .navigationTitle("Progreso")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(reportBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(.light, for: .navigationBar)
     }
 
     private func heroMetric(value: String, label: String) -> some View {
@@ -100,11 +108,11 @@ struct ReportView: View {
 
             Text(label)
                 .font(.headline)
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(22)
-        .background(BlankColors.surface)
+        .background(reportSurface)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
@@ -112,7 +120,7 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
 
             Text(value)
                 .font(.system(size: 30, weight: .bold, design: .rounded))
@@ -121,13 +129,13 @@ struct ReportView: View {
 
             Text(caption)
                 .font(.caption)
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(BlankColors.surface.opacity(0.72))
+        .background(reportSurface)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -157,19 +165,19 @@ struct ReportView: View {
             }
         }
         .padding(18)
-        .background(BlankColors.surface.opacity(0.72))
+        .background(reportSurface)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func legendItem(label: String, opacity: Double) -> some View {
         HStack(spacing: 4) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(BlankColors.text.opacity(opacity))
+                .fill(reportPrimary.opacity(opacity))
                 .frame(width: 9, height: 9)
 
             Text(label)
                 .font(.caption2)
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
         }
     }
 
@@ -177,7 +185,7 @@ struct ReportView: View {
         VStack(spacing: 3) {
             Text(dayNumber(day.date))
                 .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
                 .frame(height: 12)
 
             RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -185,7 +193,7 @@ struct ReportView: View {
                 .aspectRatio(1, contentMode: .fit)
                 .overlay(
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(BlankColors.text.opacity(day.sessionCount > 0 ? 0.16 : 0.04), lineWidth: 1)
+                        .stroke(reportPrimary.opacity(day.sessionCount > 0 ? 0.16 : 0.04), lineWidth: 1)
                 )
         }
         .frame(maxWidth: .infinity)
@@ -195,13 +203,13 @@ struct ReportView: View {
     private func reportRow(title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .foregroundStyle(BlankColors.secondaryText)
+                .foregroundStyle(reportSecondary)
             Spacer()
             Text(value)
                 .fontWeight(.semibold)
         }
         .padding(18)
-        .background(BlankColors.surface.opacity(0.72))
+        .background(reportSurface)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -214,7 +222,7 @@ struct ReportView: View {
 
                 Text("\(activity.sessionCount) sesiones")
                     .font(.caption)
-                    .foregroundStyle(BlankColors.secondaryText)
+                    .foregroundStyle(reportSecondary)
             }
 
             Spacer()
@@ -223,7 +231,7 @@ struct ReportView: View {
                 .font(.body.weight(.semibold))
         }
         .padding(16)
-        .background(BlankColors.surface.opacity(0.72))
+        .background(reportSurface)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -231,13 +239,13 @@ struct ReportView: View {
         let hours = duration / 3600
         switch hours {
         case 0:
-            return BlankColors.text.opacity(0.08)
+            return reportPrimary.opacity(0.08)
         case 0..<1:
-            return BlankColors.text.opacity(0.30)
+            return reportPrimary.opacity(0.30)
         case 1..<3:
-            return BlankColors.text.opacity(0.52)
+            return reportPrimary.opacity(0.52)
         default:
-            return BlankColors.text.opacity(0.84)
+            return reportPrimary.opacity(0.84)
         }
     }
 

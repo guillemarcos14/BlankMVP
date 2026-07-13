@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: En MacinCloud se hizo pull del commit `4c5430e` con la correccion de Progreso y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-13: En MacinCloud se hizo pull del commit `8c8440a` con Progreso estilo Foqos; `xcodebuild` fallo en `BlankDomainModels.swift` por un `missing return in closure expected to return 'BlankModeActivity'`, y se preparo la correccion local anadiendo el `return` explicito.
 - 2026-07-13: Se implemento en iOS un Progreso estilo Foqos sin copiar codigo fuente: `BlankProgressAggregator` deriva desde `BlankSession` el resumen semanal, actividad de 28 dias, actividad por modo, media de sesion, racha actual y mejor racha; `ReportView` ahora muestra esos datos como pantalla de Progreso.
 - 2026-07-13: Se reviso Foqos actual como referencia de progreso: usa historial de sesiones SwiftData por perfil, agregados semanales/mensuales por solape de tiempo, heatmap de 28 dias, media de sesion, rachas por dias con al menos una sesion completada e insights por perfil; no es solo un contador semanal plano.
@@ -92,6 +93,7 @@ Ultima actualizacion: 2026-07-13
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud ya tiene compilada correctamente la version de Progreso estilo Foqos en Debug; falta revision visual desde Xcode/simulador o dispositivo.
 - Progreso iOS ya se basa en el enfoque conceptual de Foqos: las sesiones son la fuente de verdad y la pantalla muestra tiempo protegido semanal, sesiones, media, rachas, mapa de 28 dias, mejor dia, estimacion de tiempo recuperado y modos de la semana.
 - Foqos debe tratarse como referencia funcional para progreso avanzado: historial de sesiones, actividad visual 28 dias, insights por perfil y rachas; Blank puede copiar la logica conceptual, no la marca/UI/copy.
 - Progreso Android es una estadistica semanal simple y local: no usa rachas, puntuaciones ni servidor; se reinicia visualmente al cambiar la semana de calendario.

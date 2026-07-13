@@ -37,7 +37,7 @@ struct HomeView: View {
                 bottomAction
             }
             .padding(.horizontal, 24)
-            .padding(.top, 22)
+            .padding(.top, 74)
             .padding(.bottom, 18)
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
@@ -125,7 +125,7 @@ struct HomeView: View {
                 .frame(minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .font(.body.weight(.semibold))
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
             .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
             .buttonStyle(.plain)
 
@@ -143,6 +143,7 @@ struct HomeView: View {
             .buttonStyle(.plain)
         }
         .frame(height: 44)
+        .zIndex(2)
     }
 
     @ViewBuilder
@@ -379,13 +380,17 @@ private struct AppBackground: View {
             Image(inactiveAssetName)
                 .resizable()
                 .scaledToFill()
-                .opacity(isActive ? 0 : 0.94)
+                .opacity(isActive ? 0 : 1)
             Image(activeAssetName)
                 .resizable()
                 .scaledToFill()
-                .opacity(isActive ? 0.94 : 0)
+                .opacity(isActive ? 1 : 0)
+            PaperTexture()
+                .opacity(isActive ? 0 : 0.34)
+                .blendMode(.multiply)
+                .ignoresSafeArea()
             DotPattern()
-                .opacity(isActive ? 0 : 0.22)
+                .opacity(isActive ? 0 : 0.28)
                 .ignoresSafeArea()
         }
         .ignoresSafeArea()
@@ -402,6 +407,34 @@ private struct AppBackground: View {
 
     private var theme: String {
         SessionStore.normalizedBackgroundThemeId(themeId)
+    }
+}
+
+private struct PaperTexture: View {
+    var body: some View {
+        Canvas { context, size in
+            let marks: [(CGFloat, CGFloat, CGFloat, CGFloat, Double)] = [
+                (0.10, 0.18, 0.62, 0.18, 0.12),
+                (0.48, 0.28, 0.76, 0.22, 0.10),
+                (0.18, 0.48, 0.70, 0.28, 0.14),
+                (0.58, 0.62, 0.66, 0.20, 0.11),
+                (0.14, 0.78, 0.72, 0.22, 0.13)
+            ]
+
+            for mark in marks {
+                let rect = CGRect(
+                    x: size.width * mark.0,
+                    y: size.height * mark.1,
+                    width: size.width * mark.2,
+                    height: size.height * mark.3
+                )
+                context.fill(
+                    Path(ellipseIn: rect),
+                    with: .color(BlankColors.mutedInk.opacity(mark.4))
+                )
+            }
+        }
+        .blur(radius: 28)
     }
 }
 

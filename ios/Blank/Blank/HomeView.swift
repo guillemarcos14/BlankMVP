@@ -30,18 +30,17 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive, themeId: sessionStore.backgroundThemeId)
 
-                VStack(spacing: 0) {
-                    topBar
-                    configCard
-                        .padding(.top, 18)
-                    Spacer(minLength: layout.centerSpacerMinHeight)
-                    centerMessage(maxWidth: layout.messageMaxWidth)
-                    Spacer(minLength: layout.centerSpacerMinHeight)
-                    bottomAction(width: layout.actionWidth)
-                }
-                .padding(.horizontal, layout.horizontalPadding)
-                .padding(.top, layout.topPadding)
-                .padding(.bottom, layout.bottomPadding)
+                topCluster
+                    .padding(.horizontal, layout.horizontalPadding)
+                    .padding(.top, layout.topPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                centerMessage(maxWidth: layout.messageMaxWidth)
+                    .position(x: layout.centerX, y: layout.messageCenterY)
+
+                bottomAction(width: layout.actionWidth)
+                    .padding(.bottom, layout.bottomPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
@@ -111,6 +110,13 @@ struct HomeView: View {
                 setMessage(for: result)
             }
             .presentationDetents([.medium])
+        }
+    }
+
+    private var topCluster: some View {
+        VStack(spacing: 18) {
+            topBar
+            configCard
         }
     }
 
@@ -363,16 +369,19 @@ private struct HomeLayoutMetrics {
     let bottomPadding: CGFloat
     let messageMaxWidth: CGFloat
     let actionWidth: CGFloat
-    let centerSpacerMinHeight: CGFloat
+    let centerX: CGFloat
+    let messageCenterY: CGFloat
 
     init(size: CGSize, safeAreaInsets: EdgeInsets) {
         let width = max(size.width, 320)
+        let height = max(size.height, 600)
         horizontalPadding = min(max(width * 0.075, 28), 36)
-        topPadding = safeAreaInsets.top + 26
-        bottomPadding = safeAreaInsets.bottom + 28
+        topPadding = safeAreaInsets.top + 10
+        bottomPadding = safeAreaInsets.bottom + 24
         messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
-        centerSpacerMinHeight = 24
+        centerX = width / 2
+        messageCenterY = height * 0.56
     }
 }
 

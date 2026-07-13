@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Se cambio el logo iOS/App Store a ausencia de logo: todos los PNG de `ios/Blank/Blank/Assets.xcassets/AppIcon.appiconset` son cuadrados blancos opacos `#ffffff`.
 - 2026-07-13: En MacinCloud se trajo el commit `466c820`, se verifico `xcrun agvtool what-version -terse = 7` y se dejo el arbol tracked limpio; solo quedan `xcsuserdata` no versionados de Xcode.
 - 2026-07-13: En MacinCloud se trajo `acc7856`, se compilo con `xcodebuild` para simulador con `BUILD SUCCEEDED`, se instalo el `.app` generado y se lanzo en iPhone 17; visualmente se ven modos, ajustes, textura y frase principal con ancho controlado.
 - 2026-07-13: Tras captura del simulador donde la Home quedaba demasiado baja, se separo el layout en tres capas: bloque superior anclado arriba, frase principal posicionada por altura de pantalla y CTA anclado abajo, para que los avisos no empujen la composicion.
@@ -101,8 +102,10 @@ Ultima actualizacion: 2026-07-13
 - En MacinCloud el siguiente build/archive iOS debe quedar en `1.0 (7)` porque `1.0 (6)` ya se uso para validar la captura actual.
 - El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 - La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, `HomeView` mide pantalla completa y el bloque superior se posiciona con `topSafeArea + 10`; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
+- El AppIcon iOS local ya esta regenerado como fondo blanco opaco `#ffffff`; falta compilar/archive y subir un nuevo build para que se vea en App Store/TestFlight.
 
 ## Proximos pasos concretos
+- Para publicar el nuevo icono blanco en App Store, subir estos cambios a la rama iOS, hacer pull en MacinCloud, generar archive con el siguiente build y subirlo desde Xcode/App Store Connect.
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
 - Si se quiere instalar en iPhone fisico, seleccionar el dispositivo registrado y ejecutar build/run de desarrollo.
 - No repetir solo el toggle de `Automatically manage signing`; ya se probo en `Release` con `Clean Build Folder` y el error persistio.

@@ -41,6 +41,7 @@ struct HomeView: View {
             .padding(.bottom, 18)
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .navigationBarBackButtonHidden()
@@ -242,6 +243,7 @@ struct HomeView: View {
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
             .frame(maxWidth: 342)
+            .padding(.horizontal, 6)
 
             if sessionStore.isBlankActive {
                 Button("Emergencia") {
@@ -399,10 +401,7 @@ private struct AppBackground: View {
     }
 
     private var theme: String {
-        let theme = ["grey", "sage", "mint", "teal", "blue", "indigo", "purple", "rose", "coral", "amber"].contains(themeId)
-            ? themeId
-            : "grey"
-        return theme
+        SessionStore.normalizedBackgroundThemeId(themeId)
     }
 }
 
@@ -518,7 +517,7 @@ private struct SettingsSheet: View {
                     dismiss()
                 }
                 Picker("Cambiar fondo", selection: $sessionStore.backgroundThemeId) {
-                    Text("Grey").tag("grey")
+                    Text("Grey").tag("gray")
                     Text("Sage").tag("sage")
                     Text("Mint").tag("mint")
                     Text("Teal").tag("teal")
@@ -754,7 +753,7 @@ private struct HomePreviewScene: View {
         isBlankActive: Bool = false,
         protectedSelectionCount: Int = 3,
         nfcLinked: Bool = true,
-        backgroundThemeId: String = "grey",
+        backgroundThemeId: String = "gray",
         authorizationApproved: Bool = true,
         schedule: BlankFocusSchedule = BlankFocusSchedule(),
         schedulePausedUntil: Date? = nil,
@@ -783,7 +782,7 @@ private struct HomePreviewScene: View {
 }
 
 #Preview("Home - Grey") {
-    HomePreviewScene("Home - Grey", backgroundThemeId: "grey")
+    HomePreviewScene("Home - Grey", backgroundThemeId: "gray")
 }
 
 #Preview("Home - Mint") {
@@ -799,7 +798,7 @@ private struct HomePreviewScene: View {
 }
 
 #Preview("Blank activo") {
-    HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "grey")
+    HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "gray")
 }
 
 #Preview("Blank activo - Timer") {

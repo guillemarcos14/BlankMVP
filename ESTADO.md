@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-12
+Ultima actualizacion: 2026-07-13
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,8 @@ Ultima actualizacion: 2026-07-12
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Se reviso la Home iOS tras nueva captura del iPhone: el tema `grey` no correspondia con los assets reales `bg_gray_1/bg_gray_2`, por lo que SwiftUI no cargaba la textura; se normalizo a `gray`, se migra el valor antiguo y se oculto explicitamente la navigation bar en `HomeView`.
+- 2026-07-13: Se limito el CTA principal de iOS dentro de `BlankPrimaryButtonStyle` para que no dependa solo del contenedor externo y no pueda renderizar como barra de borde a borde.
 - 2026-07-12: Se aclaro el flujo para cambiar nombre e icono en App Store Connect: el nombre visible en la ficha se edita en la version/localizacion editable y el icono requiere cambiar assets en Xcode y subir una nueva version/build para revision.
 - 2026-07-09: Apple Developer Program confirmado activo con Team ID `GS54UV79RG`.
 - 2026-07-09: Creados los App IDs `com.blanknfc.app.ios` y `com.blanknfc.app.ios.deviceactivity` en Apple Developer.
@@ -83,7 +85,7 @@ Ultima actualizacion: 2026-07-12
 - La rama remota `codex/ios-device-activity-target` ya contiene la version iOS preparada para compilar y subir como `1.0 (3)`.
 - En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
 - En MacinCloud el build number efectivo del proyecto ya esta en `4` y Organizer muestra un archive nuevo `1.0 (4)` listo para distribuir.
-- El arreglo visual de la Home Grey esta validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
+- El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -98,7 +100,7 @@ Ultima actualizacion: 2026-07-12
 - En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
 - En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
 - Distribuir/subir a App Store Connect el archive nuevo `Blank 1.0 (4)` y despues actualizarlo desde TestFlight en el iPhone.
-- Antes de subir otro build, revisar la Home Grey en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, fondo correcto y CTA redondeado con margen lateral.
+- Antes de subir otro build, revisar la Home Gray en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, textura `bg_gray_*` cargada y CTA redondeado con margen lateral.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones

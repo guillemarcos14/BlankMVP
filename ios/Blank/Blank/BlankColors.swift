@@ -35,7 +35,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 342)
             .frame(height: 48)
             .background(light ? Color.white : BlankColors.ink)
             .foregroundStyle(light ? BlankColors.ink : Color.white)

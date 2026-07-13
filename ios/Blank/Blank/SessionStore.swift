@@ -93,8 +93,9 @@ final class SessionStore: ObservableObject {
         focusModes = loadedFocusModes
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
-        backgroundThemeId = Self.normalizedBackgroundThemeId(defaults.string(forKey: Keys.backgroundThemeId))
-        defaults.set(backgroundThemeId, forKey: Keys.backgroundThemeId)
+        let normalizedBackgroundThemeId = Self.normalizedBackgroundThemeId(defaults.string(forKey: Keys.backgroundThemeId))
+        backgroundThemeId = normalizedBackgroundThemeId
+        defaults.set(normalizedBackgroundThemeId, forKey: Keys.backgroundThemeId)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
         if let timestamp = defaults.object(forKey: Keys.schedulePausedUntil) as? TimeInterval, timestamp > 0 {
             schedulePausedUntil = Date(timeIntervalSince1970: timestamp)

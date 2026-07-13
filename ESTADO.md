@@ -8,6 +8,8 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Tras `Build Failed` en Xcode por `'self' used in property access 'backgroundThemeId' before all stored properties are initialized`, se corrigio `SessionStore.init` para persistir el tema normalizado usando una constante local antes de terminar la inicializacion.
+- 2026-07-13: En MacinCloud se actualizo `~/BlankMVP` desde Terminal tecla a tecla con `git pull --ff-only origin codex/ios-device-activity-target`; quedo en `4690e7e Fix iOS home gray background` y se abrio `ios/Blank/Blank.xcodeproj` en Xcode.
 - 2026-07-13: Se reviso la Home iOS tras nueva captura del iPhone: el tema `grey` no correspondia con los assets reales `bg_gray_1/bg_gray_2`, por lo que SwiftUI no cargaba la textura; se normalizo a `gray`, se migra el valor antiguo y se oculto explicitamente la navigation bar en `HomeView`.
 - 2026-07-13: Se limito el CTA principal de iOS dentro de `BlankPrimaryButtonStyle` para que no dependa solo del contenedor externo y no pueda renderizar como barra de borde a borde.
 - 2026-07-12: Se aclaro el flujo para cambiar nombre e icono en App Store Connect: el nombre visible en la ficha se edita en la version/localizacion editable y el icono requiere cambiar assets en Xcode y subir una nueva version/build para revision.
@@ -84,7 +86,7 @@ Ultima actualizacion: 2026-07-13
 - La home iOS ya tiene el ajuste solicitado de textos, contador, transicion visual y confirmacion de emergencia; en Windows solo se hizo validacion estatica (`git diff --check`) porque no hay toolchain Swift local.
 - La rama remota `codex/ios-device-activity-target` ya contiene la version iOS preparada para compilar y subir como `1.0 (3)`.
 - En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
-- En MacinCloud el build number efectivo del proyecto ya esta en `4` y Organizer muestra un archive nuevo `1.0 (4)` listo para distribuir.
+- En MacinCloud el build number visible en Xcode para el target principal esta en `5`; Organizer puede conservar archives anteriores como `1.0 (4)`.
 - El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 
 ## Proximos pasos concretos
@@ -99,7 +101,7 @@ Ultima actualizacion: 2026-07-13
 - En MacinCloud/Xcode, compilar el proyecto iOS tras estos cambios y verificar en iPhone: fuentes reales, fondos por variante, mensaje accionable, horario con rueda y pausa NFC de 5 minutos durante horario activo.
 - En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
 - En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
-- Distribuir/subir a App Store Connect el archive nuevo `Blank 1.0 (4)` y despues actualizarlo desde TestFlight en el iPhone.
+- En Xcode, revisar visualmente `HomeView` o ejecutar `Product > Archive` para generar un nuevo archive con el arreglo de Home y build `1.0 (5)`.
 - Antes de subir otro build, revisar la Home Gray en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, textura `bg_gray_*` cargada y CTA redondeado con margen lateral.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 

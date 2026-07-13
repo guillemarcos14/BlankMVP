@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: En MacinCloud se hizo `git pull` en `~/BlankMVP` y se trajo el commit `37f9ce9`; desde `ios/Blank` se ejecuto `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` y termino con `BUILD SUCCEEDED`.
 - 2026-07-13: Se ajustaron las hojas iOS de Modos y Ajustes para que los textos normales usen negro (`BlankColors.ink`) en vez del azul de acento de SwiftUI; se mantiene como excepcion visual el reset destructivo `He olvidado mi Blank` / `Reset`.
 - 2026-07-13: Se reviso por que Modos/Ajustes abren paneles con apariencia nativa iOS: `HomeView.swift` usa `sheet` + `NavigationStack` + `List`, y varios textos secundarios usan `.foregroundStyle(.secondary)`, por lo que parte del estilo es automatico de SwiftUI y parte son colores propios de Blank.
 - 2026-07-13: Se migraron a iOS todas las frases principales de Home que existian en Android: 10 para estado inactivo y 10 para Blank activo, con acentos corregidos en `HomeView.swift`.
@@ -112,8 +113,10 @@ Ultima actualizacion: 2026-07-13
 - MacinCloud ya tiene el commit `68b248b` con el AppIcon blanco; el siguiente paso de Xcode puede hacerse desde `~/BlankMVP/ios/Blank/Blank.xcodeproj`.
 - Modos y Ajustes de iOS estan implementados como paneles nativos SwiftUI (`sheet` con `NavigationStack`/`List`); si se quiere una estetica 100% Blank hay que sustituir o personalizar esos contenedores.
 - En Modos/Ajustes iOS el color normal de texto queda forzado a `BlankColors.ink`; el reset destructivo conserva color de alerta.
+- MacinCloud ya compila por terminal el commit `37f9ce9` con las frases nuevas y colores de Modos/Ajustes; queda pendiente la revision visual en Xcode/simulador o dispositivo.
 
 ## Proximos pasos concretos
+- En Xcode/MacinCloud, hacer Run del scheme `Blank` en un simulador iPhone y revisar visualmente frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, textura Gray, top bar visible y CTA con margen.
 - En la proxima entrada a MacinCloud, hacer `git pull --ff-only origin codex/ios-device-activity-target`, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj`, compilar el scheme `Blank` y revisar especificamente los ultimos cambios de `HomeView.swift`: frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, top bar visible, textura Gray y CTA con margen.
 - En MacinCloud/Xcode, compilar y revisar la Home iOS tras la migracion de frases para confirmar que las 20 frases renderizan bien, con acentos y sin cortes visuales.
 - Para publicar el nuevo icono blanco en App Store, subir estos cambios a la rama iOS, hacer pull en MacinCloud, generar archive con el siguiente build y subirlo desde Xcode/App Store Connect.

@@ -17,11 +17,33 @@ struct HomeView: View {
     @State private var showingRelink = false
     @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
-    @State private var displayedMessage = "No estas perdiendote nada."
+    @State private var displayedMessage = "No estás perdiéndote nada."
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let idleMessages = ["No estas perdiendote nada.", "El scroll puede esperar.", "Para un momento.", "Toca empezar."]
-    private let activeMessages = ["Bien. Ahora el movil espera.", "Sigue un poco mas.", "Respira un poco.", "Nada urgente. Como siempre."]
+    private let idleMessages = [
+        "Ya sé que solo querías mirar un par de stories.",
+        "No estás perdiéndote nada.",
+        "Nadie te necesita en los próximos minutos.",
+        "El scroll puede esperar.",
+        "Para un momento.",
+        "No pasa nada si no contestas ahora.",
+        "¿Hace cuánto que no miras al frente?",
+        "Venga, toca.",
+        "No te va a llegar nada importante.",
+        "Igual hay algo mejor que hacer."
+    ]
+    private let activeMessages = [
+        "¿Ves? No pasaba nada.",
+        "Nadie se ha muerto.",
+        "Nada urgente. Como siempre.",
+        "Bien hecho.",
+        "Llevas un rato sin mirarlo. Eso es mucho.",
+        "No ha llegado nada nuevo. Ya lo decía yo.",
+        "Sigue un poco más.",
+        "El teléfono seguirá ahí.",
+        "Hoy has hecho algo difícil.",
+        "Ya está."
+    ]
 
     var body: some View {
         GeometryReader { proxy in
@@ -501,7 +523,7 @@ private struct ModesSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Modos") {
+                Section {
                     ForEach(sessionStore.focusModes) { mode in
                         Button {
                             sessionStore.selectMode(mode.id)
@@ -513,15 +535,17 @@ private struct ModesSheet: View {
                                     if mode.id == sessionStore.currentModeId {
                                         Text("\(sessionStore.selectionCount) selecciones")
                                             .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .foregroundStyle(BlankColors.ink)
                                     }
                                 }
                                 Spacer()
                                 if mode.id == sessionStore.currentModeId {
                                     Image(systemName: "checkmark")
+                                        .foregroundStyle(BlankColors.ink)
                                 }
                             }
                         }
+                        .foregroundStyle(BlankColors.ink)
                         .swipeActions {
                             Button(role: .destructive) {
                                 sessionStore.deleteMode(mode.id)
@@ -531,14 +555,22 @@ private struct ModesSheet: View {
                             .disabled(sessionStore.focusModes.count <= 1)
                         }
                     }
+                } header: {
+                    Text("Modos")
+                        .foregroundStyle(BlankColors.ink)
                 }
 
-                Section("Crear") {
+                Section {
                     TextField("Trabajo profundo", text: $newModeName)
+                        .foregroundStyle(BlankColors.ink)
                     Button("Crear modo") {
                         sessionStore.createMode(named: newModeName)
                         newModeName = ""
                     }
+                    .foregroundStyle(BlankColors.ink)
+                } header: {
+                    Text("Crear")
+                        .foregroundStyle(BlankColors.ink)
                 }
 
                 Section {
@@ -546,9 +578,11 @@ private struct ModesSheet: View {
                         showingPicker = true
                         dismiss()
                     }
+                    .foregroundStyle(BlankColors.ink)
                 }
             }
             .navigationTitle("Modos")
+            .tint(BlankColors.ink)
         }
     }
 }
@@ -572,8 +606,8 @@ private struct SettingsSheet: View {
                         Text("Progreso")
                         Spacer()
                         Text("Semana")
-                            .foregroundStyle(.secondary)
                     }
+                    .foregroundStyle(BlankColors.ink)
                 }
                 settingsButton("Programar mi Blank", meta: "Diario") {
                     showingSchedule = true
@@ -597,6 +631,8 @@ private struct SettingsSheet: View {
                     Text("Coral").tag("coral")
                     Text("Amber").tag("amber")
                 }
+                .foregroundStyle(BlankColors.ink)
+                .tint(BlankColors.ink)
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {
                     showingRelink = true
                     dismiss()
@@ -608,6 +644,7 @@ private struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Ajustes")
+            .tint(BlankColors.ink)
         }
     }
 
@@ -622,9 +659,9 @@ private struct SettingsSheet: View {
                 Text(label)
                 Spacer()
                 Text(meta)
-                    .foregroundStyle(.secondary)
             }
         }
+        .foregroundStyle(role == .destructive ? Color.red : BlankColors.ink)
     }
 }
 

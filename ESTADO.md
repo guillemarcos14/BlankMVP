@@ -8,6 +8,10 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-13: Se ajustaron las hojas iOS de Modos y Ajustes para que los textos normales usen negro (`BlankColors.ink`) en vez del azul de acento de SwiftUI; se mantiene como excepcion visual el reset destructivo `He olvidado mi Blank` / `Reset`.
+- 2026-07-13: Se reviso por que Modos/Ajustes abren paneles con apariencia nativa iOS: `HomeView.swift` usa `sheet` + `NavigationStack` + `List`, y varios textos secundarios usan `.foregroundStyle(.secondary)`, por lo que parte del estilo es automatico de SwiftUI y parte son colores propios de Blank.
+- 2026-07-13: Se migraron a iOS todas las frases principales de Home que existian en Android: 10 para estado inactivo y 10 para Blank activo, con acentos corregidos en `HomeView.swift`.
+- 2026-07-13: Se audito la paridad de frases principales de Home entre Android e iOS: Android tiene 10 frases inactivas y 10 activas; iOS tiene 4 inactivas y 4 activas, por lo que no estan todas migradas.
 - 2026-07-13: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` y se trajo el commit `68b248b` con el AppIcon blanco; `git status --short` mostro solo cambios locales de Xcode en `project.pbxproj`, `project.xcworkspace/` y `xcuserdata/`.
 - 2026-07-13: Se cambio el logo iOS/App Store a ausencia de logo: todos los PNG de `ios/Blank/Blank/Assets.xcassets/AppIcon.appiconset` son cuadrados blancos opacos `#ffffff`.
 - 2026-07-13: En MacinCloud se trajo el commit `466c820`, se verifico `xcrun agvtool what-version -terse = 7` y se dejo el arbol tracked limpio; solo quedan `xcsuserdata` no versionados de Xcode.
@@ -83,6 +87,7 @@ Ultima actualizacion: 2026-07-13
 
 ## Estado actual
 - iOS compila en Xcode 26.5 para simulador sin code signing.
+- Las frases principales de Home ya estan migradas de Android a iOS en `HomeView.swift`; en Windows solo se ha verificado el diff y queda pendiente compilar/probar en Xcode o TestFlight para confirmar que renderizan bien en pantalla.
 - El build iOS de desarrollo en MacinCloud/Xcode ya no muestra errores tras refrescar provisioning; queda pendiente distinguir si fue build para dispositivo, archive o solo build local de desarrollo.
 - Archive iOS ya se genero en Xcode como `Blank`; queda pendiente distribuirlo/subirlo desde Organizer a App Store Connect/TestFlight y resolver cualquier validacion de Apple si aparece.
 - El build iOS `Blank 1.0 (1)` ya esta subido y se pudo instalar, pero no debe seguir usandose para diagnosticar Screen Time porque parece anterior al arreglo local.
@@ -105,8 +110,12 @@ Ultima actualizacion: 2026-07-13
 - La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, `HomeView` mide pantalla completa y el bloque superior se posiciona con `topSafeArea + 10`; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
 - El AppIcon iOS local ya esta regenerado como fondo blanco opaco `#ffffff`; falta compilar/archive y subir un nuevo build para que se vea en App Store/TestFlight.
 - MacinCloud ya tiene el commit `68b248b` con el AppIcon blanco; el siguiente paso de Xcode puede hacerse desde `~/BlankMVP/ios/Blank/Blank.xcodeproj`.
+- Modos y Ajustes de iOS estan implementados como paneles nativos SwiftUI (`sheet` con `NavigationStack`/`List`); si se quiere una estetica 100% Blank hay que sustituir o personalizar esos contenedores.
+- En Modos/Ajustes iOS el color normal de texto queda forzado a `BlankColors.ink`; el reset destructivo conserva color de alerta.
 
 ## Proximos pasos concretos
+- En la proxima entrada a MacinCloud, hacer `git pull --ff-only origin codex/ios-device-activity-target`, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj`, compilar el scheme `Blank` y revisar especificamente los ultimos cambios de `HomeView.swift`: frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, top bar visible, textura Gray y CTA con margen.
+- En MacinCloud/Xcode, compilar y revisar la Home iOS tras la migracion de frases para confirmar que las 20 frases renderizan bien, con acentos y sin cortes visuales.
 - Para publicar el nuevo icono blanco en App Store, subir estos cambios a la rama iOS, hacer pull en MacinCloud, generar archive con el siguiente build y subirlo desde Xcode/App Store Connect.
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
 - Si se quiere instalar en iPhone fisico, seleccionar el dispositivo registrado y ejecutar build/run de desarrollo.

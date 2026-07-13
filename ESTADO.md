@@ -8,7 +8,7 @@ Ultima actualizacion: 2026-07-13
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
-- 2026-07-13: Tras captura de TestFlight `1.0 (6)` donde el CTA ya estaba corregido pero no se veian textura, modos ni ajustes, se bajo la top bar a una posicion visible bajo la zona de estado/TestFlight, se reforzo la textura del fondo con una capa procedural y se preparo el siguiente build como `1.0 (7)`.
+- 2026-07-13: Tras captura de TestFlight `1.0 (6)` donde el CTA ya estaba corregido pero no se veian textura, modos ni ajustes, se bajo la top bar a una posicion visible bajo la zona de estado/TestFlight, se reforzo la textura del fondo con una capa procedural, se preparo el siguiente build como `1.0 (7)` y se corrigio `CFBundleVersion` de la app principal para usar `$(CURRENT_PROJECT_VERSION)`.
 - 2026-07-13: En MacinCloud se ejecuto desde Terminal tecla a tecla `xcrun agvtool new-version -all 6` en `~/BlankMVP/ios/Blank`; `xcrun agvtool what-version -terse` devolvio `6`.
 - 2026-07-13: Tras comprobar en Organizer que ya existian archives `1.0 (5)`, se decidio que el siguiente archive iOS debe usar build `1.0 (6)`.
 - 2026-07-13: Tras `Build Failed` en Xcode por `'self' used in property access 'backgroundThemeId' before all stored properties are initialized`, se corrigio `SessionStore.init` para persistir el tema normalizado usando una constante local antes de terminar la inicializacion.

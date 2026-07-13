@@ -43,6 +43,7 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
+        .ignoresSafeArea()
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -376,10 +377,11 @@ private struct HomeLayoutMetrics {
     init(size: CGSize, safeAreaInsets: EdgeInsets) {
         let width = max(size.width, 320)
         let height = max(size.height, 600)
+        let topSafeArea = safeAreaInsets.top > 0 ? safeAreaInsets.top : 44
         horizontalPadding = min(max(width * 0.075, 28), 36)
-        topPadding = min(max(safeAreaInsets.top + 6, 48), 72)
+        topPadding = topSafeArea + 10
         topClusterSpacing = 14
-        bottomPadding = max(safeAreaInsets.bottom + 24, 52)
+        bottomPadding = max(safeAreaInsets.bottom + 18, 34)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2

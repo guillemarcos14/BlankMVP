@@ -15,6 +15,7 @@ Ultima actualizacion: 2026-07-13
 - 2026-07-13: Se corrigio la regla estructural de la Home: la frase principal queda en el centro exacto de pantalla (`height / 2`) y el bloque superior usa una banda estable basada en safe area (`48...72 pt`) para modos, ajustes y avisos.
 - 2026-07-13: En MacinCloud se ejecuto desde Terminal `git pull --ff-only origin codex/ios-device-activity-target`; la copia remota quedo en `6bd901c`, lista para que el usuario ejecute la parte de Xcode.
 - 2026-07-13: Tras confirmar en simulador que la Home seguia visualmente desplazada aunque `messageCenterY = height / 2`, se detecto que `ContentView` envolvia `HomeView` en un `NavigationStack` global; se saco la Home de ese contenedor para que mida y posicione como pantalla raiz.
+- 2026-07-13: Tras nueva captura sin cambio visual, se corrigio el calculo de area segura de `HomeView`: ahora mide pantalla completa con `.ignoresSafeArea()` y aplica `topSafeArea + 10`, eliminando el minimo artificial de 48 pt que bajaba el bloque superior.
 - 2026-07-13: Se corrigio el layout responsive de la Home iOS para que modos, ajustes, frase principal y CTA usen margenes calculados desde `safeAreaInsets` y ancho real del dispositivo, evitando posiciones pegadas a bordes en iPhone 12 frente a simuladores grandes.
 - 2026-07-13: Tras captura de TestFlight `1.0 (6)` donde el CTA ya estaba corregido pero no se veian textura, modos ni ajustes, se bajo la top bar a una posicion visible bajo la zona de estado/TestFlight, se reforzo la textura del fondo con una capa procedural, se preparo el siguiente build como `1.0 (7)` y se corrigio `CFBundleVersion` de la app principal para usar `$(CURRENT_PROJECT_VERSION)`.
 - 2026-07-13: En MacinCloud se ejecuto desde Terminal tecla a tecla `xcrun agvtool new-version -all 6` en `~/BlankMVP/ios/Blank`; `xcrun agvtool what-version -terse` devolvio `6`.
@@ -99,7 +100,7 @@ Ultima actualizacion: 2026-07-13
 - En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
 - En MacinCloud el siguiente build/archive iOS debe quedar en `1.0 (7)` porque `1.0 (6)` ya se uso para validar la captura actual.
 - El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
-- La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, el bloque superior esta acotado por safe area y `HomeView` ya no cuelga de un `NavigationStack` externo; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
+- La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, `HomeView` mide pantalla completa y el bloque superior se posiciona con `topSafeArea + 10`; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
 
 ## Proximos pasos concretos
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-14
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-14: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta el commit `81fefae` y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-14: Se ajusto la Home iOS para que, con Blank activado sobre fondo oscuro, los controles superiores de Modos y Ajustes se rendericen como boton blanco con contenido oscuro para mejorar el contraste.
 - 2026-07-13: En MacinCloud se hizo pull del commit `9339167` con los numeros de Progreso en Inter y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-13: Se ajustaron los numeros de `ReportView`/Progreso iOS para que las metricas, duraciones, rachas, dias del mapa y recuentos usen `Inter` mediante `.blankInter(...)`, eliminando la fuente rounded del sistema en esos valores.
@@ -98,7 +99,7 @@ Ultima actualizacion: 2026-07-14
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
-- Home iOS tiene corregido localmente el contraste de los botones superiores en estado activo; en Windows se verifico con `git diff --check`, pero falta compilar/probar en Xcode o TestFlight para confirmar el resultado visual real.
+- Home iOS tiene corregido el contraste de los botones superiores en estado activo; en Windows se verifico con `git diff --check` y en MacinCloud compila en Debug con `BUILD SUCCEEDED`, pero falta revisar visualmente en Xcode/simulador o TestFlight.
 - Progreso iOS ya no hereda los colores blancos globales de Home y compila en MacinCloud con `BUILD SUCCEEDED`; queda pendiente relanzar desde Xcode/simulador y revisar visualmente que todo el texto sea negro/gris oscuro sobre fondo claro.
 - Los numeros principales de Progreso iOS ya usan Inter y compilan en MacinCloud; queda pendiente relanzar desde Xcode/simulador para confirmacion visual final.
 - MacinCloud ya tiene compilada correctamente la version de Progreso estilo Foqos en Debug; falta revision visual desde Xcode/simulador o dispositivo.

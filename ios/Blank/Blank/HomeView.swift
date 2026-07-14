@@ -155,11 +155,14 @@ struct HomeView: View {
                         .font(.caption.weight(.semibold))
                         .opacity(0.72)
                 }
+                .padding(.horizontal, sessionStore.isBlankActive ? 14 : 0)
                 .frame(minHeight: 44, alignment: .leading)
+                .background(sessionStore.isBlankActive ? Color.white : Color.clear)
+                .clipShape(Capsule())
                 .contentShape(Rectangle())
             }
             .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+            .foregroundStyle(BlankColors.ink)
             .buttonStyle(.plain)
 
             Spacer()
@@ -170,9 +173,11 @@ struct HomeView: View {
                 Image(systemName: "ellipsis")
                     .font(.title3.weight(.bold))
                     .frame(width: 44, height: 44)
+                    .background(sessionStore.isBlankActive ? Color.white : Color.clear)
+                    .clipShape(Circle())
                     .contentShape(Rectangle())
             }
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+            .foregroundStyle(BlankColors.ink)
             .buttonStyle(.plain)
         }
         .frame(height: 44)

@@ -11,7 +11,6 @@ struct HomeView: View {
     @State private var message: String?
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
-    @State private var showingModes = false
     @State private var showingSettings = false
     @State private var showingSchedule = false
     @State private var showingEmergency = false
@@ -94,10 +93,6 @@ struct HomeView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
-        .sheet(isPresented: $showingModes) {
-            ModesSheet(showingPicker: $showingPicker)
-                .presentationDetents([.medium, .large])
-        }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(
                 showingPicker: $showingPicker,
@@ -145,29 +140,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        HStack {
-            Button {
-                showingModes = true
-            } label: {
-                HStack(spacing: 5) {
-                    Text(sessionStore.currentMode.name)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .opacity(0.72)
-                }
-                .padding(.horizontal, sessionStore.isBlankActive ? 14 : 0)
-                .frame(minHeight: 44, alignment: .leading)
-                .background(sessionStore.isBlankActive ? Color.white : Color.clear)
-                .clipShape(Capsule())
-                .contentShape(Rectangle())
-            }
-            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-            .foregroundStyle(BlankColors.ink)
-            .buttonStyle(.plain)
-
-            Spacer()
-
+        ZStack {
             Button {
                 showingSettings = true
             } label: {
@@ -559,76 +532,74 @@ private struct DotPattern: View {
     }
 }
 
-private struct ModesSheet: View {
+private struct ModesList: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Binding var showingPicker: Bool
-    @Environment(\.dismiss) private var dismiss
+    let onFinish: () -> Void
     @State private var newModeName = ""
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(sessionStore.focusModes) { mode in
-                        Button {
-                            sessionStore.selectMode(mode.id)
-                            dismiss()
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(mode.name)
-                                    if mode.id == sessionStore.currentModeId {
-                                        Text("\(sessionStore.selectionCount) selecciones")
-                                            .font(.caption)
-                                            .foregroundStyle(BlankColors.ink)
-                                    }
-                                }
-                                Spacer()
+        List {
+            Section {
+                ForEach(sessionStore.focusModes) { mode in
+                    Button {
+                        sessionStore.selectMode(mode.id)
+                        onFinish()
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(mode.name)
                                 if mode.id == sessionStore.currentModeId {
-                                    Image(systemName: "checkmark")
+                                    Text("\(sessionStore.selectionCount) selecciones")
+                                        .font(.caption)
                                         .foregroundStyle(BlankColors.ink)
                                 }
                             }
-                        }
-                        .foregroundStyle(BlankColors.ink)
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                sessionStore.deleteMode(mode.id)
-                            } label: {
-                                Label("Eliminar", systemImage: "trash")
+                            Spacer()
+                            if mode.id == sessionStore.currentModeId {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(BlankColors.ink)
                             }
-                            .disabled(sessionStore.focusModes.count <= 1)
                         }
                     }
-                } header: {
-                    Text("Modos")
-                        .foregroundStyle(BlankColors.ink)
-                }
-
-                Section {
-                    TextField("Trabajo profundo", text: $newModeName)
-                        .foregroundStyle(BlankColors.ink)
-                    Button("Crear modo") {
-                        sessionStore.createMode(named: newModeName)
-                        newModeName = ""
-                    }
                     .foregroundStyle(BlankColors.ink)
-                } header: {
-                    Text("Crear")
-                        .foregroundStyle(BlankColors.ink)
-                }
-
-                Section {
-                    Button("Editar apps del modo actual") {
-                        showingPicker = true
-                        dismiss()
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            sessionStore.deleteMode(mode.id)
+                        } label: {
+                            Label("Eliminar", systemImage: "trash")
+                        }
+                        .disabled(sessionStore.focusModes.count <= 1)
                     }
-                    .foregroundStyle(BlankColors.ink)
                 }
+            } header: {
+                Text("Modos")
+                    .foregroundStyle(BlankColors.ink)
             }
-            .navigationTitle("Modos")
-            .tint(BlankColors.ink)
+
+            Section {
+                TextField("Trabajo profundo", text: $newModeName)
+                    .foregroundStyle(BlankColors.ink)
+                Button("Crear modo") {
+                    sessionStore.createMode(named: newModeName)
+                    newModeName = ""
+                }
+                .foregroundStyle(BlankColors.ink)
+            } header: {
+                Text("Crear")
+                    .foregroundStyle(BlankColors.ink)
+            }
+
+            Section {
+                Button("Editar apps del modo actual") {
+                    showingPicker = true
+                    onFinish()
+                }
+                .foregroundStyle(BlankColors.ink)
+            }
         }
+        .navigationTitle("Modos")
+        .tint(BlankColors.ink)
     }
 }
 
@@ -644,6 +615,18 @@ private struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                NavigationLink {
+                    ModesList(showingPicker: $showingPicker) {
+                        dismiss()
+                    }
+                } label: {
+                    HStack {
+                        Text("Modo")
+                        Spacer()
+                        Text(sessionStore.currentMode.name)
+                    }
+                    .foregroundStyle(BlankColors.ink)
+                }
                 NavigationLink {
                     ReportView()
                 } label: {

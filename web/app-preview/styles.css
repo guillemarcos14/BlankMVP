@@ -229,6 +229,10 @@ h1 {
   justify-content: space-between;
 }
 
+.app-top {
+  justify-content: center;
+}
+
 .onboarding-top {
   color: var(--ink);
   font-size: 15px;
@@ -271,10 +275,10 @@ h1 {
   font-size: 0;
   font-weight: 500;
   height: 36px;
-  justify-content: flex-end;
+  justify-content: center;
   line-height: 1;
   padding: 0;
-  width: 32px;
+  width: 36px;
 }
 
 .profile-button::before {

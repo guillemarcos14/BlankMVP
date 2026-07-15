@@ -94,9 +94,6 @@
             <video class="screen-video screen-video-active" src="./assets/blank_background_active.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
 
             <header class="app-top">
-              <button class="mode-chip" type="button" data-preview-target="modes" aria-label="Cambiar modo">
-                <strong data-current-mode-name>Rutina diaria</strong>
-              </button>
               <button class="profile-button" type="button" aria-label="Ajustes" data-preview-target="profile">&#8942;</button>
             </header>
 
@@ -122,6 +119,10 @@
             </section>
 
             <section class="menu-list">
+              <button type="button" data-preview-target="modes">
+                <span>Modo</span>
+                <strong data-current-mode-name>Rutina diaria</strong>
+              </button>
               <button type="button" data-preview-target="report">
                 <span>Progreso</span>
                 <strong>Semana</strong>

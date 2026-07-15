@@ -99,11 +99,12 @@
 
             <section class="center-message" aria-live="polite">
               <h2 data-main-message>Hoy ya elegiste estar fuera del bucle.</h2>
-              <p data-session-meta>3 selecciones protegidas</p>
             </section>
 
             <section class="bottom-action">
+              <p class="session-counter" data-session-meta>3 selecciones protegidas</p>
               <button class="main-action" type="button" data-main-action>Iniciar Blank</button>
+              <button class="report-link home-progress-link" type="button" data-preview-target="report">Progreso</button>
             </section>
           </article>
 
@@ -138,6 +139,10 @@
               <button type="button" data-preview-target="relink">
                 <span>Vincular nuevo NFC</span>
                 <strong>Etiqueta</strong>
+              </button>
+              <button type="button" data-preview-target="emergency">
+                <span>Emergencia</span>
+                <strong>Salida</strong>
               </button>
               <button type="button" data-preview-target="forget">
                 <span>He olvidado mi Blank</span>
@@ -346,7 +351,7 @@
 
           <article class="screen emergency-screen" id="screen-emergency" data-preview-panel="emergency">
             <header class="report-top">
-              <button class="back-button" type="button" data-preview-target="block">Volver</button>
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
               <span>Emergencia</span>
             </header>
 

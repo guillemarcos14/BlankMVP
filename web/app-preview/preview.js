@@ -32,6 +32,7 @@ const emergencyUnlock = document.querySelector("[data-emergency-unlock]");
 let isBlankActive = false;
 let timerActive = false;
 let timerMinutes = 30;
+let activeSeconds = 1472;
 let onboardingStep = 0;
 let returnScreen = "profile";
 let nfcRelinked = false;
@@ -64,15 +65,20 @@ function renderBlankState() {
     mainMessage.textContent = "Hoy ya elegiste estar fuera del bucle.";
     mainAction.textContent = "Escanear NFC para salir";
     mainAction.disabled = false;
-    sessionMeta.textContent = timerActive
-      ? `Termina en ${timerMinutes} min · Timer del sistema activo`
-      : "Blank activo · salida con NFC";
+    sessionMeta.textContent = formatElapsed(activeSeconds);
   } else {
     mainMessage.innerHTML = "Vuelve cuando<br />quieras recuperar<br />silencio.";
     mainAction.textContent = "Iniciar Blank";
     mainAction.disabled = false;
     sessionMeta.textContent = `${currentMode().apps.length} selecciones protegidas`;
   }
+}
+
+function formatElapsed(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
+  const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
+  const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function setOnboardingStep(nextStep) {

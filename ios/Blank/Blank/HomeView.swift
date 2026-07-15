@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var showingSettings = false
     @State private var showingSchedule = false
     @State private var showingEmergency = false
+    @State private var showingReport = false
     @State private var showingRelink = false
     @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
@@ -97,9 +98,16 @@ struct HomeView: View {
             SettingsSheet(
                 showingPicker: $showingPicker,
                 showingSchedule: $showingSchedule,
+                showingEmergency: $showingEmergency,
                 showingRelink: $showingRelink
             )
             .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showingReport) {
+            NavigationStack {
+                ReportView()
+            }
+            .preferredColorScheme(.light)
         }
         .sheet(isPresented: $showingSchedule) {
             ScheduleSheet()
@@ -147,11 +155,9 @@ struct HomeView: View {
                 Image(systemName: "ellipsis")
                     .font(.title3.weight(.bold))
                     .frame(width: 44, height: 44)
-                    .background(sessionStore.isBlankActive ? Color.white : Color.clear)
-                    .clipShape(Circle())
                     .contentShape(Rectangle())
             }
-            .foregroundStyle(BlankColors.ink)
+            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
             .buttonStyle(.plain)
         }
         .frame(height: 44)
@@ -201,8 +207,6 @@ struct HomeView: View {
                 .minimumScaleFactor(0.72)
 
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
-                Text(elapsedText(since: blankActiveSince))
-                    .font(.blankSerif(size: 40, relativeTo: .largeTitle))
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
                     Text("Termina en \(remainingText(until: blankActiveUntil))")
                         .font(.blankBody)
@@ -244,6 +248,13 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
+            if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
+                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white)
+                    .monospacedDigit()
+            }
+
             Button(sessionStore.isBlankActive ? "Escanear NFC para salir" : "Iniciar Blank") {
                 if sessionStore.isBlankActive {
                     scanTag()
@@ -259,8 +270,8 @@ struct HomeView: View {
             .frame(width: width)
 
             if sessionStore.isBlankActive {
-                Button("Emergencia") {
-                    showingEmergency = true
+                Button("Progreso") {
+                    showingReport = true
                 }
                 .foregroundStyle(Color.white.opacity(0.74))
             }
@@ -537,6 +548,8 @@ private struct ModesList: View {
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
     @State private var newModeName = ""
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.ink }
 
     var body: some View {
         List {
@@ -552,17 +565,17 @@ private struct ModesList: View {
                                 if mode.id == sessionStore.currentModeId {
                                     Text("\(sessionStore.selectionCount) selecciones")
                                         .font(.caption)
-                                        .foregroundStyle(BlankColors.ink)
+                                        .foregroundStyle(secondaryColor)
                                 }
                             }
                             Spacer()
                             if mode.id == sessionStore.currentModeId {
                                 Image(systemName: "checkmark")
-                                    .foregroundStyle(BlankColors.ink)
+                                    .foregroundStyle(textColor)
                             }
                         }
                     }
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
                     .swipeActions {
                         Button(role: .destructive) {
                             sessionStore.deleteMode(mode.id)
@@ -574,20 +587,20 @@ private struct ModesList: View {
                 }
             } header: {
                 Text("Modos")
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
             }
 
             Section {
                 TextField("Trabajo profundo", text: $newModeName)
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
                 Button("Crear modo") {
                     sessionStore.createMode(named: newModeName)
                     newModeName = ""
                 }
-                .foregroundStyle(BlankColors.ink)
+                .foregroundStyle(textColor)
             } header: {
                 Text("Crear")
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
             }
 
             Section {
@@ -595,11 +608,12 @@ private struct ModesList: View {
                     showingPicker = true
                     onFinish()
                 }
-                .foregroundStyle(BlankColors.ink)
+                .foregroundStyle(textColor)
             }
         }
         .navigationTitle("Modos")
-        .tint(BlankColors.ink)
+        .tint(textColor)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
 
@@ -608,9 +622,11 @@ private struct SettingsSheet: View {
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @Binding var showingPicker: Bool
     @Binding var showingSchedule: Bool
+    @Binding var showingEmergency: Bool
     @Binding var showingRelink: Bool
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
         NavigationStack {
@@ -625,7 +641,7 @@ private struct SettingsSheet: View {
                         Spacer()
                         Text(sessionStore.currentMode.name)
                     }
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
                 }
                 NavigationLink {
                     ReportView()
@@ -635,7 +651,7 @@ private struct SettingsSheet: View {
                         Spacer()
                         Text("Semana")
                     }
-                    .foregroundStyle(BlankColors.ink)
+                    .foregroundStyle(textColor)
                 }
                 settingsButton("Programar mi Blank", meta: "Diario") {
                     showingSchedule = true
@@ -651,6 +667,10 @@ private struct SettingsSheet: View {
                     showingRelink = true
                     dismiss()
                 }
+                settingsButton("Emergencia", meta: "Salida") {
+                    showingEmergency = true
+                    dismiss()
+                }
                 settingsButton("He olvidado mi Blank", meta: "Reset", role: .destructive) {
                     sessionStore.forgetNfcTag()
                     screenTimeBlocker.clear()
@@ -658,8 +678,9 @@ private struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Ajustes")
-            .tint(BlankColors.ink)
+            .tint(textColor)
         }
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
     private func settingsButton(
@@ -675,7 +696,7 @@ private struct SettingsSheet: View {
                 Text(meta)
             }
         }
-        .foregroundStyle(role == .destructive ? Color.red : BlankColors.ink)
+        .foregroundStyle(role == .destructive ? Color.red : textColor)
     }
 }
 

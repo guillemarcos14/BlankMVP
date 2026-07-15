@@ -194,6 +194,7 @@ h1 {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(32, 33, 36, 0.20) 48%),
     #cfd4ce;
+  color: var(--surface);
 }
 
 .screen-video {
@@ -218,6 +219,10 @@ h1 {
 
 .home-screen.is-blank-active .screen-video-active {
   opacity: 0.72;
+}
+
+.home-screen.is-blank-active .profile-button {
+  color: var(--surface);
 }
 
 .app-top,
@@ -461,6 +466,27 @@ h1 {
 
 .bottom-action {
   flex: 0 0 auto;
+}
+
+.session-counter {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 12px;
+  text-align: center;
+}
+
+.home-screen.is-blank-active .session-counter {
+  color: var(--surface);
+}
+
+.home-screen:not(.is-blank-active) .home-progress-link {
+  display: none;
+}
+
+.home-screen.is-blank-active .home-progress-link {
+  color: rgba(245, 245, 245, 0.74);
 }
 
 .main-action {

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se ajusto la Home iOS en modo Blank activo: los tres puntos de Ajustes pasan a blanco sin fondo circular, el contador activo se mueve encima de `Escanear NFC para salir` con Inter blanco, `Progreso` ocupa el lugar visible de `Emergencia`, y `Emergencia` se traslada dentro de Ajustes. El preview web se sincronizo con la misma estructura. En Windows se valido con `node --check web/app-preview/preview.js` y `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
 - 2026-07-15: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta `e212d57` con Modos dentro de Ajustes y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-15: Se simplifico la Home iOS moviendo la seleccion/gestion de Modos dentro de Ajustes; la pantalla principal queda solo con el boton de tres puntos centrado en la banda superior. El preview web se actualizo con la misma estructura visual.
 - 2026-07-15: Se sustituyeron los fondos liquidos estaticos por loops MP4 reales: `blank_background_idle.mp4` para Blank desactivado y `blank_background_active.mp4` para Blank activado. Android los reproduce con `TextureView` + `MediaPlayer` desde `res/raw`, iOS los incluye en el target y los reproduce con `AVQueuePlayer` + `AVPlayerLooper`, y `web/app-preview` usa videos HTML en loop.
@@ -117,6 +118,7 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Home iOS queda ajustada para Blank activo con puntos blancos sin fondo, contador Inter blanco encima del CTA, acceso visible a Progreso y Emergencia dentro de Ajustes; en Windows solo se hizo validacion estatica y falta build/revision visual en Xcode o TestFlight.
 - Android, iOS y la preview web usan ya dos fondos liquidos animados en loop: claro en reposo/desactivado y oscuro en Blank activado; ya no hay selector de fondo ni persistencia de tema.
 - Home iOS ya no muestra el selector de modo en pantalla principal: Modos vive dentro de Ajustes, y el boton de tres puntos queda centrado a la misma altura superior; en Windows se verifico con `git diff --check` y en MacinCloud compila con `BUILD SUCCEEDED`. Falta revision visual desde Xcode/simulador.
 - La integracion Android de fondos animados compila con `gradlew.bat test` y `gradlew.bat assembleDebug`; la integracion iOS esta validada solo de forma estatica en Windows y falta compilar/revisar en Xcode/MacinCloud.
@@ -160,6 +162,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente la Home con Blank activo: puntos blancos sin fondo, Ajustes legible en modo oscuro, contador encima de `Escanear NFC para salir`, `Progreso` visible bajo el CTA y `Emergencia` dentro de Ajustes.
 - En MacinCloud/Xcode, pulsar Run del scheme `Blank` y revisar visualmente que la Home solo tenga los tres puntos centrados arriba y que Ajustes permita entrar a Modos.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS con los fondos animados en loop: fondo claro en reposo, fondo oscuro al activar Blank, movimiento fluido, botones superiores legibles y sin opcion de cambiar fondo en Ajustes.
 - Decidir que imagen cuadrada usar en la ficha/landing de producto y cablearla en `web/landing` o Shopify segun corresponda.

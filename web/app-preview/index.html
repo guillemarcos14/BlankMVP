@@ -40,8 +40,24 @@
             <section class="onboarding-panel is-active" data-onboarding-step="0">
               <div class="center-message onboarding-message">
                 <p class="state-label">Paso 1 de 3</p>
+                <h2>Permite que Blank bloquee.</h2>
+                <p>Blank usa Screen Time, FamilyControls y ManagedSettings para proteger las apps que elijas.</p>
+              </div>
+
+              <div class="setup-preview-card">
+                <div>
+                  <span class="panel-kicker">Screen Time</span>
+                  <strong>Autorizaci&oacute;n aprobada</strong>
+                </div>
+                <button type="button" data-onboarding-next>Continuar</button>
+              </div>
+            </section>
+
+            <section class="onboarding-panel" data-onboarding-step="1" hidden>
+              <div class="center-message onboarding-message">
+                <p class="state-label">Paso 2 de 3</p>
                 <h2>Elige qu&eacute; quieres dejar fuera.</h2>
-                <p>Selecciona las apps que suelen romper tu foco. Blank solo necesita saber cu&aacute;les proteger.</p>
+                <p>Selecciona apps, categor&iacute;as o dominios. En iOS Apple entrega tokens privados.</p>
               </div>
 
               <div class="setup-preview-card">
@@ -53,34 +69,17 @@
               </div>
             </section>
 
-            <section class="onboarding-panel" data-onboarding-step="1" hidden>
-              <div class="center-message onboarding-message">
-                <p class="state-label">Paso 2 de 3</p>
-                <h2>Vincula tu pieza f&iacute;sica.</h2>
-                <p>Acerca tu etiqueta NFC. Esa etiqueta ser&aacute; la llave para pausar o recuperar el acceso.</p>
-              </div>
-
-              <div class="nfc-card" aria-hidden="true">
-                <div class="nfc-disc"></div>
-                <span>NFC listo para escanear</span>
-              </div>
-            </section>
-
             <section class="onboarding-panel" data-onboarding-step="2" hidden>
               <div class="center-message onboarding-message">
                 <p class="state-label">Paso 3 de 3</p>
-                <h2>Permite que Blank bloquee.</h2>
-                <p>Activa el servicio de accesibilidad para detectar cuando abres una app protegida.</p>
+                <h2>Vincula tu pieza f&iacute;sica.</h2>
+                <p>Escanea tu NFC. Esa etiqueta servir&aacute; para activar y salir de Blank.</p>
               </div>
 
               <div class="permission-stack">
                 <div>
                   <span class="check-dot is-done"></span>
                   <strong>NFC vinculado</strong>
-                </div>
-                <div>
-                  <span class="check-dot"></span>
-                  <strong>Accesibilidad pendiente</strong>
                 </div>
               </div>
             </section>
@@ -91,6 +90,9 @@
           </article>
 
           <article class="screen home-screen is-active" id="screen-home" data-preview-panel="home">
+            <video class="screen-video screen-video-idle" src="./assets/blank_background_idle.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
+            <video class="screen-video screen-video-active" src="./assets/blank_background_active.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
+
             <header class="app-top">
               <button class="mode-chip" type="button" data-preview-target="modes" aria-label="Cambiar modo">
                 <strong data-current-mode-name>Rutina diaria</strong>
@@ -100,10 +102,11 @@
 
             <section class="center-message" aria-live="polite">
               <h2 data-main-message>Hoy ya elegiste estar fuera del bucle.</h2>
+              <p data-session-meta>3 selecciones protegidas</p>
             </section>
 
             <section class="bottom-action">
-              <button class="main-action" type="button" data-main-action>Usa tu NFC para salir</button>
+              <button class="main-action" type="button" data-main-action>Iniciar Blank</button>
             </section>
           </article>
 
@@ -119,16 +122,24 @@
             </section>
 
             <section class="menu-list">
-              <button type="button" data-preview-target="privacy">
-                <span>Privacidad</span>
-                <strong>Ver</strong>
+              <button type="button" data-preview-target="report">
+                <span>Progreso</span>
+                <strong>Semana</strong>
+              </button>
+              <button type="button" data-preview-target="schedule">
+                <span>Programar mi Blank</span>
+                <strong>Diario</strong>
+              </button>
+              <button type="button" data-buy-nfc>
+                <span>Comprar NFC</span>
+                <strong>Amazon</strong>
               </button>
               <button type="button" data-preview-target="relink">
-                <span>Vincular nueva etiqueta</span>
-                <strong>NFC</strong>
+                <span>Vincular nuevo NFC</span>
+                <strong>Etiqueta</strong>
               </button>
               <button type="button" data-preview-target="forget">
-                <span>Olvidar NFC</span>
+                <span>He olvidado mi Blank</span>
                 <strong>Reset</strong>
               </button>
             </section>
@@ -236,7 +247,7 @@
             <section class="text-stack">
               <div>
                 <h2>Uso de Accesibilidad</h2>
-                <p>Blank usa eventos de Accesibilidad para detectar cu&aacute;ndo una app bloqueada pasa a primer plano y mostrar la pantalla de bloqueo.</p>
+                <p>Blank usa Screen Time y ManagedSettings para aplicar escudos sobre apps, categor&iacute;as y dominios seleccionados.</p>
               </div>
               <div>
                 <h2>Datos observados</h2>
@@ -244,8 +255,44 @@
               </div>
               <div>
                 <h2>Almacenamiento</h2>
-                <p>La etiqueta NFC, apps protegidas y estado de Blank se guardan localmente en este dispositivo.</p>
+                <p>La etiqueta NFC, apps protegidas, modos y sesiones se guardan localmente en este dispositivo.</p>
               </div>
+            </section>
+          </article>
+
+          <article class="screen report-screen" id="screen-report" data-preview-panel="report">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>Progreso</span>
+            </header>
+
+            <section class="report-hero">
+              <p class="state-label">Semana</p>
+              <h2>2 h 15 min</h2>
+              <p>tiempo protegido esta semana</p>
+            </section>
+
+            <section class="report-list">
+              <div><span>Sesiones completadas</span><strong>6</strong></div>
+              <div><span>Mejor d&iacute;a</span><strong>Jue</strong></div>
+            </section>
+          </article>
+
+          <article class="screen schedule-screen" id="screen-schedule" data-preview-panel="schedule">
+            <header class="report-top">
+              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
+              <span>Diario</span>
+            </header>
+
+            <section class="apps-hero">
+              <h2>Programar mi Blank</h2>
+              <p>Blank se activa solo en esta franja. Para salir antes sigues necesitando NFC.</p>
+            </section>
+
+            <section class="menu-list">
+              <button type="button"><span>Activar horario diario</span><strong>On</strong></button>
+              <button type="button"><span>Inicio</span><strong>23:30</strong></button>
+              <button type="button"><span>Fin</span><strong>08:00</strong></button>
             </section>
           </article>
 
@@ -269,7 +316,7 @@
           <article class="screen forget-screen" id="screen-forget" data-preview-panel="forget">
             <header class="report-top">
               <button class="back-button" type="button" data-preview-target="profile">Volver</button>
-              <span>Reset NFC</span>
+              <span>Reset</span>
             </header>
 
             <section class="center-message">

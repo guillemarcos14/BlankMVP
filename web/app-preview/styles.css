@@ -134,8 +134,7 @@ h1 {
 
 .screen {
   background:
-    linear-gradient(180deg, rgba(176, 176, 169, 0.62) 0%, rgba(217, 217, 213, 0.44) 22%, rgba(233, 233, 231, 0) 52%),
-    linear-gradient(145deg, var(--bg-deep) 0%, var(--bg) 42%, var(--bg-deep) 74%, var(--bg-deeper) 100%),
+    linear-gradient(180deg, rgba(233, 233, 231, 0.28), rgba(233, 233, 231, 0.12)),
     var(--bg);
   display: none;
   height: 100%;
@@ -186,16 +185,39 @@ h1 {
 
 .home-screen {
   background:
-    linear-gradient(180deg, rgba(176, 176, 169, 0.68) 0%, rgba(217, 217, 213, 0.48) 24%, rgba(233, 233, 231, 0) 54%),
-    linear-gradient(145deg, var(--bg-deep) 0%, var(--bg) 42%, var(--bg-deep) 72%, var(--bg-deeper) 100%),
+    linear-gradient(180deg, rgba(233, 233, 231, 0.24), rgba(233, 233, 231, 0.1)),
     var(--bg);
   transition: background 520ms ease, color 320ms ease;
 }
 
 .home-screen.is-blank-active {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(32, 33, 36, 0.2) 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(32, 33, 36, 0.20) 48%),
     #cfd4ce;
+}
+
+.screen-video {
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 520ms ease;
+  width: 100%;
+  z-index: 0;
+}
+
+.home-screen .screen-video-idle {
+  opacity: 0.72;
+}
+
+.home-screen.is-blank-active .screen-video-idle {
+  opacity: 0;
+}
+
+.home-screen.is-blank-active .screen-video-active {
+  opacity: 0.72;
 }
 
 .app-top,
@@ -441,11 +463,11 @@ h1 {
   background: var(--ink);
   border: 0;
   border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34), 0 18px 34px rgba(32, 33, 36, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 22px rgba(32, 33, 36, 0.11);
   color: var(--surface);
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
-  min-height: 66px;
+  min-height: 48px;
   width: 100%;
 }
 

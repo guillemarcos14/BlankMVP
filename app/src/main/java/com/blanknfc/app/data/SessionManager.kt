@@ -62,9 +62,6 @@ class SessionManager(
     private val _setupComplete = MutableStateFlow(false)
     val setupComplete: StateFlow<Boolean> = _setupComplete.asStateFlow()
 
-    private val _backgroundThemeId = MutableStateFlow(DEFAULT_BACKGROUND_THEME_ID)
-    val backgroundThemeId: StateFlow<String> = _backgroundThemeId.asStateFlow()
-
     private val _stateLoaded = MutableStateFlow(false)
     val stateLoaded: StateFlow<Boolean> = _stateLoaded.asStateFlow()
 
@@ -95,7 +92,6 @@ class SessionManager(
                 _blockedPackages.value = parsedModes.first { it.id == currentId }.packages
                 _nfcTagUid.value = prefs[PrefsKeys.NFC_TAG_UID]
                 _setupComplete.value = prefs[PrefsKeys.SETUP_COMPLETE] ?: false
-                _backgroundThemeId.value = prefs[PrefsKeys.BACKGROUND_THEME_ID] ?: DEFAULT_BACKGROUND_THEME_ID
                 val currentWeekKey = currentWeekKey()
                 val storedWeekKey = prefs[PrefsKeys.STATS_WEEK_KEY] ?: currentWeekKey
                 _stats.value = if (storedWeekKey == currentWeekKey) {
@@ -167,7 +163,7 @@ class SessionManager(
                 mapOf("blocked_app_count" to _blockedPackages.value.size.toString())
             )
         )
-        return NfcResult.UNBRICKED
+        return NfcResult.UNBLANKED
     }
 
     fun activateBlank(): NfcResult {
@@ -176,7 +172,7 @@ class SessionManager(
             return NfcResult.NO_APPS_SELECTED
         }
         if (_isBlankActive.value) {
-            return NfcResult.BRICKED
+            return NfcResult.BLANKED
         }
 
         _isBlankActive.value = true
@@ -193,7 +189,7 @@ class SessionManager(
                 mapOf("blocked_app_count" to _blockedPackages.value.size.toString())
             )
         )
-        return NfcResult.BRICKED
+        return NfcResult.BLANKED
     }
 
     fun setBlockedPackages(packages: Set<String>) {
@@ -351,15 +347,6 @@ class SessionManager(
         }
     }
 
-    fun selectBackgroundTheme(themeId: String) {
-        _backgroundThemeId.value = themeId
-        scope.launch {
-            dataStore.edit { prefs ->
-                prefs[PrefsKeys.BACKGROUND_THEME_ID] = themeId
-            }
-        }
-    }
-
     fun recordBlockedAttempt() {
         val updated = _stats.value.copy(blockedAttemptsThisWeek = _stats.value.blockedAttemptsThisWeek + 1)
         _stats.value = updated
@@ -404,8 +391,8 @@ class SessionManager(
 
     enum class NfcResult {
         TAG_REGISTERED,
-        BRICKED,
-        UNBRICKED,
+        BLANKED,
+        UNBLANKED,
         WRONG_TAG,
         NO_APPS_SELECTED,
         NOT_ACTIVE
@@ -493,8 +480,6 @@ class SessionManager(
     }
 
     companion object {
-        const val DEFAULT_BACKGROUND_THEME_ID = "grey"
-
         private const val DEFAULT_MODE_ID = "daily"
         private const val STUDY_MODE_ID = "study"
         private const val MINUTES_PER_DAY = 24 * 60

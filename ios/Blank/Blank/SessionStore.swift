@@ -52,10 +52,6 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(schedulePausedUntil?.timeIntervalSince1970, forKey: Keys.schedulePausedUntil) }
     }
 
-    @Published var backgroundThemeId: String {
-        didSet { defaults.set(backgroundThemeId, forKey: Keys.backgroundThemeId) }
-    }
-
     @Published private(set) var deviceActivityTimerScheduled: Bool {
         didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
@@ -93,9 +89,6 @@ final class SessionStore: ObservableObject {
         focusModes = loadedFocusModes
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
-        let normalizedBackgroundThemeId = Self.normalizedBackgroundThemeId(defaults.string(forKey: Keys.backgroundThemeId))
-        backgroundThemeId = normalizedBackgroundThemeId
-        defaults.set(normalizedBackgroundThemeId, forKey: Keys.backgroundThemeId)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
         if let timestamp = defaults.object(forKey: Keys.schedulePausedUntil) as? TimeInterval, timestamp > 0 {
             schedulePausedUntil = Date(timeIntervalSince1970: timestamp)
@@ -392,17 +385,6 @@ final class SessionStore: ObservableObject {
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
     }
 
-    static func normalizedBackgroundThemeId(_ themeId: String?) -> String {
-        switch themeId {
-        case "grey":
-            return "gray"
-        case let theme? where ["gray", "sage", "mint", "teal", "blue", "indigo", "purple", "rose", "coral", "amber"].contains(theme):
-            return theme
-        default:
-            return "gray"
-        }
-    }
-
     enum NfcResult {
         case tagRegistered
         case blanked
@@ -423,7 +405,6 @@ final class SessionStore: ObservableObject {
         static let focusModes = "blankFocusModes"
         static let currentModeId = "blankCurrentModeId"
         static let schedule = "blankFocusSchedule"
-        static let backgroundThemeId = "blankBackgroundThemeId"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
         static let schedulePausedUntil = "blankSchedulePausedUntil"
     }
@@ -435,7 +416,6 @@ extension SessionStore {
         isBlankActive: Bool = false,
         protectedSelectionCount: Int = 3,
         nfcLinked: Bool = true,
-        backgroundThemeId: String = "gray",
         schedule: BlankFocusSchedule = BlankFocusSchedule(),
         schedulePausedUntil: Date? = nil,
         timedUntil: Date? = nil
@@ -447,7 +427,6 @@ extension SessionStore {
         let store = SessionStore(defaults: defaults)
         store.previewSelectionCount = protectedSelectionCount
         store.nfcTagUid = nfcLinked ? "preview-nfc-tag" : nil
-        store.backgroundThemeId = backgroundThemeId
         store.schedule = schedule
         store.schedulePausedUntil = schedulePausedUntil
         store.isBlankActive = isBlankActive

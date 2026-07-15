@@ -33,14 +33,14 @@ class SessionManagerTest {
     }
 
     @Test
-    fun activateBlankStartsBrickModeWhenAppsAreSelected() = runTest {
+    fun activateBlankStartsBlankModeWhenAppsAreSelected() = runTest {
         val manager = createManager(backgroundScope)
 
         manager.handleNfcTag("A1B2")
         manager.setBlockedPackages(setOf("com.example.blocked"))
         advanceUntilIdle()
 
-        assertEquals(SessionManager.NfcResult.BRICKED, manager.activateBlank())
+        assertEquals(SessionManager.NfcResult.BLANKED, manager.activateBlank())
         advanceUntilIdle()
         assertTrue(manager.isBlankActive.first())
         assertTrue(manager.isAppBlocked("com.example.blocked"))
@@ -55,13 +55,13 @@ class SessionManagerTest {
         manager.activateBlank()
         advanceUntilIdle()
 
-        assertEquals(SessionManager.NfcResult.UNBRICKED, manager.handleNfcTag("A1B2"))
+        assertEquals(SessionManager.NfcResult.UNBLANKED, manager.handleNfcTag("A1B2"))
         advanceUntilIdle()
         assertFalse(manager.isBlankActive.first())
     }
 
     @Test
-    fun wrongTagDoesNotToggleBrickMode() = runTest {
+    fun wrongTagDoesNotToggleBlankMode() = runTest {
         val manager = createManager(backgroundScope)
 
         manager.handleNfcTag("A1B2")
@@ -74,7 +74,7 @@ class SessionManagerTest {
     }
 
     @Test
-    fun activateBlankWithoutSelectedAppsDoesNotStartBrickMode() = runTest {
+    fun activateBlankWithoutSelectedAppsDoesNotStartBlankMode() = runTest {
         val manager = createManager(backgroundScope)
 
         manager.handleNfcTag("A1B2")
@@ -86,7 +86,7 @@ class SessionManagerTest {
     }
 
     @Test
-    fun matchingNfcTagWhenBlankIsInactiveDoesNotStartBrickMode() = runTest {
+    fun matchingNfcTagWhenBlankIsInactiveDoesNotStartBlankMode() = runTest {
         val manager = createManager(backgroundScope)
 
         manager.handleNfcTag("A1B2")
@@ -96,18 +96,6 @@ class SessionManagerTest {
         assertEquals(SessionManager.NfcResult.NOT_ACTIVE, manager.handleNfcTag("A1B2"))
         advanceUntilIdle()
         assertFalse(manager.isBlankActive.first())
-    }
-
-    @Test
-    fun backgroundThemeDefaultsToGreyAndCanBeChanged() = runTest {
-        val manager = createManager(backgroundScope)
-
-        assertEquals(SessionManager.DEFAULT_BACKGROUND_THEME_ID, manager.backgroundThemeId.first())
-
-        manager.selectBackgroundTheme("mint")
-        advanceUntilIdle()
-
-        assertEquals("mint", manager.backgroundThemeId.first())
     }
 
     @Test
@@ -142,7 +130,7 @@ class SessionManagerTest {
         manager.activateBlank()
         advanceUntilIdle()
 
-        assertEquals(SessionManager.NfcResult.UNBRICKED, manager.handleNfcTag("A1B2"))
+        assertEquals(SessionManager.NfcResult.UNBLANKED, manager.handleNfcTag("A1B2"))
         advanceUntilIdle()
 
         val stats = manager.stats.first()

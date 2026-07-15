@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-14
+Ultima actualizacion: 2026-07-15
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,21 @@ Ultima actualizacion: 2026-07-14
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se sustituyeron los fondos liquidos estaticos por loops MP4 reales: `blank_background_idle.mp4` para Blank desactivado y `blank_background_active.mp4` para Blank activado. Android los reproduce con `TextureView` + `MediaPlayer` desde `res/raw`, iOS los incluye en el target y los reproduce con `AVQueuePlayer` + `AVPlayerLooper`, y `web/app-preview` usa videos HTML en loop.
+- 2026-07-15: Se integraron como unicos fondos de la app los assets liquidos `bg_liquid_1` para Blank desactivado y `bg_liquid_2` para Blank activado en Android, iOS y `web/app-preview`; se elimino la opcion de personalizar/cambiar fondo y se borraron los fondos antiguos `gray/sage/mint/teal/blue/indigo/purple/rose/coral/amber` de Android, iOS y preview.
+- 2026-07-15: Se genero una version clara del video externo `C:\Users\Guillem\Desktop\Liquid_1\Liquid Abstract Animated Background (Loop) Monochrome.mp4` para usar como fondo de Blank desactivado, guardada como `C:\Users\Guillem\Desktop\Liquid_1\Liquid Abstract Animated Background (Loop) Blank claro.mp4`, junto con la comparativa `C:\Users\Guillem\Desktop\Liquid_1\Liquid Blank claro preview.png`.
+- 2026-07-15: Se generaron cinco imagenes verticales 3:4 para la galeria PDP en `C:\Users\Guillem\Desktop\`: `PDP-v2-gallery-2-editada.png`, `PDP-v2-gallery-3-editada.png`, `PDP-v2-gallery-4-editada.png`, `PDP-v2-gallery-6-editada.png` y `PDP-v2-gallery-7-editada.png`, sustituyendo referencias Brick por el disco blanco Blank y traduciendo el texto visible al castellano; la comparativa `PDP-v2-gallery-3-editada.png` se rehizo para evitar achatamiento lateral.
+- 2026-07-15: Se genero la imagen vertical 3:4 `C:\Users\Guillem\Desktop\PDP-v2-gallery-1-editada.png` a partir de `PDP-v2-gallery-1.webp`, sustituyendo el dispositivo cuadrado por el disco blanco Blank y traduciendo la banda superior al castellano.
+- 2026-07-15: Se generaron tres imagenes cuadradas ultra realistas para producto Blank a partir del disco NFC fisico de referencia y se guardaron en `web/landing/assets/`: `blank-product-square-hero.png`, `blank-product-square-tap.png` y `blank-product-square-detail.png`, sin texto ni logos.
+- 2026-07-15: Se preparo el bloque SEO de Shopify para la ficha de producto Blank con titulo, metadescripcion y handle optimizados para busquedas de chip NFC y bloqueo de apps.
+- 2026-07-15: Se copio la segunda imagen cuadrada generada para la ficha de producto Shopify a `C:\Users\Guillem\Desktop\blank-shopify-product-square.png`.
+- 2026-07-15: Se adapto la descripcion de producto Shopify de Blank a texto plano para pegarla en el editor visual, sin HTML.
+- 2026-07-15: Se preparo copy persuasivo para la ficha de producto Shopify de Blank, con tono startup YC y satira ligera, orientado a vender el dispositivo NFC.
+- 2026-07-14: Se genero una version de la imagen externa `C:\Users\Guillem\Desktop\Recupera tu tiempo.webp` aplanando el dispositivo visible en la mesa y haciendolo blanco, guardada como `C:\Users\Guillem\Desktop\Recupera tu tiempo dispositivo blanco plano.png`.
+- 2026-07-14: Se genero una version de la imagen externa `C:\Users\Guillem\Desktop\Tap Blank.webp` sustituyendo el dispositivo gris del fondo por un dispositivo redondo blanco, guardada como `C:\Users\Guillem\Desktop\Tap Blank dispositivo blanco.png`.
+- 2026-07-14: Se genero una version en castellano de la imagen externa `C:\Users\Guillem\Desktop\Elije Apps.webp`, guardada sin sobrescribir el original como `C:\Users\Guillem\Desktop\Elije Apps castellano.png`.
+- 2026-07-14: Se genero una version cuadrada en castellano de la imagen externa `C:\Users\Guillem\AppData\Local\Temp\codex-clipboard-95f7e998-0ded-4564-b522-233fbed5fe9f.png`, guardada como `C:\Users\Guillem\Desktop\limites-castellano-cuadrado.png`.
+- 2026-07-14: Se ajusto `C:\Users\Guillem\Desktop\limites-castellano-cuadrado.png` para quitar la negrita/Black y usar Inter regular con texto mas pequeno dentro de los contenedores blancos.
 - 2026-07-14: En MacinCloud/Xcode se actualizo el proyecto con `git pull --ff-only origin codex/ios-device-activity-target` hasta `198c4a1`, se abrio `ios/Blank/Blank.xcodeproj` y se lanzo `Product > Build` del scheme `Blank` con destino `iPhone 17 (26.5)`; Xcode mostro `Build Succeeded` a las 11:35.
 - 2026-07-14: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta el commit `81fefae` y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-14: Se ajusto la Home iOS para que, con Blank activado sobre fondo oscuro, los controles superiores de Modos y Ajustes se rendericen como boton blanco con contenido oscuro para mejorar el contraste.
@@ -100,6 +115,9 @@ Ultima actualizacion: 2026-07-14
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Android, iOS y la preview web usan ya dos fondos liquidos animados en loop: claro en reposo/desactivado y oscuro en Blank activado; ya no hay selector de fondo ni persistencia de tema.
+- La integracion Android de fondos animados compila con `gradlew.bat test` y `gradlew.bat assembleDebug`; la integracion iOS esta validada solo de forma estatica en Windows y falta compilar/revisar en Xcode/MacinCloud.
+- La landing ya dispone de tres assets cuadrados nuevos para producto Blank: una toma de producto limpio, una escena de uso con movil/NFC y una macro de detalle; aun no estan cableados en HTML/CSS.
 - Xcode en MacinCloud queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj`, rama `codex/ios-device-activity-target`, commit `198c4a1`, scheme `Blank`, destino `iPhone 17 (26.5)` y ultimo resultado visible `Build Succeeded`.
 - Home iOS tiene corregido el contraste de los botones superiores en estado activo; en Windows se verifico con `git diff --check` y en MacinCloud compila en Debug con `BUILD SUCCEEDED`, pero falta revisar visualmente en Xcode/simulador o TestFlight.
 - Progreso iOS ya no hereda los colores blancos globales de Home y compila en MacinCloud con `BUILD SUCCEEDED`; queda pendiente relanzar desde Xcode/simulador y revisar visualmente que todo el texto sea negro/gris oscuro sobre fondo claro.
@@ -129,7 +147,7 @@ Ultima actualizacion: 2026-07-14
 - La rama remota `codex/ios-device-activity-target` ya contiene la version iOS preparada para compilar y subir como `1.0 (3)`.
 - En MacinCloud, Xcode queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj` con el scheme `Blank` y destino `Any iOS Device (arm64)` tras el pull de los ultimos cambios.
 - En MacinCloud el siguiente build/archive iOS debe quedar en `1.0 (7)` porque `1.0 (6)` ya se uso para validar la captura actual.
-- El arreglo visual de la Home Grey/Gray ahora corrige el fallo de nombre de asset (`grey` -> `gray`) y se ha validado solo de forma estatica en Windows (`git diff --check`); falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
+- La Home iOS ya no depende de la familia de fondos `gray` ni de otros temas; usa `blank_background_idle.mp4`/`blank_background_active.mp4` en loop y falta compilar/probar en Xcode o TestFlight para confirmar el resultado real en iPhone.
 - La Home iOS ya no depende de paddings absolutos ni de `Spacer()` simetricos para top bar/frase/CTA; la frase queda centrada por pantalla, `HomeView` mide pantalla completa y el bloque superior se posiciona con `topSafeArea + 10`; falta compilar y revisar el ultimo ajuste en MacinCloud antes de otro TestFlight.
 - El AppIcon iOS local ya esta regenerado como fondo blanco opaco `#ffffff`; falta compilar/archive y subir un nuevo build para que se vea en App Store/TestFlight.
 - MacinCloud ya tiene el commit `68b248b` con el AppIcon blanco; el siguiente paso de Xcode puede hacerse desde `~/BlankMVP/ios/Blank/Blank.xcodeproj`.
@@ -139,11 +157,13 @@ Ultima actualizacion: 2026-07-14
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS con los fondos animados en loop: fondo claro en reposo, fondo oscuro al activar Blank, movimiento fluido, botones superiores legibles y sin opcion de cambiar fondo en Ajustes.
+- Decidir que imagen cuadrada usar en la ficha/landing de producto y cablearla en `web/landing` o Shopify segun corresponda.
 - En MacinCloud/Xcode, revisar la Home iOS con Blank activado y fondo oscuro para confirmar que los botones blancos de Modos y Ajustes se ven bien y no chocan con safe area ni textos largos.
 - En MacinCloud/Xcode, compilar y revisar visualmente `ReportView`/Progreso para confirmar que el mapa de 28 dias, las metricas y el texto caben bien en iPhone real/simulador.
 - En Xcode, pulsar Stop, volver a pulsar Run en `iPhone 17` y comprobar si la app abre; si vuelve a parar en `Thread 1: signal SIGTERM`, abrir la consola de debug y guardar el primer mensaje relevante anterior al SIGTERM.
-- En Xcode/MacinCloud, hacer Run del scheme `Blank` en un simulador iPhone y revisar visualmente frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, textura Gray, top bar visible y CTA con margen.
-- En la proxima entrada a MacinCloud, hacer `git pull --ff-only origin codex/ios-device-activity-target`, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj`, compilar el scheme `Blank` y revisar especificamente los ultimos cambios de `HomeView.swift`: frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, top bar visible, textura Gray y CTA con margen.
+- En Xcode/MacinCloud, hacer Run del scheme `Blank` en un simulador iPhone y revisar visualmente frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, fondos animados en loop, top bar visible y CTA con margen.
+- En la proxima entrada a MacinCloud, hacer `git pull --ff-only origin codex/ios-device-activity-target`, abrir `~/BlankMVP/ios/Blank/Blank.xcodeproj`, compilar el scheme `Blank` y revisar especificamente los ultimos cambios de `HomeView.swift`: fondos animados en loop, sin selector de fondo en Ajustes, frases con acentos, Modos/Ajustes con textos negros, reset destructivo en rojo, top bar visible y CTA con margen.
 - En MacinCloud/Xcode, compilar y revisar la Home iOS tras la migracion de frases para confirmar que las 20 frases renderizan bien, con acentos y sin cortes visuales.
 - Para publicar el nuevo icono blanco en App Store, subir estos cambios a la rama iOS, hacer pull en MacinCloud, generar archive con el siguiente build y subirlo desde Xcode/App Store Connect.
 - Confirmar si el build con `0 errores` fue `Product > Build` para `Any iOS Device (arm64)` y guardar captura/nota del resultado.
@@ -158,11 +178,12 @@ Ultima actualizacion: 2026-07-14
 - En Xcode, usar Canvas/Previews sobre `HomeView.swift` para ajustar estetica antes de hacer otro build real.
 - En MacinCloud/Xcode, compilar y revisar `HomeView` en simulador/previews para validar visualmente la transicion smooth y la hoja de Emergencia.
 - En Xcode, revisar visualmente `HomeView` o ejecutar `Product > Archive` para generar un nuevo archive con el arreglo de Home y build `1.0 (7)`.
-- Antes de subir otro build, revisar la Home Gray en Xcode/simulador o iPhone: barra de estado oscura, modo visible, ajustes pulsable, textura `bg_gray_*` cargada y CTA redondeado con margen lateral.
+- Antes de subir otro build, revisar la Home con fondos animados en Xcode/simulador o iPhone: barra de estado legible, modo visible, ajustes pulsable, loop claro en reposo, loop oscuro en activo y CTA redondeado con margen lateral.
 - En MacinCloud, probar la Home con un simulador cercano al iPhone 12 ademas del iPhone 17 para confirmar que safe area, CTA y frase principal mantienen distancia visual suficiente.
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-15: Los fondos de Home deben ser loops MP4 reales: claro para Blank desactivado y oscuro para Blank activado, sin selector de personalizacion.
 - [cerrada] 2026-07-09: Para iOS, la rama operativa de compilacion en MacinCloud es `codex/ios-device-activity-target`.
 - [cerrada] 2026-07-09: El Team ID de Apple para el proyecto iOS es `GS54UV79RG`.
 - [cerrada] 2026-07-09: El proyecto usara `ESTADO.md` en la raiz como fuente de verdad incremental para continuidad entre sesiones.

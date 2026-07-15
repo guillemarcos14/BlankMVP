@@ -1,4 +1,5 @@
 import FamilyControls
+import AVFoundation
 import SwiftUI
 
 struct HomeView: View {
@@ -50,7 +51,7 @@ struct HomeView: View {
             let layout = HomeLayoutMetrics(size: proxy.size, safeAreaInsets: proxy.safeAreaInsets)
 
             ZStack {
-                AppBackground(isActive: sessionStore.isBlankActive, themeId: sessionStore.backgroundThemeId)
+                AppBackground(isActive: sessionStore.isBlankActive)
 
                 topCluster(spacing: layout.topClusterSpacing)
                     .padding(.horizontal, layout.horizontalPadding)
@@ -432,7 +433,6 @@ private struct ConfigIssue: Identifiable {
 
 private struct AppBackground: View {
     let isActive: Bool
-    let themeId: String
 
     var body: some View {
         ZStack {
@@ -440,13 +440,9 @@ private struct AppBackground: View {
                 .opacity(isActive ? 0 : 1)
             BlankColors.ink
                 .opacity(isActive ? 1 : 0)
-            Image(inactiveAssetName)
-                .resizable()
-                .scaledToFill()
+            LoopingVideoBackground(resourceName: "blank_background_idle")
                 .opacity(isActive ? 0 : 1)
-            Image(activeAssetName)
-                .resizable()
-                .scaledToFill()
+            LoopingVideoBackground(resourceName: "blank_background_active")
                 .opacity(isActive ? 1 : 0)
             PaperTexture()
                 .opacity(isActive ? 0 : 0.34)
@@ -459,17 +455,61 @@ private struct AppBackground: View {
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.75), value: isActive)
     }
+}
 
-    private var inactiveAssetName: String {
-        "bg_\(theme)_1"
+private struct LoopingVideoBackground: UIViewRepresentable {
+    let resourceName: String
+
+    func makeUIView(context: Context) -> LoopingVideoView {
+        let view = LoopingVideoView()
+        view.configure(resourceName: resourceName)
+        return view
     }
 
-    private var activeAssetName: String {
-        "bg_\(theme)_2"
+    func updateUIView(_ uiView: LoopingVideoView, context: Context) {
+        uiView.configure(resourceName: resourceName)
+    }
+}
+
+private final class LoopingVideoView: UIView {
+    private let playerLayer = AVPlayerLayer()
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
+    private var currentResourceName: String?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
     }
 
-    private var theme: String {
-        SessionStore.normalizedBackgroundThemeId(themeId)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
+    }
+
+    func configure(resourceName: String) {
+        if currentResourceName == resourceName {
+            player?.play()
+            return
+        }
+
+        currentResourceName = resourceName
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
+
+        let playerItem = AVPlayerItem(url: url)
+        let queuePlayer = AVQueuePlayer()
+        queuePlayer.isMuted = true
+        queuePlayer.actionAtItemEnd = .none
+
+        looper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
+        playerLayer.player = queuePlayer
+        player = queuePlayer
+        queuePlayer.play()
     }
 }
 
@@ -624,20 +664,6 @@ private struct SettingsSheet: View {
                     }
                     dismiss()
                 }
-                Picker("Cambiar fondo", selection: $sessionStore.backgroundThemeId) {
-                    Text("Grey").tag("gray")
-                    Text("Sage").tag("sage")
-                    Text("Mint").tag("mint")
-                    Text("Teal").tag("teal")
-                    Text("Blue").tag("blue")
-                    Text("Indigo").tag("indigo")
-                    Text("Purple").tag("purple")
-                    Text("Rose").tag("rose")
-                    Text("Coral").tag("coral")
-                    Text("Amber").tag("amber")
-                }
-                .foregroundStyle(BlankColors.ink)
-                .tint(BlankColors.ink)
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {
                     showingRelink = true
                     dismiss()
@@ -864,7 +890,6 @@ private struct HomePreviewScene: View {
         isBlankActive: Bool = false,
         protectedSelectionCount: Int = 3,
         nfcLinked: Bool = true,
-        backgroundThemeId: String = "gray",
         authorizationApproved: Bool = true,
         schedule: BlankFocusSchedule = BlankFocusSchedule(),
         schedulePausedUntil: Date? = nil,
@@ -875,7 +900,6 @@ private struct HomePreviewScene: View {
             isBlankActive: isBlankActive,
             protectedSelectionCount: protectedSelectionCount,
             nfcLinked: nfcLinked,
-            backgroundThemeId: backgroundThemeId,
             schedule: schedule,
             schedulePausedUntil: schedulePausedUntil,
             timedUntil: timedUntil
@@ -892,12 +916,8 @@ private struct HomePreviewScene: View {
     }
 }
 
-#Preview("Home - Grey") {
-    HomePreviewScene("Home - Grey", backgroundThemeId: "gray")
-}
-
-#Preview("Home - Mint") {
-    HomePreviewScene("Home - Mint", backgroundThemeId: "mint")
+#Preview("Home - Reposo") {
+    HomePreviewScene("Home - Reposo")
 }
 
 #Preview("Home - Sin apps") {
@@ -909,14 +929,13 @@ private struct HomePreviewScene: View {
 }
 
 #Preview("Blank activo") {
-    HomePreviewScene("Blank activo", isBlankActive: true, backgroundThemeId: "gray")
+    HomePreviewScene("Blank activo", isBlankActive: true)
 }
 
 #Preview("Blank activo - Timer") {
     HomePreviewScene(
         "Blank activo - Timer",
         isBlankActive: true,
-        backgroundThemeId: "indigo",
         timedUntil: Date().addingTimeInterval(38 * 60)
     )
 }
@@ -925,7 +944,6 @@ private struct HomePreviewScene: View {
     HomePreviewScene(
         "Horario pausado",
         isBlankActive: false,
-        backgroundThemeId: "teal",
         schedule: BlankFocusSchedule(enabled: true, startMinute: 0, endMinute: 24 * 60 - 1),
         schedulePausedUntil: Date().addingTimeInterval(5 * 60)
     )

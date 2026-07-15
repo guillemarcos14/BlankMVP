@@ -5,6 +5,8 @@ const targetButtonsWithReturn = document.querySelectorAll("[data-return-screen]"
 const mainAction = document.querySelector("[data-main-action]");
 const homeScreen = document.querySelector(".home-screen");
 const mainMessage = document.querySelector("[data-main-message]");
+const sessionMeta = document.querySelector("[data-session-meta]");
+const buyNfcButton = document.querySelector("[data-buy-nfc]");
 const onboardingPanels = document.querySelectorAll("[data-onboarding-step]");
 const onboardingDots = document.querySelectorAll(".onboarding-dots span");
 const onboardingNext = document.querySelector("[data-onboarding-next]");
@@ -28,6 +30,8 @@ const emergencyInput = document.querySelector("[data-emergency-input]");
 const emergencyUnlock = document.querySelector("[data-emergency-unlock]");
 
 let isBlankActive = false;
+let timerActive = false;
+let timerMinutes = 30;
 let onboardingStep = 0;
 let returnScreen = "profile";
 let nfcRelinked = false;
@@ -58,12 +62,16 @@ function renderBlankState() {
 
   if (isBlankActive) {
     mainMessage.textContent = "Hoy ya elegiste estar fuera del bucle.";
-    mainAction.textContent = "Usa tu NFC para salir";
-    mainAction.disabled = true;
+    mainAction.textContent = "Escanear NFC para salir";
+    mainAction.disabled = false;
+    sessionMeta.textContent = timerActive
+      ? `Termina en ${timerMinutes} min · Timer del sistema activo`
+      : "Blank activo · salida con NFC";
   } else {
     mainMessage.innerHTML = "Vuelve cuando<br />quieras recuperar<br />silencio.";
     mainAction.textContent = "Iniciar Blank";
     mainAction.disabled = false;
+    sessionMeta.textContent = `${currentMode().apps.length} selecciones protegidas`;
   }
 }
 
@@ -101,9 +109,18 @@ targetButtonsWithReturn.forEach((button) => {
 });
 
 mainAction.addEventListener("click", () => {
-  if (isBlankActive) return;
-  isBlankActive = true;
+  if (isBlankActive) {
+    isBlankActive = false;
+    timerActive = false;
+  } else {
+    isBlankActive = true;
+    timerActive = false;
+  }
   renderBlankState();
+});
+
+buyNfcButton.addEventListener("click", () => {
+  window.location.href = "https://getblank.netlify.app/nfc.html";
 });
 
 onboardingNext.addEventListener("click", () => {

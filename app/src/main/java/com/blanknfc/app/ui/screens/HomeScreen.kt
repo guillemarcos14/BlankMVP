@@ -1,8 +1,14 @@
 ﻿package com.blanknfc.app.ui.screens
 
 import android.content.Intent
+import android.content.Context
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.Settings
+import android.view.Surface
+import android.view.TextureView
+import android.view.ViewGroup
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -11,11 +17,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,15 +61,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -75,7 +78,6 @@ import com.blanknfc.app.data.FocusSchedule
 import com.blanknfc.app.data.FocusStats
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.service.BlankSchedule
-import com.blanknfc.app.ui.theme.BlankBackground
 import com.blanknfc.app.ui.theme.BlankGray
 import com.blanknfc.app.ui.theme.BlankOnSurface
 import com.blanknfc.app.ui.theme.BlankSurface
@@ -94,17 +96,9 @@ private enum class HomePanel {
     SCHEDULE,
     RELINK,
     FORGET,
-    BACKGROUND,
     BLOCK,
     EMERGENCY
 }
-
-private data class BackgroundTheme(
-    val id: String,
-    val label: String,
-    val idleResId: Int,
-    val activeResId: Int
-)
 
 private data class ConfigIssue(
     val title: String,
@@ -113,20 +107,7 @@ private data class ConfigIssue(
     val onAction: () -> Unit = {}
 )
 
-private val BackgroundThemes = listOf(
-    BackgroundTheme("grey", "Grey", R.drawable.bg_gray_1, R.drawable.bg_gray_2),
-    BackgroundTheme("sage", "Sage", R.drawable.bg_sage_1, R.drawable.bg_sage_2),
-    BackgroundTheme("mint", "Mint", R.drawable.bg_mint_1, R.drawable.bg_mint_2),
-    BackgroundTheme("teal", "Teal", R.drawable.bg_teal_1, R.drawable.bg_teal_2),
-    BackgroundTheme("blue", "Blue", R.drawable.bg_blue_1, R.drawable.bg_blue_2),
-    BackgroundTheme("indigo", "Indigo", R.drawable.bg_indigo_1, R.drawable.bg_indigo_2),
-    BackgroundTheme("purple", "Purple", R.drawable.bg_purple_1, R.drawable.bg_purple_2),
-    BackgroundTheme("rose", "Rose", R.drawable.bg_rose_1, R.drawable.bg_rose_2),
-    BackgroundTheme("coral", "Coral", R.drawable.bg_coral_1, R.drawable.bg_coral_2),
-    BackgroundTheme("amber", "Amber", R.drawable.bg_amber_1, R.drawable.bg_amber_2)
-)
-
-private const val BackgroundImageAlpha = 0.62f
+private const val BackgroundVideoAlpha = 0.72f
 private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
 
 private val LightModeMessages = listOf(
@@ -166,12 +147,9 @@ fun HomeScreen(
     val isBlankActive by sessionManager.isBlankActive.collectAsState()
     val modes by sessionManager.modes.collectAsState()
     val currentModeId by sessionManager.currentModeId.collectAsState()
-    val backgroundThemeId by sessionManager.backgroundThemeId.collectAsState()
     val stats by sessionManager.stats.collectAsState()
     val schedule by sessionManager.schedule.collectAsState()
     val currentMode = modes.firstOrNull { it.id == currentModeId } ?: modes.first()
-    val backgroundTheme = BackgroundThemes.firstOrNull { it.id == backgroundThemeId }
-        ?: BackgroundThemes.first { it.id == SessionManager.DEFAULT_BACKGROUND_THEME_ID }
     val buttonLight = !isBlankActive
     val apps = remember { PackageHelper.getInstalledApps(context) }
     var panel by remember { mutableStateOf(HomePanel.HOME) }
@@ -249,8 +227,7 @@ fun HomeScreen(
 
     AppBackground(
         isBlankActive = isBlankActive,
-        isDark = panel == HomePanel.BLOCK || panel == HomePanel.EMERGENCY,
-        backgroundTheme = backgroundTheme
+        isDark = panel == HomePanel.BLOCK || panel == HomePanel.EMERGENCY
     ) {
         AnimatedContent(
             targetState = panel,
@@ -292,9 +269,6 @@ fun HomeScreen(
                 },
                 onForget = {
                     panel = HomePanel.FORGET
-                },
-                onBackground = {
-                    panel = HomePanel.BACKGROUND
                 }
             )
 
@@ -330,13 +304,6 @@ fun HomeScreen(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.SETTINGS },
                 onAction = onForgetTag
-            )
-
-            HomePanel.BACKGROUND -> BackgroundPanel(
-                selectedThemeId = backgroundTheme.id,
-                buttonLight = buttonLight,
-                onBack = { panel = HomePanel.SETTINGS },
-                onSelect = sessionManager::selectBackgroundTheme
             )
 
             HomePanel.STATS -> StatsPanel(
@@ -402,7 +369,6 @@ fun HomeScreen(
 private fun AppBackground(
     isBlankActive: Boolean,
     isDark: Boolean,
-    backgroundTheme: BackgroundTheme,
     content: @Composable () -> Unit
 ) {
     Box(
@@ -412,17 +378,15 @@ private fun AppBackground(
     ) {
         if (!isDark) {
             Crossfade(
-                targetState = if (isBlankActive) backgroundTheme.activeResId else backgroundTheme.idleResId,
+                targetState = if (isBlankActive) R.raw.blank_background_active else R.raw.blank_background_idle,
                 animationSpec = tween(durationMillis = 520),
-                label = "blank_background_image"
-            ) { backgroundResId ->
-                Image(
-                    painter = painterResource(backgroundResId),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                label = "blank_background_video"
+            ) { backgroundVideoResId ->
+                BackgroundLoopVideo(
+                    videoResId = backgroundVideoResId,
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(BackgroundImageAlpha)
+                        .alpha(BackgroundVideoAlpha)
                 )
             }
         }
@@ -449,6 +413,83 @@ private fun AppBackground(
             content()
         }
     }
+}
+
+@Composable
+private fun BackgroundLoopVideo(
+    videoResId: Int,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    AndroidView(
+        modifier = modifier,
+        factory = { viewContext ->
+            LoopingVideoTextureView(viewContext).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        update = { textureView ->
+            textureView.play(context, videoResId)
+        }
+    )
+}
+
+private class LoopingVideoTextureView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
+    private var mediaPlayer: MediaPlayer? = null
+    private var currentVideoResId: Int? = null
+
+    init {
+        surfaceTextureListener = this
+    }
+
+    fun play(context: Context, videoResId: Int) {
+        if (currentVideoResId == videoResId && mediaPlayer?.isPlaying == true) return
+        currentVideoResId = videoResId
+        if (isAvailable) {
+            startPlayer(context, videoResId, Surface(surfaceTexture))
+        }
+    }
+
+    private fun startPlayer(context: Context, videoResId: Int, surface: Surface) {
+        releasePlayer()
+        val assetFileDescriptor = context.resources.openRawResourceFd(videoResId)
+        mediaPlayer = MediaPlayer().apply {
+            setDataSource(
+                assetFileDescriptor.fileDescriptor,
+                assetFileDescriptor.startOffset,
+                assetFileDescriptor.length
+            )
+            assetFileDescriptor.close()
+            isLooping = true
+            setVolume(0f, 0f)
+            setSurface(surface)
+            setOnPreparedListener { preparedPlayer -> preparedPlayer.start() }
+            prepareAsync()
+        }
+    }
+
+    private fun releasePlayer() {
+        mediaPlayer?.release()
+        mediaPlayer = null
+    }
+
+    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+        currentVideoResId?.let { videoResId ->
+            startPlayer(context, videoResId, Surface(surface))
+        }
+    }
+
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) = Unit
+
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+        releasePlayer()
+        return true
+    }
+
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
 }
 
 @Composable
@@ -658,8 +699,7 @@ private fun SettingsPanel(
     onStats: () -> Unit,
     onSchedule: () -> Unit,
     onRelink: () -> Unit,
-    onForget: () -> Unit,
-    onBackground: () -> Unit
+    onForget: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(title = "Ajustes", onBack = onBack)
@@ -670,7 +710,6 @@ private fun SettingsPanel(
             add(MenuItem("Progreso", "Semana", onStats))
             add(MenuItem("Programar mi Blank", "Diario", onSchedule))
             add(MenuItem("Comprar NFC", "Amazon", onBuyNfc))
-            add(MenuItem("Cambiar fondo", "Color", onBackground))
             add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
             add(MenuItem("He olvidado mi Blank", "Reset", onForget))
         }
@@ -682,101 +721,6 @@ private fun SettingsPanel(
 }
 
 private data class MenuItem(val label: String, val meta: String, val action: () -> Unit)
-
-@Composable
-private fun BackgroundPanel(
-    selectedThemeId: String,
-    buttonLight: Boolean,
-    onBack: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Fondo", onBack = onBack)
-        Spacer(modifier = Modifier.height(46.dp))
-        Text(text = "Elige un fondo", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Blank usará la variante clara en reposo y la variante intensa cuando esté activo.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = BlankOnSurface
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(BackgroundThemes, key = { it.id }) { theme ->
-                BackgroundThemeRow(
-                    theme = theme,
-                    selected = theme.id == selectedThemeId,
-                    buttonLight = buttonLight,
-                    onSelect = { onSelect(theme.id) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackgroundThemeRow(
-    theme: BackgroundTheme,
-    selected: Boolean,
-    buttonLight: Boolean,
-    onSelect: () -> Unit
-) {
-    val buttonBackground = if (buttonLight) Color.White else Color.Black
-    val buttonContent = if (buttonLight) Color.Black else Color.White
-    val metaColor = buttonContent.copy(alpha = 0.72f)
-    val border = if (selected) BorderStroke(2.dp, buttonContent) else null
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = buttonBackground,
-        shape = RoundedCornerShape(22.dp),
-        border = border,
-        onClick = onSelect
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BackgroundPreview(theme.idleResId)
-            Spacer(modifier = Modifier.widthIn(min = 10.dp))
-            BackgroundPreview(theme.activeResId)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 14.dp)
-            ) {
-                Text(text = theme.label, color = buttonContent, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    text = if (selected) "Seleccionado" else "Disponible",
-                    color = metaColor,
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun BackgroundPreview(resId: Int) {
-    Surface(
-        modifier = Modifier
-            .widthIn(min = 44.dp, max = 44.dp)
-            .aspectRatio(0.72f),
-        shape = RoundedCornerShape(14.dp),
-        color = BlankBackground
-    ) {
-        Image(
-            painter = painterResource(resId),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(BackgroundImageAlpha)
-        )
-    }
-}
 
 @Composable
 private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {

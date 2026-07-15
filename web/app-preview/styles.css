@@ -628,6 +628,11 @@ h1 {
   width: 100%;
 }
 
+.menu-list button.danger-row,
+.menu-list button.danger-row strong {
+  color: #d34a4a;
+}
+
 .mode-row {
   align-items: stretch;
   display: grid;

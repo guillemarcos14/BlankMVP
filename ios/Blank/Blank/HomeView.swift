@@ -648,13 +648,13 @@ private struct SettingsSheet: View {
                     showingRelink = true
                     dismiss()
                 }
-                settingsButton("Emergencia", meta: "Salida") {
-                    showingEmergency = true
-                    dismiss()
-                }
-                settingsButton("He olvidado mi Blank", meta: "Reset", role: .destructive) {
+                settingsButton("He olvidado mi Blank", meta: "Reset") {
                     sessionStore.forgetNfcTag()
                     screenTimeBlocker.clear()
+                    dismiss()
+                }
+                settingsButton("Emergencia", meta: "Salida", role: .destructive) {
+                    showingEmergency = true
                     dismiss()
                 }
             }

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: En MacinCloud se hizo pull manual tecla a tecla hasta `aeecf09` y se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build`; termino con `BUILD SUCCEEDED`. El intento con `-scheme blank` fallo porque la automatizacion RDP solo introducia minusculas y el scheme real es `Blank`, pero el build por proyecto valido el target `Blank`.
 - 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `4c711f4` con los ajustes de Home activa. Se intento compilar desde la Terminal de MacinCloud via RDP web, pero la automatizacion del navegador no pudo introducir comandos de forma fiable porque el cliente RDP transformaba la entrada en combinaciones de control (`^V`, `^M`) y perdia caracteres; queda pendiente pegar los comandos manualmente en Terminal.
 - 2026-07-15: Se ajusto la Home iOS en modo Blank activo: los tres puntos de Ajustes pasan a blanco sin fondo circular, el contador activo se mueve encima de `Escanear NFC para salir` con Inter blanco, `Progreso` ocupa el lugar visible de `Emergencia`, y `Emergencia` se traslada dentro de Ajustes. El preview web se sincronizo con la misma estructura. En Windows se valido con `node --check web/app-preview/preview.js` y `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
 - 2026-07-15: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta `e212d57` con Modos dentro de Ajustes y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
@@ -119,6 +120,7 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud ya tiene el commit `aeecf09` y el build por proyecto de iOS termino con `BUILD SUCCEEDED`; falta revision visual en Xcode/simulador/TestFlight y, si se quiere distribuir, subir el siguiente build desde Organizer.
 - Home iOS queda ajustada para Blank activo con puntos blancos sin fondo, contador Inter blanco encima del CTA, acceso visible a Progreso y Emergencia dentro de Ajustes; en Windows solo se hizo validacion estatica y falta build/revision visual en Xcode o TestFlight.
 - Android, iOS y la preview web usan ya dos fondos liquidos animados en loop: claro en reposo/desactivado y oscuro en Blank activado; ya no hay selector de fondo ni persistencia de tema.
 - Home iOS ya no muestra el selector de modo en pantalla principal: Modos vive dentro de Ajustes, y el boton de tres puntos queda centrado a la misma altura superior; en Windows se verifico con `git diff --check` y en MacinCloud compila con `BUILD SUCCEEDED`. Falta revision visual desde Xcode/simulador.
@@ -163,6 +165,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En Xcode/MacinCloud, abrir o refrescar `~/BlankMVP/ios/Blank/Blank.xcodeproj`, revisar visualmente la Home y luego generar archive/subida si el resultado visual es correcto.
 - En MacinCloud Terminal, pegar manualmente: `cd ~/BlankMVP && git pull --ff-only origin codex/ios-device-activity-target && cd ios/Blank && xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` para validar el commit `4c711f4`.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home con Blank activo: puntos blancos sin fondo, Ajustes legible en modo oscuro, contador encima de `Escanear NFC para salir`, `Progreso` visible bajo el CTA y `Emergencia` dentro de Ajustes.
 - En MacinCloud/Xcode, pulsar Run del scheme `Blank` y revisar visualmente que la Home solo tenga los tres puntos centrados arriba y que Ajustes permita entrar a Modos.

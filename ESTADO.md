@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `3229f30` con la segunda pasada visual de Progreso y el ajuste de Ajustes. Se intento compilar en MacinCloud, pero la sesion RDP aparecio en pantalla de login del Mac; queda pendiente que el usuario inicie sesion para poder hacer `git pull` y `xcodebuild` tecla a tecla.
 - 2026-07-15: Se refino visualmente `ReportView`/Progreso iOS hacia un estilo mas Apple: el carrusel ya no usa el indicador nativo, tiene dots propios, menos borde/caja pesada, grafica mas fina tipo Health y metricas secundarias en lista compacta en vez de tarjetas grandes. Se mantuvo la estructura `Tiempo ahorrado` / `Tiempo en Blank` sin cambiar la logica de datos.
 - 2026-07-15: En Ajustes iOS se mantuvieron `Emergencia` y `He olvidado mi Blank`, pero se permutaron posiciones y color: `He olvidado mi Blank` queda antes con texto normal, y `Emergencia` pasa a ser el ultimo campo en rojo. El preview web se sincronizo con la misma jerarquia.
 - 2026-07-15: En MacinCloud se hizo pull del commit `6fe2484` con `Progreso` visible en Home clara y Ajustes sin `Progreso` ni `Comprar NFC`; se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build` y termino con `BUILD SUCCEEDED`. Queda pendiente relanzar/revisar visualmente en Xcode o simulador porque la app que estaba abierta seguia mostrando la UI anterior.
@@ -128,6 +129,7 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- El commit `3229f30` esta subido con los cambios de Progreso y Ajustes, pero aun no esta compilado en MacinCloud porque la sesion RDP pide login.
 - Progreso iOS tiene una segunda pasada visual mas limpia y Apple-like aplicada localmente; falta compilar en MacinCloud y revisar visualmente en Xcode/simulador.
 - Ajustes iOS deja `Emergencia` como ultima accion en rojo y `He olvidado mi Blank` como reset normal anterior; falta compilar y revisar visualmente.
 - Home/Ajustes iOS con los enlaces refinados ya compila en MacinCloud con `BUILD SUCCEEDED`; falta relanzar la app desde Xcode/simulador para confirmar visualmente que Home clara muestra `Progreso` y Ajustes ya no muestra `Progreso` ni `Comprar NFC`.
@@ -180,6 +182,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- Iniciar sesion en MacinCloud/RDP y avisar al agente; despues ejecutar tecla a tecla `cd /users/user953323/blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`.
 - En MacinCloud, compilar el commit con la segunda pasada de `ReportView` y el nuevo orden/color de Ajustes; despues revisar visualmente `Progreso`, los dots propios, la grafica, las filas secundarias y que `Emergencia` sea el ultimo campo rojo.
 - En MacinCloud/Xcode, relanzar la app o pulsar Run para revisar visualmente la version compilada del commit `6fe2484`: `Progreso` bajo `Iniciar Blank` en Home clara, y Ajustes sin `Progreso` ni `Comprar NFC`.
 - En MacinCloud/Xcode, revisar visualmente Ajustes para confirmar que no aparecen `Progreso` ni `Comprar NFC`, y que el orden restante empieza por `Modo`, `Programar mi Blank`, `Vincular nuevo NFC`.

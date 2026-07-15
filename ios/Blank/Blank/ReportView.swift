@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @State private var selectedHeroPage = 0
 
     private let reportBackground = BlankColors.background
     private let reportSurface = BlankColors.surface
@@ -18,29 +19,22 @@ struct ReportView: View {
     var body: some View {
         let progress = report
         let weekly = progress.weeklyReport
+        let savedTime = cappedSavedTime(weekly)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Progreso")
-                        .font(.largeTitle.weight(.bold))
-
-                    Text("Actividad real de tus sesiones. Sin premios ni ruido.")
-                        .font(.body)
-                        .foregroundStyle(reportSecondary)
-                }
-
-                heroMetric(
-                    value: formatDuration(weekly.totalFocusTime),
-                    label: "tiempo protegido esta semana"
+                heroCarousel(
+                    weekly: weekly,
+                    savedTime: savedTime,
+                    activityDays: progress.recentActivity
                 )
 
                 LazyVGrid(
                     columns: [
-                        GridItem(.flexible(), spacing: 12),
-                        GridItem(.flexible(), spacing: 12)
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
                     ],
-                    spacing: 12
+                    spacing: 10
                 ) {
                     metricTile(
                         title: "Sesiones",
@@ -58,17 +52,10 @@ struct ReportView: View {
                         caption: "actual"
                     )
                     metricTile(
-                        title: "Mejor racha",
-                        value: "\(progress.longestStreakDays)d",
-                        caption: "ultimos 365 dias"
+                        title: "Mejor dia",
+                        value: bestDayText(report: weekly),
+                        caption: "esta semana"
                     )
-                }
-
-                activitySection(days: progress.recentActivity)
-
-                VStack(spacing: 10) {
-                    reportRow(title: "Mejor dia", value: bestDayText(report: weekly))
-                    reportRow(title: "Tiempo recuperado estimado", value: formatDuration(weekly.estimatedTimeSaved))
                 }
 
                 if !progress.modeActivity.isEmpty {
@@ -84,11 +71,15 @@ struct ReportView: View {
                     }
                 }
 
-                Text("La estimacion usa 15 minutos recuperados por sesion completada. El mapa de actividad reparte el tiempo por dia cuando una sesion cruza medianoche.")
+                Text("Cada sesion cuenta. Blank solo mide lo necesario.")
                     .font(.footnote)
                     .foregroundStyle(reportSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 2)
             }
-            .padding(24)
+            .padding(.horizontal, 22)
+            .padding(.top, 26)
+            .padding(.bottom, 32)
         }
         .background(reportBackground.ignoresSafeArea())
         .foregroundStyle(reportPrimary)
@@ -99,25 +90,128 @@ struct ReportView: View {
         .toolbarColorScheme(.light, for: .navigationBar)
     }
 
-    private func heroMetric(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(value)
-                .font(.blankInter(size: 56, weight: .bold, relativeTo: .largeTitle))
-                .minimumScaleFactor(0.62)
-                .lineLimit(1)
+    private func heroCarousel(
+        weekly: BlankWeeklyReport,
+        savedTime: TimeInterval,
+        activityDays: [BlankActivityDay]
+    ) -> some View {
+        TabView(selection: $selectedHeroPage) {
+            heroPage(
+                label: "Tiempo ahorrado",
+                value: formatDuration(savedTime),
+                description: "recuperadas de tu vida gracias a Blank",
+                chartTitle: "Ahorro estimado",
+                chartValues: savedSeries(from: activityDays)
+            )
+            .tag(0)
 
-            Text(label)
-                .font(.headline)
-                .foregroundStyle(reportSecondary)
+            heroPage(
+                label: "Tiempo en Blank",
+                value: formatDuration(weekly.totalFocusTime),
+                description: "protegidas esta semana",
+                chartTitle: "Modo Blank",
+                chartValues: activityDays.map(\.totalFocusTime)
+            )
+            .tag(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(22)
-        .background(reportSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .tabViewStyle(.page(indexDisplayMode: .always))
+        .frame(height: 468)
+        .background(
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(reportSurface.opacity(0.58))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .stroke(.white.opacity(0.66), lineWidth: 1)
+                )
+        )
+    }
+
+    private func heroPage(
+        label: String,
+        value: String,
+        description: String,
+        chartTitle: String,
+        chartValues: [TimeInterval]
+    ) -> some View {
+        VStack(spacing: 22) {
+            VStack(spacing: 10) {
+                Text(label.uppercased())
+                    .font(.caption.weight(.semibold))
+                    .tracking(2.6)
+                    .foregroundStyle(reportSecondary)
+
+                Text(value)
+                    .font(.blankInter(size: 64, weight: .bold, relativeTo: .largeTitle))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.54)
+
+                Text(description)
+                    .font(.body)
+                    .foregroundStyle(reportSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+            }
+            .padding(.top, 28)
+            .frame(maxWidth: .infinity)
+
+            chartCard(title: chartTitle, values: chartValues)
+
+            Spacer(minLength: 20)
+        }
+        .padding(.horizontal, 18)
+    }
+
+    private func chartCard(title: String, values: [TimeInterval]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.headline)
+
+                Spacer()
+
+                Text("Ultimos 28 dias")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                ProgressLineChart(values: values, primary: reportPrimary, secondary: reportSecondary)
+                    .frame(height: 150)
+
+                VStack(alignment: .trailing) {
+                    Text("2 h")
+                    Spacer()
+                    Text("1 h")
+                    Spacer()
+                    Text("0")
+                }
+                .font(.caption)
+                .foregroundStyle(reportSecondary)
+                .frame(height: 150)
+            }
+
+            HStack {
+                Text("28 dias atras")
+                Spacer()
+                Text("Hoy")
+            }
+            .font(.caption)
+            .foregroundStyle(reportSecondary)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(reportBackground.opacity(0.82))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(reportPrimary.opacity(0.08), lineWidth: 1)
+                )
+        )
     }
 
     private func metricTile(title: String, value: String, caption: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
@@ -125,7 +219,7 @@ struct ReportView: View {
             Text(value)
                 .font(.blankInter(size: 30, weight: .bold, relativeTo: .title))
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(0.68)
 
             Text(caption)
                 .font(.caption)
@@ -135,82 +229,14 @@ struct ReportView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(reportSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private func activitySection(days: [BlankActivityDay]) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Ultimos 28 dias")
-                    .font(.headline)
-
-                Spacer()
-
-                HStack(spacing: 8) {
-                    legendItem(label: "<1h", opacity: 0.30)
-                    legendItem(label: "1-3h", opacity: 0.52)
-                    legendItem(label: ">3h", opacity: 0.84)
-                }
-            }
-
-            VStack(spacing: 8) {
-                ForEach(Array(weekRows(from: days).enumerated()), id: \.offset) { row in
-                    HStack(spacing: 6) {
-                        ForEach(row.element) { day in
-                            activitySquare(day)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(18)
-        .background(reportSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    private func legendItem(label: String, opacity: Double) -> some View {
-        HStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(reportPrimary.opacity(opacity))
-                .frame(width: 9, height: 9)
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(reportSecondary)
-        }
-    }
-
-    private func activitySquare(_ day: BlankActivityDay) -> some View {
-        VStack(spacing: 3) {
-            Text(dayNumber(day.date))
-                .font(.blankInter(size: 10, weight: .medium, relativeTo: .caption2))
-                .foregroundStyle(reportSecondary)
-                .frame(height: 12)
-
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(activityColor(for: day.totalFocusTime))
-                .aspectRatio(1, contentMode: .fit)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(reportSurface.opacity(0.72))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .stroke(reportPrimary.opacity(day.sessionCount > 0 ? 0.16 : 0.04), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(reportPrimary.opacity(0.06), lineWidth: 1)
                 )
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel("\(dayNumber(day.date)): \(formatDuration(day.totalFocusTime))")
-    }
-
-    private func reportRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .foregroundStyle(reportSecondary)
-            Spacer()
-            Text(value)
-                .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-        }
-        .padding(18)
-        .background(reportSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        )
     }
 
     private func modeRow(_ activity: BlankModeActivity) -> some View {
@@ -231,28 +257,24 @@ struct ReportView: View {
                 .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
         }
         .padding(16)
-        .background(reportSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(reportSurface.opacity(0.72))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(reportPrimary.opacity(0.06), lineWidth: 1)
+                )
+        )
     }
 
-    private func activityColor(for duration: TimeInterval) -> Color {
-        let hours = duration / 3600
-        switch hours {
-        case 0:
-            return reportPrimary.opacity(0.08)
-        case 0..<1:
-            return reportPrimary.opacity(0.30)
-        case 1..<3:
-            return reportPrimary.opacity(0.52)
-        default:
-            return reportPrimary.opacity(0.84)
+    private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {
+        days.map { day in
+            min(day.totalFocusTime, TimeInterval(day.sessionCount * 15 * 60))
         }
     }
 
-    private func weekRows(from days: [BlankActivityDay]) -> [[BlankActivityDay]] {
-        stride(from: 0, to: days.count, by: 7).map { start in
-            Array(days[start..<min(start + 7, days.count)])
-        }
+    private func cappedSavedTime(_ report: BlankWeeklyReport) -> TimeInterval {
+        min(report.estimatedTimeSaved, report.totalFocusTime)
     }
 
     private func bestDayText(report: BlankWeeklyReport) -> String {
@@ -272,10 +294,6 @@ struct ReportView: View {
         return symbols[symbolIndex]
     }
 
-    private func dayNumber(_ date: Date) -> String {
-        String(Calendar.current.component(.day, from: date))
-    }
-
     private func formatDuration(_ duration: TimeInterval) -> String {
         let totalMinutes = max(0, Int(duration / 60))
         let hours = totalMinutes / 60
@@ -290,5 +308,127 @@ struct ReportView: View {
         }
 
         return "\(hours) h \(minutes) min"
+    }
+}
+
+private struct ProgressLineChart: View {
+    let values: [TimeInterval]
+    let primary: Color
+    let secondary: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let points = chartPoints(in: proxy.size)
+
+            ZStack {
+                VStack(spacing: 0) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Rectangle()
+                            .fill(secondary.opacity(index == 2 ? 0.10 : 0.06))
+                            .frame(height: 1)
+                        if index < 2 {
+                            Spacer()
+                        }
+                    }
+                }
+
+                HStack(spacing: 0) {
+                    ForEach(0..<7, id: \.self) { _ in
+                        Rectangle()
+                            .fill(secondary.opacity(0.10))
+                            .frame(width: 1)
+                        Spacer()
+                    }
+                }
+
+                chartFill(points: points, height: proxy.size.height)
+                    .fill(
+                        LinearGradient(
+                            colors: [primary.opacity(0.10), primary.opacity(0.00)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                chartPath(points: points)
+                    .stroke(primary.opacity(0.88), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+
+                ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+                    if shouldShowPoint(at: index, total: points.count) {
+                        Circle()
+                            .fill(primary)
+                            .frame(width: 5, height: 5)
+                            .position(point)
+                    }
+                }
+            }
+        }
+    }
+
+    private var cappedValues: [TimeInterval] {
+        let fallback = Array(repeating: TimeInterval.zero, count: 28)
+        return values.isEmpty ? fallback : values
+    }
+
+    private var maxValue: TimeInterval {
+        max(cappedValues.max() ?? 0, 2 * 60 * 60)
+    }
+
+    private func chartPoints(in size: CGSize) -> [CGPoint] {
+        let data = cappedValues
+        guard data.count > 1 else {
+            return [CGPoint(x: size.width / 2, y: size.height)]
+        }
+
+        return data.enumerated().map { index, value in
+            let x = CGFloat(index) / CGFloat(data.count - 1) * size.width
+            let ratio = min(max(value / maxValue, 0), 1)
+            let y = size.height - CGFloat(ratio) * size.height
+            return CGPoint(x: x, y: y)
+        }
+    }
+
+    private func chartPath(points: [CGPoint]) -> Path {
+        Path { path in
+            guard let first = points.first else { return }
+            path.move(to: first)
+
+            for index in points.indices.dropFirst() {
+                let previous = points[index - 1]
+                let current = points[index]
+                let midpoint = CGPoint(
+                    x: (previous.x + current.x) / 2,
+                    y: (previous.y + current.y) / 2
+                )
+                path.addQuadCurve(to: midpoint, control: previous)
+                path.addQuadCurve(to: current, control: current)
+            }
+        }
+    }
+
+    private func chartFill(points: [CGPoint], height: CGFloat) -> Path {
+        Path { path in
+            guard let first = points.first, let last = points.last else { return }
+            path.move(to: CGPoint(x: first.x, y: height))
+            path.addLine(to: first)
+
+            for index in points.indices.dropFirst() {
+                let previous = points[index - 1]
+                let current = points[index]
+                let midpoint = CGPoint(
+                    x: (previous.x + current.x) / 2,
+                    y: (previous.y + current.y) / 2
+                )
+                path.addQuadCurve(to: midpoint, control: previous)
+                path.addQuadCurve(to: current, control: current)
+            }
+
+            path.addLine(to: CGPoint(x: last.x, y: height))
+            path.closeSubpath()
+        }
+    }
+
+    private func shouldShowPoint(at index: Int, total: Int) -> Bool {
+        index == 0 || index == total - 1 || index % 4 == 0
     }
 }

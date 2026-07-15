@@ -234,12 +234,18 @@ enum BlankWeeklySessionAggregator {
             }
         }
 
+        let totalFocusTime = dailyDurations.reduce(0, +)
+        let estimatedTimeSaved = min(
+            totalFocusTime,
+            TimeInterval(completedSessions.count * estimatedMinutesSavedPerSession * 60)
+        )
+
         return BlankWeeklyReport(
             dailyDurations: dailyDurations,
             dailySessionCounts: dailySessionCounts,
-            totalFocusTime: dailyDurations.reduce(0, +),
+            totalFocusTime: totalFocusTime,
             completedSessionCount: completedSessions.count,
-            estimatedTimeSaved: TimeInterval(completedSessions.count * estimatedMinutesSavedPerSession * 60)
+            estimatedTimeSaved: estimatedTimeSaved
         )
     }
 }

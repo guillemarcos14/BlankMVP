@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se redisenio `ReportView`/Progreso iOS con un carrusel superior deslizable: primera pagina `Tiempo ahorrado` como dato emocional principal y segunda pagina `Tiempo en Blank` como dato real protegido, ambas con grafica de linea de los ultimos 28 dias. Los datos secundarios quedan debajo como metricas discretas. Tambien se capo `estimatedTimeSaved` para que nunca supere el tiempo real en modo Blank. En Windows se valido con `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
 - 2026-07-15: Se anadio a `AGENTS.md` la regla permanente para futuras compilaciones en MacinCloud: el agente se encarga de la Terminal por RDP web con pulsaciones individuales, evita pegado/atajos, confirma `BUILD SUCCEEDED` o el primer error util, y al terminar entrega al usuario los pasos manuales de Xcode para revision visual/archive/upload.
 - 2026-07-15: En MacinCloud se hizo pull manual tecla a tecla hasta `aeecf09` y se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build`; termino con `BUILD SUCCEEDED`. El intento con `-scheme blank` fallo porque la automatizacion RDP solo introducia minusculas y el scheme real es `Blank`, pero el build por proyecto valido el target `Blank`.
 - 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `4c711f4` con los ajustes de Home activa. Se intento compilar desde la Terminal de MacinCloud via RDP web, pero la automatizacion del navegador no pudo introducir comandos de forma fiable porque el cliente RDP transformaba la entrada en combinaciones de control (`^V`, `^M`) y perdia caracteres; queda pendiente pegar los comandos manualmente en Terminal.
@@ -121,6 +122,7 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Progreso iOS ahora prioriza `Tiempo ahorrado` y permite deslizar a `Tiempo en Blank`; la estimacion queda limitada para no superar el tiempo protegido real. Esta validado solo de forma estatica en Windows y falta build/revision visual en Xcode/MacinCloud.
 - MacinCloud ya tiene el commit `aeecf09` y el build por proyecto de iOS termino con `BUILD SUCCEEDED`; falta revision visual en Xcode/simulador/TestFlight y, si se quiere distribuir, subir el siguiente build desde Organizer.
 - Home iOS queda ajustada para Blank activo con puntos blancos sin fondo, contador Inter blanco encima del CTA, acceso visible a Progreso y Emergencia dentro de Ajustes; en Windows solo se hizo validacion estatica y falta build/revision visual en Xcode o TestFlight.
 - Android, iOS y la preview web usan ya dos fondos liquidos animados en loop: claro en reposo/desactivado y oscuro en Blank activado; ya no hay selector de fondo ni persistencia de tema.
@@ -166,6 +168,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente `ReportView`/Progreso: swipe entre `Tiempo ahorrado` y `Tiempo en Blank`, graficas de linea, dots del carrusel, contraste, alturas y que el tiempo ahorrado no supere el tiempo en Blank.
 - En Xcode/MacinCloud, abrir o refrescar `~/BlankMVP/ios/Blank/Blank.xcodeproj`, revisar visualmente la Home y luego generar archive/subida si el resultado visual es correcto.
 - En MacinCloud Terminal, pegar manualmente: `cd ~/BlankMVP && git pull --ff-only origin codex/ios-device-activity-target && cd ios/Blank && xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` para validar el commit `4c711f4`.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home con Blank activo: puntos blancos sin fondo, Ajustes legible en modo oscuro, contador encima de `Escanear NFC para salir`, `Progreso` visible bajo el CTA y `Emergencia` dentro de Ajustes.
@@ -196,6 +199,7 @@ Ultima actualizacion: 2026-07-15
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-15: En Progreso iOS, el dato principal debe ser `Tiempo ahorrado` y `Tiempo en Blank` debe vivir en la segunda pagina del carrusel; el ahorro estimado nunca puede ser mayor que el tiempo real protegido.
 - [cerrada] 2026-07-15: Para futuras peticiones de compilar en MacinCloud, el agente debe hacer la Terminal con pulsaciones individuales por RDP web y despues dar al usuario instrucciones concretas para completar manualmente el proceso en Xcode.
 - [cerrada] 2026-07-15: La seleccion de Modos debe vivir dentro de Ajustes para simplificar la pantalla principal; Home mantiene solo el acceso de tres puntos centrado arriba.
 - [cerrada] 2026-07-15: Los fondos de Home deben ser loops MP4 reales: claro para Blank desactivado y oscuro para Blank activado, sin selector de personalizacion.

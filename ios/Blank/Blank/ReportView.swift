@@ -1,11 +1,12 @@
+import AVFoundation
 import SwiftUI
+import UIKit
 
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @State private var selectedHeroPage = 0
 
     private let reportBackground = BlankColors.background
-    private let reportSurface = BlankColors.surface
     private let reportPrimary = BlankColors.ink
     private let reportSecondary = BlankColors.mutedInk
 
@@ -20,44 +21,57 @@ struct ReportView: View {
         let progress = report
         let weekly = progress.weeklyReport
         let savedTime = cappedSavedTime(weekly)
+        let hasProgress = weekly.completedSessionCount > 0 || weekly.totalFocusTime > 0
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                heroCarousel(
-                    weekly: weekly,
-                    savedTime: savedTime,
-                    activityDays: progress.recentActivity
-                )
+        ZStack {
+            ReportLiquidBackground()
 
-                metricList(weekly: weekly, progress: progress)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 26) {
+                    heroCarousel(
+                        weekly: weekly,
+                        savedTime: savedTime,
+                        activityDays: progress.recentActivity,
+                        insight: insightText(weekly: weekly, progress: progress)
+                    )
 
-                if !progress.modeActivity.isEmpty {
-                    modesSection(progress.modeActivity)
+                    if hasProgress {
+                        metricList(weekly: weekly, progress: progress)
+
+                        if !progress.modeActivity.isEmpty {
+                            modesSection(progress.modeActivity)
+                        }
+                    } else {
+                        emptyState()
+                    }
+
+                    Text("Cada sesion cuenta. Blank solo mide lo necesario.")
+                        .font(.footnote)
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 2)
                 }
-
-                Text("Cada sesion cuenta. Blank solo mide lo necesario.")
-                    .font(.footnote)
-                    .foregroundStyle(reportSecondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 2)
+                .padding(.horizontal, 22)
+                .padding(.top, 24)
+                .padding(.bottom, 34)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 24)
-            .padding(.bottom, 34)
         }
-        .background(reportBackground.ignoresSafeArea())
         .foregroundStyle(reportPrimary)
         .navigationTitle("Progreso")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(reportBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+        .onChange(of: selectedHeroPage) { _ in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
     }
 
     private func heroCarousel(
         weekly: BlankWeeklyReport,
         savedTime: TimeInterval,
-        activityDays: [BlankActivityDay]
+        activityDays: [BlankActivityDay],
+        insight: String
     ) -> some View {
         VStack(spacing: 16) {
             TabView(selection: $selectedHeroPage) {
@@ -80,7 +94,7 @@ struct ReportView: View {
                 .tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 404)
+            .frame(height: 414)
 
             HStack(spacing: 7) {
                 ForEach(0..<2, id: \.self) { page in
@@ -91,6 +105,14 @@ struct ReportView: View {
             }
             .animation(.easeInOut(duration: 0.22), value: selectedHeroPage)
             .frame(maxWidth: .infinity)
+
+            Text(insight)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(reportSecondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
     }
 
@@ -122,6 +144,7 @@ struct ReportView: View {
             }
             .padding(.top, 10)
             .frame(maxWidth: .infinity)
+            .animation(.easeInOut(duration: 0.28), value: selectedHeroPage)
 
             chartPanel(title: chartTitle, values: chartValues)
         }
@@ -166,14 +189,7 @@ struct ReportView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 17)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(reportSurface.opacity(0.52))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(reportPrimary.opacity(0.05), lineWidth: 1)
-                )
-        )
+        .liquidGlass(cornerRadius: 26)
     }
 
     private func metricList(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> some View {
@@ -188,14 +204,7 @@ struct ReportView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(reportSurface.opacity(0.60))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(reportPrimary.opacity(0.05), lineWidth: 1)
-                )
-        )
+        .liquidGlass(cornerRadius: 22)
     }
 
     private func metricRow(title: String, value: String, caption: String) -> some View {
@@ -235,14 +244,7 @@ struct ReportView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(reportSurface.opacity(0.60))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(reportPrimary.opacity(0.05), lineWidth: 1)
-                    )
-            )
+            .liquidGlass(cornerRadius: 22)
         }
     }
 
@@ -270,6 +272,41 @@ struct ReportView: View {
         Rectangle()
             .fill(reportPrimary.opacity(0.07))
             .frame(height: 1)
+    }
+
+    private func emptyState() -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Tu tiempo recuperado aparecera aqui.")
+                .font(.headline.weight(.semibold))
+
+            Text("Activa Blank y vuelve cuando tengas tu primera sesion protegida.")
+                .font(.body)
+                .foregroundStyle(reportSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .liquidGlass(cornerRadius: 22)
+    }
+
+    private func insightText(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> String {
+        if weekly.completedSessionCount == 0 {
+            return "Tu primera sesion empezara a construir esta grafica."
+        }
+
+        if weekly.estimatedTimeSaved >= 3 * 60 * 60 {
+            return "Has recuperado casi media jornada para ti."
+        }
+
+        if progress.currentStreakDays >= 3 {
+            return "Blank te ha protegido \(progress.currentStreakDays) dias seguidos."
+        }
+
+        if weekly.completedSessionCount >= 5 {
+            return "Ya hay \(weekly.completedSessionCount) momentos en los que no volviste al bucle."
+        }
+
+        return "Has recuperado tiempo real sin convertirlo en otra pantalla mas."
     }
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {
@@ -313,6 +350,109 @@ struct ReportView: View {
         }
 
         return "\(hours) h \(minutes) min"
+    }
+}
+
+private struct ReportLiquidBackground: View {
+    var body: some View {
+        ZStack {
+            BlankColors.background
+
+            ReportLoopingVideoBackground(resourceName: "blank_background_idle")
+                .opacity(0.10)
+                .saturation(0.18)
+                .contrast(0.88)
+                .blendMode(.softLight)
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.40),
+                    BlankColors.background.opacity(0.70),
+                    Color.white.opacity(0.26)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private extension View {
+    func liquidGlass(cornerRadius: CGFloat) -> some View {
+        self
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.72),
+                                BlankColors.ink.opacity(0.055),
+                                Color.white.opacity(0.28)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: BlankColors.ink.opacity(0.045), radius: 18, x: 0, y: 10)
+    }
+}
+
+private struct ReportLoopingVideoBackground: UIViewRepresentable {
+    let resourceName: String
+
+    func makeUIView(context: Context) -> ReportLoopingVideoView {
+        let view = ReportLoopingVideoView()
+        view.configure(resourceName: resourceName)
+        return view
+    }
+
+    func updateUIView(_ uiView: ReportLoopingVideoView, context: Context) {
+        uiView.configure(resourceName: resourceName)
+    }
+}
+
+private final class ReportLoopingVideoView: UIView {
+    private let playerLayer = AVPlayerLayer()
+    private var player: AVQueuePlayer?
+    private var looper: AVPlayerLooper?
+    private var currentResourceName: String?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        playerLayer.videoGravity = .resizeAspectFill
+        layer.addSublayer(playerLayer)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        playerLayer.frame = bounds
+    }
+
+    func configure(resourceName: String) {
+        if currentResourceName == resourceName {
+            player?.play()
+            return
+        }
+
+        currentResourceName = resourceName
+        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
+
+        let playerItem = AVPlayerItem(url: url)
+        let queuePlayer = AVQueuePlayer()
+        queuePlayer.isMuted = true
+        queuePlayer.actionAtItemEnd = .none
+        playerLayer.player = queuePlayer
+        looper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
+        player = queuePlayer
+        queuePlayer.play()
     }
 }
 

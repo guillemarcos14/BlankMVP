@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se implemento una tercera pasada visual 10x de `ReportView`/Progreso iOS: fondo liquido sutil reutilizando el loop claro, superficies tipo liquid glass con material translúcido, insight dinamico bajo el carrusel, estado vacio cuidado, haptic ligero al deslizar entre `Tiempo ahorrado` y `Tiempo en Blank`, y metricas secundarias compactas. En Windows se valido con `git diff --check`; falta compilar/revisar en MacinCloud/Xcode.
 - 2026-07-15: En MacinCloud se hizo pull de `origin/codex/ios-device-activity-target` con la segunda pasada visual de Progreso y el ajuste de Ajustes; se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build` y termino con `BUILD SUCCEEDED`. Queda pendiente solo revision visual en Xcode/simulador/TestFlight.
 - 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `3229f30` con la segunda pasada visual de Progreso y el ajuste de Ajustes. Se intento compilar en MacinCloud, pero la sesion RDP aparecio en pantalla de login del Mac; queda pendiente que el usuario inicie sesion para poder hacer `git pull` y `xcodebuild` tecla a tecla.
 - 2026-07-15: Se refino visualmente `ReportView`/Progreso iOS hacia un estilo mas Apple: el carrusel ya no usa el indicador nativo, tiene dots propios, menos borde/caja pesada, grafica mas fina tipo Health y metricas secundarias en lista compacta en vez de tarjetas grandes. Se mantuvo la estructura `Tiempo ahorrado` / `Tiempo en Blank` sin cambiar la logica de datos.
@@ -130,6 +131,7 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Progreso iOS tiene aplicada la tercera pasada visual tipo Apple/liquid glass; en Windows esta validada de forma estatica y queda pendiente compilar en MacinCloud y revisar visualmente el material, fondo, haptic, insight, estado vacio y graficas.
 - Progreso iOS tiene una segunda pasada visual mas limpia y Apple-like, y ya compila en MacinCloud con `BUILD SUCCEEDED`; falta revision visual en Xcode/simulador/TestFlight.
 - Ajustes iOS deja `Emergencia` como ultima accion en rojo y `He olvidado mi Blank` como reset normal anterior; ya compila en MacinCloud y falta revision visual.
 - Home/Ajustes iOS con los enlaces refinados ya compila en MacinCloud con `BUILD SUCCEEDED`; falta relanzar la app desde Xcode/simulador para confirmar visualmente que Home clara muestra `Progreso` y Ajustes ya no muestra `Progreso` ni `Comprar NFC`.
@@ -182,6 +184,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud Terminal, hacer `git pull --ff-only origin codex/ios-device-activity-target` y compilar `ios/Blank` con `xcodebuild -project blank.xcodeproj build` para validar la tercera pasada visual de Progreso; despues revisar visualmente en Xcode/simulador.
 - En MacinCloud/Xcode o simulador, revisar visualmente `Progreso`, los dots propios, la grafica, las filas secundarias y que `Emergencia` sea el ultimo campo rojo.
 - En MacinCloud/Xcode, relanzar la app o pulsar Run para revisar visualmente la version compilada del commit `6fe2484`: `Progreso` bajo `Iniciar Blank` en Home clara, y Ajustes sin `Progreso` ni `Comprar NFC`.
 - En MacinCloud/Xcode, revisar visualmente Ajustes para confirmar que no aparecen `Progreso` ni `Comprar NFC`, y que el orden restante empieza por `Modo`, `Programar mi Blank`, `Vincular nuevo NFC`.
@@ -217,6 +220,7 @@ Ultima actualizacion: 2026-07-15
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-15: Progreso iOS debe evolucionar hacia una pieza premium tipo Apple: fondo liquido sutil, superficies liquid glass, carrusel emocional, insight humano y datos secundarios discretos sin volver al aspecto de documento plano.
 - [cerrada] 2026-07-15: En Ajustes se mantienen `Emergencia` y `He olvidado mi Blank`, pero `Emergencia` debe ser la ultima fila y la unica accion en rojo; `He olvidado mi Blank` queda antes con texto normal.
 - [cerrada] 2026-07-15: En Progreso iOS, el dato principal debe ser `Tiempo ahorrado` y `Tiempo en Blank` debe vivir en la segunda pagina del carrusel; el ahorro estimado nunca puede ser mayor que el tiempo real protegido.
 - [cerrada] 2026-07-15: Para futuras peticiones de compilar en MacinCloud, el agente debe hacer la Terminal con pulsaciones individuales por RDP web y despues dar al usuario instrucciones concretas para completar manualmente el proceso en Xcode.

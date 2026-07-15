@@ -269,12 +269,10 @@ struct HomeView: View {
             .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
             .frame(width: width)
 
-            if sessionStore.isBlankActive {
-                Button("Progreso") {
-                    showingReport = true
-                }
-                .foregroundStyle(Color.white.opacity(0.74))
+            Button("Progreso") {
+                showingReport = true
             }
+            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.74) : BlankColors.mutedInk)
         }
     }
 
@@ -625,7 +623,6 @@ private struct SettingsSheet: View {
     @Binding var showingEmergency: Bool
     @Binding var showingRelink: Bool
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
@@ -643,24 +640,8 @@ private struct SettingsSheet: View {
                     }
                     .foregroundStyle(textColor)
                 }
-                NavigationLink {
-                    ReportView()
-                } label: {
-                    HStack {
-                        Text("Progreso")
-                        Spacer()
-                        Text("Semana")
-                    }
-                    .foregroundStyle(textColor)
-                }
                 settingsButton("Programar mi Blank", meta: "Diario") {
                     showingSchedule = true
-                    dismiss()
-                }
-                settingsButton("Comprar NFC", meta: "Amazon") {
-                    if let url = URL(string: "https://getblank.netlify.app/nfc.html") {
-                        openURL(url)
-                    }
                     dismiss()
                 }
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {

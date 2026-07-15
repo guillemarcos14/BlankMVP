@@ -6,7 +6,6 @@ const mainAction = document.querySelector("[data-main-action]");
 const homeScreen = document.querySelector(".home-screen");
 const mainMessage = document.querySelector("[data-main-message]");
 const sessionMeta = document.querySelector("[data-session-meta]");
-const buyNfcButton = document.querySelector("[data-buy-nfc]");
 const onboardingPanels = document.querySelectorAll("[data-onboarding-step]");
 const onboardingDots = document.querySelectorAll(".onboarding-dots span");
 const onboardingNext = document.querySelector("[data-onboarding-next]");
@@ -123,10 +122,6 @@ mainAction.addEventListener("click", () => {
     timerActive = false;
   }
   renderBlankState();
-});
-
-buyNfcButton.addEventListener("click", () => {
-  window.location.href = "https://getblank.netlify.app/nfc.html";
 });
 
 onboardingNext.addEventListener("click", () => {

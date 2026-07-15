@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `4c711f4` con los ajustes de Home activa. Se intento compilar desde la Terminal de MacinCloud via RDP web, pero la automatizacion del navegador no pudo introducir comandos de forma fiable porque el cliente RDP transformaba la entrada en combinaciones de control (`^V`, `^M`) y perdia caracteres; queda pendiente pegar los comandos manualmente en Terminal.
 - 2026-07-15: Se ajusto la Home iOS en modo Blank activo: los tres puntos de Ajustes pasan a blanco sin fondo circular, el contador activo se mueve encima de `Escanear NFC para salir` con Inter blanco, `Progreso` ocupa el lugar visible de `Emergencia`, y `Emergencia` se traslada dentro de Ajustes. El preview web se sincronizo con la misma estructura. En Windows se valido con `node --check web/app-preview/preview.js` y `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
 - 2026-07-15: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta `e212d57` con Modos dentro de Ajustes y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-15: Se simplifico la Home iOS moviendo la seleccion/gestion de Modos dentro de Ajustes; la pantalla principal queda solo con el boton de tres puntos centrado en la banda superior. El preview web se actualizo con la misma estructura visual.
@@ -162,6 +163,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud Terminal, pegar manualmente: `cd ~/BlankMVP && git pull --ff-only origin codex/ios-device-activity-target && cd ios/Blank && xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` para validar el commit `4c711f4`.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home con Blank activo: puntos blancos sin fondo, Ajustes legible en modo oscuro, contador encima de `Escanear NFC para salir`, `Progreso` visible bajo el CTA y `Emergencia` dentro de Ajustes.
 - En MacinCloud/Xcode, pulsar Run del scheme `Blank` y revisar visualmente que la Home solo tenga los tres puntos centrados arriba y que Ajustes permita entrar a Modos.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS con los fondos animados en loop: fondo claro en reposo, fondo oscuro al activar Blank, movimiento fluido, botones superiores legibles y sin opcion de cambiar fondo en Ajustes.

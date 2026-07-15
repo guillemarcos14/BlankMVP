@@ -16,6 +16,16 @@
 - No presentes un build firmado o un archive como completado si solo se ha verificado `CODE_SIGNING_ALLOWED=NO`.
 - No digas que TestFlight esta listo mientras `Family Controls (Distribution)` siga pendiente de aprobacion por Apple.
 
+## Compilacion en MacinCloud
+- Cuando el usuario pida compilar en MacinCloud, el agente debe encargarse de la Terminal por RDP web usando pulsaciones individuales, no pegado ni atajos de teclado, porque el cliente puede transformar `Cmd/Ctrl+V` en caracteres de control y perder texto.
+- Secuencia esperada:
+  1. Entrar en `~/BlankMVP`.
+  2. Ejecutar `git pull --ff-only origin codex/ios-device-activity-target`.
+  3. Entrar en `ios/Blank`.
+  4. Compilar desde Terminal. Si no se pueden introducir mayusculas de forma fiable, usar `xcodebuild -project blank.xcodeproj build`, que ya valido el target `Blank` en MacinCloud. Si se puede escribir con mayusculas, preferir `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`.
+  5. Confirmar explicitamente si termina con `BUILD SUCCEEDED` o copiar el primer error util si falla.
+- Al terminar la parte de Terminal, dar siempre al usuario los pasos manuales de Xcode para revisar visualmente, subir version/build si hace falta, hacer `Product > Archive` y `Distribute App > App Store Connect > Upload`. El agente no debe presentar el proceso de Xcode/TestFlight como completado si solo se ha hecho build por Terminal.
+
 ## Al final de cada bloque de trabajo
 Actualiza `ESTADO.md` siempre, sin que el usuario lo pida, cuando ocurra cualquiera de:
 - Has completado la tarea solicitada.

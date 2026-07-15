@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: Se anadio a `AGENTS.md` la regla permanente para futuras compilaciones en MacinCloud: el agente se encarga de la Terminal por RDP web con pulsaciones individuales, evita pegado/atajos, confirma `BUILD SUCCEEDED` o el primer error util, y al terminar entrega al usuario los pasos manuales de Xcode para revision visual/archive/upload.
 - 2026-07-15: En MacinCloud se hizo pull manual tecla a tecla hasta `aeecf09` y se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build`; termino con `BUILD SUCCEEDED`. El intento con `-scheme blank` fallo porque la automatizacion RDP solo introducia minusculas y el scheme real es `Blank`, pero el build por proyecto valido el target `Blank`.
 - 2026-07-15: Se subio a `origin/codex/ios-device-activity-target` el commit `4c711f4` con los ajustes de Home activa. Se intento compilar desde la Terminal de MacinCloud via RDP web, pero la automatizacion del navegador no pudo introducir comandos de forma fiable porque el cliente RDP transformaba la entrada en combinaciones de control (`^V`, `^M`) y perdia caracteres; queda pendiente pegar los comandos manualmente en Terminal.
 - 2026-07-15: Se ajusto la Home iOS en modo Blank activo: los tres puntos de Ajustes pasan a blanco sin fondo circular, el contador activo se mueve encima de `Escanear NFC para salir` con Inter blanco, `Progreso` ocupa el lugar visible de `Emergencia`, y `Emergencia` se traslada dentro de Ajustes. El preview web se sincronizo con la misma estructura. En Windows se valido con `node --check web/app-preview/preview.js` y `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
@@ -195,6 +196,7 @@ Ultima actualizacion: 2026-07-15
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-15: Para futuras peticiones de compilar en MacinCloud, el agente debe hacer la Terminal con pulsaciones individuales por RDP web y despues dar al usuario instrucciones concretas para completar manualmente el proceso en Xcode.
 - [cerrada] 2026-07-15: La seleccion de Modos debe vivir dentro de Ajustes para simplificar la pantalla principal; Home mantiene solo el acceso de tres puntos centrado arriba.
 - [cerrada] 2026-07-15: Los fondos de Home deben ser loops MP4 reales: claro para Blank desactivado y oscuro para Blank activado, sin selector de personalizacion.
 - [cerrada] 2026-07-09: Para iOS, la rama operativa de compilacion en MacinCloud es `codex/ios-device-activity-target`.

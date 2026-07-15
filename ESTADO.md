@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-15: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta `e212d57` con Modos dentro de Ajustes y se recompilo desde `ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build`; termino con `BUILD SUCCEEDED`.
 - 2026-07-15: Se simplifico la Home iOS moviendo la seleccion/gestion de Modos dentro de Ajustes; la pantalla principal queda solo con el boton de tres puntos centrado en la banda superior. El preview web se actualizo con la misma estructura visual.
 - 2026-07-15: Se sustituyeron los fondos liquidos estaticos por loops MP4 reales: `blank_background_idle.mp4` para Blank desactivado y `blank_background_active.mp4` para Blank activado. Android los reproduce con `TextureView` + `MediaPlayer` desde `res/raw`, iOS los incluye en el target y los reproduce con `AVQueuePlayer` + `AVPlayerLooper`, y `web/app-preview` usa videos HTML en loop.
 - 2026-07-15: Se integraron como unicos fondos de la app los assets liquidos `bg_liquid_1` para Blank desactivado y `bg_liquid_2` para Blank activado en Android, iOS y `web/app-preview`; se elimino la opcion de personalizar/cambiar fondo y se borraron los fondos antiguos `gray/sage/mint/teal/blue/indigo/purple/rose/coral/amber` de Android, iOS y preview.
@@ -117,7 +118,7 @@ Ultima actualizacion: 2026-07-15
 
 ## Estado actual
 - Android, iOS y la preview web usan ya dos fondos liquidos animados en loop: claro en reposo/desactivado y oscuro en Blank activado; ya no hay selector de fondo ni persistencia de tema.
-- Home iOS ya no muestra el selector de modo en pantalla principal: Modos vive dentro de Ajustes, y el boton de tres puntos queda centrado a la misma altura superior; en Windows se verifico con `git diff --check`, falta compilar/revisar en MacinCloud.
+- Home iOS ya no muestra el selector de modo en pantalla principal: Modos vive dentro de Ajustes, y el boton de tres puntos queda centrado a la misma altura superior; en Windows se verifico con `git diff --check` y en MacinCloud compila con `BUILD SUCCEEDED`. Falta revision visual desde Xcode/simulador.
 - La integracion Android de fondos animados compila con `gradlew.bat test` y `gradlew.bat assembleDebug`; la integracion iOS esta validada solo de forma estatica en Windows y falta compilar/revisar en Xcode/MacinCloud.
 - La landing ya dispone de tres assets cuadrados nuevos para producto Blank: una toma de producto limpio, una escena de uso con movil/NFC y una macro de detalle; aun no estan cableados en HTML/CSS.
 - Xcode en MacinCloud queda abierto en `~/BlankMVP/ios/Blank/Blank.xcodeproj`, rama `codex/ios-device-activity-target`, commit `198c4a1`, scheme `Blank`, destino `iPhone 17 (26.5)` y ultimo resultado visible `Build Succeeded`.
@@ -159,7 +160,7 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
-- En MacinCloud/Xcode, hacer pull del commit con Modos dentro de Ajustes, compilar `Blank` y revisar visualmente que la Home solo tenga los tres puntos centrados arriba y que Ajustes permita entrar a Modos.
+- En MacinCloud/Xcode, pulsar Run del scheme `Blank` y revisar visualmente que la Home solo tenga los tres puntos centrados arriba y que Ajustes permita entrar a Modos.
 - En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS con los fondos animados en loop: fondo claro en reposo, fondo oscuro al activar Blank, movimiento fluido, botones superiores legibles y sin opcion de cambiar fondo en Ajustes.
 - Decidir que imagen cuadrada usar en la ficha/landing de producto y cablearla en `web/landing` o Shopify segun corresponda.
 - En MacinCloud/Xcode, revisar la Home iOS con Blank activado y fondo oscuro para confirmar que los botones blancos de Modos y Ajustes se ven bien y no chocan con safe area ni textos largos.

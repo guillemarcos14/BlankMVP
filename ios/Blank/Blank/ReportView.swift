@@ -160,7 +160,7 @@ struct ReportView: View {
     private func chartPanel(title: String, values: [TimeInterval]) -> some View {
         let scale = ChartScale(values: values)
 
-        VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
                     .font(.headline.weight(.semibold))

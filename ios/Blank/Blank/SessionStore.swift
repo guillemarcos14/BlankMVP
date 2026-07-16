@@ -52,6 +52,10 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(schedulePausedUntil?.timeIntervalSince1970, forKey: Keys.schedulePausedUntil) }
     }
 
+    @Published private(set) var emergencyUnlocksThisWeek: Int {
+        didSet { defaults.set(emergencyUnlocksThisWeek, forKey: Keys.emergencyUnlocksThisWeek) }
+    }
+
     @Published private(set) var deviceActivityTimerScheduled: Bool {
         didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
@@ -90,6 +94,12 @@ final class SessionStore: ObservableObject {
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
+        if defaults.string(forKey: Keys.emergencyUnlockWeekKey) == Self.currentWeekKey() {
+            emergencyUnlocksThisWeek = defaults.integer(forKey: Keys.emergencyUnlocksThisWeek)
+        } else {
+            emergencyUnlocksThisWeek = 0
+        }
+        defaults.set(Self.currentWeekKey(), forKey: Keys.emergencyUnlockWeekKey)
         if let timestamp = defaults.object(forKey: Keys.schedulePausedUntil) as? TimeInterval, timestamp > 0 {
             schedulePausedUntil = Date(timeIntervalSince1970: timestamp)
         } else {
@@ -135,6 +145,10 @@ final class SessionStore: ObservableObject {
     var currentWeekReport: BlankWeeklyReport {
         let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: Date())
         return BlankWeeklySessionAggregator.aggregate(sessions: sessions, weekStart: weekStart)
+    }
+
+    var emergencyUnlocksRemaining: Int {
+        max(0, Self.maxEmergencyUnlocksPerWeek - emergencyUnlocksThisWeek)
     }
 
     func handleNfcTag(uid: String) -> NfcResult {
@@ -199,6 +213,18 @@ final class SessionStore: ObservableObject {
         deviceActivityTimerScheduled = false
         endActiveSession()
         return .unblanked
+    }
+
+    func deactivateForEmergency() -> Bool {
+        resetEmergencyUnlocksIfNeeded()
+        if isBlankActive {
+            guard emergencyUnlocksThisWeek < Self.maxEmergencyUnlocksPerWeek else {
+                return false
+            }
+            emergencyUnlocksThisWeek += 1
+        }
+        _ = deactivateBlank()
+        return true
     }
 
     func applyScheduleWindow(at date: Date = Date()) {
@@ -385,6 +411,20 @@ final class SessionStore: ObservableObject {
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
     }
 
+    private func resetEmergencyUnlocksIfNeeded() {
+        let currentWeekKey = Self.currentWeekKey()
+        guard defaults.string(forKey: Keys.emergencyUnlockWeekKey) != currentWeekKey else {
+            return
+        }
+        emergencyUnlocksThisWeek = 0
+        defaults.set(currentWeekKey, forKey: Keys.emergencyUnlockWeekKey)
+    }
+
+    private static func currentWeekKey(for date: Date = Date()) -> String {
+        let components = Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        return "\(components.yearForWeekOfYear ?? 0)-\(components.weekOfYear ?? 0)"
+    }
+
     enum NfcResult {
         case tagRegistered
         case blanked
@@ -407,7 +447,11 @@ final class SessionStore: ObservableObject {
         static let schedule = "blankFocusSchedule"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
         static let schedulePausedUntil = "blankSchedulePausedUntil"
+        static let emergencyUnlockWeekKey = "blankEmergencyUnlockWeekKey"
+        static let emergencyUnlocksThisWeek = "blankEmergencyUnlocksThisWeek"
     }
+
+    private static let maxEmergencyUnlocksPerWeek = 3
 }
 
 #if DEBUG

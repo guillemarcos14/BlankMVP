@@ -148,6 +148,7 @@ fun HomeScreen(
     val modes by sessionManager.modes.collectAsState()
     val currentModeId by sessionManager.currentModeId.collectAsState()
     val stats by sessionManager.stats.collectAsState()
+    val emergencyUnlocksRemaining by sessionManager.emergencyUnlocksRemaining.collectAsState()
     val schedule by sessionManager.schedule.collectAsState()
     val currentMode = modes.firstOrNull { it.id == currentModeId } ?: modes.first()
     val buttonLight = !isBlankActive
@@ -329,10 +330,12 @@ fun HomeScreen(
             )
 
             HomePanel.EMERGENCY -> EmergencyPanel(
+                emergencyUnlocksRemaining = emergencyUnlocksRemaining,
                 onBack = { panel = HomePanel.BLOCK },
                 onUnlock = {
-                    sessionManager.deactivateForEmergency()
-                    panel = HomePanel.HOME
+                    if (sessionManager.deactivateForEmergency()) {
+                        panel = HomePanel.HOME
+                    }
                 }
             )
         }
@@ -1211,7 +1214,11 @@ private fun BlockPanel(onEmergency: () -> Unit) {
 }
 
 @Composable
-private fun EmergencyPanel(onBack: () -> Unit, onUnlock: () -> Unit) {
+private fun EmergencyPanel(
+    emergencyUnlocksRemaining: Int,
+    onBack: () -> Unit,
+    onUnlock: () -> Unit
+) {
     var phrase by remember { mutableStateOf("") }
     val expected = stringResource(R.string.emergency_phrase)
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1222,6 +1229,16 @@ private fun EmergencyPanel(onBack: () -> Unit, onUnlock: () -> Unit) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(text = "Escribe la frase completa.", style = MaterialTheme.typography.headlineLarge, color = BlankSurface, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = if (emergencyUnlocksRemaining > 0)
+                        "Te quedan $emergencyUnlocksRemaining desbloqueos de emergencia esta semana."
+                    else
+                        "Ya has usado tus 3 desbloqueos de emergencia esta semana.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = BlankSurface.copy(alpha = 0.72f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(text = expected, style = MaterialTheme.typography.bodyLarge, color = BlankSurface.copy(alpha = 0.72f), textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
@@ -1240,7 +1257,7 @@ private fun EmergencyPanel(onBack: () -> Unit, onUnlock: () -> Unit) {
         MainActionButton(
             text = stringResource(R.string.emergency_unlock),
             light = true,
-            enabled = phrase.trim() == expected,
+            enabled = emergencyUnlocksRemaining > 0 && phrase.trim() == expected,
             onClick = onUnlock
         )
     }

@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,9 +74,11 @@ class BlockActivity : ComponentActivity() {
         setContent {
             BlankTheme {
                 BlockScreen(
+                    emergencyUnlocksRemaining = sessionManager.emergencyUnlocksRemaining.collectAsState().value,
                     onEmergencyUnlock = {
-                        emergencyUnlocked = true
-                        sessionManager.deactivateForEmergency()
+                        val unlocked = sessionManager.deactivateForEmergency()
+                        emergencyUnlocked = unlocked
+                        unlocked
                     }
                 )
             }
@@ -90,7 +93,10 @@ class BlockActivity : ComponentActivity() {
 }
 
 @Composable
-private fun BlockScreen(onEmergencyUnlock: () -> Unit) {
+private fun BlockScreen(
+    emergencyUnlocksRemaining: Int,
+    onEmergencyUnlock: () -> Boolean
+) {
     val context = LocalContext.current
     var emergencyMode by remember { mutableStateOf(false) }
     var emergencyDone by remember { mutableStateOf(false) }
@@ -147,6 +153,16 @@ private fun BlockScreen(onEmergencyUnlock: () -> Unit) {
                     if (emergencyMode) {
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
+                            text = if (emergencyUnlocksRemaining > 0)
+                                "Te quedan $emergencyUnlocksRemaining desbloqueos de emergencia esta semana."
+                            else
+                                "Ya has usado tus 3 desbloqueos de emergencia esta semana.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.72f),
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
                             text = requiredPhrase,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.72f),
@@ -188,10 +204,9 @@ private fun BlockScreen(onEmergencyUnlock: () -> Unit) {
             } else {
                 PrimaryBlockButton(
                     text = stringResource(R.string.emergency_unlock),
-                    enabled = typedPhrase.trim() == requiredPhrase,
+                    enabled = emergencyUnlocksRemaining > 0 && typedPhrase.trim() == requiredPhrase,
                     onClick = {
-                        emergencyDone = true
-                        onEmergencyUnlock()
+                        emergencyDone = onEmergencyUnlock()
                     }
                 )
                 TextButton(onClick = { emergencyMode = false }) {

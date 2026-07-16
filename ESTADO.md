@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-15
+Ultima actualizacion: 2026-07-16
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,10 @@ Ultima actualizacion: 2026-07-15
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-16: Se refino `ReportView`/Progreso iOS: `Tiempo ahorrado` ahora muestra una nota pequena explicando que se estima como 15 min por sesion completada y se limita al tiempo real en Blank; cada grafica calcula su propia escala redondeada en vez de mostrar siempre `2 h / 1 h / 0`; los insights se reescribieron para evitar frases confusas como `media jornada`; y `Mejor dia` usa nombres completos en espanol (`Martes`) en vez de abreviaturas inglesas. En Windows se valido con `git diff --check`; falta compilar/revisar visualmente en Xcode/MacinCloud.
+- 2026-07-16: Se limito Emergencia a 3 desbloqueos reales por semana en Android e iOS, con contador persistido por semana y UI que muestra los desbloqueos restantes; la preview web refleja el mismo limite. Tambien se ajustaron los loops MP4 de iOS en Home y Progreso para configurar `AVAudioSession` como `.ambient` con `mixWithOthers`, evitando que la musica activa del iPhone se corte al entrar en la app. En Windows se valido con `node --check web/app-preview/preview.js`, `git diff --check` y `gradlew.bat testDebugUnitTest`; falta compilar/revisar en MacinCloud/Xcode para validar Swift y probar con musica real en iPhone.
+- 2026-07-16: En MacinCloud se hizo `git pull --ff-only origin codex/ios-device-activity-target` hasta `141031a`, se genero archive Release desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj archive` y termino con `** ARCHIVE SUCCEEDED **`. En Xcode Organizer se valido y subio a App Store Connect correctamente: Xcode mostro `Blank 1.0 (16) validated` y despues `Blank 1.0 (16) uploaded`; Organizer queda con `Submission Status: Uploaded Today at 11:09 AM`, build number 16.
+- 2026-07-16: Se reviso si la app iOS actual puede ir a produccion. Conclusion operativa: producto suficiente para iniciar release, pero antes de llamarlo produccion hay que hacer revision visual final en Xcode/simulador o iPhone, generar archive firmado de la version actual, validar/subir a App Store Connect y pasar App Review.
 - 2026-07-15: Correccion de estado: tras desbloquear MacinCloud, el commit `cd69250` con la tercera pasada visual 10x de Progreso se trajo y compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build`; termino con `BUILD SUCCEEDED`. Queda pendiente solo revision visual en Xcode/simulador/TestFlight.
 - 2026-07-15: Se implemento una tercera pasada visual 10x de `ReportView`/Progreso iOS: fondo liquido sutil reutilizando el loop claro, superficies tipo liquid glass con material translúcido, insight dinamico bajo el carrusel, estado vacio cuidado, haptic ligero al deslizar entre `Tiempo ahorrado` y `Tiempo en Blank`, y metricas secundarias compactas. En Windows se valido con `git diff --check` y en MacinCloud con `BUILD SUCCEEDED`; falta revision visual en Xcode/simulador/TestFlight.
 - 2026-07-15: En MacinCloud se hizo pull de `origin/codex/ios-device-activity-target` con la segunda pasada visual de Progreso y el ajuste de Ajustes; se compilo desde `~/BlankMVP/ios/Blank` con `xcodebuild -project blank.xcodeproj build` y termino con `BUILD SUCCEEDED`. Queda pendiente solo revision visual en Xcode/simulador/TestFlight.
@@ -132,6 +136,11 @@ Ultima actualizacion: 2026-07-15
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Progreso iOS tiene aclarado el calculo de ahorro, escalas de grafica dinamicas por serie, mejores insights y dia de mayor actividad en espanol; falta validacion visual/compilacion Swift en MacinCloud.
+- Emergencia queda limitada a 3 usos semanales persistidos en Android/iOS; el cuarto intento queda bloqueado en UI y en la capa de sesion. Falta build/revision iOS en MacinCloud porque en Windows no hay toolchain Swift.
+- Los fondos MP4 iOS ya fuerzan categoria de audio ambiente con mezcla para no interrumpir musica externa; falta prueba real en iPhone con musica sonando.
+- iOS tiene ya archive Release validado y subido a App Store Connect como `Blank 1.0 (16)`. Falta entrar en App Store Connect cuando el build termine de procesarse, seleccionarlo en la version iOS y enviar a App Review.
+- La app iOS esta suficientemente cerrada a nivel de producto y ya tiene archive firmado, validado y subido; queda pendiente la fase web de App Store Connect/App Review.
 - Progreso iOS con tercera pasada visual tipo Apple/liquid glass ya compila en MacinCloud con `BUILD SUCCEEDED`; falta revisar visualmente material, fondo, haptic, insight, estado vacio y graficas en Xcode/simulador/TestFlight.
 - Progreso iOS tiene una segunda pasada visual mas limpia y Apple-like, y ya compila en MacinCloud con `BUILD SUCCEEDED`; falta revision visual en Xcode/simulador/TestFlight.
 - Ajustes iOS deja `Emergencia` como ultima accion en rojo y `He olvidado mi Blank` como reset normal anterior; ya compila en MacinCloud y falta revision visual.
@@ -185,6 +194,10 @@ Ultima actualizacion: 2026-07-15
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente Progreso: que la nota pequena del ahorro quepa bien, que las escalas cambien segun los datos, que los insights tengan sentido y que `Mejor dia` salga como `Lunes/Martes/...`.
+- En MacinCloud/Xcode, compilar la version actual y probar en iPhone con musica reproduciendose antes de abrir Blank; confirmar que la musica no se corta al entrar en Home ni en Progreso.
+- En iPhone/simulador, probar Emergencia 4 veces en la misma semana: las 3 primeras deben desbloquear y la cuarta debe quedar bloqueada mostrando que ya no quedan desbloqueos.
+- En App Store Connect, esperar a que el build `1.0 (16)` termine de procesarse, seleccionarlo en la version iOS, revisar compliance/metadata/precios si aparece algun aviso y pulsar `Submit for Review`.
 - En MacinCloud/Xcode o simulador, relanzar la app y revisar visualmente la tercera pasada de Progreso: fondo liquido sutil, superficies liquid glass, carrusel, haptic, insight, estado vacio y graficas.
 - En MacinCloud/Xcode o simulador, revisar visualmente `Progreso`, los dots propios, la grafica, las filas secundarias y que `Emergencia` sea el ultimo campo rojo.
 - En MacinCloud/Xcode, relanzar la app o pulsar Run para revisar visualmente la version compilada del commit `6fe2484`: `Progreso` bajo `Iniciar Blank` en Home clara, y Ajustes sin `Progreso` ni `Comprar NFC`.

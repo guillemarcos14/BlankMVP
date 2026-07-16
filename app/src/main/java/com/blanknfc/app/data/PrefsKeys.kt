@@ -19,6 +19,8 @@ object PrefsKeys {
     val STATS_SESSIONS_THIS_WEEK = intPreferencesKey("stats_sessions_this_week")
     val STATS_PROTECTED_MS_THIS_WEEK = longPreferencesKey("stats_protected_ms_this_week")
     val STATS_BLOCKED_ATTEMPTS_THIS_WEEK = intPreferencesKey("stats_blocked_attempts_this_week")
+    val EMERGENCY_UNLOCK_WEEK_KEY = stringPreferencesKey("emergency_unlock_week_key")
+    val EMERGENCY_UNLOCKS_THIS_WEEK = intPreferencesKey("emergency_unlocks_this_week")
     val SCHEDULE_ENABLED = booleanPreferencesKey("schedule_enabled")
     val SCHEDULE_START_MINUTE = intPreferencesKey("schedule_start_minute")
     val SCHEDULE_END_MINUTE = intPreferencesKey("schedule_end_minute")

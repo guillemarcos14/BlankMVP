@@ -74,8 +74,16 @@ class SessionManager(
     private val _stats = MutableStateFlow(FocusStats())
     val stats: StateFlow<FocusStats> = _stats.asStateFlow()
 
+    private val _emergencyUnlocksThisWeek = MutableStateFlow(0)
+    val emergencyUnlocksThisWeek: StateFlow<Int> = _emergencyUnlocksThisWeek.asStateFlow()
+
+    private val _emergencyUnlocksRemaining = MutableStateFlow(MAX_EMERGENCY_UNLOCKS_PER_WEEK)
+    val emergencyUnlocksRemaining: StateFlow<Int> = _emergencyUnlocksRemaining.asStateFlow()
+
     private val _schedule = MutableStateFlow(FocusSchedule())
     val schedule: StateFlow<FocusSchedule> = _schedule.asStateFlow()
+
+    private var emergencyUnlockWeekKey = currentWeekKey()
 
     init {
         scope.launch {
@@ -103,6 +111,15 @@ class SessionManager(
                 } else {
                     FocusStats()
                 }
+                val storedEmergencyWeekKey = prefs[PrefsKeys.EMERGENCY_UNLOCK_WEEK_KEY] ?: currentWeekKey
+                emergencyUnlockWeekKey = currentWeekKey
+                val emergencyUnlocks = if (storedEmergencyWeekKey == currentWeekKey) {
+                    prefs[PrefsKeys.EMERGENCY_UNLOCKS_THIS_WEEK] ?: 0
+                } else {
+                    0
+                }
+                _emergencyUnlocksThisWeek.value = emergencyUnlocks
+                _emergencyUnlocksRemaining.value = (MAX_EMERGENCY_UNLOCKS_PER_WEEK - emergencyUnlocks).coerceAtLeast(0)
                 _schedule.value = FocusSchedule(
                     enabled = prefs[PrefsKeys.SCHEDULE_ENABLED] ?: false,
                     startMinute = prefs[PrefsKeys.SCHEDULE_START_MINUTE] ?: (23 * 60 + 30),
@@ -302,7 +319,18 @@ class SessionManager(
         _nfcRelinkCompleted.value = true
     }
 
-    fun deactivateForEmergency() {
+    fun deactivateForEmergency(): Boolean {
+        resetEmergencyUnlocksIfNeeded()
+        if (_isBlankActive.value && _emergencyUnlocksThisWeek.value >= MAX_EMERGENCY_UNLOCKS_PER_WEEK) {
+            return false
+        }
+
+        if (_isBlankActive.value) {
+            val updatedEmergencyUnlocks = _emergencyUnlocksThisWeek.value + 1
+            _emergencyUnlocksThisWeek.value = updatedEmergencyUnlocks
+            _emergencyUnlocksRemaining.value = (MAX_EMERGENCY_UNLOCKS_PER_WEEK - updatedEmergencyUnlocks).coerceAtLeast(0)
+        }
+
         val savedStart = _blankActiveSince.value
         _isBlankActive.value = false
         _blankActiveSince.value = 0L
@@ -311,9 +339,12 @@ class SessionManager(
             dataStore.edit { prefs ->
                 prefs[PrefsKeys.IS_BLANK_ACTIVE] = false
                 prefs[PrefsKeys.BLANK_ACTIVE_SINCE] = 0L
+                prefs[PrefsKeys.EMERGENCY_UNLOCK_WEEK_KEY] = emergencyUnlockWeekKey
+                prefs[PrefsKeys.EMERGENCY_UNLOCKS_THIS_WEEK] = _emergencyUnlocksThisWeek.value
             }
         }
         analyticsTracker?.track(BlankEvent(BlankEvents.BLANK_MODE_DEACTIVATED))
+        return true
     }
 
     fun forgetNfcTag() {
@@ -453,6 +484,14 @@ class SessionManager(
         }
     }
 
+    private fun resetEmergencyUnlocksIfNeeded() {
+        val currentWeekKey = currentWeekKey()
+        if (emergencyUnlockWeekKey == currentWeekKey) return
+        emergencyUnlockWeekKey = currentWeekKey
+        _emergencyUnlocksThisWeek.value = 0
+        _emergencyUnlocksRemaining.value = MAX_EMERGENCY_UNLOCKS_PER_WEEK
+    }
+
     private fun serializeModes(modes: List<BlankMode>): String {
         return modes.joinToString(MODE_SEPARATOR) { mode ->
             listOf(
@@ -483,6 +522,7 @@ class SessionManager(
         private const val DEFAULT_MODE_ID = "daily"
         private const val STUDY_MODE_ID = "study"
         private const val MINUTES_PER_DAY = 24 * 60
+        private const val MAX_EMERGENCY_UNLOCKS_PER_WEEK = 3
         private const val MODE_SEPARATOR = ";"
         private const val FIELD_SEPARATOR = "|"
         private const val PACKAGE_SEPARATOR = ","

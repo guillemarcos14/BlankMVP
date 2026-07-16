@@ -27,6 +27,7 @@ const forgetButton = document.querySelector("[data-forget-nfc]");
 const emergencyStartButton = document.querySelector("[data-emergency-start]");
 const emergencyInput = document.querySelector("[data-emergency-input]");
 const emergencyUnlock = document.querySelector("[data-emergency-unlock]");
+const emergencyRemaining = document.querySelector("[data-emergency-remaining]");
 
 let isBlankActive = false;
 let timerActive = false;
@@ -39,6 +40,7 @@ let currentModeId = "daily";
 let editingModeId = null;
 let openModeMenuId = null;
 let isCreateModeWindowOpen = false;
+let emergencyUnlocksThisWeek = 0;
 let modes = [
   { id: "daily", name: "Rutina diaria", apps: ["Instagram", "TikTok", "YouTube"] },
   { id: "study", name: "Estudio", apps: ["Instagram", "TikTok", "Reddit", "X"] },
@@ -362,15 +364,25 @@ emergencyStartButton.addEventListener("click", () => {
   setPreview("home");
 });
 
+function renderEmergencyUnlocks() {
+  const remaining = Math.max(0, 3 - emergencyUnlocksThisWeek);
+  emergencyRemaining.textContent = remaining > 0
+    ? `Te quedan ${remaining} desbloqueos de emergencia esta semana.`
+    : "Ya has usado tus 3 desbloqueos de emergencia esta semana.";
+  emergencyUnlock.disabled = remaining <= 0 || emergencyInput.value.trim() !== "quiero desactivar blank aunque sea una mala idea";
+}
+
 emergencyInput.addEventListener("input", () => {
-  emergencyUnlock.disabled = emergencyInput.value.trim() !== "quiero desactivar blank aunque sea una mala idea";
+  renderEmergencyUnlocks();
 });
 
 emergencyUnlock.addEventListener("click", () => {
+  if (isBlankActive && emergencyUnlocksThisWeek >= 3) return;
+  if (isBlankActive) emergencyUnlocksThisWeek += 1;
   isBlankActive = false;
   renderBlankState();
   emergencyInput.value = "";
-  emergencyUnlock.disabled = true;
+  renderEmergencyUnlocks();
   setPreview("home");
 });
 
@@ -381,3 +393,4 @@ renderModes();
 renderCreateModeWindow();
 renderAppCount();
 renderBlankState();
+renderEmergencyUnlocks();

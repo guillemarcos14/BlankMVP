@@ -113,6 +113,13 @@ struct ReportView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 12)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+            Text("Tiempo ahorrado: estimamos 15 min por sesion completada y lo limitamos al tiempo real en Blank.")
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.78))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 18)
         }
     }
 
@@ -151,6 +158,8 @@ struct ReportView: View {
     }
 
     private func chartPanel(title: String, values: [TimeInterval]) -> some View {
+        let scale = ChartScale(values: values)
+
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
@@ -164,13 +173,13 @@ struct ReportView: View {
             }
 
             HStack(alignment: .top, spacing: 12) {
-                ProgressLineChart(values: values, primary: reportPrimary, secondary: reportSecondary)
+                ProgressLineChart(values: values, maxValue: scale.maxValue, primary: reportPrimary, secondary: reportSecondary)
                     .frame(height: 144)
 
                 VStack(alignment: .trailing) {
-                    Text("2 h")
+                    Text(formatChartScale(scale.maxValue))
                     Spacer()
-                    Text("1 h")
+                    Text(formatChartScale(scale.maxValue / 2))
                     Spacer()
                     Text("0")
                 }
@@ -294,8 +303,18 @@ struct ReportView: View {
             return "Tu primera sesion empezara a construir esta grafica."
         }
 
-        if weekly.estimatedTimeSaved >= 3 * 60 * 60 {
-            return "Has recuperado casi media jornada para ti."
+        let savedTime = cappedSavedTime(weekly)
+
+        if savedTime >= 8 * 60 * 60 {
+            return "Has recuperado casi medio dia para ti."
+        }
+
+        if savedTime >= 4 * 60 * 60 {
+            return "Has recuperado varias horas que antes se iban solas."
+        }
+
+        if savedTime >= 60 * 60 {
+            return "Has recuperado mas de una hora sin convertirla en otra pantalla."
         }
 
         if progress.currentStreakDays >= 3 {
@@ -327,13 +346,14 @@ struct ReportView: View {
         }
 
         let formatter = DateFormatter()
-        let symbols = formatter.shortWeekdaySymbols ?? []
+        formatter.locale = Locale(identifier: "es_ES")
+        let symbols = formatter.weekdaySymbols ?? []
         guard !symbols.isEmpty else {
             return "Sin datos"
         }
         let calendarStartIndex = Calendar.current.firstWeekday - 1
         let symbolIndex = (calendarStartIndex + bestIndex) % symbols.count
-        return symbols[symbolIndex]
+        return symbols[symbolIndex].capitalized(with: Locale(identifier: "es_ES"))
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -350,6 +370,17 @@ struct ReportView: View {
         }
 
         return "\(hours) h \(minutes) min"
+    }
+
+    private func formatChartScale(_ duration: TimeInterval) -> String {
+        let totalMinutes = max(0, Int((duration / 60).rounded()))
+        if totalMinutes < 60 {
+            return "\(totalMinutes) min"
+        }
+
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        return minutes == 0 ? "\(hours) h" : "\(hours) h \(minutes) min"
     }
 }
 
@@ -443,6 +474,7 @@ private final class ReportLoopingVideoView: UIView {
         }
 
         currentResourceName = resourceName
+        configureAmbientAudioSession()
         guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
 
         let playerItem = AVPlayerItem(url: url)
@@ -454,10 +486,15 @@ private final class ReportLoopingVideoView: UIView {
         player = queuePlayer
         queuePlayer.play()
     }
+
+    private func configureAmbientAudioSession() {
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+    }
 }
 
 private struct ProgressLineChart: View {
     let values: [TimeInterval]
+    let maxValue: TimeInterval
     let primary: Color
     let secondary: Color
 
@@ -504,10 +541,6 @@ private struct ProgressLineChart: View {
     private var cappedValues: [TimeInterval] {
         let fallback = Array(repeating: TimeInterval.zero, count: 28)
         return values.isEmpty ? fallback : values
-    }
-
-    private var maxValue: TimeInterval {
-        max(cappedValues.max() ?? 0, 2 * 60 * 60)
     }
 
     private func chartPoints(in size: CGSize) -> [CGPoint] {
@@ -566,5 +599,38 @@ private struct ProgressLineChart: View {
 
     private func shouldShowPoint(at index: Int, total: Int) -> Bool {
         index == total - 1 || index % 7 == 0
+    }
+}
+
+private struct ChartScale {
+    let maxValue: TimeInterval
+
+    init(values: [TimeInterval]) {
+        let largestValue = values.max() ?? 0
+        maxValue = Self.roundedMaxValue(for: largestValue)
+    }
+
+    private static func roundedMaxValue(for value: TimeInterval) -> TimeInterval {
+        let fallback = 30 * 60
+        let target = max(value, TimeInterval(fallback))
+        let steps: [TimeInterval] = [
+            15 * 60,
+            30 * 60,
+            60 * 60,
+            2 * 60 * 60,
+            4 * 60 * 60,
+            6 * 60 * 60,
+            8 * 60 * 60,
+            12 * 60 * 60,
+            16 * 60 * 60,
+            24 * 60 * 60
+        ]
+
+        if let step = steps.first(where: { $0 >= target }) {
+            return step
+        }
+
+        let hours = ceil(target / (6 * 60 * 60)) * 6
+        return hours * 60 * 60
     }
 }

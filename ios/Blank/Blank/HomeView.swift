@@ -114,13 +114,16 @@ struct HomeView: View {
                 .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingEmergency) {
-            EmergencySheet {
-                withAnimation(.easeInOut(duration: 0.65)) {
-                    _ = sessionStore.deactivateBlank()
+            EmergencySheet(emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining) {
+                let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
+                    sessionStore.deactivateForEmergency()
                 }
-                screenTimeBlocker.clear()
-                message = nil
-                messageAction = nil
+                if unlocked {
+                    screenTimeBlocker.clear()
+                    message = nil
+                    messageAction = nil
+                }
+                return unlocked
             }
             .presentationDetents([.medium])
         }
@@ -481,6 +484,7 @@ private final class LoopingVideoView: UIView {
         }
 
         currentResourceName = resourceName
+        configureAmbientAudioSession()
         guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
 
         let playerItem = AVPlayerItem(url: url)
@@ -492,6 +496,10 @@ private final class LoopingVideoView: UIView {
         playerLayer.player = queuePlayer
         player = queuePlayer
         queuePlayer.play()
+    }
+
+    private func configureAmbientAudioSession() {
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
     }
 }
 
@@ -730,7 +738,8 @@ private struct ScheduleSheet: View {
 
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
-    let onUnlock: () -> Void
+    let emergencyUnlocksRemaining: Int
+    let onUnlock: () -> Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -738,11 +747,15 @@ private struct EmergencySheet: View {
                 .font(.blankSerif(size: 42, relativeTo: .largeTitle))
             Text("Esto desactiva Blank sin usar tu NFC y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
                 .foregroundStyle(.secondary)
+            Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos de emergencia esta semana." : "Ya has usado tus 3 desbloqueos de emergencia esta semana.")
+                .foregroundStyle(.secondary)
             Button("Confirmar emergencia") {
-                onUnlock()
-                dismiss()
+                if onUnlock() {
+                    dismiss()
+                }
             }
             .buttonStyle(BlankPrimaryButtonStyle())
+            .disabled(emergencyUnlocksRemaining <= 0)
             Button("Cancelar") {
                 dismiss()
             }

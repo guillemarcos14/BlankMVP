@@ -71,7 +71,7 @@ struct SetupView: View {
         .background(BrickColors.background)
         .foregroundStyle(BrickColors.text)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
-        .onChange(of: sessionStore.selection) { _, newSelection in
+        .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
     }

@@ -12,11 +12,15 @@ final class NFCReader: NSObject, NFCTagReaderSessionDelegate {
         }
 
         self.completion = completion
-        let session = NFCTagReaderSession(
+        guard let session = NFCTagReaderSession(
             pollingOption: [.iso14443, .iso15693],
             delegate: self,
             queue: nil
-        )
+        ) else {
+            completion(.failure(NFCReaderError.unavailable))
+            self.completion = nil
+            return
+        }
         session.alertMessage = "Hold your iPhone near the Blank NFC tag."
         self.session = session
         session.begin()

@@ -38,7 +38,6 @@ import com.blanknfc.app.ui.theme.BlankGreen
 import com.blanknfc.app.ui.theme.BlankOnSurface
 import com.blanknfc.app.ui.theme.BlankRed
 import com.blanknfc.app.ui.theme.BlankRedDark
-import com.blanknfc.app.ui.theme.BlankSurface
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -138,14 +137,10 @@ fun HomeScreen(
 
         Button(
             onClick = {
-                message = if (isBlankActive) {
-                    "Hold your paired Blank tag near this phone."
+                message = if (blockedPackages.isEmpty()) {
+                    "Select at least one app to block first."
                 } else {
-                    when (sessionManager.activateBlank()) {
-                        SessionManager.NfcResult.BRICKED -> "Blank mode activated."
-                        SessionManager.NfcResult.NO_APPS_SELECTED -> "Select at least one app to block first."
-                        else -> "Hold your paired Blank tag near this phone."
-                    }
+                    "Hold your paired Blank tag near this phone."
                 }
             },
             shape = RoundedCornerShape(8.dp),

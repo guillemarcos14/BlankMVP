@@ -43,10 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.blanknfc.app.R
 import com.blanknfc.app.data.SessionManager
-import com.blanknfc.app.ui.theme.BlankGray
 import com.blanknfc.app.ui.theme.BlankLine
 import com.blanknfc.app.ui.theme.BlankOnSurface
-import com.blanknfc.app.ui.theme.BlankSurface
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -198,7 +196,7 @@ private fun HomeBackground(
         Crossfade(
             targetState = if (isBlankActive) R.drawable.bg_gray_2 else R.drawable.bg_gray_1,
             animationSpec = tween(durationMillis = 520),
-            label = "blank_app_store_background"
+            label = "blank_gray_background"
         ) { backgroundResId ->
             Image(
                 painter = painterResource(backgroundResId),

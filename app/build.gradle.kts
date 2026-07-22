@@ -24,12 +24,12 @@ val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() &&
 
 android {
     namespace = "com.blanknfc.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.blanknfc.app"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 20
         versionName = "1.0"
         setProperty("archivesBaseName", "Blank-$versionName")

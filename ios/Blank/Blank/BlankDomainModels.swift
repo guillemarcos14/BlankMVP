@@ -202,16 +202,18 @@ enum BlankWeeklySessionAggregator {
         sessions: [BlankSession],
         weekStart: Date,
         estimatedMinutesSavedPerSession: Int = 15,
+        now: Date = Date(),
         calendar: Calendar = .current
     ) -> BlankWeeklyReport {
         let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-        let completedSessions = sessions.compactMap { session -> (start: Date, end: Date)? in
-            guard let endedAt = session.endedAt,
-                  session.startedAt < weekEnd,
-                  endedAt > weekStart else {
+        let trackedSessions = sessions.compactMap { session -> (start: Date, end: Date, completed: Bool)? in
+            let sessionEnd = session.endedAt ?? now
+            guard session.startedAt < weekEnd,
+                  sessionEnd > weekStart,
+                  sessionEnd > session.startedAt else {
                 return nil
             }
-            return (session.startedAt, endedAt)
+            return (session.startedAt, sessionEnd, session.endedAt != nil)
         }
 
         var dailyDurations = Array(repeating: TimeInterval.zero, count: 7)
@@ -223,7 +225,7 @@ enum BlankWeeklySessionAggregator {
                 continue
             }
 
-            for session in completedSessions {
+            for session in trackedSessions {
                 let overlapStart = max(session.start, dayStart)
                 let overlapEnd = min(session.end, dayEnd)
 
@@ -235,16 +237,17 @@ enum BlankWeeklySessionAggregator {
         }
 
         let totalFocusTime = dailyDurations.reduce(0, +)
+        let completedSessionCount = trackedSessions.filter { $0.completed }.count
         let estimatedTimeSaved = min(
             totalFocusTime,
-            TimeInterval(completedSessions.count * estimatedMinutesSavedPerSession * 60)
+            TimeInterval(max(completedSessionCount, trackedSessions.count) * estimatedMinutesSavedPerSession * 60)
         )
 
         return BlankWeeklyReport(
             dailyDurations: dailyDurations,
             dailySessionCounts: dailySessionCounts,
             totalFocusTime: totalFocusTime,
-            completedSessionCount: completedSessions.count,
+            completedSessionCount: max(completedSessionCount, trackedSessions.count),
             estimatedTimeSaved: estimatedTimeSaved
         )
     }
@@ -284,13 +287,14 @@ enum BlankProgressAggregator {
         let weeklyReport = BlankWeeklySessionAggregator.aggregate(
             sessions: sessions,
             weekStart: weekStart,
+            now: now,
             calendar: calendar
         )
 
         return BlankProgressReport(
             weeklyReport: weeklyReport,
             recentActivity: activityDays(sessions: sessions, days: 28, endingOn: now, calendar: calendar),
-            modeActivity: modeActivity(sessions: sessions, modes: modes, weekStart: weekStart, calendar: calendar),
+            modeActivity: modeActivity(sessions: sessions, modes: modes, weekStart: weekStart, now: now, calendar: calendar),
             currentStreakDays: currentStreakDays(sessions: sessions, now: now, calendar: calendar),
             longestStreakDays: longestStreakDays(sessions: sessions, days: 365, endingOn: now, calendar: calendar)
         )
@@ -333,6 +337,7 @@ enum BlankProgressAggregator {
         sessions: [BlankSession],
         modes: [BlankFocusMode],
         weekStart: Date,
+        now: Date,
         calendar: Calendar
     ) -> [BlankModeActivity] {
         guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
@@ -343,14 +348,15 @@ enum BlankProgressAggregator {
         var totals: [UUID: (duration: TimeInterval, count: Int)] = [:]
 
         for session in sessions {
-            guard let endedAt = session.endedAt,
-                  session.startedAt < weekEnd,
-                  endedAt > weekStart else {
+            let sessionEnd = session.endedAt ?? now
+            guard session.startedAt < weekEnd,
+                  sessionEnd > weekStart,
+                  sessionEnd > session.startedAt else {
                 continue
             }
 
             let overlapStart = max(session.startedAt, weekStart)
-            let overlapEnd = min(endedAt, weekEnd)
+            let overlapEnd = min(sessionEnd, weekEnd)
             guard overlapStart < overlapEnd else { continue }
 
             let current = totals[session.profileId] ?? (0, 0)

@@ -56,7 +56,7 @@ struct ReportView: View {
                         emptyState()
                     }
 
-                    Text("Cada sesion cuenta. Blank solo mide lo necesario.")
+                    Text("Cada sesión cuenta. Blank solo mide lo necesario.")
                         .font(.footnote)
                         .foregroundStyle(reportSecondary)
                         .frame(maxWidth: .infinity, alignment: .center)
@@ -89,7 +89,7 @@ struct ReportView: View {
                 heroPage(
                     label: "Tiempo ahorrado",
                     value: formatDuration(savedTime),
-                    description: "recuperadas de tu vida gracias a Blank",
+                    description: "Recuperadas de tu vida gracias a Blank",
                     chartTitle: "Ahorro estimado",
                     chartValues: savedSeries(from: activityDays)
                 )
@@ -98,7 +98,7 @@ struct ReportView: View {
                 heroPage(
                     label: "Tiempo en Blank",
                     value: formatDuration(weekly.totalFocusTime),
-                    description: "protegidas esta semana",
+                    description: "Protegidas esta semana",
                     chartTitle: "Modo Blank",
                     chartValues: activityDays.map(\.totalFocusTime)
                 )
@@ -178,7 +178,7 @@ struct ReportView: View {
 
                 Spacer()
 
-                Text("Ultimos 28 dias")
+                Text("Últimos 28 días")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }
@@ -200,7 +200,7 @@ struct ReportView: View {
             }
 
             HStack {
-                Text("28 dias atras")
+                Text("28 días atrás")
                 Spacer()
                 Text("Hoy")
             }
@@ -225,7 +225,7 @@ struct ReportView: View {
             )
             subtleDivider()
             metricRow(
-                title: "Calidad de proteccion",
+                title: "Calidad de protección",
                 value: "\(protectionQualityScore(weekly: weekly, progress: progress, emergencyUnlocksRemaining: emergencyUnlocksRemaining))/100",
                 caption: protectionQualityCaption(weekly: weekly, emergencyUnlocksRemaining: emergencyUnlocksRemaining)
             )
@@ -247,13 +247,13 @@ struct ReportView: View {
         emergencyUnlocksRemaining: Int
     ) -> some View {
         VStack(spacing: 0) {
-            metricRow(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "protegidas esta semana")
+            metricRow(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Protegidas esta semana")
             subtleDivider()
-            metricRow(title: "Media protegida", value: formatDuration(weekly.averageSessionDuration), caption: "por sesion real")
+            metricRow(title: "Media protegida", value: formatDuration(weekly.averageSessionDuration), caption: "Por sesión real")
             subtleDivider()
-            metricRow(title: "Racha", value: "\(progress.currentStreakDays)d", caption: "dias con Blank")
+            metricRow(title: "Racha", value: "\(progress.currentStreakDays)d", caption: "Días con Blank")
             subtleDivider()
-            metricRow(title: "Mejor dia", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+            metricRow(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
             subtleDivider()
             metricRow(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
         }
@@ -331,10 +331,10 @@ struct ReportView: View {
 
     private func emptyState() -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tu tiempo recuperado aparecera aqui.")
+            Text("Tu tiempo recuperado aparecerá aquí.")
                 .font(.headline.weight(.semibold))
 
-            Text("Activa Blank y vuelve cuando tengas tu primera sesion protegida.")
+            Text("Activa Blank y vuelve cuando tengas tu primera sesión protegida.")
                 .font(.body)
                 .foregroundStyle(reportSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -346,13 +346,13 @@ struct ReportView: View {
 
     private func insightText(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> String {
         if weekly.completedSessionCount == 0 {
-            return "Blank ya esta midiendo esta sesion. Las senales se vuelven mas utiles al terminarla."
+            return "Blank ya está midiendo esta sesión. Las señales se vuelven más útiles al terminarla."
         }
 
         let savedTime = cappedSavedTime(weekly)
 
         if savedTime >= 8 * 60 * 60 {
-            return "Has recuperado casi medio dia para ti."
+            return "Has recuperado casi medio día para ti."
         }
 
         if savedTime >= 4 * 60 * 60 {
@@ -360,18 +360,18 @@ struct ReportView: View {
         }
 
         if savedTime >= 60 * 60 {
-            return "Has recuperado mas de una hora sin convertirla en otra pantalla."
+            return "Has recuperado más de una hora sin convertirla en otra pantalla."
         }
 
         if progress.currentStreakDays >= 3 {
-            return "Blank te ha protegido \(progress.currentStreakDays) dias seguidos."
+            return "Blank te ha protegido \(progress.currentStreakDays) días seguidos."
         }
 
         if weekly.completedSessionCount >= 5 {
             return "Ya hay \(weekly.completedSessionCount) momentos en los que no volviste al bucle."
         }
 
-        return "Has recuperado tiempo real sin convertirlo en otra pantalla mas."
+        return "Has recuperado tiempo real sin convertirlo en otra pantalla más."
     }
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {
@@ -385,24 +385,24 @@ struct ReportView: View {
     }
 
     private func savedTimeExplanation(_ report: BlankWeeklyReport) -> String {
-        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(report))) estimados con 7 min por sesion y un 10% del tiempo protegido, limitado al tiempo real en Blank."
+        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(report))) estimados con 7 min por sesión y un 10% del tiempo protegido, limitado al tiempo real en Blank."
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {
         guard let day = riskiestDay(activityDays: activityDays) else {
-            return "Sin patron"
+            return "Sin patrón"
         }
         return weekdayName(for: day.date)
     }
 
     private func riskMomentCaption(activityDays: [BlankActivityDay]) -> String {
         guard let day = riskiestDay(activityDays: activityDays) else {
-            return "con mas datos aparecera tu franja vulnerable"
+            return "Con más datos aparecerá tu franja vulnerable"
         }
         if day.sessionCount > 1 {
-            return "\(day.sessionCount) sesiones: dia donde mas recurres a Blank"
+            return "\(day.sessionCount) sesiones: día donde más recurres a Blank"
         }
-        return "dia donde mas tiempo pediste proteccion"
+        return "Día donde más tiempo pediste protección"
     }
 
     private func riskiestDay(activityDays: [BlankActivityDay]) -> BlankActivityDay? {
@@ -440,16 +440,16 @@ struct ReportView: View {
 
     private func protectionQualityCaption(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
         guard weekly.completedSessionCount > 0 else {
-            return "completa una sesion para medirlo"
+            return "Completa una sesión para medirlo"
         }
         let usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if usedEmergencies == 0 {
-            return "sesiones limpias, sin rescates esta semana"
+            return "Sesiones limpias, sin rescates esta semana"
         }
         if usedEmergencies < 3 {
-            return "mejorara al reducir emergencias"
+            return "Mejorará al reducir emergencias"
         }
-        return "semana fragil: ya usaste todas las emergencias"
+        return "Semana frágil: ya usaste todas las emergencias"
     }
 
     private func controlRecoveryValue(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
@@ -460,18 +460,18 @@ struct ReportView: View {
         if usedEmergencies < 3 {
             return "\(3 - usedEmergencies) reservas"
         }
-        return "Limite"
+        return "Límite"
     }
 
     private func controlRecoveryCaption(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
         let usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if weekly.completedSessionCount > 0 && usedEmergencies == 0 {
-            return "todavia no necesitaste rescates esta semana"
+            return "Todavía no necesitaste rescates esta semana"
         }
         if usedEmergencies < 3 {
-            return "emergencias restantes esta semana"
+            return "Emergencias restantes esta semana"
         }
-        return "toca volver a depender del NFC"
+        return "Toca volver a depender del NFC"
     }
 
     private func usedEmergencyUnlocks(_ emergencyUnlocksRemaining: Int) -> Int {
@@ -481,19 +481,19 @@ struct ReportView: View {
     private func emergencyCaption(_ emergencyUnlocksRemaining: Int) -> String {
         let used = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if used == 0 {
-            return "sin rescates esta semana"
+            return "Sin rescates esta semana"
         }
         if emergencyUnlocksRemaining > 0 {
-            return "\(emergencyUnlocksRemaining) disponibles todavia"
+            return "\(emergencyUnlocksRemaining) disponibles todavía"
         }
-        return "limite semanal alcanzado"
+        return "Límite semanal alcanzado"
     }
 
     private func bestDayCaption(report: BlankWeeklyReport) -> String {
         guard let bestIndex = report.dailyDurations.indices.max(by: {
             report.dailyDurations[$0] < report.dailyDurations[$1]
         }), report.dailyDurations[bestIndex] > 0 else {
-            return "esta semana"
+            return "Esta semana"
         }
         let duration = formatDuration(report.dailyDurations[bestIndex])
         let sessions = report.dailySessionCounts[bestIndex]

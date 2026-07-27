@@ -94,12 +94,14 @@ final class SessionStore: ObservableObject {
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
-        if defaults.string(forKey: Keys.emergencyUnlockWeekKey) == Self.currentWeekKey() {
+        let currentWeekKey = Self.currentWeekKey()
+        if defaults.string(forKey: Keys.emergencyUnlockWeekKey) == currentWeekKey {
             emergencyUnlocksThisWeek = defaults.integer(forKey: Keys.emergencyUnlocksThisWeek)
         } else {
             emergencyUnlocksThisWeek = 0
+            defaults.set(currentWeekKey, forKey: Keys.emergencyUnlockWeekKey)
+            defaults.set(0, forKey: Keys.emergencyUnlocksThisWeek)
         }
-        defaults.set(Self.currentWeekKey(), forKey: Keys.emergencyUnlockWeekKey)
         if let timestamp = defaults.object(forKey: Keys.schedulePausedUntil) as? TimeInterval, timestamp > 0 {
             schedulePausedUntil = Date(timeIntervalSince1970: timestamp)
         } else {
@@ -148,7 +150,10 @@ final class SessionStore: ObservableObject {
     }
 
     var emergencyUnlocksRemaining: Int {
-        max(0, Self.maxEmergencyUnlocksPerWeek - emergencyUnlocksThisWeek)
+        if defaults.string(forKey: Keys.emergencyUnlockWeekKey) != Self.currentWeekKey() {
+            return Self.maxEmergencyUnlocksPerWeek
+        }
+        return max(0, Self.maxEmergencyUnlocksPerWeek - emergencyUnlocksThisWeek)
     }
 
     func handleNfcTag(uid: String) -> NfcResult {
@@ -228,6 +233,8 @@ final class SessionStore: ObservableObject {
     }
 
     func applyScheduleWindow(at date: Date = Date()) {
+        resetEmergencyUnlocksIfNeeded(for: date)
+
         if let blankActiveUntil, isBlankActive, date >= blankActiveUntil {
             _ = deactivateBlank()
             return
@@ -411,17 +418,20 @@ final class SessionStore: ObservableObject {
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
     }
 
-    private func resetEmergencyUnlocksIfNeeded() {
-        let currentWeekKey = Self.currentWeekKey()
+    private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {
+        let currentWeekKey = Self.currentWeekKey(for: date)
         guard defaults.string(forKey: Keys.emergencyUnlockWeekKey) != currentWeekKey else {
             return
         }
         emergencyUnlocksThisWeek = 0
         defaults.set(currentWeekKey, forKey: Keys.emergencyUnlockWeekKey)
+        defaults.set(0, forKey: Keys.emergencyUnlocksThisWeek)
     }
 
     private static func currentWeekKey(for date: Date = Date()) -> String {
-        let components = Calendar.current.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = .current
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
         return "\(components.yearForWeekOfYear ?? 0)-\(components.weekOfYear ?? 0)"
     }
 

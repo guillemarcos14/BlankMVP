@@ -540,7 +540,7 @@ class SessionManager(
 
         private fun currentWeekKey(): String {
             val calendar = Calendar.getInstance()
-            val year = calendar.get(Calendar.YEAR)
+            val year = calendar.getWeekYear()
             val week = calendar.get(Calendar.WEEK_OF_YEAR)
             return "$year-$week"
         }

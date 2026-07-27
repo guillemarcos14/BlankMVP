@@ -402,6 +402,8 @@ class SessionManager(
     }
 
     fun applyScheduleWindow(nowMillis: Long = System.currentTimeMillis()) {
+        resetEmergencyUnlocksIfNeeded()
+
         val schedule = _schedule.value
         if (!schedule.enabled) return
         if (isMinuteInWindow(minuteOfDay(nowMillis), schedule.startMinute, schedule.endMinute)) {
@@ -539,7 +541,10 @@ class SessionManager(
         }
 
         private fun currentWeekKey(): String {
-            val calendar = Calendar.getInstance()
+            val calendar = Calendar.getInstance().apply {
+                firstDayOfWeek = Calendar.MONDAY
+                minimalDaysInFirstWeek = 4
+            }
             val year = calendar.getWeekYear()
             val week = calendar.get(Calendar.WEEK_OF_YEAR)
             return "$year-$week"

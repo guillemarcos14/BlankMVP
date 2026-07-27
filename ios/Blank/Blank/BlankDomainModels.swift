@@ -201,7 +201,6 @@ enum BlankWeeklySessionAggregator {
     static func aggregate(
         sessions: [BlankSession],
         weekStart: Date,
-        estimatedMinutesSavedPerSession: Int = 15,
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> BlankWeeklyReport {
@@ -238,16 +237,19 @@ enum BlankWeeklySessionAggregator {
 
         let totalFocusTime = dailyDurations.reduce(0, +)
         let completedSessionCount = trackedSessions.filter { $0.completed }.count
+        let trackedSessionCount = max(completedSessionCount, trackedSessions.count)
+        let sessionBaseSavedTime = TimeInterval(trackedSessionCount * 7 * 60)
+        let protectedTimeSavedShare = totalFocusTime * 0.10
         let estimatedTimeSaved = min(
             totalFocusTime,
-            TimeInterval(max(completedSessionCount, trackedSessions.count) * estimatedMinutesSavedPerSession * 60)
+            sessionBaseSavedTime + protectedTimeSavedShare
         )
 
         return BlankWeeklyReport(
             dailyDurations: dailyDurations,
             dailySessionCounts: dailySessionCounts,
             totalFocusTime: totalFocusTime,
-            completedSessionCount: max(completedSessionCount, trackedSessions.count),
+            completedSessionCount: trackedSessionCount,
             estimatedTimeSaved: estimatedTimeSaved
         )
     }

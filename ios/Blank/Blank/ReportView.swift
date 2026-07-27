@@ -376,7 +376,7 @@ struct ReportView: View {
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {
         days.map { day in
-            min(day.totalFocusTime, TimeInterval(day.sessionCount * 15 * 60))
+            min(day.totalFocusTime, TimeInterval(day.sessionCount * 7 * 60) + day.totalFocusTime * 0.10)
         }
     }
 
@@ -385,7 +385,7 @@ struct ReportView: View {
     }
 
     private func savedTimeExplanation(_ report: BlankWeeklyReport) -> String {
-        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(report))) estimados desde sesiones completadas, limitado a \(formatDuration(report.totalFocusTime)) reales en Blank."
+        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(report))) estimados con 7 min por sesion y un 10% del tiempo protegido, limitado al tiempo real en Blank."
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {

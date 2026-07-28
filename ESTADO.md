@@ -8,6 +8,8 @@ Ultima actualizacion: 2026-07-28
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-28: En la worktree de prueba `C:\Users\Guillem\Desktop\BrickMVP-prueba` se creo un nuevo prototipo de Home iOS/Android aislado del repo principal. La Home usa el asset `blank_home_trial` basado en `C:\Users\Guillem\Desktop\blank-center-mobile-bg-v1-1080x1920.png`, marca superior izquierda con cuadrado y texto `BLANK`, copy inferior izquierdo y boton `Blank` con estilo liquid glass para iniciar bloqueo. Archivos tocados: `ios/Blank/Blank/HomeView.swift`, `ios/Blank/Blank/Assets.xcassets/blank_home_trial.imageset/`, `app/src/main/java/com/blanknfc/app/ui/screens/HomeScreen.kt` y `app/src/main/res/drawable-nodpi/blank_home_trial.png`. Validado Android con `gradlew.bat assembleDebug --no-daemon --stacktrace` y `git diff --check`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode si se quiere avanzar con esta prueba.
+- 2026-07-28: En la worktree de prueba `C:\Users\Guillem\Desktop\BrickMVP-prueba` se probo un rediseño experimental de Home iOS/Android con fondo abstracto motion-blur, `MENU`, cita y boton `Blank`; despues el usuario pidio echarlo atras y se restauraron `HomeView.swift`, `HomeScreen.kt`, assets generados y captura de prueba. No queda aplicado en codigo.
 - 2026-07-28: En MacinCloud/RDP se compilo por Terminal el commit `ab54fa7` (`Simplify progress screen`) con el rediseño minimalista de `Progreso`. Se introdujeron los comandos con pulsaciones individuales mediante `keypress`, sin pegado ni atajos: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `cd ios`, `cd blank` y `xcodebuild -project blank.xcodeproj build`. El pull avanzo de `a049307` a `ab54fa7` y el build termino con `** BUILD SUCCEEDED **`. Queda pendiente revision visual en Xcode/simulador y, si procede, archive/subida manual desde Xcode.
 - 2026-07-28: Se implemento el formato minimalista de `Progreso` en iOS y Android. La vista principal queda en hero de `tiempo recuperado`, frase humana, tendencia semanal, resumen `Esta semana` con 3 datos, tarjeta `Siguiente mejora` accionable y detalle oculto/expandible para datos secundarios. Android se valido con `gradlew.bat testDebugUnitTest --no-daemon --stacktrace`, `gradlew.bat assembleDebug --no-daemon --stacktrace` y `git diff --check`; iOS queda pendiente de compilar y revisar visualmente en MacinCloud/Xcode.
 - 2026-07-28: Se propuso un rediseño conceptual minimalista de `Progreso`: titulo `Progreso`, hero con tiempo recuperado acumulado, frase humana de valor, tendencia semanal compacta, un unico insight accionable y un resumen semanal de maximo 3 datos; se recomienda ocultar diagnostico avanzado bajo detalle y no mostrar stats redundantes en la vista principal.
@@ -217,6 +219,7 @@ Ultima actualizacion: 2026-07-28
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- La rama de prueba `codex/prueba-modificacion` contiene un prototipo activo de Home iOS/Android con fondo abstracto, marca `BLANK` arriba a la izquierda, copy inferior izquierdo y boton `Blank` liquid glass. El repo principal `C:\Users\Guillem\Desktop\BrickMVP` no se ha modificado para esta prueba.
 - MacinCloud tiene compilado correctamente el commit `0e16779` de la rama `codex/ios-device-activity-target`; resultado confirmado por Terminal: `** BUILD SUCCEEDED **`.
 - iOS `ReportView.swift` tiene aplicado el nuevo copy/layout del panel de Progreso Semanal; pendiente compilar y revisar visualmente en MacinCloud/Xcode porque Windows no tiene toolchain Swift.
 - Android compila correctamente tras las mejoras de Progreso, confirmación de olvido y horario. iOS tiene cambios SwiftUI aplicados localmente pero sigue pendiente de validación en MacinCloud/Xcode porque Windows no tiene toolchain Swift.
@@ -297,6 +300,7 @@ Ultima actualizacion: 2026-07-28
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- Revisar visualmente el prototipo de Home en Android emulador/fisico y en iOS MacinCloud/Xcode antes de decidir si se descarta, se itera o se traslada al codigo real.
 - Redisenar `Progreso` con menos ruido: conservar 1 dato principal, 1 grafica o tendencia, 1 insight accionable y 2-3 metricas secundarias maximo; mover el resto a detalle/diagnostico o eliminarlo si no cambia comportamiento del usuario.
 - En MacinCloud/Xcode, con `~/BlankMVP/ios/Blank/Blank.xcodeproj` abierto y scheme `Blank`, revisar visualmente antes de archivar: Progreso con tarjetas `Hoy`/`Semana`/`Mes`/`Año`, onboarding con status pills/CTA `Hacer mi primer Blank`, hoja de confirmacion de `He olvidado mi Blank`, `Programar mi Blank` con selector compacto, y Home con CTA `Escanear Blank para salir`.
 - Para trabajar desde otros PCs: cerrar primero los cambios locales actuales en commits pequenos o stash, hacer `git fetch`, integrar `origin/codex/ios-device-activity-target` sin perder cambios, pushear la rama y comprobar en GitHub que `ESTADO.md`, `AGENTS.md`, `docs/`, `ios/`, `app/` y `web/landing/` estan actualizados.
@@ -391,6 +395,7 @@ Ultima actualizacion: 2026-07-28
 - [cerrada] 2026-07-12: El bypass para entrar al Home sin NFC solo puede existir en `DEBUG` y `targetEnvironment(simulator)`, nunca en TestFlight ni produccion.
 
 ## Descartado
+- 2026-07-28: Se descarta mantener el rediseño experimental de Home con fondo abstracto/cita/MENU porque el usuario pidio echarlo atras antes de continuar con otra direccion visual.
 - 2026-07-09: No se considera bloqueado por Swift/proyecto porque el build de simulador sin firma en Xcode 26.5 termino con `BUILD SUCCEEDED`.
 - 2026-07-09: No se podia completar archive/TestFlight porque faltaba provisioning valido y seguia pendiente la aprobacion de `Family Controls (Distribution)`.
 - 2026-07-09: No se anadio la regla solo al `README.md` porque es una instruccion operativa para agentes, no documentacion de producto.

@@ -17,6 +17,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,11 +60,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -383,36 +387,33 @@ private fun AppBackground(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color.Black else Color(0xFFE7E7E2))
+            .background(Color.Black)
     ) {
-        if (!isDark) {
-            Crossfade(
-                targetState = if (isBlankActive) R.raw.blank_background_active else R.raw.blank_background_idle,
-                animationSpec = tween(durationMillis = 520),
-                label = "blank_background_video"
-            ) { backgroundVideoResId ->
-                BackgroundLoopVideo(
-                    videoResId = backgroundVideoResId,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(BackgroundVideoAlpha)
+        Image(
+            painter = painterResource(id = R.drawable.blank_home_trial),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.50f),
+                            Color.Black.copy(alpha = 0.10f),
+                            Color.Black.copy(alpha = 0.36f)
+                        )
+                    )
                 )
-            }
-        }
-        if (!isDark) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val dot = Color(0xFF969690).copy(alpha = 0.18f)
-                val step = 13.dp.toPx()
-                var y = 0f
-                while (y < size.height) {
-                    var x = 0f
-                    while (x < size.width) {
-                        drawCircle(dot, radius = 0.65.dp.toPx(), center = Offset(x, y))
-                        x += step
-                    }
-                    y += step
-                }
-            }
+        )
+        if (isBlankActive || isDark) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.22f))
+            )
         }
         Box(
             modifier = Modifier
@@ -514,9 +515,9 @@ private fun HomePanelContent(
     onMainAction: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        IconDotsAligned(
+        BlankBrandMark(
             onClick = onSettings,
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopStart)
         )
         if (configIssues.isNotEmpty()) {
             ConfigIssuesCard(
@@ -526,49 +527,40 @@ private fun HomePanelContent(
                     .padding(top = 62.dp)
             )
         }
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            AnimatedContent(
-                targetState = isBlankActive,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(360)) togetherWith fadeOut(animationSpec = tween(220))
-                },
-            label = "blank_home_message"
+        Crossfade(
+            targetState = isBlankActive,
+            animationSpec = tween(durationMillis = 260),
+            label = "blank_home_action",
+            modifier = Modifier.align(Alignment.BottomStart)
         ) { active ->
             val messages = if (active) DarkModeMessages else LightModeMessages
             val message = remember(active) {
                 messages[Random.nextInt(messages.size)]
             }
-
-            Text(
-                text = message,
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
-                color = BlankOnSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        }
-        Crossfade(
-            targetState = isBlankActive,
-            animationSpec = tween(durationMillis = 260),
-            label = "blank_home_action",
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) { active ->
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.widthIn(max = 330.dp),
+                horizontalAlignment = Alignment.Start
             ) {
+                Text(
+                    text = if (active) "Blank está activo.\nEscanea tu pieza para salir." else message,
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
+                    color = Color.White,
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(18.dp))
                 MainActionButton(
-                    text = if (active) "Escanear Blank para salir" else "Iniciar Blank",
+                    text = "Blank",
                     enabled = !active,
-                    light = !active,
+                    light = true,
+                    liquidGlass = true,
+                    modifier = Modifier.widthIn(max = 210.dp),
                     onClick = onMainAction
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 TextButton(onClick = onStats) {
                     Text(
                         text = "Progreso",
-                        color = if (active) Color.White.copy(alpha = 0.74f) else BlankOnSurface.copy(alpha = 0.72f),
+                        color = Color.White.copy(alpha = 0.78f),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
                     )
                 }
@@ -578,10 +570,35 @@ private fun HomePanelContent(
 }
 
 @Composable
+private fun BlankBrandMark(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .height(44.dp)
+            .clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .background(Color.White)
+        )
+        Spacer(modifier = Modifier.widthIn(min = 10.dp))
+        Text(
+            text = "BLANK",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 2.4.sp
+            ),
+            color = Color.White
+        )
+    }
+}
+
+@Composable
 private fun ConfigIssuesCard(issues: List<ConfigIssue>, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.78f),
+        color = Color.White.copy(alpha = 0.22f),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(
@@ -1844,6 +1861,7 @@ private fun MainActionButton(
     text: String,
     enabled: Boolean = true,
     light: Boolean = false,
+    liquidGlass: Boolean = false,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -1852,19 +1870,24 @@ private fun MainActionButton(
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (light) Color.White else Color.Black,
-            contentColor = if (light) Color.Black else Color.White,
+            containerColor = when {
+                liquidGlass -> Color.White.copy(alpha = 0.22f)
+                light -> Color.White
+                else -> Color.Black
+            },
+            contentColor = if (liquidGlass || !light) Color.White else Color.Black,
             disabledContainerColor = Color(0xFFD8D8D5),
             disabledContentColor = BlankGray
         ),
+        border = if (liquidGlass) BorderStroke(1.dp, Color.White.copy(alpha = 0.48f)) else null,
         modifier = modifier
             .fillMaxWidth()
-            .height(54.dp)
+            .height(if (liquidGlass) 56.dp else 54.dp)
             .shadow(
-                elevation = if (enabled) 14.dp else 0.dp,
+                elevation = if (enabled) 18.dp else 0.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.12f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = Color.Black.copy(alpha = if (liquidGlass) 0.22f else 0.12f),
+                spotColor = Color.Black.copy(alpha = if (liquidGlass) 0.22f else 0.12f)
             )
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium))

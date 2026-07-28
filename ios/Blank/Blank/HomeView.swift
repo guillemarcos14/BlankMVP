@@ -54,21 +54,24 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive)
 
-                topCluster(spacing: layout.topClusterSpacing)
+                topBrand
                     .padding(.horizontal, layout.horizontalPadding)
                     .padding(.top, layout.topPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                centerMessage(maxWidth: layout.messageMaxWidth)
-                    .position(x: layout.centerX, y: layout.messageCenterY)
+                configCard
+                    .padding(.horizontal, layout.horizontalPadding)
+                    .padding(.top, layout.topPadding + 54)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 bottomAction(width: layout.actionWidth)
+                    .padding(.horizontal, layout.horizontalPadding)
                     .padding(.bottom, layout.bottomPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
         }
         .ignoresSafeArea()
-        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .foregroundStyle(Color.white)
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
@@ -152,27 +155,24 @@ struct HomeView: View {
         }
     }
 
-    private func topCluster(spacing: CGFloat) -> some View {
-        VStack(spacing: spacing) {
-            topBar
-            configCard
-        }
-    }
-
-    private var topBar: some View {
-        ZStack {
-            Button {
-                showingSettings = true
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.title3.weight(.bold))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+    private var topBrand: some View {
+        Button {
+            showingSettings = true
+        } label: {
+            HStack(spacing: 10) {
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: 9, height: 9)
+                Text("BLANK")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .tracking(2.4)
             }
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
-            .buttonStyle(.plain)
+            .foregroundStyle(Color.white)
+            .frame(height: 44)
+            .contentShape(Rectangle())
         }
-        .frame(height: 44)
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .zIndex(2)
     }
 
@@ -205,7 +205,8 @@ struct HomeView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.78))
+            .background(Color.white.opacity(0.22))
+            .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
     }
@@ -259,7 +260,15 @@ struct HomeView: View {
     }
 
     private func bottomAction(width: CGFloat) -> some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(bottomCopy)
+                .font(.blankSerif(size: 26, relativeTo: .title2))
+                .lineSpacing(1)
+                .multilineTextAlignment(.leading)
+                .foregroundStyle(Color.white)
+                .shadow(color: Color.black.opacity(0.30), radius: 10, y: 5)
+                .frame(maxWidth: min(width, 330), alignment: .leading)
+
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
                 Text(elapsedText(since: blankActiveSince))
                     .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
@@ -267,7 +276,7 @@ struct HomeView: View {
                     .monospacedDigit()
             }
 
-            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Iniciar Blank") {
+            Button("Blank") {
                 if sessionStore.isBlankActive {
                     scanTag()
                 } else {
@@ -278,14 +287,22 @@ struct HomeView: View {
                     setMessage(for: result)
                 }
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
-            .frame(width: width)
+            .buttonStyle(BlankLiquidGlassButtonStyle())
+            .frame(width: min(width, 210))
 
             Button("Progreso") {
                 showingReport = true
             }
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.74) : BlankColors.mutedInk)
+            .font(.blankInter(size: 14, weight: .medium, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.78))
         }
+    }
+
+    private var bottomCopy: String {
+        if sessionStore.isBlankActive {
+            return "Blank esta activo.\nEscanea tu pieza para salir."
+        }
+        return displayedMessage
     }
 
     private var configIssues: [ConfigIssue] {
@@ -430,24 +447,44 @@ private struct AppBackground: View {
 
     var body: some View {
         ZStack {
-            BlankColors.background
-                .opacity(isActive ? 0 : 1)
-            BlankColors.ink
-                .opacity(isActive ? 1 : 0)
-            LoopingVideoBackground(resourceName: "blank_background_idle")
-                .opacity(isActive ? 0 : 1)
-            LoopingVideoBackground(resourceName: "blank_background_active")
-                .opacity(isActive ? 1 : 0)
-            PaperTexture()
-                .opacity(isActive ? 0 : 0.34)
-                .blendMode(.multiply)
+            Image("blank_home_trial")
+                .resizable()
+                .scaledToFill()
                 .ignoresSafeArea()
-            DotPattern()
-                .opacity(isActive ? 0 : 0.28)
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.50),
+                    Color.black.opacity(0.10),
+                    Color.black.opacity(0.36)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            Color.black.opacity(isActive ? 0.22 : 0)
                 .ignoresSafeArea()
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.75), value: isActive)
+    }
+}
+
+private struct BlankLiquidGlassButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .foregroundStyle(Color.white)
+            .background(.ultraThinMaterial)
+            .background(Color.white.opacity(configuration.isPressed ? 0.16 : 0.22))
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.48), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(0.24), radius: 24, y: 14)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
     }
 }
 

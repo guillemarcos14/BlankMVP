@@ -104,7 +104,8 @@ struct HomeView: View {
                 showingSchedule: $showingSchedule,
                 showingEmergency: $showingEmergency,
                 showingRelink: $showingRelink,
-                showingForgetConfirm: $showingForgetConfirm
+                showingForgetConfirm: $showingForgetConfirm,
+                showingReport: $showingReport
             )
             .presentationDetents([.medium, .large])
         }
@@ -262,12 +263,12 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             Text(bottomCopy)
-                .font(.blankSerif(size: 26, relativeTo: .title2))
-                .lineSpacing(1)
+                .font(.blankSerif(size: 20, relativeTo: .title3))
+                .lineSpacing(0)
                 .multilineTextAlignment(.leading)
                 .foregroundStyle(Color.white)
                 .shadow(color: Color.black.opacity(0.30), radius: 10, y: 5)
-                .frame(maxWidth: min(width, 330), alignment: .leading)
+                .frame(maxWidth: min(width, 282), alignment: .leading)
 
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
                 Text(elapsedText(since: blankActiveSince))
@@ -288,21 +289,12 @@ struct HomeView: View {
                 }
             }
             .buttonStyle(BlankLiquidGlassButtonStyle())
-            .frame(width: min(width, 210))
-
-            Button("Progreso") {
-                showingReport = true
-            }
-            .font(.blankInter(size: 14, weight: .medium, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.78))
+            .frame(width: min(width, 152))
         }
     }
 
     private var bottomCopy: String {
-        if sessionStore.isBlankActive {
-            return "Blank esta activo.\nEscanea tu pieza para salir."
-        }
-        return displayedMessage
+        "\"Haiqu recognized by Sifted\nas an emerging top quantum\ncomputing startup\""
     }
 
     private var configIssues: [ConfigIssue] {
@@ -677,6 +669,7 @@ private struct SettingsSheet: View {
     @Binding var showingEmergency: Bool
     @Binding var showingRelink: Bool
     @Binding var showingForgetConfirm: Bool
+    @Binding var showingReport: Bool
     @Environment(\.dismiss) private var dismiss
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -697,6 +690,10 @@ private struct SettingsSheet: View {
                 }
                 settingsButton("Programar mi Blank", meta: "Diario") {
                     showingSchedule = true
+                    dismiss()
+                }
+                settingsButton("Progreso", meta: "Stats") {
+                    showingReport = true
                     dismiss()
                 }
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {

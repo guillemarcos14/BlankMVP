@@ -255,7 +255,6 @@ fun HomeScreen(
                 isBlankActive = isBlankActive,
                 configIssues = configIssues,
                 onSettings = { panel = HomePanel.SETTINGS },
-                onStats = { panel = HomePanel.STATS },
                 onMainAction = {
                     if (currentMode.packages.isEmpty()) {
                         modeBeingEdited = currentMode
@@ -271,6 +270,7 @@ fun HomeScreen(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
                 onModes = { panel = HomePanel.MODES },
+                onStats = { panel = HomePanel.STATS },
                 onSchedule = {
                     panel = HomePanel.SCHEDULE
                 },
@@ -511,7 +511,6 @@ private fun HomePanelContent(
     isBlankActive: Boolean,
     configIssues: List<ConfigIssue>,
     onSettings: () -> Unit,
-    onStats: () -> Unit,
     onMainAction: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -533,17 +532,17 @@ private fun HomePanelContent(
             label = "blank_home_action",
             modifier = Modifier.align(Alignment.BottomStart)
         ) { active ->
-            val messages = if (active) DarkModeMessages else LightModeMessages
-            val message = remember(active) {
-                messages[Random.nextInt(messages.size)]
-            }
             Column(
-                modifier = Modifier.widthIn(max = 330.dp),
+                modifier = Modifier.widthIn(max = 282.dp),
                 horizontalAlignment = Alignment.Start
             ) {
                 Text(
-                    text = if (active) "Blank está activo.\nEscanea tu pieza para salir." else message,
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
+                    text = "\"Haiqu recognized by Sifted\nas an emerging top quantum\ncomputing startup\"",
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontSize = 20.sp,
+                        lineHeight = 22.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
                     color = Color.White,
                     textAlign = TextAlign.Start
                 )
@@ -553,17 +552,9 @@ private fun HomePanelContent(
                     enabled = !active,
                     light = true,
                     liquidGlass = true,
-                    modifier = Modifier.widthIn(max = 210.dp),
+                    modifier = Modifier.widthIn(max = 152.dp),
                     onClick = onMainAction
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                TextButton(onClick = onStats) {
-                    Text(
-                        text = "Progreso",
-                        color = Color.White.copy(alpha = 0.78f),
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
-                    )
-                }
             }
         }
     }
@@ -733,6 +724,7 @@ private fun SettingsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit,
     onModes: () -> Unit,
+    onStats: () -> Unit,
     onSchedule: () -> Unit,
     onRelink: () -> Unit,
     onForget: () -> Unit,
@@ -746,6 +738,7 @@ private fun SettingsPanel(
         val items = buildList {
             add(MenuItem("Modo", "Apps", onModes))
             add(MenuItem("Programar mi Blank", "Diario", onSchedule))
+            add(MenuItem("Progreso", "Stats", onStats))
             add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
             add(MenuItem("He olvidado mi Blank", "Reset", onForget))
             add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))

@@ -385,7 +385,7 @@ class SessionManager(
     }
 
     companion object {
-        const val DEFAULT_BACKGROUND_THEME_ID = "grey"
+        const val DEFAULT_BACKGROUND_THEME_ID = "blank"
 
         private const val DEFAULT_MODE_ID = "daily"
         private const val MODE_SEPARATOR = ";"

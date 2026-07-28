@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var showingEmergency = false
     @State private var showingReport = false
     @State private var showingRelink = false
+    @State private var showingForgetConfirm = false
     @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
     @State private var displayedMessage = "No estás perdiéndote nada."
@@ -99,7 +100,8 @@ struct HomeView: View {
                 showingPicker: $showingPicker,
                 showingSchedule: $showingSchedule,
                 showingEmergency: $showingEmergency,
-                showingRelink: $showingRelink
+                showingRelink: $showingRelink,
+                showingForgetConfirm: $showingForgetConfirm
             )
             .presentationDetents([.medium, .large])
         }
@@ -130,6 +132,13 @@ struct HomeView: View {
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
                 .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingForgetConfirm) {
+            ForgetBlankConfirmSheet {
+                sessionStore.forgetNfcTag()
+                screenTimeBlocker.clear()
+            }
+            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingTimer) {
             TimerStartSheet { minutes in
@@ -258,7 +267,7 @@ struct HomeView: View {
                     .monospacedDigit()
             }
 
-            Button(sessionStore.isBlankActive ? "Escanear NFC para salir" : "Iniciar Blank") {
+            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Iniciar Blank") {
                 if sessionStore.isBlankActive {
                     scanTag()
                 } else {
@@ -630,6 +639,7 @@ private struct SettingsSheet: View {
     @Binding var showingSchedule: Bool
     @Binding var showingEmergency: Bool
     @Binding var showingRelink: Bool
+    @Binding var showingForgetConfirm: Bool
     @Environment(\.dismiss) private var dismiss
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -657,8 +667,7 @@ private struct SettingsSheet: View {
                     dismiss()
                 }
                 settingsButton("He olvidado mi Blank", meta: "Reset") {
-                    sessionStore.forgetNfcTag()
-                    screenTimeBlocker.clear()
+                    showingForgetConfirm = true
                     dismiss()
                 }
                 settingsButton("Emergencia", meta: "Salida", role: .destructive) {
@@ -693,35 +702,45 @@ private struct ScheduleSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @State private var enabled = false
-    @State private var startDate = dateForMinute(23 * 60 + 30)
-    @State private var endDate = dateForMinute(8 * 60)
+    @State private var startMinute = 23 * 60 + 30
+    @State private var endMinute = 8 * 60
 
     var body: some View {
         NavigationStack {
-            Form {
+            VStack(alignment: .leading, spacing: 18) {
                 Toggle("Activar horario diario", isOn: $enabled)
-                Section("Inicio") {
-                    DatePicker("Inicio", selection: $startDate, displayedComponents: .hourAndMinute)
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+
+                VStack(spacing: 10) {
+                    TimeMenuRow(title: "Inicio", minute: $startMinute)
+                    TimeMenuRow(title: "Fin", minute: $endMinute)
                 }
-                Section("Fin") {
-                    DatePicker("Fin", selection: $endDate, displayedComponents: .hourAndMinute)
-                        .datePickerStyle(.wheel)
-                        .labelsHidden()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ventana activa")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BlankColors.mutedInk)
+                    Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
+                        .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
+                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+
+                Spacer(minLength: 0)
             }
+            .padding(24)
             .navigationTitle("Horario")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
                         sessionStore.schedule = BlankFocusSchedule(
                             enabled: enabled,
-                            startMinute: minuteOfDay(from: startDate),
-                            endMinute: minuteOfDay(from: endDate)
+                            startMinute: startMinute,
+                            endMinute: endMinute
                         )
                         dismiss()
                     }
@@ -729,10 +748,75 @@ private struct ScheduleSheet: View {
             }
             .onAppear {
                 enabled = sessionStore.schedule.enabled
-                startDate = dateForMinute(sessionStore.schedule.startMinute)
-                endDate = dateForMinute(sessionStore.schedule.endMinute)
+                startMinute = sessionStore.schedule.startMinute
+                endMinute = sessionStore.schedule.endMinute
             }
         }
+    }
+}
+
+private struct TimeMenuRow: View {
+    let title: String
+    @Binding var minute: Int
+
+    private let options = stride(from: 0, through: 23 * 60 + 30, by: 30).map { $0 }
+
+    var body: some View {
+        Menu {
+            ForEach(options, id: \.self) { option in
+                Button(formatMinute(option)) {
+                    minute = option
+                }
+            }
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                Spacer()
+                Text(formatMinute(minute))
+                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
+                    .monospacedDigit()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BlankColors.mutedInk)
+            }
+            .foregroundStyle(BlankColors.ink)
+            .padding(.horizontal, 18)
+            .frame(height: 56)
+            .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+}
+
+private struct ForgetBlankConfirmSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("He olvidado mi Blank")
+                .font(.blankSerif(size: 40, relativeTo: .largeTitle))
+            Text("Esto desactiva Blank, borra la pieza NFC vinculada y vuelve al onboarding para que puedas registrar una nueva.")
+                .foregroundStyle(.secondary)
+            Text("Tus modos y apps seleccionadas se mantienen.")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
+
+            Button("Sí, olvidar mi Blank") {
+                onConfirm()
+                dismiss()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle())
+
+            Button("Cancelar") {
+                dismiss()
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+
+            Spacer()
+        }
+        .padding(24)
     }
 }
 

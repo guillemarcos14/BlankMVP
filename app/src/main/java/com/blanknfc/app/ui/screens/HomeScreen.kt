@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +74,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.blanknfc.app.R
+import com.blanknfc.app.data.FocusActivityDay
 import com.blanknfc.app.data.BlankMode
 import com.blanknfc.app.data.FocusSchedule
 import com.blanknfc.app.data.FocusStats
@@ -86,6 +88,7 @@ import com.blanknfc.app.util.AppInfo
 import com.blanknfc.app.util.BatteryHelper
 import com.blanknfc.app.util.NfcHelper
 import com.blanknfc.app.util.PackageHelper
+import java.util.Calendar
 import kotlin.random.Random
 
 private enum class HomePanel {
@@ -105,6 +108,12 @@ private data class ConfigIssue(
     val body: String,
     val action: String?,
     val onAction: () -> Unit = {}
+)
+
+private data class ProgressPeriodSummary(
+    val label: String,
+    val value: String,
+    val caption: String
 )
 
 private const val BackgroundVideoAlpha = 0.72f
@@ -239,11 +248,10 @@ fun HomeScreen(
         ) { currentPanel ->
         when (currentPanel) {
             HomePanel.HOME -> HomePanelContent(
-                currentMode = currentMode,
                 isBlankActive = isBlankActive,
                 configIssues = configIssues,
-                onModes = { panel = HomePanel.MODES },
                 onSettings = { panel = HomePanel.SETTINGS },
+                onStats = { panel = HomePanel.STATS },
                 onMainAction = {
                     if (currentMode.packages.isEmpty()) {
                         modeBeingEdited = currentMode
@@ -258,10 +266,7 @@ fun HomeScreen(
             HomePanel.SETTINGS -> SettingsPanel(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
-                onBuyNfc = ::openNfcOptions,
-                onStats = {
-                    panel = HomePanel.STATS
-                },
+                onModes = { panel = HomePanel.MODES },
                 onSchedule = {
                     panel = HomePanel.SCHEDULE
                 },
@@ -270,6 +275,9 @@ fun HomeScreen(
                 },
                 onForget = {
                     panel = HomePanel.FORGET
+                },
+                onEmergency = {
+                    panel = HomePanel.EMERGENCY
                 }
             )
 
@@ -296,21 +304,17 @@ fun HomeScreen(
                 onAction = onRelinkTag
             )
 
-            HomePanel.FORGET -> CenterActionPanel(
-                topTitle = "Reset NFC",
-                label = "Confirmación",
-                title = "Olvidar la etiqueta NFC.",
-                body = "Esto desactivará Blank y reiniciará el onboarding. Tus apps protegidas se mantienen.",
-                action = "Confirmar reset",
+            HomePanel.FORGET -> ForgetConfirmPanel(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.SETTINGS },
-                onAction = onForgetTag
+                onConfirm = onForgetTag
             )
 
             HomePanel.STATS -> StatsPanel(
                 stats = stats,
+                emergencyUnlocksRemaining = emergencyUnlocksRemaining,
                 buttonLight = buttonLight,
-                onBack = { panel = HomePanel.SETTINGS }
+                onBack = { panel = HomePanel.HOME }
             )
 
             HomePanel.SCHEDULE -> SchedulePanel(
@@ -331,7 +335,9 @@ fun HomeScreen(
 
             HomePanel.EMERGENCY -> EmergencyPanel(
                 emergencyUnlocksRemaining = emergencyUnlocksRemaining,
-                onBack = { panel = HomePanel.BLOCK },
+                onBack = {
+                    panel = if (isBlankActive) HomePanel.BLOCK else HomePanel.SETTINGS
+                },
                 onUnlock = {
                     if (sessionManager.deactivateForEmergency()) {
                         panel = HomePanel.HOME
@@ -443,22 +449,24 @@ private fun BackgroundLoopVideo(
 private class LoopingVideoTextureView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
     private var mediaPlayer: MediaPlayer? = null
     private var currentVideoResId: Int? = null
+    private var currentSurface: Surface? = null
 
     init {
         surfaceTextureListener = this
     }
 
     fun play(context: Context, videoResId: Int) {
-        if (currentVideoResId == videoResId && mediaPlayer?.isPlaying == true) return
+        if (currentVideoResId == videoResId && mediaPlayer != null) return
         currentVideoResId = videoResId
         if (isAvailable) {
-            startPlayer(context, videoResId, Surface(surfaceTexture))
+            startPlayer(context, videoResId)
         }
     }
 
-    private fun startPlayer(context: Context, videoResId: Int, surface: Surface) {
+    private fun startPlayer(context: Context, videoResId: Int) {
         releasePlayer()
         val assetFileDescriptor = context.resources.openRawResourceFd(videoResId)
+        currentSurface = Surface(surfaceTexture)
         mediaPlayer = MediaPlayer().apply {
             setDataSource(
                 assetFileDescriptor.fileDescriptor,
@@ -468,7 +476,7 @@ private class LoopingVideoTextureView(context: Context) : TextureView(context), 
             assetFileDescriptor.close()
             isLooping = true
             setVolume(0f, 0f)
-            setSurface(surface)
+            setSurface(currentSurface)
             setOnPreparedListener { preparedPlayer -> preparedPlayer.start() }
             prepareAsync()
         }
@@ -477,11 +485,13 @@ private class LoopingVideoTextureView(context: Context) : TextureView(context), 
     private fun releasePlayer() {
         mediaPlayer?.release()
         mediaPlayer = null
+        currentSurface?.release()
+        currentSurface = null
     }
 
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
         currentVideoResId?.let { videoResId ->
-            startPlayer(context, videoResId, Surface(surface))
+            startPlayer(context, videoResId)
         }
     }
 
@@ -497,21 +507,15 @@ private class LoopingVideoTextureView(context: Context) : TextureView(context), 
 
 @Composable
 private fun HomePanelContent(
-    currentMode: BlankMode,
     isBlankActive: Boolean,
     configIssues: List<ConfigIssue>,
-    onModes: () -> Unit,
     onSettings: () -> Unit,
+    onStats: () -> Unit,
     onMainAction: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        TopBar(
-            left = {
-                ModeChipAligned(name = currentMode.name, onClick = onModes)
-            },
-            right = {
-                IconDotsAligned(onClick = onSettings)
-            },
+        IconDotsAligned(
+            onClick = onSettings,
             modifier = Modifier.align(Alignment.TopCenter)
         )
         if (configIssues.isNotEmpty()) {
@@ -550,12 +554,25 @@ private fun HomePanelContent(
             label = "blank_home_action",
             modifier = Modifier.align(Alignment.BottomCenter)
         ) { active ->
-            MainActionButton(
-                text = if (active) "Usa tu NFC para salir" else "Iniciar Blank",
-                enabled = !active,
-                light = !active,
-                onClick = onMainAction
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                MainActionButton(
+                    text = if (active) "Escanear Blank para salir" else "Iniciar Blank",
+                    enabled = !active,
+                    light = !active,
+                    onClick = onMainAction
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TextButton(onClick = onStats) {
+                    Text(
+                        text = "Progreso",
+                        color = if (active) Color.White.copy(alpha = 0.74f) else BlankOnSurface.copy(alpha = 0.72f),
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                }
+            }
         }
     }
 }
@@ -631,9 +648,9 @@ private fun ModeChipAligned(name: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun IconDotsAligned(onClick: () -> Unit) {
+private fun IconDotsAligned(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(44.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
@@ -698,11 +715,11 @@ private fun IconDots(onClick: () -> Unit) {
 private fun SettingsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit,
-    onBuyNfc: () -> Unit,
-    onStats: () -> Unit,
+    onModes: () -> Unit,
     onSchedule: () -> Unit,
     onRelink: () -> Unit,
-    onForget: () -> Unit
+    onForget: () -> Unit,
+    onEmergency: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(title = "Ajustes", onBack = onBack)
@@ -710,11 +727,11 @@ private fun SettingsPanel(
         Text(text = "Ajustes", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Progreso", "Semana", onStats))
+            add(MenuItem("Modo", "Apps", onModes))
             add(MenuItem("Programar mi Blank", "Diario", onSchedule))
-            add(MenuItem("Comprar NFC", "Amazon", onBuyNfc))
             add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
             add(MenuItem("He olvidado mi Blank", "Reset", onForget))
+            add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))
         }
         MenuList(
             buttonLight = buttonLight,
@@ -723,7 +740,12 @@ private fun SettingsPanel(
     }
 }
 
-private data class MenuItem(val label: String, val meta: String, val action: () -> Unit)
+private data class MenuItem(
+    val label: String,
+    val meta: String,
+    val action: () -> Unit,
+    val destructive: Boolean = false
+)
 
 @Composable
 private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
@@ -742,7 +764,8 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = item.label, color = buttonContent, modifier = Modifier.weight(1f))
+                    val labelColor = if (item.destructive) Color(0xFFB3261E) else buttonContent
+                    Text(text = item.label, color = labelColor, modifier = Modifier.weight(1f))
                     Text(text = item.meta, color = metaColor, style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -753,34 +776,50 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
 @Composable
 private fun StatsPanel(
     stats: FocusStats,
+    emergencyUnlocksRemaining: Int,
     buttonLight: Boolean,
     onBack: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Progreso", onBack = onBack)
-        Spacer(modifier = Modifier.height(46.dp))
-        Text(text = "Esta semana", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Sin rachas ni premios. Solo señales útiles de que Blank está haciendo su trabajo.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = BlankOnSurface
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatRow(
-                label = "Sesiones completadas",
-                value = stats.sessionsThisWeek.toString(),
+    var selectedPage by remember { mutableStateOf(0) }
+    val savedMs = estimatedSavedMs(stats)
+    val insight = progressInsight(stats, savedMs)
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            ScreenHeader(title = "Progreso", onBack = onBack)
+            Spacer(modifier = Modifier.height(38.dp))
+            Text(text = "Tu progreso", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tiempo protegido por periodo, sin ruido.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = BlankOnSurface.copy(alpha = 0.72f)
+            )
+        }
+        item {
+            ProgressHeroCarousel(
+                selectedPage = selectedPage,
+                onPageChange = { selectedPage = it },
+                stats = stats,
+                savedMs = savedMs,
                 buttonLight = buttonLight
             )
-            StatRow(
-                label = "Tiempo protegido",
-                value = formatProtectedTime(stats.protectedMsThisWeek),
-                buttonLight = buttonLight
+        }
+        item {
+            Text(
+                text = insight,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = BlankOnSurface.copy(alpha = 0.74f),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
-            StatRow(
-                label = "Intentos bloqueados",
-                value = stats.blockedAttemptsThisWeek.toString(),
+        }
+        item {
+            ProgressPeriodGrid(
+                stats = stats,
                 buttonLight = buttonLight
             )
         }
@@ -788,7 +827,247 @@ private fun StatsPanel(
 }
 
 @Composable
-private fun StatRow(label: String, value: String, buttonLight: Boolean) {
+private fun ProgressHeroCarousel(
+    selectedPage: Int,
+    onPageChange: (Int) -> Unit,
+    stats: FocusStats,
+    savedMs: Long,
+    buttonLight: Boolean
+) {
+    val values = if (selectedPage == 0) {
+        savedChartValues(stats)
+    } else {
+        focusChartValues(stats.activityDays, stats.protectedMsThisWeek)
+    }
+    val label = if (selectedPage == 0) "Tiempo ahorrado" else "Tiempo en Blank"
+    val value = if (selectedPage == 0) formatProtectedTime(savedMs) else formatProtectedTime(stats.protectedMsThisWeek)
+    val description = if (selectedPage == 0) "Recuperadas de tu vida gracias a Blank" else "Protegidas esta semana"
+    val chartTitle = if (selectedPage == 0) "Ahorro estimado" else "Modo Blank"
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(26.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProgressTab("Tiempo ahorrado", selectedPage == 0, buttonLight) { onPageChange(0) }
+                ProgressTab("Tiempo en Blank", selectedPage == 1, buttonLight) { onPageChange(1) }
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
+                color = progressTextColor(buttonLight).copy(alpha = 0.64f)
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
+                color = progressTextColor(buttonLight)
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = progressTextColor(buttonLight).copy(alpha = 0.68f)
+            )
+            ProgressLineChart(
+                title = chartTitle,
+                values = values,
+                buttonLight = buttonLight,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                ProgressDot(active = selectedPage == 0, buttonLight = buttonLight)
+                Spacer(modifier = Modifier.size(7.dp))
+                ProgressDot(active = selectedPage == 1, buttonLight = buttonLight)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressTab(text: String, selected: Boolean, buttonLight: Boolean, onClick: () -> Unit) {
+    Surface(
+        color = if (selected) progressTextColor(buttonLight) else progressTextColor(buttonLight).copy(alpha = 0.08f),
+        contentColor = if (selected) {
+            if (buttonLight) Color.White else Color.Black
+        } else {
+            progressTextColor(buttonLight).copy(alpha = 0.72f)
+        },
+        shape = RoundedCornerShape(999.dp),
+        onClick = onClick
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ProgressDot(active: Boolean, buttonLight: Boolean) {
+    val color = progressTextColor(buttonLight)
+    Canvas(modifier = Modifier.size(width = if (active) 18.dp else 6.dp, height = 6.dp)) {
+        drawRoundRect(
+            color = color.copy(alpha = if (active) 0.8f else 0.2f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f, size.height / 2f)
+        )
+    }
+}
+
+@Composable
+private fun ProgressLineChart(title: String, values: List<Long>, buttonLight: Boolean, modifier: Modifier = Modifier) {
+    val textColor = progressTextColor(buttonLight)
+    val scale = roundedChartScale(values.maxOrNull() ?: 0L)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = title, style = MaterialTheme.typography.bodySmall, color = textColor.copy(alpha = 0.58f), modifier = Modifier.weight(1f))
+            Text(text = formatProtectedTime(scale), style = MaterialTheme.typography.bodySmall, color = textColor.copy(alpha = 0.46f))
+        }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val left = 2.dp.toPx()
+            val right = size.width - 2.dp.toPx()
+            val top = 10.dp.toPx()
+            val bottom = size.height - 10.dp.toPx()
+            val maxValue = scale.coerceAtLeast(1L).toFloat()
+            val points = values.ifEmpty { listOf(0L) }
+            for (i in 0..2) {
+                val y = top + ((bottom - top) * i / 2f)
+                drawLine(
+                    color = textColor.copy(alpha = 0.08f),
+                    start = Offset(left, y),
+                    end = Offset(right, y),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+            if (points.size == 1) {
+                val y = bottom - ((points.first().toFloat() / maxValue) * (bottom - top))
+                drawCircle(color = textColor.copy(alpha = 0.84f), radius = 3.dp.toPx(), center = Offset(left, y))
+            } else {
+                val step = (right - left) / (points.size - 1).coerceAtLeast(1)
+                val offsets = points.mapIndexed { index, value ->
+                    val x = left + step * index
+                    val y = bottom - ((value.toFloat() / maxValue) * (bottom - top))
+                    Offset(x, y)
+                }
+                offsets.zipWithNext().forEach { (start, end) ->
+                    drawLine(
+                        color = textColor.copy(alpha = 0.84f),
+                        start = start,
+                        end = end,
+                        strokeWidth = 2.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+                offsets.forEach { point ->
+                    drawCircle(color = textColor.copy(alpha = 0.9f), radius = 2.5.dp.toPx(), center = point)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressPeriodGrid(
+    stats: FocusStats,
+    buttonLight: Boolean
+) {
+    val summaries = progressPeriodSummaries(stats)
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        summaries.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                row.forEach { summary ->
+                    PeriodCard(
+                        summary = summary,
+                        buttonLight = buttonLight,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (row.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PeriodCard(
+    summary: ProgressPeriodSummary,
+    buttonLight: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = if (buttonLight) Color.Black else Color.White
+    Surface(
+        modifier = modifier,
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Text(text = summary.label, color = textColor.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = summary.value, color = textColor, style = MaterialTheme.typography.titleLarge)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(text = summary.caption, color = textColor.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun ProgressInsightCards(
+    stats: FocusStats,
+    emergencyUnlocksRemaining: Int,
+    buttonLight: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatRow(
+            label = "Momento de riesgo",
+            value = riskMomentValue(stats),
+            caption = riskMomentCaption(stats),
+            buttonLight = buttonLight
+        )
+        StatRow(
+            label = "Calidad de protección",
+            value = "${protectionQualityScore(stats, emergencyUnlocksRemaining)}/100",
+            caption = protectionQualityCaption(stats, emergencyUnlocksRemaining),
+            buttonLight = buttonLight
+        )
+        StatRow(
+            label = "Control recuperado",
+            value = controlRecoveryValue(stats, emergencyUnlocksRemaining),
+            caption = controlRecoveryCaption(stats, emergencyUnlocksRemaining),
+            buttonLight = buttonLight
+        )
+    }
+}
+
+@Composable
+private fun ProgressMetricList(
+    stats: FocusStats,
+    emergencyUnlocksRemaining: Int,
+    buttonLight: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatRow("Sesiones", stats.sessionsThisWeek.toString(), "Completadas", buttonLight)
+        StatRow("Media protegida", formatProtectedTime(averageSessionMs(stats)), "Por sesión real", buttonLight)
+        StatRow("Racha", "${currentStreakDays(stats.activityDays)}d", "Días con Blank", buttonLight)
+        StatRow("Mejor día", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), buttonLight)
+        StatRow("Impulsos frenados", stats.blockedAttemptsThisWeek.toString(), "Veces que Blank creó una pausa", buttonLight)
+        StatRow("Emergencias", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), buttonLight)
+    }
+}
+
+@Composable
+private fun StatRow(label: String, value: String, caption: String, buttonLight: Boolean) {
     val rowColor = if (buttonLight) Color.White else Color.Black
     val textColor = if (buttonLight) Color.Black else Color.White
     val metaColor = textColor.copy(alpha = 0.64f)
@@ -801,7 +1080,10 @@ private fun StatRow(label: String, value: String, buttonLight: Boolean) {
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = label, color = metaColor, modifier = Modifier.weight(1f))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = label, color = textColor, style = MaterialTheme.typography.bodyLarge)
+                Text(text = caption, color = metaColor, style = MaterialTheme.typography.bodySmall)
+            }
             Text(text = value, color = textColor, style = MaterialTheme.typography.titleLarge)
         }
     }
@@ -815,11 +1097,8 @@ private fun SchedulePanel(
     onSave: (FocusSchedule) -> Unit
 ) {
     var enabled by remember(schedule) { mutableStateOf(schedule.enabled) }
-    var startTime by remember(schedule) { mutableStateOf(formatMinute(schedule.startMinute)) }
-    var endTime by remember(schedule) { mutableStateOf(formatMinute(schedule.endMinute)) }
-    val parsedStart = parseMinute(startTime)
-    val parsedEnd = parseMinute(endTime)
-    val canSave = parsedStart != null && parsedEnd != null
+    var startMinute by remember(schedule) { mutableStateOf(schedule.startMinute) }
+    var endMinute by remember(schedule) { mutableStateOf(schedule.endMinute) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(title = "Programar mi Blank", onBack = onBack)
@@ -839,20 +1118,39 @@ private fun SchedulePanel(
             onCheckedChange = { enabled = it }
         )
         Spacer(modifier = Modifier.height(10.dp))
-        TimeField(label = "Inicio", value = startTime, onValueChange = { startTime = it })
+        TimeDropdown(label = "Inicio", minute = startMinute, buttonLight = buttonLight, onMinuteChange = { startMinute = it })
         Spacer(modifier = Modifier.height(10.dp))
-        TimeField(label = "Fin", value = endTime, onValueChange = { endTime = it })
+        TimeDropdown(label = "Fin", minute = endMinute, buttonLight = buttonLight, onMinuteChange = { endMinute = it })
+        Spacer(modifier = Modifier.height(16.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black,
+            shape = RoundedCornerShape(22.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+                Text(
+                    text = "Ventana activa",
+                    color = progressTextColor(buttonLight).copy(alpha = 0.62f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "${formatMinute(startMinute)} - ${formatMinute(endMinute)}",
+                    color = progressTextColor(buttonLight),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
+        }
         Spacer(modifier = Modifier.weight(1f))
         MainActionButton(
             text = "Guardar horario",
-            enabled = canSave,
             light = buttonLight,
             onClick = {
                 onSave(
                     FocusSchedule(
                         enabled = enabled,
-                        startMinute = parsedStart ?: schedule.startMinute,
-                        endMinute = parsedEnd ?: schedule.endMinute
+                        startMinute = startMinute,
+                        endMinute = endMinute
                     )
                 )
             }
@@ -885,15 +1183,44 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun TimeField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        placeholder = { Text("23:30") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
-    )
+private fun TimeDropdown(
+    label: String,
+    minute: Int,
+    buttonLight: Boolean,
+    onMinuteChange: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = if (buttonLight) Color.Black else Color.White
+    Box {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true },
+            color = rowColor,
+            shape = RoundedCornerShape(22.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = label, color = textColor, modifier = Modifier.weight(1f))
+                Text(text = formatMinute(minute), color = textColor, style = MaterialTheme.typography.titleMedium)
+                Text(text = "⌄", color = textColor.copy(alpha = 0.62f), modifier = Modifier.padding(start = 8.dp))
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            timeOptions().forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(formatMinute(option)) },
+                    onClick = {
+                        onMinuteChange(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1184,6 +1511,60 @@ private fun CenterActionPanel(
 }
 
 @Composable
+private fun ForgetConfirmPanel(
+    buttonLight: Boolean,
+    onBack: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    var confirmed by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScreenHeader(title = "Reset NFC", onBack = onBack)
+        Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "Confirmación", color = BlankOnSurface, style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Olvidar mi Blank.",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = BlankOnSurface,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Se desactivará Blank, se borrará la etiqueta NFC vinculada y volverás al onboarding para registrar una nueva.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = BlankOnSurface,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+                Surface(color = if (buttonLight) Color.White else Color.Black, shape = RoundedCornerShape(22.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { confirmed = !confirmed }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                        Text(
+                            text = "Entiendo que tendré que vincular un Blank de nuevo.",
+                            color = progressTextColor(buttonLight),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+        MainActionButton(
+            text = "Sí, olvidar mi Blank",
+            enabled = confirmed,
+            light = buttonLight,
+            onClick = onConfirm
+        )
+    }
+}
+
+@Composable
 private fun BlockPanel(onEmergency: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
@@ -1333,10 +1714,274 @@ private fun formatProtectedTime(ms: Long): String {
     }
 }
 
+private fun estimatedSavedMs(stats: FocusStats): Long {
+    val estimated = stats.sessionsThisWeek * 15L * 60L * 1000L
+    return estimated.coerceAtMost(stats.protectedMsThisWeek).coerceAtLeast(0L)
+}
+
+private fun savedTimeExplanation(stats: FocusStats): String {
+    val saved = formatProtectedTime(estimatedSavedMs(stats))
+    val protected = formatProtectedTime(stats.protectedMsThisWeek)
+    return "Tiempo ahorrado: $saved estimados desde sesiones completadas, limitado a $protected reales en Blank."
+}
+
+private fun averageSessionMs(stats: FocusStats): Long {
+    if (stats.sessionsThisWeek <= 0) return 0L
+    return stats.protectedMsThisWeek / stats.sessionsThisWeek
+}
+
+private fun focusChartValues(days: List<FocusActivityDay>, fallbackWeekMs: Long): List<Long> {
+    val values = days.sortedBy { it.key }.takeLast(28).map { it.protectedMs }
+    return values.ifEmpty { listOf(fallbackWeekMs) }
+}
+
+private fun savedChartValues(stats: FocusStats): List<Long> {
+    val values = stats.activityDays.sortedBy { it.key }.takeLast(28).map { day ->
+        (day.sessions * 15L * 60L * 1000L).coerceAtMost(day.protectedMs)
+    }
+    return values.ifEmpty { listOf(estimatedSavedMs(stats)) }
+}
+
+private fun progressPeriodSummaries(stats: FocusStats): List<ProgressPeriodSummary> {
+    val calendar = Calendar.getInstance().apply {
+        firstDayOfWeek = Calendar.MONDAY
+        minimalDaysInFirstWeek = 4
+    }
+    val todayOrdinal = calendar.get(Calendar.YEAR) * 400 + calendar.get(Calendar.DAY_OF_YEAR)
+    val weekStartOrdinal = startOrdinal(calendar, Calendar.DAY_OF_WEEK)
+    val monthStartOrdinal = startOrdinal(calendar, Calendar.DAY_OF_MONTH)
+    val yearStartOrdinal = calendar.get(Calendar.YEAR) * 400 + 1
+
+    fun daysSince(startOrdinal: Int): List<FocusActivityDay> {
+        return stats.activityDays.filter { day ->
+            val ordinal = dayOrdinal(day.key) ?: return@filter false
+            ordinal in startOrdinal..todayOrdinal
+        }
+    }
+
+    return listOf(
+        periodSummary("Hoy", daysSince(todayOrdinal)),
+        ProgressPeriodSummary(
+            label = "Semana",
+            value = formatProtectedTime(stats.protectedMsThisWeek),
+            caption = if (stats.sessionsThisWeek == 1) "1 sesión" else "${stats.sessionsThisWeek} sesiones"
+        ),
+        periodSummary("Mes", daysSince(monthStartOrdinal)),
+        periodSummary("Año", daysSince(yearStartOrdinal))
+    )
+}
+
+private fun periodSummary(label: String, days: List<FocusActivityDay>): ProgressPeriodSummary {
+    val protectedMs = days.sumOf { it.protectedMs }
+    val sessions = days.sumOf { it.sessions }
+    return ProgressPeriodSummary(
+        label = label,
+        value = formatProtectedTime(protectedMs),
+        caption = if (sessions == 1) "1 sesión" else "$sessions sesiones"
+    )
+}
+
+private fun startOrdinal(calendar: Calendar, field: Int): Int {
+    val copy = calendar.clone() as Calendar
+    if (field == Calendar.DAY_OF_WEEK) {
+        while (copy.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+            copy.add(Calendar.DAY_OF_YEAR, -1)
+        }
+    } else {
+        copy.set(field, 1)
+    }
+    return copy.get(Calendar.YEAR) * 400 + copy.get(Calendar.DAY_OF_YEAR)
+}
+
+private fun roundedChartScale(valuesMax: Long): Long {
+    val minutes = ((valuesMax / 60000L) + 1L).coerceAtLeast(15L)
+    val roundedMinutes = when {
+        minutes <= 30L -> 30L
+        minutes <= 60L -> 60L
+        minutes <= 120L -> 120L
+        else -> ((minutes + 59L) / 60L) * 60L
+    }
+    return roundedMinutes * 60000L
+}
+
+private fun currentStreakDays(days: List<FocusActivityDay>): Int {
+    val activeDays = days
+        .filter { it.sessions > 0 || it.protectedMs > 0L }
+        .sortedByDescending { it.key }
+    var expected: Int? = null
+    var streak = 0
+    activeDays.forEach { day ->
+        val ordinal = dayOrdinal(day.key) ?: return@forEach
+        if (expected == null || ordinal == expected) {
+            streak += 1
+            expected = ordinal - 1
+        } else {
+            return streak
+        }
+    }
+    return streak
+}
+
+private fun dayOrdinal(key: String): Int? {
+    val parts = key.split("-")
+    if (parts.size != 2) return null
+    val year = parts[0].toIntOrNull() ?: return null
+    val day = parts[1].toIntOrNull() ?: return null
+    return year * 400 + day
+}
+
+private fun bestDay(days: List<FocusActivityDay>): FocusActivityDay? {
+    val best = days.maxByOrNull { it.protectedMs + (it.sessions * 60000L) }
+    return if (best == null || (best.protectedMs <= 0L && best.sessions <= 0)) null else best
+}
+
+private fun bestDayValue(days: List<FocusActivityDay>): String {
+    return bestDay(days)?.let { dayName(it.dayOfWeek) } ?: "Sin datos"
+}
+
+private fun bestDayCaption(days: List<FocusActivityDay>): String {
+    val day = bestDay(days) ?: return "Esta semana"
+    val details = mutableListOf<String>()
+    if (day.protectedMs > 0L) details += formatProtectedTime(day.protectedMs)
+    if (day.blockedAttempts == 0) {
+        details += "Sin impulsos"
+    } else {
+        details += "${day.blockedAttempts} impulsos frenados"
+    }
+    return details.joinToString(" · ")
+}
+
+private fun dayName(dayOfWeek: Int): String {
+    return when (dayOfWeek) {
+        Calendar.MONDAY -> "Lunes"
+        Calendar.TUESDAY -> "Martes"
+        Calendar.WEDNESDAY -> "Miércoles"
+        Calendar.THURSDAY -> "Jueves"
+        Calendar.FRIDAY -> "Viernes"
+        Calendar.SATURDAY -> "Sábado"
+        Calendar.SUNDAY -> "Domingo"
+        else -> "Sin datos"
+    }
+}
+
+private fun riskMomentValue(stats: FocusStats): String {
+    val riskyDay = riskiestDay(stats.activityDays)
+    return riskyDay?.let { dayName(it.dayOfWeek) } ?: "Sin patrón"
+}
+
+private fun riskMomentCaption(stats: FocusStats): String {
+    val riskyDay = riskiestDay(stats.activityDays)
+        ?: return "Con más datos aparecerá tu franja vulnerable"
+    if (riskyDay.blockedAttempts > 0) {
+        return "${riskyDay.blockedAttempts} impulsos frenados ese día"
+    }
+    if (riskyDay.sessions > 0) {
+        return "Día donde más recurres a Blank"
+    }
+    return "Sin señales de riesgo todavía"
+}
+
+private fun riskiestDay(days: List<FocusActivityDay>): FocusActivityDay? {
+    return days
+        .filter { it.blockedAttempts > 0 || it.sessions > 0 || it.protectedMs > 0L }
+        .maxWithOrNull(
+            compareBy<FocusActivityDay> { it.blockedAttempts }
+                .thenBy { it.sessions }
+                .thenBy { it.protectedMs }
+        )
+}
+
+private fun protectionQualityScore(stats: FocusStats, emergencyUnlocksRemaining: Int): Int {
+    if (stats.sessionsThisWeek <= 0 && stats.protectedMsThisWeek <= 0L) return 0
+    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
+    val attemptsPerSession = if (stats.sessionsThisWeek > 0) {
+        stats.blockedAttemptsThisWeek.toFloat() / stats.sessionsThisWeek
+    } else {
+        stats.blockedAttemptsThisWeek.toFloat()
+    }
+    val averageMinutes = averageSessionMs(stats) / 60000L
+    val durationBonus = when {
+        averageMinutes >= 60L -> 12
+        averageMinutes >= 30L -> 8
+        averageMinutes >= 15L -> 4
+        else -> 0
+    }
+    val attemptPenalty = (attemptsPerSession * 10f).toInt().coerceAtMost(35)
+    val emergencyPenalty = usedEmergencies * 12
+    val streakBonus = currentStreakDays(stats.activityDays).coerceAtMost(5) * 3
+    return (76 + durationBonus + streakBonus - attemptPenalty - emergencyPenalty).coerceIn(0, 100)
+}
+
+private fun protectionQualityCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
+    if (stats.sessionsThisWeek <= 0) return "Completa una sesión para medirlo"
+    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
+    return when {
+        usedEmergencies == 0 && stats.blockedAttemptsThisWeek == 0 -> "Sesiones limpias, sin escapes ni impulsos"
+        usedEmergencies == 0 -> "Hubo impulsos, pero no rompiste Blank"
+        usedEmergencies < 3 -> "Mejorará al reducir emergencias"
+        else -> "Semana frágil: ya usaste todas las emergencias"
+    }
+}
+
+private fun controlRecoveryValue(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
+    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
+    return when {
+        stats.blockedAttemptsThisWeek > 0 -> "${stats.blockedAttemptsThisWeek} pausas"
+        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Estable"
+        usedEmergencies < 3 -> "${3 - usedEmergencies} reservas"
+        else -> "Límite"
+    }
+}
+
+private fun controlRecoveryCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
+    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
+    return when {
+        stats.blockedAttemptsThisWeek > 0 && usedEmergencies == 0 -> "Impulsos frenados sin usar emergencias"
+        stats.blockedAttemptsThisWeek > 0 -> "Blank hizo visible el impulso antes de actuar"
+        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Todavía no necesitaste rescates esta semana"
+        usedEmergencies < 3 -> "Emergencias restantes esta semana"
+        else -> "Toca volver a depender del NFC"
+    }
+}
+
+private fun usedEmergencyUnlocks(emergencyUnlocksRemaining: Int): Int {
+    return (3 - emergencyUnlocksRemaining).coerceIn(0, 3)
+}
+
+private fun emergencyCaption(emergencyUnlocksRemaining: Int): String {
+    val used = usedEmergencyUnlocks(emergencyUnlocksRemaining)
+    return when {
+        used == 0 -> "Sin rescates esta semana"
+        emergencyUnlocksRemaining > 0 -> "$emergencyUnlocksRemaining disponibles todavía"
+        else -> "Límite semanal alcanzado"
+    }
+}
+
+private fun progressInsight(stats: FocusStats, savedMs: Long): String {
+    return when {
+        stats.sessionsThisWeek == 0 -> "Cuando completes tu primera sesión, Blank empezará a construir tu progreso semanal."
+        protectionQualityScore(stats, 3) >= 90 -> "Tus sesiones están saliendo limpias: poco impulso y mucho tiempo protegido."
+        stats.blockedAttemptsThisWeek >= 5 -> "Tu patrón ya es visible: Blank está interceptando varios impulsos antes de que manden ellos."
+        savedMs >= 60L * 60L * 1000L -> "Ya has recuperado más de una hora de atención esta semana."
+        stats.sessionsThisWeek >= 3 -> "La repetición empieza a contar: ya tienes varias sesiones completadas esta semana."
+        stats.blockedAttemptsThisWeek > 0 -> "Blank ya ha interceptado impulsos automáticos. Esa fricción es el producto."
+        else -> "Una sesión completada ya es una interrupción menos del piloto automático."
+    }
+}
+
+@Composable
+private fun progressTextColor(buttonLight: Boolean): Color {
+    return if (buttonLight) Color.Black else Color.White
+}
+
 private fun formatMinute(minuteOfDay: Int): String {
     val hour = (minuteOfDay / 60).coerceIn(0, 23)
     val minute = (minuteOfDay % 60).coerceIn(0, 59)
     return hour.toString().padStart(2, '0') + ":" + minute.toString().padStart(2, '0')
+}
+
+private fun timeOptions(): List<Int> {
+    return (0..47).map { it * 30 }
 }
 
 private fun parseMinute(value: String): Int? {

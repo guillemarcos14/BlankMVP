@@ -180,6 +180,7 @@ fun SetupScreen(
                                 stepText = "Paso 1 de 3",
                                 title = "Elige qu\u00E9 quieres dejar fuera.",
                                 description = "Selecciona las apps que suelen romper tu foco. Blank solo necesita saber cu\u00E1les proteger.",
+                                statusText = if (selectedAppCount > 0) "Apps listas" else null,
                                 primaryText = stringResource(R.string.setup_select_apps),
                                 secondaryText = if (selectedAppCount > 0) stringResource(R.string.setup_continue) else null,
                                 onPrimary = onSelectApps,
@@ -195,6 +196,7 @@ fun SetupScreen(
                                     stepText = "Paso 2 de 3",
                                     title = "Vincula tu pieza f\u00EDsica.",
                                     description = nfcDescription,
+                                    statusText = if (nfcTagUid != null) "NFC listo" else null,
                                     primaryText = when {
                                         !nfcAvailable -> stringResource(R.string.setup_retry)
                                         !nfcEnabled -> stringResource(R.string.setup_open_nfc)
@@ -315,6 +317,7 @@ private fun MainSetupStep(
     stepText: String? = null,
     title: String,
     description: String,
+    statusText: String? = null,
     primaryText: String,
     primaryEnabled: Boolean = true,
     secondaryText: String? = null,
@@ -345,6 +348,10 @@ private fun MainSetupStep(
             textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(max = 330.dp)
         )
+        if (statusText != null) {
+            Spacer(modifier = Modifier.height(18.dp))
+            StatusPill(text = statusText)
+        }
         Spacer(modifier = Modifier.height(28.dp))
         PrimaryButton(text = primaryText, enabled = primaryEnabled, onClick = onPrimary)
         if (secondaryText != null && onSecondary != null) {
@@ -401,9 +408,13 @@ private fun PermissionsStep(
             checked = batteryOptimizedIgnored,
             onClick = onOpenBattery
         )
+        if (accessibilityEnabled) {
+            Spacer(modifier = Modifier.height(18.dp))
+            StatusPill(text = stringResource(R.string.setup_permissions_ready))
+        }
         Spacer(modifier = Modifier.height(18.dp))
         PrimaryButton(
-            text = if (accessibilityEnabled) "Entrar en Blank" else stringResource(R.string.setup_open_accessibility),
+            text = if (accessibilityEnabled) stringResource(R.string.setup_continue) else stringResource(R.string.setup_open_accessibility),
             onClick = if (accessibilityEnabled) onRetry else onOpenAccessibility
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -430,11 +441,31 @@ private fun SetupCompleteStep(onFinish: () -> Unit) {
             textAlign = TextAlign.Center,
             modifier = Modifier.widthIn(max = 330.dp)
         )
+        Spacer(modifier = Modifier.height(18.dp))
+        StatusPill(text = stringResource(R.string.setup_complete_status))
         Spacer(modifier = Modifier.height(28.dp))
         PrimaryButton(
-            text = stringResource(R.string.setup_enter_blank),
+            text = stringResource(R.string.setup_first_blank),
             onClick = onFinish
         )
+    }
+}
+
+@Composable
+private fun StatusPill(text: String) {
+    Surface(
+        color = Color.White.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(999.dp),
+        modifier = Modifier.height(42.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "✓", style = MaterialTheme.typography.labelLarge, color = BlankOnSurface)
+            Text(text = text, style = MaterialTheme.typography.labelLarge, color = BlankOnSurface)
+        }
     }
 }
 

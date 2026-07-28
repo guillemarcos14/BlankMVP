@@ -12,6 +12,10 @@
 	<string>Blank</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>es</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>Blank</string>
 	<key>CFBundlePackageType</key>
@@ -23,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
-	<string>Blank uses NFC to pair and scan your physical Blank tag.</string>
+	<string>Blank usa NFC para vincular y escanear tu etiqueta fisica Blank.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

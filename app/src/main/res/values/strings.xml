@@ -26,7 +26,10 @@
     <string name="setup_accessibility_error_desc">Accesibilidad es necesaria para saber cuándo abres una app protegida. Abre Ajustes, activa Blank y vuelve para reintentar.</string>
     <string name="setup_battery_error_desc">La optimización de batería puede cortar el bloqueo en segundo plano. Abre Ajustes, permite que Blank siga funcionando y reintenta.</string>
     <string name="setup_complete_title">¡Todo listo!</string>
-    <string name="setup_complete_desc">Blank ya est&#225; preparado. Para empezar una sesi&#243;n pulsa Iniciar Blank. Para salir, acerca tu etiqueta NFC.</string>
+    <string name="setup_complete_desc">Blank ya est&#225; preparado. Ahora puedes hacer tu primer bloqueo.</string>
+    <string name="setup_permissions_ready">Permisos listos</string>
+    <string name="setup_complete_status">Configuraci&#243;n lista</string>
+    <string name="setup_first_blank">Hacer mi primer Blank</string>
     <string name="setup_required">Obligatorio</string>
     <string name="setup_recommended">Recomendado</string>
     <string name="setup_enter_blank">Entrar en Blank</string>

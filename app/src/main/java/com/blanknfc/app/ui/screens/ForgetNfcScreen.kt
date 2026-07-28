@@ -2,6 +2,7 @@ package com.blanknfc.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,6 +25,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +47,8 @@ fun ForgetNfcScreen(
     onConfirm: () -> Unit,
     onBack: () -> Unit
 ) {
+    var confirmed by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -75,14 +84,24 @@ fun ForgetNfcScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Esto borrará la etiqueta NFC vinculada, desactivará Blank y reiniciará el onboarding. Tus apps bloqueadas se mantienen hasta que las cambies.",
+                        text = "Esto borrará la etiqueta NFC vinculada, desactivará Blank y reiniciará el onboarding. Tus apps protegidas se mantienen.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = BlankGray,
                         textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(18.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
+                        Text(
+                            text = "Entiendo que tendré que vincular un Blank de nuevo.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = BlankOnSurface
+                        )
+                    }
                     Spacer(modifier = Modifier.height(26.dp))
                     Button(
                         onClick = onConfirm,
+                        enabled = confirmed,
                         shape = RoundedCornerShape(999.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = BlankOnSurface, contentColor = BlankSurface),
                         modifier = Modifier.fillMaxWidth().height(56.dp)

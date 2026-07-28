@@ -24,6 +24,7 @@ struct SetupView: View {
                         eyebrow: "Paso 1 de 3",
                         title: "Permite que Blank bloquee.",
                         body: screenTimeDescription,
+                        statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time listo" : nil,
                         primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continuar" : "Autorizar Screen Time",
                         secondaryTitle: nil,
                         primaryAction: authorizeScreenTime
@@ -31,23 +32,25 @@ struct SetupView: View {
                 case 1:
                     stepContent(
                         eyebrow: "Paso 2 de 3",
-                        title: "Elige que quieres dejar fuera.",
+                        title: "Elige qué quieres dejar fuera.",
                         body: sessionStore.hasSelectedApps
                             ? "\(sessionStore.selectionCount) selecciones protegidas en \(sessionStore.currentMode.name)."
-                            : "Selecciona apps, categorias o dominios. En iOS Apple entrega tokens privados, no nombres de paquetes.",
+                            : "Selecciona apps, categorías o dominios. En iOS Apple entrega tokens privados, no nombres de paquetes.",
+                        statusText: sessionStore.hasSelectedApps ? "Apps listas" : nil,
                         primaryTitle: sessionStore.hasSelectedApps ? "Continuar" : "Seleccionar apps",
-                        secondaryTitle: sessionStore.hasSelectedApps ? "Editar seleccion" : nil,
+                        secondaryTitle: sessionStore.hasSelectedApps ? "Editar selección" : nil,
                         primaryAction: selectAppsOrContinue,
                         secondaryAction: { showingPicker = true }
                     )
                 case 2:
                     stepContent(
                         eyebrow: "Paso 3 de 3",
-                        title: "Vincula tu pieza fisica.",
+                        title: "Vincula tu pieza física.",
                         body: sessionStore.nfcTagUid == nil
-                            ? "Escanea el NFC que activara y desactivara Blank en este iPhone."
-                            : "NFC registrado. Blank ya puede usar tu pieza fisica.",
-                        primaryTitle: sessionStore.nfcTagUid == nil ? "Escanear NFC" : "Entrar en Blank",
+                            ? "Escanea el NFC que activará y desactivará Blank en este iPhone."
+                            : "NFC registrado. Blank ya puede usar tu pieza física.",
+                        statusText: sessionStore.nfcTagUid == nil ? nil : "NFC listo",
+                        primaryTitle: sessionStore.nfcTagUid == nil ? "Escanear mi Blank" : "Hacer mi primer Blank",
                         secondaryTitle: nil,
                         primaryAction: scanOrFinish
                     )
@@ -58,7 +61,7 @@ struct SetupView: View {
 
             if let message {
                 Text(message)
-                    .font(.footnote)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
                     .foregroundStyle(BlankColors.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(.top, 18)
@@ -100,7 +103,7 @@ struct SetupView: View {
     private var header: some View {
         HStack {
             Text("Blank")
-                .font(.headline)
+                .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
             Spacer()
             HStack(spacing: 7) {
                 ForEach(0..<3, id: \.self) { index in
@@ -114,9 +117,9 @@ struct SetupView: View {
 
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
-            return "Screen Time esta autorizado. Blank usara FamilyControls y ManagedSettings, el equivalente permitido por Apple."
+            return "Screen Time está autorizado. Blank ya puede proteger las apps que elijas."
         }
-        return "Blank necesita acceso a Screen Time para proteger las apps que elijas. Esto sustituye al servicio de Accesibilidad de Android."
+        return "Blank necesita acceso a Screen Time para proteger las apps que elijas."
     }
 
     private var stepIndicator: some View {
@@ -133,6 +136,7 @@ struct SetupView: View {
         eyebrow: String,
         title: String,
         body: String,
+        statusText: String? = nil,
         primaryTitle: String,
         secondaryTitle: String?,
         primaryAction: @escaping () -> Void,
@@ -140,18 +144,22 @@ struct SetupView: View {
     ) -> some View {
         VStack(spacing: 14) {
             Text(eyebrow)
-                .font(.subheadline.weight(.semibold))
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(BlankColors.mutedInk)
             Text(title)
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
             Text(body)
-                .font(.body)
+                .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(BlankColors.mutedInk)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 340)
                 .padding(.top, 2)
+            if let statusText {
+                StatusPill(text: statusText)
+                    .padding(.top, 10)
+            }
             Button(primaryTitle, action: primaryAction)
                 .buttonStyle(BlankPrimaryButtonStyle())
                 .padding(.top, 14)
@@ -161,6 +169,21 @@ struct SetupView: View {
                     .buttonStyle(BlankSecondaryButtonStyle())
             }
         }
+    }
+
+    private func StatusPill(text: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark")
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+            Text(text)
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+        }
+        .foregroundStyle(BlankColors.ink)
+        .padding(.horizontal, 16)
+        .frame(height: 42)
+        .background(BlankColors.warmSurface)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(BlankColors.line, lineWidth: 1))
     }
 
     private func authorizeScreenTime() {

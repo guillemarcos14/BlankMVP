@@ -42,6 +42,7 @@ struct ReportView: View {
                             progress: progress,
                             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
+                        periodSummaryCards(sessions: sessionStore.sessions)
 
                         metricList(
                             weekly: weekly,
@@ -105,7 +106,7 @@ struct ReportView: View {
                 .tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 414)
+            .frame(height: 382)
 
             HStack(spacing: 7) {
                 ForEach(0..<2, id: \.self) { page in
@@ -239,6 +240,32 @@ struct ReportView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 4)
         .liquidGlass(cornerRadius: 22)
+    }
+
+    private func periodSummaryCards(sessions: [BlankSession]) -> some View {
+        let summaries = progressPeriodSummaries(sessions: sessions)
+        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            ForEach(summaries) { summary in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(summary.title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                    Text(summary.value)
+                        .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Text(summary.caption)
+                        .font(.caption2)
+                        .foregroundStyle(reportSecondary.opacity(0.82))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .liquidGlass(cornerRadius: 18)
+            }
+        }
     }
 
     private func metricList(
@@ -498,6 +525,44 @@ struct ReportView: View {
         let duration = formatDuration(report.dailyDurations[bestIndex])
         let sessions = report.dailySessionCounts[bestIndex]
         return "\(duration) · \(sessions) sesiones"
+    }
+
+    private func progressPeriodSummaries(sessions: [BlankSession]) -> [ProgressPeriodSummary] {
+        let calendar = Calendar.current
+        let now = Date()
+        let periods: [(String, Date)] = [
+            ("Hoy", calendar.startOfDay(for: now)),
+            ("Semana", BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)),
+            ("Mes", calendar.dateInterval(of: .month, for: now)?.start ?? calendar.startOfDay(for: now)),
+            ("Año", calendar.dateInterval(of: .year, for: now)?.start ?? calendar.startOfDay(for: now))
+        ]
+
+        return periods.map { title, start in
+            let duration = focusTime(sessions: sessions, from: start, to: now)
+            let count = sessionCount(sessions: sessions, from: start, to: now)
+            return ProgressPeriodSummary(
+                title: title,
+                value: formatDuration(duration),
+                caption: count == 1 ? "1 sesión" : "\(count) sesiones"
+            )
+        }
+    }
+
+    private func focusTime(sessions: [BlankSession], from start: Date, to end: Date) -> TimeInterval {
+        sessions.reduce(0) { total, session in
+            let sessionEnd = session.endedAt ?? end
+            let overlapStart = max(session.startedAt, start)
+            let overlapEnd = min(sessionEnd, end)
+            guard overlapStart < overlapEnd else { return total }
+            return total + overlapEnd.timeIntervalSince(overlapStart)
+        }
+    }
+
+    private func sessionCount(sessions: [BlankSession], from start: Date, to end: Date) -> Int {
+        sessions.filter { session in
+            let sessionEnd = session.endedAt ?? end
+            return session.startedAt < end && sessionEnd > start
+        }.count
     }
 
     private func bestDayText(report: BlankWeeklyReport) -> String {
@@ -802,4 +867,12 @@ private struct ChartScale {
         let hours = ceil(target / (6 * 60 * 60)) * 6
         return hours * 60 * 60
     }
+}
+
+private struct ProgressPeriodSummary: Identifiable {
+    let title: String
+    let value: String
+    let caption: String
+
+    var id: String { title }
 }

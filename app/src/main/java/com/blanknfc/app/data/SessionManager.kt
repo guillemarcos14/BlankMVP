@@ -26,7 +26,16 @@ data class BlankMode(
 data class FocusStats(
     val sessionsThisWeek: Int = 0,
     val protectedMsThisWeek: Long = 0L,
-    val blockedAttemptsThisWeek: Int = 0
+    val blockedAttemptsThisWeek: Int = 0,
+    val activityDays: List<FocusActivityDay> = emptyList()
+)
+
+data class FocusActivityDay(
+    val key: String,
+    val dayOfWeek: Int,
+    val sessions: Int = 0,
+    val protectedMs: Long = 0L,
+    val blockedAttempts: Int = 0
 )
 
 data class FocusSchedule(
@@ -102,14 +111,16 @@ class SessionManager(
                 _setupComplete.value = prefs[PrefsKeys.SETUP_COMPLETE] ?: false
                 val currentWeekKey = currentWeekKey()
                 val storedWeekKey = prefs[PrefsKeys.STATS_WEEK_KEY] ?: currentWeekKey
+                val activityDays = parseActivityDays(prefs[PrefsKeys.STATS_ACTIVITY_DAYS])
                 _stats.value = if (storedWeekKey == currentWeekKey) {
                     FocusStats(
                         sessionsThisWeek = prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] ?: 0,
                         protectedMsThisWeek = prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] ?: 0L,
-                        blockedAttemptsThisWeek = prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] ?: 0
+                        blockedAttemptsThisWeek = prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] ?: 0,
+                        activityDays = activityDays
                     )
                 } else {
-                    FocusStats()
+                    FocusStats(activityDays = activityDays)
                 }
                 val storedEmergencyWeekKey = prefs[PrefsKeys.EMERGENCY_UNLOCK_WEEK_KEY] ?: currentWeekKey
                 emergencyUnlockWeekKey = currentWeekKey
@@ -379,7 +390,10 @@ class SessionManager(
     }
 
     fun recordBlockedAttempt() {
-        val updated = _stats.value.copy(blockedAttemptsThisWeek = _stats.value.blockedAttemptsThisWeek + 1)
+        val updated = _stats.value.copy(
+            blockedAttemptsThisWeek = _stats.value.blockedAttemptsThisWeek + 1,
+            activityDays = updateTodayActivity(_stats.value.activityDays, blockedAttemptsDelta = 1)
+        )
         _stats.value = updated
         scope.launch {
             persistStats(updated)
@@ -469,7 +483,12 @@ class SessionManager(
         val elapsed = (System.currentTimeMillis() - savedStart).coerceAtLeast(0L)
         val updated = _stats.value.copy(
             sessionsThisWeek = _stats.value.sessionsThisWeek + 1,
-            protectedMsThisWeek = _stats.value.protectedMsThisWeek + elapsed
+            protectedMsThisWeek = _stats.value.protectedMsThisWeek + elapsed,
+            activityDays = updateTodayActivity(
+                _stats.value.activityDays,
+                sessionsDelta = 1,
+                protectedMsDelta = elapsed
+            )
         )
         _stats.value = updated
         scope.launch {
@@ -483,7 +502,55 @@ class SessionManager(
             prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] = stats.sessionsThisWeek
             prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] = stats.protectedMsThisWeek
             prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] = stats.blockedAttemptsThisWeek
+            prefs[PrefsKeys.STATS_ACTIVITY_DAYS] = serializeActivityDays(stats.activityDays)
         }
+    }
+
+    private fun updateTodayActivity(
+        days: List<FocusActivityDay>,
+        sessionsDelta: Int = 0,
+        protectedMsDelta: Long = 0L,
+        blockedAttemptsDelta: Int = 0
+    ): List<FocusActivityDay> {
+        val today = todayKey()
+        val existing = days.firstOrNull { it.key == today }
+            ?: FocusActivityDay(key = today, dayOfWeek = currentDayOfWeek())
+        val updatedToday = existing.copy(
+            dayOfWeek = currentDayOfWeek(),
+            sessions = existing.sessions + sessionsDelta,
+            protectedMs = existing.protectedMs + protectedMsDelta,
+            blockedAttempts = existing.blockedAttempts + blockedAttemptsDelta
+        )
+        return (days.filterNot { it.key == today } + updatedToday)
+            .sortedBy { it.key }
+            .takeLast(366)
+    }
+
+    private fun serializeActivityDays(days: List<FocusActivityDay>): String {
+        return days.sortedBy { it.key }.takeLast(366).joinToString(";") { day ->
+            listOf(
+                day.key,
+                day.dayOfWeek.toString(),
+                day.sessions.toString(),
+                day.protectedMs.toString(),
+                day.blockedAttempts.toString()
+            ).joinToString(",")
+        }
+    }
+
+    private fun parseActivityDays(raw: String?): List<FocusActivityDay> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return raw.split(";").mapNotNull { item ->
+            val parts = item.split(",")
+            if (parts.size != 5) return@mapNotNull null
+            FocusActivityDay(
+                key = parts[0],
+                dayOfWeek = parts[1].toIntOrNull() ?: Calendar.MONDAY,
+                sessions = parts[2].toIntOrNull() ?: 0,
+                protectedMs = parts[3].toLongOrNull() ?: 0L,
+                blockedAttempts = parts[4].toIntOrNull() ?: 0
+            )
+        }.sortedBy { it.key }.takeLast(366)
     }
 
     private fun resetEmergencyUnlocksIfNeeded() {
@@ -548,6 +615,17 @@ class SessionManager(
             val year = calendar.getWeekYear()
             val week = calendar.get(Calendar.WEEK_OF_YEAR)
             return "$year-$week"
+        }
+
+        private fun todayKey(): String {
+            val calendar = Calendar.getInstance()
+            val year = calendar.get(Calendar.YEAR)
+            val day = calendar.get(Calendar.DAY_OF_YEAR).toString().padStart(3, '0')
+            return "$year-$day"
+        }
+
+        private fun currentDayOfWeek(): Int {
+            return Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
         }
 
         private fun minuteOfDay(nowMillis: Long): Int {

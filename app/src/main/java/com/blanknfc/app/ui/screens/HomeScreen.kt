@@ -61,7 +61,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -96,18 +95,11 @@ private enum class HomePanel {
     EMERGENCY
 }
 
-private enum class BackgroundImageKind {
-    Drawable,
-    Encoded
-}
-
 private data class BackgroundTheme(
     val id: String,
     val label: String,
     val idleResId: Int,
-    val activeResId: Int,
-    val imageKind: BackgroundImageKind = BackgroundImageKind.Drawable,
-    val imageAlpha: Float = BackgroundImageAlpha
+    val activeResId: Int
 )
 
 private data class ConfigIssue(
@@ -118,19 +110,8 @@ private data class ConfigIssue(
 )
 
 private val BackgroundThemes = listOf(
-    BackgroundTheme("grey", "Blank", R.string.bg_blank_home_1, R.string.bg_blank_home_2, BackgroundImageKind.Encoded, imageAlpha = 1f),
-    BackgroundTheme("sage", "Sage", R.drawable.bg_sage_1, R.drawable.bg_sage_2),
-    BackgroundTheme("mint", "Mint", R.drawable.bg_mint_1, R.drawable.bg_mint_2),
-    BackgroundTheme("teal", "Teal", R.drawable.bg_teal_1, R.drawable.bg_teal_2),
-    BackgroundTheme("blue", "Blue", R.drawable.bg_blue_1, R.drawable.bg_blue_2),
-    BackgroundTheme("indigo", "Indigo", R.drawable.bg_indigo_1, R.drawable.bg_indigo_2),
-    BackgroundTheme("purple", "Purple", R.drawable.bg_purple_1, R.drawable.bg_purple_2),
-    BackgroundTheme("rose", "Rose", R.drawable.bg_rose_1, R.drawable.bg_rose_2),
-    BackgroundTheme("coral", "Coral", R.drawable.bg_coral_1, R.drawable.bg_coral_2),
-    BackgroundTheme("amber", "Amber", R.drawable.bg_amber_1, R.drawable.bg_amber_2)
+    BackgroundTheme("blank", "Blank", R.string.bg_blank_home_1, R.string.bg_blank_home_2)
 )
-
-private const val BackgroundImageAlpha = 0.62f
 
 private val LightModeMessages = listOf(
     "Ya sé que solo querías mirar un par de stories.",
@@ -403,11 +384,8 @@ private fun AppBackground(
             ) { backgroundResId ->
                 BackgroundImage(
                     resId = backgroundResId,
-                    imageKind = backgroundTheme.imageKind,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(backgroundTheme.imageAlpha)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -720,9 +698,9 @@ private fun BackgroundThemeRow(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BackgroundPreview(theme.idleResId, theme.imageKind, theme.imageAlpha)
+            BackgroundPreview(theme.idleResId)
             Spacer(modifier = Modifier.widthIn(min = 10.dp))
-            BackgroundPreview(theme.activeResId, theme.imageKind, theme.imageAlpha)
+            BackgroundPreview(theme.activeResId)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -740,7 +718,7 @@ private fun BackgroundThemeRow(
 }
 
 @Composable
-private fun BackgroundPreview(resId: Int, imageKind: BackgroundImageKind, imageAlpha: Float) {
+private fun BackgroundPreview(resId: Int) {
     Surface(
         modifier = Modifier
             .widthIn(min = 44.dp, max = 44.dp)
@@ -750,11 +728,8 @@ private fun BackgroundPreview(resId: Int, imageKind: BackgroundImageKind, imageA
     ) {
         BackgroundImage(
             resId = resId,
-            imageKind = imageKind,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(imageAlpha)
+            modifier = Modifier.fillMaxSize()
         )
     }
 }
@@ -762,27 +737,17 @@ private fun BackgroundPreview(resId: Int, imageKind: BackgroundImageKind, imageA
 @Composable
 private fun BackgroundImage(
     resId: Int,
-    imageKind: BackgroundImageKind,
     contentScale: ContentScale,
     modifier: Modifier = Modifier
 ) {
-    if (imageKind == BackgroundImageKind.Encoded) {
-        val encoded = stringResource(resId)
-        val imageBitmap = remember(encoded) {
-            val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-        }
-        if (imageBitmap != null) {
-            Image(
-                bitmap = imageBitmap,
-                contentDescription = null,
-                contentScale = contentScale,
-                modifier = modifier
-            )
-        }
-    } else {
+    val encoded = stringResource(resId)
+    val imageBitmap = remember(encoded) {
+        val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+    }
+    if (imageBitmap != null) {
         Image(
-            painter = painterResource(resId),
+            bitmap = imageBitmap,
             contentDescription = null,
             contentScale = contentScale,
             modifier = modifier

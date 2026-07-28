@@ -57,11 +57,19 @@ struct ReportView: View {
                         emptyState()
                     }
 
-                    Text("Cada sesión cuenta. Blank solo mide lo necesario.")
-                        .font(.footnote)
-                        .foregroundStyle(reportSecondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 2)
+                    VStack(spacing: 10) {
+                        Text("Cada sesión cuenta. Blank solo mide lo necesario.")
+                            .font(.footnote)
+                            .foregroundStyle(reportSecondary)
+
+                        Text(savedTimeExplanation(weekly))
+                            .font(.caption2)
+                            .foregroundStyle(reportSecondary.opacity(0.78))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 18)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 2)
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 24)
@@ -69,7 +77,7 @@ struct ReportView: View {
             }
         }
         .foregroundStyle(reportPrimary)
-        .navigationTitle("Progreso")
+        .navigationTitle("Progreso Semanal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(reportBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -88,25 +96,21 @@ struct ReportView: View {
         VStack(spacing: 16) {
             TabView(selection: $selectedHeroPage) {
                 heroPage(
-                    label: "Tiempo ahorrado",
                     value: formatDuration(savedTime),
-                    description: "Recuperadas de tu vida gracias a Blank",
-                    chartTitle: "Ahorro estimado",
+                    description: "Tiempo recuperado",
                     chartValues: savedSeries(from: activityDays)
                 )
                 .tag(0)
 
                 heroPage(
-                    label: "Tiempo en Blank",
                     value: formatDuration(weekly.totalFocusTime),
-                    description: "Protegidas esta semana",
-                    chartTitle: "Modo Blank",
+                    description: "Tiempo blankeado",
                     chartValues: activityDays.map(\.totalFocusTime)
                 )
                 .tag(1)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 382)
+            .frame(height: 316)
 
             HStack(spacing: 7) {
                 ForEach(0..<2, id: \.self) { page in
@@ -126,29 +130,16 @@ struct ReportView: View {
                 .padding(.horizontal, 12)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
 
-            Text(savedTimeExplanation(weekly))
-                .font(.caption2)
-                .foregroundStyle(reportSecondary.opacity(0.78))
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 18)
         }
     }
 
     private func heroPage(
-        label: String,
         value: String,
         description: String,
-        chartTitle: String,
         chartValues: [TimeInterval]
     ) -> some View {
         VStack(spacing: 24) {
             VStack(spacing: 8) {
-                Text(label.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .tracking(2.4)
-                    .foregroundStyle(reportSecondary)
-
                 Text(value)
                     .font(.blankInter(size: 68, weight: .bold, relativeTo: .largeTitle))
                     .lineLimit(1)
@@ -165,25 +156,14 @@ struct ReportView: View {
             .frame(maxWidth: .infinity)
             .animation(.easeInOut(duration: 0.28), value: selectedHeroPage)
 
-            chartPanel(title: chartTitle, values: chartValues)
+            chartPanel(values: chartValues)
         }
     }
 
-    private func chartPanel(title: String, values: [TimeInterval]) -> some View {
+    private func chartPanel(values: [TimeInterval]) -> some View {
         let scale = ChartScale(values: values)
 
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-
-                Spacer()
-
-                Text("Últimos 28 días")
-                    .font(.caption)
-                    .foregroundStyle(reportSecondary)
-            }
-
             HStack(alignment: .top, spacing: 12) {
                 ProgressLineChart(values: values, maxValue: scale.maxValue, primary: reportPrimary, secondary: reportSecondary)
                     .frame(height: 144)
@@ -199,14 +179,6 @@ struct ReportView: View {
                 .foregroundStyle(reportSecondary.opacity(0.88))
                 .frame(height: 144)
             }
-
-            HStack {
-                Text("28 días atrás")
-                Spacer()
-                Text("Hoy")
-            }
-            .font(.caption2)
-            .foregroundStyle(reportSecondary.opacity(0.88))
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 17)

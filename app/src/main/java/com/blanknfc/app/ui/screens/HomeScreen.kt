@@ -1,7 +1,9 @@
 package com.blanknfc.app.ui.screens
 
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.provider.Settings
+import android.util.Base64
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -53,6 +55,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -93,11 +96,18 @@ private enum class HomePanel {
     EMERGENCY
 }
 
+private enum class BackgroundImageKind {
+    Drawable,
+    Encoded
+}
+
 private data class BackgroundTheme(
     val id: String,
     val label: String,
     val idleResId: Int,
-    val activeResId: Int
+    val activeResId: Int,
+    val imageKind: BackgroundImageKind = BackgroundImageKind.Drawable,
+    val imageAlpha: Float = BackgroundImageAlpha
 )
 
 private data class ConfigIssue(
@@ -108,7 +118,7 @@ private data class ConfigIssue(
 )
 
 private val BackgroundThemes = listOf(
-    BackgroundTheme("grey", "Grey", R.drawable.bg_gray_1, R.drawable.bg_gray_2),
+    BackgroundTheme("grey", "Blank", R.string.bg_blank_home_1, R.string.bg_blank_home_2, BackgroundImageKind.Encoded, imageAlpha = 1f),
     BackgroundTheme("sage", "Sage", R.drawable.bg_sage_1, R.drawable.bg_sage_2),
     BackgroundTheme("mint", "Mint", R.drawable.bg_mint_1, R.drawable.bg_mint_2),
     BackgroundTheme("teal", "Teal", R.drawable.bg_teal_1, R.drawable.bg_teal_2),
@@ -391,13 +401,13 @@ private fun AppBackground(
                 animationSpec = tween(durationMillis = 520),
                 label = "blank_background_image"
             ) { backgroundResId ->
-                Image(
-                    painter = painterResource(backgroundResId),
-                    contentDescription = null,
+                BackgroundImage(
+                    resId = backgroundResId,
+                    imageKind = backgroundTheme.imageKind,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(BackgroundImageAlpha)
+                        .alpha(backgroundTheme.imageAlpha)
                 )
             }
         }
@@ -710,9 +720,9 @@ private fun BackgroundThemeRow(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BackgroundPreview(theme.idleResId)
+            BackgroundPreview(theme.idleResId, theme.imageKind, theme.imageAlpha)
             Spacer(modifier = Modifier.widthIn(min = 10.dp))
-            BackgroundPreview(theme.activeResId)
+            BackgroundPreview(theme.activeResId, theme.imageKind, theme.imageAlpha)
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -730,7 +740,7 @@ private fun BackgroundThemeRow(
 }
 
 @Composable
-private fun BackgroundPreview(resId: Int) {
+private fun BackgroundPreview(resId: Int, imageKind: BackgroundImageKind, imageAlpha: Float) {
     Surface(
         modifier = Modifier
             .widthIn(min = 44.dp, max = 44.dp)
@@ -738,13 +748,44 @@ private fun BackgroundPreview(resId: Int) {
         shape = RoundedCornerShape(14.dp),
         color = BlankBackground
     ) {
-        Image(
-            painter = painterResource(resId),
-            contentDescription = null,
+        BackgroundImage(
+            resId = resId,
+            imageKind = imageKind,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .alpha(BackgroundImageAlpha)
+                .alpha(imageAlpha)
+        )
+    }
+}
+
+@Composable
+private fun BackgroundImage(
+    resId: Int,
+    imageKind: BackgroundImageKind,
+    contentScale: ContentScale,
+    modifier: Modifier = Modifier
+) {
+    if (imageKind == BackgroundImageKind.Encoded) {
+        val encoded = stringResource(resId)
+        val imageBitmap = remember(encoded) {
+            val bytes = Base64.decode(encoded.trim(), Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap,
+                contentDescription = null,
+                contentScale = contentScale,
+                modifier = modifier
+            )
+        }
+    } else {
+        Image(
+            painter = painterResource(resId),
+            contentDescription = null,
+            contentScale = contentScale,
+            modifier = modifier
         )
     }
 }

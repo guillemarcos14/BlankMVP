@@ -48,6 +48,9 @@ fun NavGraph(
         composable(Routes.HOME) {
             HomeScreen(
                 sessionManager = sessionManager,
+                onEditApps = {
+                    navController.navigate(Routes.APP_SELECTOR)
+                },
                 onRelinkTag = {
                     navController.navigate(Routes.RELINK_NFC)
                 },

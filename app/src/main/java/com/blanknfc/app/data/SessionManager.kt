@@ -113,7 +113,7 @@ class SessionManager(
         }
 
         if (!_isBlankActive.value) {
-            return NfcResult.NOT_ACTIVE
+            return activateBlank()
         }
 
         _isBlankActive.value = false

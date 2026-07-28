@@ -1,5 +1,10 @@
 # Gestion de estado del proyecto
 
+## Regla obligatoria
+- Ante cualquier peticion, accion, analisis, cambio de codigo, gestion de GitHub, compilacion, decision de producto o respuesta sustantiva sobre este proyecto, lee primero `ESTADO.md` en la raiz del repo.
+- `ESTADO.md` es la fuente de verdad operativa del proyecto. Si hay conflicto entre una intuicion, un README, una rama antigua o contexto conversacional incompleto y `ESTADO.md`, prioriza `ESTADO.md` salvo instruccion explicita del usuario.
+- No empieces a actuar sobre el repo sin haber consultado `ESTADO.md` en la sesion actual.
+
 ## Al inicio de cada sesion
 1. Lee `ESTADO.md` en la raiz del repo antes de hacer nada.
 2. Si no existe, crealo con la estructura definida abajo antes de empezar la tarea.

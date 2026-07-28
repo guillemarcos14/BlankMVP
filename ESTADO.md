@@ -6,7 +6,8 @@ Ultima actualizacion: 2026-07-28
 - BlankMVP es el repositorio de Blank, un bloqueador de apps controlado por NFC.
 - El producto combina una app Android, una app iOS y una landing/web de validacion comercial.
 - La vision actual es convertir Blank en un dispositivo fisico de foco digital: tocar un tag NFC para activar/desactivar bloqueo de apps distractoras, creando friccion real sin depender solo de fuerza de voluntad.
-- Este archivo debe leerse al inicio de cada sesion para recuperar contexto operativo.
+- Este archivo debe leerse siempre antes de cualquier peticion, accion, analisis, cambio de codigo, gestion de GitHub, compilacion, decision de producto o respuesta sustantiva sobre el proyecto.
+- `ESTADO.md` es la fuente de verdad operativa del proyecto.
 
 ## Estado de GitHub
 - `main` contiene ahora este archivo para que Codex pueda acceder al contexto desde la rama por defecto.
@@ -25,6 +26,7 @@ Ultima actualizacion: 2026-07-28
 - 2026-07-28: Se resolvio parcialmente el conflicto Android de `app/build.gradle.kts` en la rama de la PR manteniendo `compileSdk = 36`, `targetSdk = 36` y `versionCode = 21`.
 - 2026-07-28: Se detectaron conflictos restantes por rutas antiguas `ios/Brick/Brick/*` frente a la migracion activa `ios/Blank/*`.
 - 2026-07-28: Para evitar un merge grande y arriesgado, se sube a `main` un estado operativo compacto y `AGENTS.md` sin arrastrar los 101 archivos de la rama conflictiva.
+- 2026-07-28: Se reforzo la regla operativa: ante cualquier peticion o accion sobre este proyecto, consultar siempre antes `ESTADO.md` como fuente de verdad.
 
 ## Estado actual
 - `ESTADO.md` existe en `main` como fuente de contexto compacta.
@@ -42,6 +44,7 @@ Ultima actualizacion: 2026-07-28
 - [cerrada] 2026-07-09: Las instrucciones de gestion de estado viven en `AGENTS.md`.
 - [cerrada] 2026-07-09: Para iOS, la rama operativa historica es `codex/ios-device-activity-target`.
 - [cerrada] 2026-07-28: No se mergea automaticamente la PR grande conflictiva solo para traer `ESTADO.md`; se sube el estado operativo a `main` de forma acotada.
+- [cerrada] 2026-07-28: Ante cualquier peticion, accion, analisis o cambio sobre este proyecto, se consulta primero `ESTADO.md`; es la fuente de verdad operativa.
 
 ## Descartado
 - 2026-07-28: Descartado mergear a ciegas la PR #3 porque tiene conflictos de migracion iOS y afecta muchos archivos.

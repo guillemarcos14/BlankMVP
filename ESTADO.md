@@ -27,17 +27,20 @@ Ultima actualizacion: 2026-07-28
 - 2026-07-28: Se detectaron conflictos restantes por rutas antiguas `ios/Brick/Brick/*` frente a la migracion activa `ios/Blank/*`.
 - 2026-07-28: Para evitar un merge grande y arriesgado, se sube a `main` un estado operativo compacto y `AGENTS.md` sin arrastrar los 101 archivos de la rama conflictiva.
 - 2026-07-28: Se reforzo la regla operativa: ante cualquier peticion o accion sobre este proyecto, consultar siempre antes `ESTADO.md` como fuente de verdad.
+- 2026-07-28: Se aplico en `web/landing/index.html` un nuevo override `web/landing/home-background.css` para cambiar el fondo de la hero/home por un fade suave azul-gris-beige alineado con la direccion visual de Blank App.
 
 ## Estado actual
 - `ESTADO.md` existe en `main` como fuente de contexto compacta.
 - Para historia completa, consultar `ESTADO.md` en `codex/ios-device-activity-target`.
 - No considerar mergeada la rama grande hasta resolver conscientemente la migracion `ios/Brick` -> `ios/Blank` y revisar los cambios de Android/iOS/assets.
+- La home de `web/landing/` carga `home-background.css` despues de `styles.css` para aplicar el nuevo fondo sin tocar el stylesheet principal.
 
 ## Proximos pasos concretos
 - Usar `main` para recuperar contexto minimo desde cualquier PC o nueva sesion Codex.
 - Si se quiere integrar todo el trabajo de `codex/ios-device-activity-target`, hacerlo en una rama dedicada con merge local, resolviendo explicitamente los conflictos iOS y validando Android/iOS.
 - Mantener `compileSdk = 36`, `targetSdk = 36` y `versionCode = 21` o superior en Android; no retroceder esos valores.
 - Para iOS, tratar `ios/Blank/` como la ruta actual y `ios/Brick/` como ruta antigua salvo que se compruebe lo contrario.
+- Revisar visualmente la landing desplegada en Netlify cuando termine el redeploy automatico.
 
 ## Decisiones
 - [cerrada] 2026-07-09: El proyecto usa `ESTADO.md` como fuente de verdad incremental para continuidad entre sesiones.
@@ -45,6 +48,7 @@ Ultima actualizacion: 2026-07-28
 - [cerrada] 2026-07-09: Para iOS, la rama operativa historica es `codex/ios-device-activity-target`.
 - [cerrada] 2026-07-28: No se mergea automaticamente la PR grande conflictiva solo para traer `ESTADO.md`; se sube el estado operativo a `main` de forma acotada.
 - [cerrada] 2026-07-28: Ante cualquier peticion, accion, analisis o cambio sobre este proyecto, se consulta primero `ESTADO.md`; es la fuente de verdad operativa.
+- [cerrada] 2026-07-28: El cambio visual de fondo de la home web se implementa como override CSS separado para mantenerlo acotado y facil de revertir.
 
 ## Descartado
 - 2026-07-28: Descartado mergear a ciegas la PR #3 porque tiene conflictos de migracion iOS y afecta muchos archivos.

@@ -1,5 +1,4 @@
 import FamilyControls
-import AVFoundation
 import SwiftUI
 
 struct HomeView: View {
@@ -19,33 +18,9 @@ struct HomeView: View {
     @State private var showingForgetConfirm = false
     @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
-    @State private var displayedMessage = "No estás perdiéndote nada."
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let idleMessages = [
-        "Ya sé que solo querías mirar un par de stories.",
-        "No estás perdiéndote nada.",
-        "Nadie te necesita en los próximos minutos.",
-        "El scroll puede esperar.",
-        "Para un momento.",
-        "No pasa nada si no contestas ahora.",
-        "¿Hace cuánto que no miras al frente?",
-        "Venga, toca.",
-        "No te va a llegar nada importante.",
-        "Igual hay algo mejor que hacer."
-    ]
-    private let activeMessages = [
-        "¿Ves? No pasaba nada.",
-        "Nadie se ha muerto.",
-        "Nada urgente. Como siempre.",
-        "Bien hecho.",
-        "Llevas un rato sin mirarlo. Eso es mucho.",
-        "No ha llegado nada nuevo. Ya lo decía yo.",
-        "Sigue un poco más.",
-        "El teléfono seguirá ahí.",
-        "Hoy has hecho algo difícil.",
-        "Ya está."
-    ]
+    private let homeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
 
     var body: some View {
         GeometryReader { proxy in
@@ -59,12 +34,8 @@ struct HomeView: View {
                     .padding(.top, layout.topPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                centerMessage(maxWidth: layout.messageMaxWidth)
+                centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
                     .position(x: layout.centerX, y: layout.messageCenterY)
-
-                bottomAction(width: layout.actionWidth)
-                    .padding(.bottom, layout.bottomPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
         }
         .ignoresSafeArea()
@@ -79,13 +50,7 @@ struct HomeView: View {
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         }
         .onAppear {
-            displayedMessage = (sessionStore.isBlankActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
             screenTimeBlocker.refreshAuthorizationStatus()
-        }
-        .onChange(of: sessionStore.isBlankActive) { isActive in
-            withAnimation(.easeInOut(duration: 0.65)) {
-                displayedMessage = (isActive ? activeMessages : idleMessages).randomElement() ?? "Blank"
-            }
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -210,15 +175,31 @@ struct HomeView: View {
         }
     }
 
-    private func centerMessage(maxWidth: CGFloat) -> some View {
-        VStack(spacing: 14) {
-            Text(displayedMessage)
-                .font(.blankSerif(size: 40, relativeTo: .largeTitle))
+    private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
+        VStack(spacing: 24) {
+            Text(homeTagline)
+                .font(.blankInter(size: 37, weight: .semibold, relativeTo: .largeTitle))
+                .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineLimit(4)
-                .minimumScaleFactor(0.72)
+                .lineSpacing(1)
+                .lineLimit(3)
+                .minimumScaleFactor(0.78)
 
+            bottomAction(width: actionWidth)
+
+            centerStatus
+        }
+        .frame(maxWidth: maxWidth)
+    }
+
+    @ViewBuilder
+    private var centerStatus: some View {
+        VStack(spacing: 8) {
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
+                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white.opacity(0.86))
+                    .monospacedDigit()
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
                     Text("Termina en \(remainingText(until: blankActiveUntil))")
                         .font(.blankBody)
@@ -255,19 +236,12 @@ struct HomeView: View {
                 }
             }
         }
-        .frame(maxWidth: maxWidth)
     }
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
-            if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
-                Text(elapsedText(since: blankActiveSince))
-                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(Color.white)
-                    .monospacedDigit()
-            }
-
-            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Iniciar Blank") {
+            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 178)
+            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
                 if sessionStore.isBlankActive {
                     scanTag()
                 } else {
@@ -278,8 +252,8 @@ struct HomeView: View {
                     setMessage(for: result)
                 }
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: sessionStore.isBlankActive))
-            .frame(width: width)
+            .buttonStyle(HomeBlankearButtonStyle())
+            .frame(width: buttonWidth)
 
             Button("Progreso") {
                 showingReport = true
@@ -404,10 +378,24 @@ private struct HomeLayoutMetrics {
         topPadding = topSafeArea + 10
         topClusterSpacing = 14
         bottomPadding = max(safeAreaInsets.bottom + 18, 34)
-        messageMaxWidth = min(max(width - horizontalPadding * 2, 260), 320)
+        messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
-        messageCenterY = height / 2
+        messageCenterY = height * 0.56
+    }
+}
+
+private struct HomeBlankearButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 48)
+            .background(Color(red: 0.69, green: 0.70, blue: 0.72).opacity(0.82))
+            .clipShape(Capsule())
+            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.06), radius: 10, y: 5)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
@@ -430,131 +418,13 @@ private struct AppBackground: View {
 
     var body: some View {
         ZStack {
-            BlankColors.background
-                .opacity(isActive ? 0 : 1)
-            BlankColors.ink
-                .opacity(isActive ? 1 : 0)
-            LoopingVideoBackground(resourceName: "blank_background_idle")
-                .opacity(isActive ? 0 : 1)
-            LoopingVideoBackground(resourceName: "blank_background_active")
-                .opacity(isActive ? 1 : 0)
-            PaperTexture()
-                .opacity(isActive ? 0 : 0.34)
-                .blendMode(.multiply)
-                .ignoresSafeArea()
-            DotPattern()
-                .opacity(isActive ? 0 : 0.28)
+            Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
+                .resizable()
+                .scaledToFill()
                 .ignoresSafeArea()
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.75), value: isActive)
-    }
-}
-
-private struct LoopingVideoBackground: UIViewRepresentable {
-    let resourceName: String
-
-    func makeUIView(context: Context) -> LoopingVideoView {
-        let view = LoopingVideoView()
-        view.configure(resourceName: resourceName)
-        return view
-    }
-
-    func updateUIView(_ uiView: LoopingVideoView, context: Context) {
-        uiView.configure(resourceName: resourceName)
-    }
-}
-
-private final class LoopingVideoView: UIView {
-    private let playerLayer = AVPlayerLayer()
-    private var player: AVQueuePlayer?
-    private var looper: AVPlayerLooper?
-    private var currentResourceName: String?
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        playerLayer.videoGravity = .resizeAspectFill
-        layer.addSublayer(playerLayer)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        playerLayer.frame = bounds
-    }
-
-    func configure(resourceName: String) {
-        if currentResourceName == resourceName {
-            player?.play()
-            return
-        }
-
-        currentResourceName = resourceName
-        configureAmbientAudioSession()
-        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
-
-        let playerItem = AVPlayerItem(url: url)
-        let queuePlayer = AVQueuePlayer()
-        queuePlayer.isMuted = true
-        queuePlayer.actionAtItemEnd = .none
-
-        looper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
-        playerLayer.player = queuePlayer
-        player = queuePlayer
-        queuePlayer.play()
-    }
-
-    private func configureAmbientAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
-    }
-}
-
-private struct PaperTexture: View {
-    var body: some View {
-        Canvas { context, size in
-            let marks: [(CGFloat, CGFloat, CGFloat, CGFloat, Double)] = [
-                (0.10, 0.18, 0.62, 0.18, 0.12),
-                (0.48, 0.28, 0.76, 0.22, 0.10),
-                (0.18, 0.48, 0.70, 0.28, 0.14),
-                (0.58, 0.62, 0.66, 0.20, 0.11),
-                (0.14, 0.78, 0.72, 0.22, 0.13)
-            ]
-
-            for mark in marks {
-                let rect = CGRect(
-                    x: size.width * mark.0,
-                    y: size.height * mark.1,
-                    width: size.width * mark.2,
-                    height: size.height * mark.3
-                )
-                context.fill(
-                    Path(ellipseIn: rect),
-                    with: .color(BlankColors.mutedInk.opacity(mark.4))
-                )
-            }
-        }
-        .blur(radius: 28)
-    }
-}
-
-private struct DotPattern: View {
-    var body: some View {
-        Canvas { context, size in
-            let color = BlankColors.mutedInk.opacity(0.35)
-            let step: CGFloat = 13
-            var y: CGFloat = 0
-            while y < size.height {
-                var x: CGFloat = 0
-                while x < size.width {
-                    context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1.4, height: 1.4)), with: .color(color))
-                    x += step
-                }
-                y += step
-            }
-        }
     }
 }
 

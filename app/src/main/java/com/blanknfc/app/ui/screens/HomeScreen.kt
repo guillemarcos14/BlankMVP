@@ -1,14 +1,8 @@
 ﻿package com.blanknfc.app.ui.screens
 
 import android.content.Intent
-import android.content.Context
-import android.graphics.SurfaceTexture
-import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.Settings
-import android.view.Surface
-import android.view.TextureView
-import android.view.ViewGroup
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -17,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,21 +50,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -89,7 +84,6 @@ import com.blanknfc.app.util.BatteryHelper
 import com.blanknfc.app.util.NfcHelper
 import com.blanknfc.app.util.PackageHelper
 import java.util.Calendar
-import kotlin.random.Random
 
 private enum class HomePanel {
     HOME,
@@ -116,34 +110,8 @@ private data class ProgressPeriodSummary(
     val caption: String
 )
 
-private const val BackgroundVideoAlpha = 0.72f
 private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
-
-private val LightModeMessages = listOf(
-    "Ya sé que solo querías mirar un par de stories.",
-    "No estás perdiéndote nada.",
-    "Nadie te necesita en los próximos minutos.",
-    "El scroll puede esperar.",
-    "Para un momento.",
-    "No pasa nada si no contestas ahora.",
-    "¿Hace cuánto que no miras al frente?",
-    "Venga, toca.",
-    "No te va a llegar nada importante.",
-    "Igual hay algo mejor que hacer."
-)
-
-private val DarkModeMessages = listOf(
-    "¿Ves? No pasaba nada.",
-    "Nadie se ha muerto.",
-    "Nada urgente. Como siempre.",
-    "Bien hecho.",
-    "Llevas un rato sin mirarlo. Eso es mucho.",
-    "No ha llegado nada nuevo. Ya lo decía yo.",
-    "Sigue un poco más.",
-    "El teléfono seguirá ahí.",
-    "Hoy has hecho algo difícil.",
-    "Ya está."
-)
+private const val HomeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
 
 @Composable
 fun HomeScreen(
@@ -387,31 +355,17 @@ private fun AppBackground(
     ) {
         if (!isDark) {
             Crossfade(
-                targetState = if (isBlankActive) R.raw.blank_background_active else R.raw.blank_background_idle,
+                targetState = if (isBlankActive) R.drawable.blank_home_background_active else R.drawable.blank_home_background_idle,
                 animationSpec = tween(durationMillis = 520),
-                label = "blank_background_video"
-            ) { backgroundVideoResId ->
-                BackgroundLoopVideo(
-                    videoResId = backgroundVideoResId,
+                label = "blank_background_image"
+            ) { backgroundImageResId ->
+                Image(
+                    painter = painterResource(backgroundImageResId),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
-                        .alpha(BackgroundVideoAlpha)
                 )
-            }
-        }
-        if (!isDark) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val dot = Color(0xFF969690).copy(alpha = 0.18f)
-                val step = 13.dp.toPx()
-                var y = 0f
-                while (y < size.height) {
-                    var x = 0f
-                    while (x < size.width) {
-                        drawCircle(dot, radius = 0.65.dp.toPx(), center = Offset(x, y))
-                        x += step
-                    }
-                    y += step
-                }
             }
         }
         Box(
@@ -422,87 +376,6 @@ private fun AppBackground(
             content()
         }
     }
-}
-
-@Composable
-private fun BackgroundLoopVideo(
-    videoResId: Int,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    AndroidView(
-        modifier = modifier,
-        factory = { viewContext ->
-            LoopingVideoTextureView(viewContext).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-        },
-        update = { textureView ->
-            textureView.play(context, videoResId)
-        }
-    )
-}
-
-private class LoopingVideoTextureView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
-    private var mediaPlayer: MediaPlayer? = null
-    private var currentVideoResId: Int? = null
-    private var currentSurface: Surface? = null
-
-    init {
-        surfaceTextureListener = this
-    }
-
-    fun play(context: Context, videoResId: Int) {
-        if (currentVideoResId == videoResId && mediaPlayer != null) return
-        currentVideoResId = videoResId
-        if (isAvailable) {
-            startPlayer(context, videoResId)
-        }
-    }
-
-    private fun startPlayer(context: Context, videoResId: Int) {
-        releasePlayer()
-        val assetFileDescriptor = context.resources.openRawResourceFd(videoResId)
-        currentSurface = Surface(surfaceTexture)
-        mediaPlayer = MediaPlayer().apply {
-            setDataSource(
-                assetFileDescriptor.fileDescriptor,
-                assetFileDescriptor.startOffset,
-                assetFileDescriptor.length
-            )
-            assetFileDescriptor.close()
-            isLooping = true
-            setVolume(0f, 0f)
-            setSurface(currentSurface)
-            setOnPreparedListener { preparedPlayer -> preparedPlayer.start() }
-            prepareAsync()
-        }
-    }
-
-    private fun releasePlayer() {
-        mediaPlayer?.release()
-        mediaPlayer = null
-        currentSurface?.release()
-        currentSurface = null
-    }
-
-    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
-        currentVideoResId?.let { videoResId ->
-            startPlayer(context, videoResId)
-        }
-    }
-
-    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) = Unit
-
-    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
-        releasePlayer()
-        return true
-    }
-
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
 }
 
 @Composable
@@ -526,49 +399,39 @@ private fun HomePanelContent(
                     .padding(top = 62.dp)
             )
         }
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            AnimatedContent(
-                targetState = isBlankActive,
-                transitionSpec = {
-                    fadeIn(animationSpec = tween(360)) togetherWith fadeOut(animationSpec = tween(220))
-                },
-            label = "blank_home_message"
-        ) { active ->
-            val messages = if (active) DarkModeMessages else LightModeMessages
-            val message = remember(active) {
-                messages[Random.nextInt(messages.size)]
-            }
-
-            Text(
-                text = message,
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
-                color = BlankOnSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        }
-        Crossfade(
-            targetState = isBlankActive,
-            animationSpec = tween(durationMillis = 260),
-            label = "blank_home_action",
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) { active ->
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                MainActionButton(
-                    text = if (active) "Escanear Blank para salir" else "Iniciar Blank",
-                    enabled = !active,
-                    light = !active,
+                Text(
+                    text = HomeTagline,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 38.sp,
+                        lineHeight = 43.sp
+                    ),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                HomeBlankearButton(
+                    text = if (isBlankActive) "Escanear Blank para salir" else "Blankear",
+                    enabled = !isBlankActive,
+                    modifier = Modifier.widthIn(max = if (isBlankActive) 342.dp else 178.dp),
                     onClick = onMainAction
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 TextButton(onClick = onStats) {
                     Text(
                         text = "Progreso",
-                        color = if (active) Color.White.copy(alpha = 0.74f) else BlankOnSurface.copy(alpha = 0.72f),
+                        color = if (isBlankActive) Color.White.copy(alpha = 0.74f) else BlankOnSurface.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
                     )
                 }
@@ -1836,6 +1699,37 @@ private fun ScreenHeader(
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.End
         )
+    }
+}
+
+@Composable
+private fun HomeBlankearButton(
+    text: String,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(999.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
+            disabledContentColor = Color.White
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(999.dp),
+                ambientColor = Color.Black.copy(alpha = 0.06f),
+                spotColor = Color.Black.copy(alpha = 0.06f)
+            )
+    ) {
+        Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
     }
 }
 

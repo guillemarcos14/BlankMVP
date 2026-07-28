@@ -1,4 +1,3 @@
-import AVFoundation
 import SwiftUI
 import UIKit
 
@@ -660,7 +659,9 @@ private struct ReportLiquidBackground: View {
         ZStack {
             BlankColors.background
 
-            ReportLoopingVideoBackground(resourceName: "blank_background_idle")
+            Image("blank_home_background_idle")
+                .resizable()
+                .scaledToFill()
                 .opacity(0.10)
                 .saturation(0.18)
                 .contrast(0.88)
@@ -700,66 +701,6 @@ private extension View {
                     )
             )
             .shadow(color: BlankColors.ink.opacity(0.045), radius: 18, x: 0, y: 10)
-    }
-}
-
-private struct ReportLoopingVideoBackground: UIViewRepresentable {
-    let resourceName: String
-
-    func makeUIView(context: Context) -> ReportLoopingVideoView {
-        let view = ReportLoopingVideoView()
-        view.configure(resourceName: resourceName)
-        return view
-    }
-
-    func updateUIView(_ uiView: ReportLoopingVideoView, context: Context) {
-        uiView.configure(resourceName: resourceName)
-    }
-}
-
-private final class ReportLoopingVideoView: UIView {
-    private let playerLayer = AVPlayerLayer()
-    private var player: AVQueuePlayer?
-    private var looper: AVPlayerLooper?
-    private var currentResourceName: String?
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        playerLayer.videoGravity = .resizeAspectFill
-        layer.addSublayer(playerLayer)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        playerLayer.frame = bounds
-    }
-
-    func configure(resourceName: String) {
-        if currentResourceName == resourceName {
-            player?.play()
-            return
-        }
-
-        currentResourceName = resourceName
-        configureAmbientAudioSession()
-        guard let url = Bundle.main.url(forResource: resourceName, withExtension: "mp4") else { return }
-
-        let playerItem = AVPlayerItem(url: url)
-        let queuePlayer = AVQueuePlayer()
-        queuePlayer.isMuted = true
-        queuePlayer.actionAtItemEnd = .none
-        playerLayer.player = queuePlayer
-        looper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
-        player = queuePlayer
-        queuePlayer.play()
-    }
-
-    private func configureAmbientAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
     }
 }
 

@@ -233,7 +233,7 @@ The user can deactivate Blank mode with the paired NFC tag and can clear shields
 
 Prepared now:
 
-- `ios/Brick/Brick/Assets.xcassets/AppIcon.appiconset`
+- `ios/Blank/Blank/Assets.xcassets/AppIcon.appiconset`
 - App icon generated from `web/landing/assets/blank-star-logo.png`
 - iPhone icon slots: 40, 58, 60, 80, 87, 120, 180 px
 - App Store marketing icon: 1024 px
@@ -257,8 +257,8 @@ Recommended first screenshot set:
 
 Run this on macOS:
 
-1. Open `ios/Brick/Brick.xcodeproj`.
-2. Select target `Brick`.
+1. Open `ios/Blank/Blank.xcodeproj`.
+2. Select target `Blank`.
 3. Set Team to the paid Apple Developer account.
 4. Keep bundle ID `com.blanknfc.app.ios`.
 5. Confirm Signing & Capabilities:
@@ -283,7 +283,7 @@ Completed on Windows before Apple account activation:
 - Device Activity Monitor extension plist parses and uses `com.apple.deviceactivity.monitor-extension`.
 - Extension entitlements parse and include Family Controls.
 - `Assets.xcassets` is linked to the app target and `AppIcon` is selected for Debug and Release.
-- No active QR/barcode unlock code remains in `ios/Brick` or `web/app-preview`; NFC remains the only physical unlock path.
+- No active QR/barcode unlock code remains in `ios/Blank` or `web/app-preview`; NFC remains the only physical unlock path.
 
 Not verifiable on Windows:
 

@@ -43,6 +43,14 @@ Tags:
 Productivity, Focus, Digital wellbeing
 ```
 
+Phone screenshots:
+
+```text
+screenshots/play-store/phone-06-nfc-scan.png
+screenshots/play-store/phone-07-select-apps.png
+screenshots/play-store/phone-08-focus-mode.png
+```
+
 Contact email:
 
 ```text
@@ -172,4 +180,3 @@ Blank does not require an account, login credentials, or server access.
 Primera beta interna de Blank para pruebas cerradas. Incluye el flujo inicial de configuración, selección de apps bloqueadas y activación mediante NFC.
 </es-ES>
 ```
-

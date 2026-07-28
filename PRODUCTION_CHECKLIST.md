@@ -3,7 +3,7 @@
 ## Build Readiness
 
 - Install JDK 17 and set `JAVA_HOME`.
-- Install Android SDK Platform 35.
+- Install Android SDK Platform 36.
 - Run `.\gradlew.bat testDebugUnitTest`.
 - Run `.\gradlew.bat assembleDebug`.
 - Configure a release keystore outside the repository using `docs/ANDROID_BETA_RELEASE.md`.
@@ -27,7 +27,7 @@
 
 ## Google Play Policy
 
-- Keep `targetSdk` at API 35 or higher.
+- Keep `targetSdk` at API 36 or higher.
 - Do not add `QUERY_ALL_PACKAGES` unless Play Console approval is explicitly required and granted.
 - Keep app visibility limited to launcher apps through manifest `<queries>`.
 - Provide in-app Accessibility disclosure before sending the user to system settings.
@@ -41,7 +41,7 @@
 
 ## iOS Production Path
 
-- Open `ios/Brick/Brick.xcodeproj` in Xcode on macOS.
+- Open `ios/Blank/Blank.xcodeproj` in Xcode on macOS.
 - Set Team and bundle identifier.
 - Request Apple's Family Controls entitlement before relying on real iPhone app shielding.
 - Add/confirm Near Field Communication Tag Reading and Family Controls capabilities.
@@ -60,6 +60,10 @@
 
 - Publish `web/landing/` or port it to your site builder.
 - Connect the beta form to Tally, Typeform, Airtable, ConvertKit, or a backend.
+- Treat all users already signed up before public launch as one `founders` group.
+- Founder benefits should thank early trust: 24-hour priority access, founder acknowledgement, 3-day preferred stock reservation, and 50% off the first Blank Physical Device with code `Founders`.
+- Use 12.99 EUR as the launch price for the Blank Physical Device, with gradual price increases after the first phase.
+- Keep the future 1.99 EUR/month subscription clearly marked as not implemented yet.
 - Recruit 20-50 testers and give each one a physical NFC tag.
 - Run the 7-day test described in `docs/MARKET_TEST_PLAN.md`.
 - Use the success criteria before spending on larger inventory.

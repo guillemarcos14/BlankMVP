@@ -11,11 +11,22 @@ Validate whether people will use and pay for a physical NFC-based app blocker.
 - People trying to reduce late-night phone use.
 - ADHD/productivity communities where physical commitment devices may resonate.
 
+## Founder Base
+
+Founders are the users who signed up before Blank was created or publicly launched.
+
+There is only one founder group. The goal is to thank them for their early trust, not to split them into separate beta/founding tiers.
+
+Founder communication should offer:
+
+- 24-hour priority access before the public launch.
+- Clear thanks for joining before the product existed.
+- 3-day preferred stock reservation window.
+- 50% discount on the first Blank Physical Device with code `Founders`.
+
 ## Beta Cohort
 
-Start with 20-50 testers.
-
-Recruit from:
+If a practical product test is needed, recruit from:
 
 - Personal network.
 - Productivity and digital wellbeing communities.
@@ -38,9 +49,9 @@ Test three positions:
 
 Price tests:
 
-- 19 EUR early beta.
-- 29 EUR standard tag kit.
-- 39 EUR premium two-tag kit.
+- 12.99 EUR launch price for the Blank Physical Device.
+- Gradual pricing increases after the first launch phase.
+- 1.99 EUR/month future subscription, not implemented yet.
 
 ## Success Criteria
 
@@ -77,5 +88,6 @@ Weak signal:
 - Number of Blank sessions used.
 - Biggest frustration.
 - Did it help you focus?
-- Would you pay 19/29/39 EUR?
+- Would you pay 12.99 EUR for the Blank Physical Device?
+- Would 1.99 EUR/month feel fair for a future subscription if Blank keeps helping you reduce app use?
 - Email for follow-up.

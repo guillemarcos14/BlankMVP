@@ -29,7 +29,25 @@ Privacy-first MVP:
 - Problem: App blockers are easy to ignore when the escape hatch is on the same phone.
 - Mechanism: Choose apps, pair tag, tap to blank, tap again to unblank.
 - Trust: Local-first, transparent permissions, no screen reading.
-- Beta CTA: Join the beta or preorder the NFC tag kit.
+- Founder CTA: Join Blank early or claim founder access if already signed up.
+
+## Pricing
+
+- Blank Physical Device launch price: 12.99 EUR.
+- Pricing should increase gradually after the first launch phase.
+- Future subscription: 1.99 EUR/month.
+- The subscription is not implemented yet and should only be described as future/planned.
+
+## Founders
+
+Founders are users who signed up before Blank was created or publicly launched.
+
+There is only one founder group. Benefits should be positioned as a thank-you for early trust:
+
+- 24-hour priority access before the public launch.
+- Founder acknowledgement in communications.
+- 3-day preferred stock reservation window.
+- 50% discount on the first Blank Physical Device with code `Founders`.
 
 ## Beta Release Notes
 

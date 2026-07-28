@@ -8,7 +8,7 @@ iOS cannot use the Android Accessibility blocking model. Production app blocking
 - `ManagedSettings` for shielding selected apps and domains.
 - `DeviceActivity` later if scheduled monitoring windows are needed.
 
-The app in `ios/Brick` uses this architecture. Real shielding requires the Family Controls entitlement on the app identifier.
+The app in `ios/Blank` uses this architecture. Real shielding requires the Family Controls entitlement on the app identifier.
 
 ## Current iOS Build Scope
 
@@ -49,8 +49,8 @@ The user can deactivate Blank mode with the paired NFC tag and can reset the pai
 
 ## TestFlight Setup
 
-1. Open `ios/Brick/Brick.xcodeproj` in Xcode.
-2. Select the `Brick` target.
+1. Open `ios/Blank/Blank.xcodeproj` in Xcode.
+2. Select the `Blank` target.
 3. Set Team to `GUILLEM ARCOS GONZALEZ - GS54UV79RG`.
 4. Keep the app bundle identifier as `com.blanknfc.app.ios`.
 5. Select the `BlankDeviceActivityMonitor` target and keep its bundle identifier as `com.blanknfc.app.ios.deviceactivity`.
@@ -58,7 +58,7 @@ The user can deactivate Blank mode with the paired NFC tag and can reset the pai
 7. Add capabilities:
    - Family Controls.
    - Near Field Communication Tag Reading.
-8. Confirm `Brick.entitlements` is attached to Debug and Release.
+8. Confirm `Blank.entitlements` is attached to Debug and Release.
 9. Confirm `BlankDeviceActivityMonitor.entitlements` is attached to Debug and Release for the extension.
 10. Archive from Xcode.
 11. Upload to App Store Connect.
@@ -85,7 +85,7 @@ The copy, metadata, privacy answers, review notes, and asset checklist for App S
 
 ## Timer Caveat
 
-The current timer flow stores its end date locally and attempts to schedule a DeviceActivity timer. The `BlankDeviceActivityMonitor` extension is wired as a Device Activity Monitor Extension target in `ios/Brick/Brick.xcodeproj` and embedded in the app.
+The current timer flow stores its end date locally and attempts to schedule a DeviceActivity timer. The `BlankDeviceActivityMonitor` extension is wired as a Device Activity Monitor Extension target in `ios/Blank/Blank.xcodeproj` and embedded in the app.
 
 Before relying on timer expiration in TestFlight, confirm:
 
@@ -119,4 +119,4 @@ Blank stores setup state locally and does not collect screen contents, messages,
 - Wrong tag is rejected.
 - Shielded apps are blocked while Blank mode is active.
 - Shields clear after deactivation.
-- Forget tag resets setup when not bricked.
+- Forget tag resets setup when not blanked.

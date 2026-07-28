@@ -1,12 +1,12 @@
 # Blank for iPhone
 
-This is the native iOS MVP for Brick.
+This is the native iOS MVP for Blank.
 
 ## What works on iPhone
 
 - Pair a physical NFC tag with Core NFC.
 - Toggle Blank mode with the paired tag.
-- Persist Brick state locally with `UserDefaults`.
+- Persist Blank state locally with `UserDefaults`.
 - Select apps and categories with Apple's Screen Time picker.
 - Shield the selected apps while Blank mode is active using `ManagedSettings`.
 
@@ -22,8 +22,8 @@ To test real app blocking on a physical iPhone, the Apple Developer account and 
 
 ## How to test
 
-1. Open `ios/Brick/Brick.xcodeproj` in Xcode on macOS.
-2. Select the `Brick` target and set your Team in Signing & Capabilities.
+1. Open `ios/Blank/Blank.xcodeproj` in Xcode on macOS.
+2. Select the `Blank` target and set your Team in Signing & Capabilities.
 3. Keep the app bundle identifier as `com.blanknfc.app.ios` unless Apple forces a change.
 4. Add/confirm these capabilities:
    - Near Field Communication Tag Reading

@@ -25,7 +25,7 @@ If future work copies or substantially adapts Foqos source, add the MIT notice t
 ## Why iOS first
 
 - Foqos is primarily an iOS app built with SwiftUI, SwiftData, FamilyControls, ManagedSettings, DeviceActivity, CoreNFC, WidgetKit, Live Activities, and App Intents.
-- Blank already has an iOS MVP under `ios/Brick` with Core NFC, FamilyControls selection, and ManagedSettings shielding.
+- Blank already has an iOS MVP under `ios/Blank` with Core NFC, FamilyControls selection, and ManagedSettings shielding.
 - iOS app blocking cannot use Android Accessibility. It must use Apple's Screen Time stack.
 - The main external dependency is Apple approval for the Family Controls entitlement.
 

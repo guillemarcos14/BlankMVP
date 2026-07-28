@@ -11,7 +11,7 @@ Example `keystore.properties`:
 ```properties
 storeFile=C:\\Users\\Guillem\\keys\\blank-release.jks
 storePassword=replace_me
-keyAlias=brick
+keyAlias=blank
 keyPassword=replace_me
 ```
 
@@ -44,8 +44,8 @@ Upload `C:\Users\Guillem\Desktop\Blank-internal-testing-1.0.aab` to Google Play 
 Keep both files below backed up. Losing them blocks future updates with the same upload key:
 
 ```text
-C:\Users\Guillem\Desktop\BrickMVP\release-keys\blank-upload.jks
-C:\Users\Guillem\Desktop\BrickMVP\keystore.properties
+C:\Users\Guillem\Desktop\BlankMVP\release-keys\blank-upload.jks
+C:\Users\Guillem\Desktop\BlankMVP\keystore.properties
 ```
 
 ## Play Console Internal Testing

@@ -135,7 +135,9 @@ class SessionManagerTest {
 
         val stats = manager.stats.first()
         assertEquals(1, stats.sessionsThisWeek)
+        assertEquals(1, stats.totalSessions)
         assertTrue(stats.protectedMsThisWeek >= 0L)
+        assertTrue(stats.totalProtectedMs >= 0L)
     }
 
     @Test
@@ -162,6 +164,7 @@ class SessionManagerTest {
 
         assertFalse(manager.isBlankActive.first())
         assertEquals(1, manager.stats.first().sessionsThisWeek)
+        assertEquals(1, manager.stats.first().totalSessions)
     }
 
     @Test

@@ -27,6 +27,8 @@ data class FocusStats(
     val sessionsThisWeek: Int = 0,
     val protectedMsThisWeek: Long = 0L,
     val blockedAttemptsThisWeek: Int = 0,
+    val totalSessions: Int = 0,
+    val totalProtectedMs: Long = 0L,
     val activityDays: List<FocusActivityDay> = emptyList()
 )
 
@@ -112,15 +114,25 @@ class SessionManager(
                 val currentWeekKey = currentWeekKey()
                 val storedWeekKey = prefs[PrefsKeys.STATS_WEEK_KEY] ?: currentWeekKey
                 val activityDays = parseActivityDays(prefs[PrefsKeys.STATS_ACTIVITY_DAYS])
+                val totalSessions = prefs[PrefsKeys.STATS_TOTAL_SESSIONS]
+                    ?: activityDays.sumOf { it.sessions }
+                val totalProtectedMs = prefs[PrefsKeys.STATS_TOTAL_PROTECTED_MS]
+                    ?: activityDays.sumOf { it.protectedMs }
                 _stats.value = if (storedWeekKey == currentWeekKey) {
                     FocusStats(
                         sessionsThisWeek = prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] ?: 0,
                         protectedMsThisWeek = prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] ?: 0L,
                         blockedAttemptsThisWeek = prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] ?: 0,
+                        totalSessions = totalSessions,
+                        totalProtectedMs = totalProtectedMs,
                         activityDays = activityDays
                     )
                 } else {
-                    FocusStats(activityDays = activityDays)
+                    FocusStats(
+                        totalSessions = totalSessions,
+                        totalProtectedMs = totalProtectedMs,
+                        activityDays = activityDays
+                    )
                 }
                 val storedEmergencyWeekKey = prefs[PrefsKeys.EMERGENCY_UNLOCK_WEEK_KEY] ?: currentWeekKey
                 emergencyUnlockWeekKey = currentWeekKey
@@ -484,6 +496,8 @@ class SessionManager(
         val updated = _stats.value.copy(
             sessionsThisWeek = _stats.value.sessionsThisWeek + 1,
             protectedMsThisWeek = _stats.value.protectedMsThisWeek + elapsed,
+            totalSessions = _stats.value.totalSessions + 1,
+            totalProtectedMs = _stats.value.totalProtectedMs + elapsed,
             activityDays = updateTodayActivity(
                 _stats.value.activityDays,
                 sessionsDelta = 1,
@@ -502,6 +516,8 @@ class SessionManager(
             prefs[PrefsKeys.STATS_SESSIONS_THIS_WEEK] = stats.sessionsThisWeek
             prefs[PrefsKeys.STATS_PROTECTED_MS_THIS_WEEK] = stats.protectedMsThisWeek
             prefs[PrefsKeys.STATS_BLOCKED_ATTEMPTS_THIS_WEEK] = stats.blockedAttemptsThisWeek
+            prefs[PrefsKeys.STATS_TOTAL_SESSIONS] = stats.totalSessions
+            prefs[PrefsKeys.STATS_TOTAL_PROTECTED_MS] = stats.totalProtectedMs
             prefs[PrefsKeys.STATS_ACTIVITY_DAYS] = serializeActivityDays(stats.activityDays)
         }
     }

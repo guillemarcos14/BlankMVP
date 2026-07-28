@@ -20,9 +20,11 @@ struct ReportView: View {
     var body: some View {
         let progress = report
         let weekly = progress.weeklyReport
-        let savedTime = cappedSavedTime(weekly)
+        let totalFocusTime = focusTime(sessions: sessionStore.sessions, from: .distantPast, to: Date())
+        let totalSessionCount = sessionCount(sessions: sessionStore.sessions, from: .distantPast, to: Date())
+        let savedTime = cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount)
         let hasRecentActivity = progress.recentActivity.contains { $0.sessionCount > 0 || $0.totalFocusTime > 0 }
-        let hasProgress = weekly.completedSessionCount > 0 || weekly.totalFocusTime > 0 || hasRecentActivity
+        let hasProgress = totalSessionCount > 0 || totalFocusTime > 0 || hasRecentActivity
 
         ZStack {
             ReportLiquidBackground()
@@ -30,10 +32,10 @@ struct ReportView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
                     heroCarousel(
-                        weekly: weekly,
+                        totalFocusTime: totalFocusTime,
                         savedTime: savedTime,
                         activityDays: progress.recentActivity,
-                        insight: insightText(weekly: weekly, progress: progress)
+                        insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
                     )
 
                     if hasProgress {
@@ -62,7 +64,7 @@ struct ReportView: View {
                             .font(.footnote)
                             .foregroundStyle(reportSecondary)
 
-                        Text(savedTimeExplanation(weekly))
+                        Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
                             .font(.caption2)
                             .foregroundStyle(reportSecondary.opacity(0.78))
                             .multilineTextAlignment(.center)
@@ -88,7 +90,7 @@ struct ReportView: View {
     }
 
     private func heroCarousel(
-        weekly: BlankWeeklyReport,
+        totalFocusTime: TimeInterval,
         savedTime: TimeInterval,
         activityDays: [BlankActivityDay],
         insight: String
@@ -103,7 +105,7 @@ struct ReportView: View {
                 .tag(0)
 
                 heroPage(
-                    value: formatDuration(weekly.totalFocusTime),
+                    value: formatDuration(totalFocusTime),
                     description: "Tiempo blankeado",
                     chartValues: activityDays.map(\.totalFocusTime)
                 )
@@ -343,12 +345,10 @@ struct ReportView: View {
         .liquidGlass(cornerRadius: 22)
     }
 
-    private func insightText(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> String {
-        if weekly.completedSessionCount == 0 {
+    private func insightText(totalSessionCount: Int, savedTime: TimeInterval, progress: BlankProgressReport) -> String {
+        if totalSessionCount == 0 {
             return "Blank ya está midiendo esta sesión. Las señales se vuelven más útiles al terminarla."
         }
-
-        let savedTime = cappedSavedTime(weekly)
 
         if savedTime >= 8 * 60 * 60 {
             return "Has recuperado casi medio día para ti."
@@ -366,8 +366,8 @@ struct ReportView: View {
             return "Blank te ha protegido \(progress.currentStreakDays) días seguidos."
         }
 
-        if weekly.completedSessionCount >= 5 {
-            return "Ya hay \(weekly.completedSessionCount) momentos en los que no volviste al bucle."
+        if totalSessionCount >= 5 {
+            return "Ya hay \(totalSessionCount) momentos en los que no volviste al bucle."
         }
 
         return "Has recuperado tiempo real sin convertirlo en otra pantalla más."
@@ -379,12 +379,12 @@ struct ReportView: View {
         }
     }
 
-    private func cappedSavedTime(_ report: BlankWeeklyReport) -> TimeInterval {
-        min(report.estimatedTimeSaved, report.totalFocusTime)
+    private func cappedSavedTime(totalFocusTime: TimeInterval, sessionCount: Int) -> TimeInterval {
+        min(totalFocusTime, TimeInterval(sessionCount * 7 * 60) + totalFocusTime * 0.10)
     }
 
-    private func savedTimeExplanation(_ report: BlankWeeklyReport) -> String {
-        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(report))) estimados con 7 min por sesión y un 10% del tiempo protegido, limitado al tiempo real en Blank."
+    private func savedTimeExplanation(totalFocusTime: TimeInterval, sessionCount: Int) -> String {
+        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: sessionCount))) estimados con 7 min por sesión y un 10% del tiempo protegido, limitado al tiempo real en Blank."
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {

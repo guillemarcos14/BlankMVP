@@ -840,8 +840,8 @@ private fun ProgressHeroCarousel(
         focusChartValues(stats.activityDays, stats.protectedMsThisWeek)
     }
     val label = if (selectedPage == 0) "Tiempo ahorrado" else "Tiempo en Blank"
-    val value = if (selectedPage == 0) formatProtectedTime(savedMs) else formatProtectedTime(stats.protectedMsThisWeek)
-    val description = if (selectedPage == 0) "Recuperadas de tu vida gracias a Blank" else "Protegidas esta semana"
+    val value = if (selectedPage == 0) formatProtectedTime(savedMs) else formatProtectedTime(stats.totalProtectedMs)
+    val description = if (selectedPage == 0) "Recuperadas de tu vida gracias a Blank" else "Protegidas con Blank"
     val chartTitle = if (selectedPage == 0) "Ahorro estimado" else "Modo Blank"
 
     Surface(
@@ -1715,13 +1715,13 @@ private fun formatProtectedTime(ms: Long): String {
 }
 
 private fun estimatedSavedMs(stats: FocusStats): Long {
-    val estimated = stats.sessionsThisWeek * 15L * 60L * 1000L
-    return estimated.coerceAtMost(stats.protectedMsThisWeek).coerceAtLeast(0L)
+    val estimated = stats.totalSessions * 15L * 60L * 1000L
+    return estimated.coerceAtMost(stats.totalProtectedMs).coerceAtLeast(0L)
 }
 
 private fun savedTimeExplanation(stats: FocusStats): String {
     val saved = formatProtectedTime(estimatedSavedMs(stats))
-    val protected = formatProtectedTime(stats.protectedMsThisWeek)
+    val protected = formatProtectedTime(stats.totalProtectedMs)
     return "Tiempo ahorrado: $saved estimados desde sesiones completadas, limitado a $protected reales en Blank."
 }
 
@@ -1959,10 +1959,10 @@ private fun emergencyCaption(emergencyUnlocksRemaining: Int): String {
 
 private fun progressInsight(stats: FocusStats, savedMs: Long): String {
     return when {
-        stats.sessionsThisWeek == 0 -> "Cuando completes tu primera sesión, Blank empezará a construir tu progreso semanal."
+        stats.totalSessions == 0 -> "Cuando completes tu primera sesión, Blank empezará a construir tu progreso semanal."
         protectionQualityScore(stats, 3) >= 90 -> "Tus sesiones están saliendo limpias: poco impulso y mucho tiempo protegido."
         stats.blockedAttemptsThisWeek >= 5 -> "Tu patrón ya es visible: Blank está interceptando varios impulsos antes de que manden ellos."
-        savedMs >= 60L * 60L * 1000L -> "Ya has recuperado más de una hora de atención esta semana."
+        savedMs >= 60L * 60L * 1000L -> "Ya has recuperado más de una hora de atención con Blank."
         stats.sessionsThisWeek >= 3 -> "La repetición empieza a contar: ya tienes varias sesiones completadas esta semana."
         stats.blockedAttemptsThisWeek > 0 -> "Blank ya ha interceptado impulsos automáticos. Esa fricción es el producto."
         else -> "Una sesión completada ya es una interrupción menos del piloto automático."

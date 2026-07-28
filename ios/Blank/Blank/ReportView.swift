@@ -31,30 +31,27 @@ struct ReportView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    heroCarousel(
-                        totalFocusTime: totalFocusTime,
+                    minimalHero(
                         savedTime: savedTime,
                         activityDays: progress.recentActivity,
                         insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
                     )
 
                     if hasProgress {
-                        progressInsightCards(
+                        weeklySummary(
                             weekly: weekly,
-                            progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
-                        )
-                        periodSummaryCards(sessions: sessionStore.sessions)
-
-                        metricList(
-                            weekly: weekly,
-                            progress: progress,
                             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
 
-                        if !progress.modeActivity.isEmpty {
-                            modesSection(progress.modeActivity)
-                        }
+                        nextStepCard(progress: progress)
+
+                        detailDisclosure(
+                            weekly: weekly,
+                            totalFocusTime: totalFocusTime,
+                            totalSessionCount: totalSessionCount,
+                            progress: progress,
+                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                        )
                     } else {
                         emptyState()
                     }
@@ -79,50 +76,31 @@ struct ReportView: View {
             }
         }
         .foregroundStyle(reportPrimary)
-        .navigationTitle("Progreso Semanal")
+        .navigationTitle("Progreso")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(reportBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
-        .onChange(of: selectedHeroPage) { _ in
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        }
     }
 
-    private func heroCarousel(
-        totalFocusTime: TimeInterval,
+    private func minimalHero(
         savedTime: TimeInterval,
         activityDays: [BlankActivityDay],
         insight: String
     ) -> some View {
-        VStack(spacing: 16) {
-            TabView(selection: $selectedHeroPage) {
-                heroPage(
-                    value: formatDuration(savedTime),
-                    description: "Tiempo recuperado",
-                    chartValues: savedSeries(from: activityDays)
-                )
-                .tag(0)
+        VStack(spacing: 22) {
+            VStack(spacing: 8) {
+                Text(formatDuration(savedTime))
+                    .font(.blankInter(size: 68, weight: .bold, relativeTo: .largeTitle))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.50)
 
-                heroPage(
-                    value: formatDuration(totalFocusTime),
-                    description: "Tiempo blankeado",
-                    chartValues: activityDays.map(\.totalFocusTime)
-                )
-                .tag(1)
+                Text("tiempo recuperado")
+                    .font(.body)
+                    .foregroundStyle(reportSecondary)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 316)
-
-            HStack(spacing: 7) {
-                ForEach(0..<2, id: \.self) { page in
-                    Capsule()
-                        .fill(page == selectedHeroPage ? reportPrimary : reportPrimary.opacity(0.18))
-                        .frame(width: page == selectedHeroPage ? 18 : 6, height: 6)
-                }
-            }
-            .animation(.easeInOut(duration: 0.22), value: selectedHeroPage)
             .frame(maxWidth: .infinity)
+            .padding(.top, 18)
 
             Text(insight)
                 .font(.footnote.weight(.medium))
@@ -132,6 +110,7 @@ struct ReportView: View {
                 .padding(.horizontal, 12)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
 
+            chartPanel(values: savedSeries(from: activityDays))
         }
     }
 
@@ -183,8 +162,81 @@ struct ReportView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 17)
+        .padding(.vertical, 15)
         .liquidGlass(cornerRadius: 26)
+    }
+
+    private func weeklySummary(
+        weekly: BlankWeeklyReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Esta semana")
+                .font(.headline)
+
+            VStack(spacing: 0) {
+                metricRow(title: "Protegidas", value: formatDuration(weekly.totalFocusTime), caption: "Tiempo en Blank")
+                subtleDivider()
+                metricRow(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Bloques de foco")
+                subtleDivider()
+                metricRow(title: "Emergencias", value: "\(emergencyUnlocksRemaining)", caption: "Restantes")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .liquidGlass(cornerRadius: 22)
+    }
+
+    private func nextStepCard(progress: BlankProgressReport) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Siguiente mejora")
+                .font(.headline)
+
+            Text(nextStepText(progress: progress))
+                .font(.body)
+                .foregroundStyle(reportSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .liquidGlass(cornerRadius: 22)
+    }
+
+    private func detailDisclosure(
+        weekly: BlankWeeklyReport,
+        totalFocusTime: TimeInterval,
+        totalSessionCount: Int,
+        progress: BlankProgressReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        DisclosureGroup {
+            VStack(spacing: 0) {
+                metricRow(title: "Tiempo blankeado", value: formatDuration(totalFocusTime), caption: "Total protegido")
+                subtleDivider()
+                metricRow(title: "Sesiones totales", value: "\(totalSessionCount)", caption: "Desde el inicio")
+                subtleDivider()
+                metricRow(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                subtleDivider()
+                metricRow(title: "Rescates usados", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+
+                if !progress.modeActivity.isEmpty {
+                    subtleDivider()
+                    ForEach(progress.modeActivity.indices, id: \.self) { index in
+                        modeRow(progress.modeActivity[index])
+                        if index < progress.modeActivity.count - 1 {
+                            subtleDivider()
+                        }
+                    }
+                }
+            }
+            .padding(.top, 8)
+        } label: {
+            Text("Ver detalle")
+                .font(.body.weight(.medium))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .liquidGlass(cornerRadius: 22)
     }
 
     private func progressInsightCards(
@@ -371,6 +423,19 @@ struct ReportView: View {
         }
 
         return "Has recuperado tiempo real sin convertirlo en otra pantalla más."
+    }
+
+    private func nextStepText(progress: BlankProgressReport) -> String {
+        guard let riskyDay = riskiestDay(activityDays: progress.recentActivity) else {
+            return "Completa unas sesiones más y Blank detectará qué momento conviene reforzar."
+        }
+
+        let dayName = weekdayName(for: riskyDay.date).lowercased(with: Locale(identifier: "es_ES"))
+        if riskyDay.sessionCount > 1 {
+            return "Tu momento de riesgo suele ser el \(dayName). Programa Blank antes de esa franja."
+        }
+
+        return "El \(dayName) fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
     }
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {

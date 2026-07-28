@@ -780,9 +780,9 @@ private fun StatsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit
 ) {
-    var selectedPage by remember { mutableStateOf(0) }
     val savedMs = estimatedSavedMs(stats)
     val insight = progressInsight(stats, savedMs)
+    var showDetail by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -791,24 +791,67 @@ private fun StatsPanel(
         item {
             ScreenHeader(title = "Progreso", onBack = onBack)
             Spacer(modifier = Modifier.height(38.dp))
-            Text(text = "Tu progreso", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Tiempo protegido por periodo, sin ruido.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = BlankOnSurface.copy(alpha = 0.72f)
-            )
         }
         item {
-            ProgressHeroCarousel(
-                selectedPage = selectedPage,
-                onPageChange = { selectedPage = it },
+            ProgressMinimalHero(
                 stats = stats,
                 savedMs = savedMs,
+                insight = insight,
                 buttonLight = buttonLight
             )
         }
         item {
+            WeeklySummaryCard(
+                stats = stats,
+                emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+                buttonLight = buttonLight
+            )
+        }
+        item {
+            NextStepCard(
+                stats = stats,
+                buttonLight = buttonLight
+            )
+        }
+        item {
+            ProgressDetailCard(
+                stats = stats,
+                emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+                buttonLight = buttonLight,
+                expanded = showDetail,
+                onToggle = { showDetail = !showDetail }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressMinimalHero(
+    stats: FocusStats,
+    savedMs: Long,
+    insight: String,
+    buttonLight: Boolean
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.Transparent
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = formatProtectedTime(savedMs),
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
+                color = BlankOnSurface,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = "tiempo recuperado",
+                style = MaterialTheme.typography.bodyLarge,
+                color = BlankOnSurface.copy(alpha = 0.68f),
+                textAlign = TextAlign.Center
+            )
             Text(
                 text = insight,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
@@ -816,14 +859,139 @@ private fun StatsPanel(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.72f),
+                shape = RoundedCornerShape(26.dp)
+            ) {
+                ProgressLineChart(
+                    title = "Tendencia semanal",
+                    values = savedChartValues(stats),
+                    buttonLight = buttonLight,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(142.dp)
+                        .padding(18.dp)
+                )
+            }
         }
-        item {
-            ProgressPeriodGrid(
-                stats = stats,
-                buttonLight = buttonLight
+    }
+}
+
+@Composable
+private fun WeeklySummaryCard(
+    stats: FocusStats,
+    emergencyUnlocksRemaining: Int,
+    buttonLight: Boolean
+) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text(text = "Esta semana", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(12.dp))
+            SummaryLine("Protegidas", formatProtectedTime(stats.protectedMsThisWeek), "Tiempo en Blank", textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Sesiones", stats.sessionsThisWeek.toString(), "Bloques de foco", textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Emergencias", emergencyUnlocksRemaining.toString(), "Restantes", textColor)
+        }
+    }
+}
+
+@Composable
+private fun NextStepCard(stats: FocusStats, buttonLight: Boolean) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text(text = "Siguiente mejora", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = nextStepText(stats),
+                color = textColor.copy(alpha = 0.66f),
+                style = MaterialTheme.typography.bodyMedium
             )
         }
     }
+}
+
+@Composable
+private fun ProgressDetailCard(
+    stats: FocusStats,
+    emergencyUnlocksRemaining: Int,
+    buttonLight: Boolean,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp),
+        onClick = onToggle
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Ver detalle",
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (expanded) "Ocultar" else "Abrir",
+                    color = textColor.copy(alpha = 0.58f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            if (expanded) {
+                Spacer(modifier = Modifier.height(10.dp))
+                SummaryLine("Tiempo blankeado", formatProtectedTime(stats.totalProtectedMs), "Total protegido", textColor)
+                ProgressDivider(textColor)
+                SummaryLine("Mejor día", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), textColor)
+                ProgressDivider(textColor)
+                SummaryLine("Rescates usados", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), textColor)
+                ProgressDivider(textColor)
+                SummaryLine("Impulsos frenados", stats.blockedAttemptsThisWeek.toString(), "Pausas creadas esta semana", textColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryLine(label: String, value: String, caption: String, textColor: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = label, color = textColor, style = MaterialTheme.typography.bodyLarge)
+            Text(text = caption, color = textColor.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
+        }
+        Text(text = value, color = textColor, style = MaterialTheme.typography.titleLarge)
+    }
+}
+
+@Composable
+private fun ProgressDivider(textColor: Color) {
+    Spacer(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(textColor.copy(alpha = 0.08f))
+    )
 }
 
 @Composable
@@ -1954,6 +2122,17 @@ private fun emergencyCaption(emergencyUnlocksRemaining: Int): String {
         used == 0 -> "Sin rescates esta semana"
         emergencyUnlocksRemaining > 0 -> "$emergencyUnlocksRemaining disponibles todavía"
         else -> "Límite semanal alcanzado"
+    }
+}
+
+private fun nextStepText(stats: FocusStats): String {
+    val riskyDay = riskiestDay(stats.activityDays)
+        ?: return "Completa unas sesiones más y Blank detectará qué momento conviene reforzar."
+    val day = dayName(riskyDay.dayOfWeek).lowercase()
+    return when {
+        riskyDay.blockedAttempts > 0 -> "Tu momento de riesgo suele ser el $day. Programa Blank antes de esa franja."
+        riskyDay.sessions > 1 -> "El $day recurres más a Blank. Refuerza esa rutina antes de abrir las apps."
+        else -> "El $day fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
     }
 }
 

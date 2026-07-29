@@ -106,7 +106,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassScrim = Color.black.opacity(0.10)
+        let glassScrim = Color.black.opacity(0.12)
         let logoReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.22),
@@ -232,9 +232,9 @@ struct HomeView: View {
     }
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 22) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -296,7 +296,7 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
-            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 178)
+            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 205)
             Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
                 if sessionStore.isBlankActive {
                     scanTag()
@@ -427,7 +427,7 @@ private struct HomeLayoutMetrics {
         let height = max(size.height, 600)
         let topSafeArea = safeAreaInsets.top > 0 ? safeAreaInsets.top : 44
         horizontalPadding = min(max(width * 0.075, 28), 36)
-        topPadding = topSafeArea + 18
+        topPadding = topSafeArea + 26
         configTopPadding = topPadding + 47 + 14
         bottomPadding = max(safeAreaInsets.bottom + 18, 34)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)
@@ -440,7 +440,7 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.14 : 0.10)
+        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.16 : 0.12)
         let capsuleReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.20),
@@ -466,7 +466,7 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 47)
+            .frame(height: 50)
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().fill(glassScrim).allowsHitTesting(false))
             .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))

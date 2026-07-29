@@ -106,7 +106,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassScrim = Color.black.opacity(0.12)
+        let glassTint = Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0).opacity(0.42)
         let logoReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.22),
@@ -148,7 +148,7 @@ struct HomeView: View {
                     .frame(width: 31, height: 31)
                     .frame(width: 47, height: 47)
                     .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().fill(glassScrim).allowsHitTesting(false))
+                    .overlay(Circle().fill(glassTint).allowsHitTesting(false))
                     .overlay(Circle().fill(logoReflection).allowsHitTesting(false))
                     .overlay(Circle().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
                     .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
@@ -170,7 +170,7 @@ struct HomeView: View {
             .padding(.horizontal, 22)
             .frame(width: 236, height: 47)
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(glassScrim).allowsHitTesting(false))
+            .overlay(Capsule().fill(glassTint).allowsHitTesting(false))
             .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
             .overlay(Capsule().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
@@ -184,6 +184,7 @@ struct HomeView: View {
             Text(title)
                 .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
+                .foregroundColor(Color.white)
                 .frame(width: 64, height: 47)
                 .contentShape(Rectangle())
         }
@@ -234,10 +235,10 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 22) {
             Text(homeTagline)
-                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineSpacing(0)
+                .lineSpacing(-2)
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
@@ -440,7 +441,7 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.16 : 0.12)
+        let glassTint = Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0).opacity(configuration.isPressed ? 0.58 : 0.48)
         let capsuleReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.20),
@@ -465,10 +466,11 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
         configuration.label
             .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
             .foregroundStyle(Color.white)
+            .foregroundColor(Color.white)
             .frame(maxWidth: .infinity)
             .frame(height: 50)
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(glassScrim).allowsHitTesting(false))
+            .overlay(Capsule().fill(glassTint).allowsHitTesting(false))
             .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
             .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)

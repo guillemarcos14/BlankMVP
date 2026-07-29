@@ -132,10 +132,10 @@ struct HomeView: View {
             Button {
                 openSettings()
             } label: {
-                Image("blank_logo_white")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 31, height: 31)
+                Image(systemName: "sparkle")
+                    .font(.system(size: 25, weight: .medium))
+                    .foregroundStyle(Color.white)
+                    .foregroundColor(Color.white)
                     .frame(width: 47, height: 47)
                     .background {
                         ZStack {

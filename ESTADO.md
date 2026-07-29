@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-29
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-29: En MacinCloud/RDP se compilo por Terminal el commit `9d7f17f` de `codex/ios-device-activity-target` con pulsaciones individuales, sin pegado. Se ejecuto `git pull --ff-only origin codex/ios-device-activity-target` y `xcodebuild -project blank.xcodeproj build`; el build termino con `** BUILD SUCCEEDED **`. `git rev-parse --short head` confirmo `9d7f17f`. Queda pendiente revision visual manual en Xcode/simulador.
 - 2026-07-29: Se ajusto solo iOS el ancho del boton principal `Blankear` en Home de 205 a 184 pt para reducir el espacio lateral respecto al texto y acercarlo mas a la proporcion de la referencia, manteniendo altura 50 pt y glass actual. Pendiente compilar en MacinCloud y revisar visualmente.
 - 2026-07-29: Se ajusto solo iOS la posicion vertical del bloque texto+boton de Home, bajandolo ligeramente de `height * 0.50` a `height * 0.52` para acercarlo al centro visual de la referencia sin hundirlo. Pendiente compilar en MacinCloud y revisar visualmente.
 - 2026-07-29: En MacinCloud/RDP se compilo por Terminal el commit `2303c95` de `codex/ios-device-activity-target` con pulsaciones individuales, sin pegado. Se ejecuto `git pull --ff-only origin codex/ios-device-activity-target` y `xcodebuild -project blank.xcodeproj build`; el build termino con `** BUILD SUCCEEDED **`. `git rev-parse --short head` confirmo `2303c95`. Queda pendiente revision visual manual en Xcode/simulador.

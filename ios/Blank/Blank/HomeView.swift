@@ -117,16 +117,6 @@ struct HomeView: View {
             startRadius: 0,
             endRadius: 52
         )
-        let capsuleReflection = RadialGradient(
-            colors: [
-                Color.white.opacity(0.20),
-                Color.white.opacity(0.06),
-                Color.white.opacity(0.00)
-            ],
-            center: .topLeading,
-            startRadius: 0,
-            endRadius: 132
-        )
         let topNavBorder = LinearGradient(
             colors: [
                 Color.white.opacity(0.42),
@@ -178,7 +168,8 @@ struct HomeView: View {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
                     Capsule().fill(glassTint)
-                    Capsule().fill(capsuleReflection)
+                    GlassCornerHighlight(width: 78, height: 30, xOffset: -79, yOffset: -15)
+                        .clipShape(Capsule())
                     Capsule().stroke(topNavBorder, lineWidth: 1)
                 }
                 .allowsHitTesting(false)
@@ -452,16 +443,6 @@ private struct HomeLayoutMetrics {
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let glassTint = Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0).opacity(configuration.isPressed ? 0.58 : 0.48)
-        let capsuleReflection = RadialGradient(
-            colors: [
-                Color.white.opacity(0.20),
-                Color.white.opacity(0.06),
-                Color.white.opacity(0.00)
-            ],
-            center: .topLeading,
-            startRadius: 0,
-            endRadius: 132
-        )
         let capsuleBorder = LinearGradient(
             colors: [
                 Color.white.opacity(0.42),
@@ -483,13 +464,39 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
                     Capsule().fill(glassTint)
-                    Capsule().fill(capsuleReflection)
+                    GlassCornerHighlight(width: 78, height: 30, xOffset: -64, yOffset: -16)
+                        .clipShape(Capsule())
                     Capsule().stroke(capsuleBorder, lineWidth: 1)
                 }
                 .allowsHitTesting(false)
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
+    }
+}
+
+private struct GlassCornerHighlight: View {
+    let width: CGFloat
+    let height: CGFloat
+    let xOffset: CGFloat
+    let yOffset: CGFloat
+
+    var body: some View {
+        Ellipse()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.24),
+                        Color.white.opacity(0.08),
+                        Color.white.opacity(0.00)
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: max(width, height) / 2
+                )
+            )
+            .frame(width: width, height: height)
+            .offset(x: xOffset, y: yOffset)
     }
 }
 

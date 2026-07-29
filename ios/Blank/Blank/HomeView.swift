@@ -1,6 +1,12 @@
 import FamilyControls
 import SwiftUI
 
+private enum SettingsRoute: Hashable {
+    case modes
+    case schedule
+    case report
+}
+
 struct HomeView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
@@ -11,10 +17,8 @@ struct HomeView: View {
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
     @State private var showingSettings = false
-    @State private var showingSchedule = false
+    @State private var settingsRoute: SettingsRoute?
     @State private var showingEmergency = false
-    @State private var showingReport = false
-    @State private var showingModes = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
@@ -62,31 +66,13 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsSheet(
+                initialRoute: $settingsRoute,
                 showingPicker: $showingPicker,
-                showingSchedule: $showingSchedule,
                 showingEmergency: $showingEmergency,
                 showingRelink: $showingRelink,
                 showingForgetConfirm: $showingForgetConfirm
             )
             .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showingReport) {
-            NavigationStack {
-                ReportView()
-            }
-            .preferredColorScheme(.light)
-        }
-        .sheet(isPresented: $showingModes) {
-            NavigationStack {
-                ModesList(showingPicker: $showingPicker) {
-                    showingModes = false
-                }
-            }
-            .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showingSchedule) {
-            ScheduleSheet()
-                .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet(emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining) {
@@ -123,11 +109,11 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassScrim = Color.black.opacity(0.18)
+        let glassScrim = Color.white.opacity(0.12)
         let logoReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.04),
+                Color.white.opacity(0.42),
+                Color.white.opacity(0.12),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -136,8 +122,8 @@ struct HomeView: View {
         )
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.14),
-                Color.white.opacity(0.035),
+                Color.white.opacity(0.36),
+                Color.white.opacity(0.10),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -157,7 +143,7 @@ struct HomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                showingSettings = true
+                openSettings()
             } label: {
                 Image("blank_logo_white")
                     .resizable()
@@ -175,13 +161,13 @@ struct HomeView: View {
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
-                    showingReport = true
+                    openSettings(.report)
                 }
                 topNavButton("Mode") {
-                    showingModes = true
+                    openSettings(.modes)
                 }
                 topNavButton("Habits") {
-                    showingSchedule = true
+                    openSettings(.schedule)
                 }
             }
             .padding(.horizontal, 22)
@@ -192,6 +178,7 @@ struct HomeView: View {
             .overlay(Capsule().stroke(topNavBorder, lineWidth: 1))
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
+        .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity)
         .frame(height: 47)
         .zIndex(2)
@@ -200,13 +187,18 @@ struct HomeView: View {
     private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
                 .frame(minWidth: 64)
                 .frame(height: 47)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func openSettings(_ route: SettingsRoute? = nil) {
+        settingsRoute = route
+        showingSettings = true
     }
 
     @ViewBuilder
@@ -246,8 +238,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-2.1)
+                .font(.blankInter(size: 33, weight: .regular, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -445,17 +436,17 @@ private struct HomeLayoutMetrics {
         messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
-        messageCenterY = height * 0.56
+        messageCenterY = height * 0.50
     }
 }
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.23 : 0.18)
+        let glassScrim = Color.white.opacity(configuration.isPressed ? 0.16 : 0.12)
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.04),
+                Color.white.opacity(0.36),
+                Color.white.opacity(0.10),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -474,7 +465,7 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
         )
 
         configuration.label
-            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
+            .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
             .frame(height: 47)
@@ -593,22 +584,19 @@ private struct ModesList: View {
 private struct SettingsSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @Binding var initialRoute: SettingsRoute?
     @Binding var showingPicker: Bool
-    @Binding var showingSchedule: Bool
     @Binding var showingEmergency: Bool
     @Binding var showingRelink: Bool
     @Binding var showingForgetConfirm: Bool
+    @State private var path: [SettingsRoute] = []
     @Environment(\.dismiss) private var dismiss
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
-                NavigationLink {
-                    ModesList(showingPicker: $showingPicker) {
-                        dismiss()
-                    }
-                } label: {
+                NavigationLink(value: SettingsRoute.modes) {
                     HStack {
                         Text("Modo")
                         Spacer()
@@ -616,14 +604,15 @@ private struct SettingsSheet: View {
                     }
                     .foregroundStyle(textColor)
                 }
-                settingsButton("Programar mi Blank", meta: "Diario") {
-                    showingSchedule = true
-                    dismiss()
+                NavigationLink(value: SettingsRoute.schedule) {
+                    HStack {
+                        Text("Programar mi Blank")
+                        Spacer()
+                        Text("Diario")
+                    }
+                    .foregroundStyle(textColor)
                 }
-                NavigationLink {
-                    ReportView()
-                        .preferredColorScheme(.light)
-                } label: {
+                NavigationLink(value: SettingsRoute.report) {
                     HStack {
                         Text("Progreso")
                         Spacer()
@@ -645,7 +634,30 @@ private struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Ajustes")
+            .navigationDestination(for: SettingsRoute.self) { route in
+                switch route {
+                case .modes:
+                    ModesList(showingPicker: $showingPicker) {
+                        dismiss()
+                    }
+                case .schedule:
+                    ScheduleEditorContent()
+                case .report:
+                    ReportView()
+                        .preferredColorScheme(.light)
+                }
+            }
             .tint(textColor)
+            .onAppear {
+                guard let initialRoute else { return }
+                path = [initialRoute]
+                self.initialRoute = nil
+            }
+            .onChange(of: initialRoute) { route in
+                guard let route else { return }
+                path = [route]
+                initialRoute = nil
+            }
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
@@ -667,7 +679,7 @@ private struct SettingsSheet: View {
     }
 }
 
-private struct ScheduleSheet: View {
+private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @State private var enabled = false
@@ -675,51 +687,49 @@ private struct ScheduleSheet: View {
     @State private var endMinute = 8 * 60
 
     var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 18) {
-                Toggle("Activar horario diario", isOn: $enabled)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+        VStack(alignment: .leading, spacing: 18) {
+            Toggle("Activar horario diario", isOn: $enabled)
+                .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
 
-                VStack(spacing: 10) {
-                    TimeMenuRow(title: "Inicio", minute: $startMinute)
-                    TimeMenuRow(title: "Fin", minute: $endMinute)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Ventana activa")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(BlankColors.mutedInk)
-                    Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
-                        .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
-                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-                Spacer(minLength: 0)
+            VStack(spacing: 10) {
+                TimeMenuRow(title: "Inicio", minute: $startMinute)
+                TimeMenuRow(title: "Fin", minute: $endMinute)
             }
-            .padding(24)
-            .navigationTitle("Horario")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
-                        sessionStore.schedule = BlankFocusSchedule(
-                            enabled: enabled,
-                            startMinute: startMinute,
-                            endMinute: endMinute
-                        )
-                        dismiss()
-                    }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Ventana activa")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(BlankColors.mutedInk)
+                Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
+                    .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
+                Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+
+            Spacer(minLength: 0)
+        }
+        .padding(24)
+        .navigationTitle("Horario")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Guardar") {
+                    sessionStore.schedule = BlankFocusSchedule(
+                        enabled: enabled,
+                        startMinute: startMinute,
+                        endMinute: endMinute
+                    )
+                    dismiss()
                 }
             }
-            .onAppear {
-                enabled = sessionStore.schedule.enabled
-                startMinute = sessionStore.schedule.startMinute
-                endMinute = sessionStore.schedule.endMinute
-            }
+        }
+        .onAppear {
+            enabled = sessionStore.schedule.enabled
+            startMinute = sessionStore.schedule.startMinute
+            endMinute = sessionStore.schedule.endMinute
         }
     }
 }

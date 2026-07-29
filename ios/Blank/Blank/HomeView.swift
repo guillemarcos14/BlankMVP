@@ -133,7 +133,7 @@ struct HomeView: View {
                 openSettings()
             } label: {
                 Image(systemName: "sparkle")
-                    .font(.system(size: 25, weight: .medium))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.white)
                     .foregroundColor(Color.white)
                     .frame(width: 47, height: 47)
@@ -298,7 +298,7 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
-            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 184)
+            let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
             Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
                 if sessionStore.isBlankActive {
                     scanTag()

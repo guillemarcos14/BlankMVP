@@ -76,6 +76,7 @@ struct SetupView: View {
                 enterSimulatorHome()
             }
             .buttonStyle(BlankSecondaryButtonStyle())
+            .frame(width: onboardingButtonWidth(for: "Entrar al Home en simulador"))
             .padding(.top, message == nil ? 18 : 10)
             #endif
             #endif
@@ -83,7 +84,7 @@ struct SetupView: View {
             Spacer(minLength: 48)
             stepIndicator
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 28)
             .padding(.vertical, 42)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -153,9 +154,11 @@ struct SetupView: View {
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(BlankColors.mutedInk)
             Text(title)
-                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
-                .lineSpacing(-1)
+                .lineSpacing(-2)
+                .lineLimit(3)
+                .minimumScaleFactor(0.78)
             Text(body)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(BlankColors.mutedInk)
@@ -169,11 +172,13 @@ struct SetupView: View {
             }
             Button(primaryTitle, action: primaryAction)
                 .buttonStyle(BlankPrimaryButtonStyle())
+                .frame(width: onboardingButtonWidth(for: primaryTitle))
                 .padding(.top, 14)
 
             if let secondaryTitle, let secondaryAction {
                 Button(secondaryTitle, action: secondaryAction)
                     .buttonStyle(BlankSecondaryButtonStyle())
+                    .frame(width: onboardingButtonWidth(for: secondaryTitle))
             }
         }
     }
@@ -264,4 +269,9 @@ struct SetupView: View {
     }
     #endif
     #endif
+
+    private func onboardingButtonWidth(for title: String) -> CGFloat {
+        let estimated = CGFloat(title.count) * 8.6 + 64
+        return min(max(estimated, 184), 260)
+    }
 }

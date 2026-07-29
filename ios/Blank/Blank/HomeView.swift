@@ -298,7 +298,7 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
-            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 205)
+            let buttonWidth = sessionStore.isBlankActive ? width : min(width, 184)
             Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
                 if sessionStore.isBlankActive {
                     scanTag()

@@ -90,7 +90,7 @@ struct ReportView: View {
         VStack(spacing: 22) {
             VStack(spacing: 8) {
                 Text(formatDuration(savedTime))
-                    .font(.blankInter(size: 68, weight: .bold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: 64, weight: .semibold, relativeTo: .largeTitle))
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
@@ -121,7 +121,7 @@ struct ReportView: View {
         VStack(spacing: 24) {
             VStack(spacing: 8) {
                 Text(value)
-                    .font(.blankInter(size: 68, weight: .bold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: 64, weight: .semibold, relativeTo: .largeTitle))
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
@@ -657,21 +657,13 @@ struct ReportView: View {
 private struct ReportLiquidBackground: View {
     var body: some View {
         ZStack {
-            BlankColors.background
-
-            Image("blank_home_background_idle")
-                .resizable()
-                .scaledToFill()
-                .opacity(0.10)
-                .saturation(0.18)
-                .contrast(0.88)
-                .blendMode(.softLight)
+            BlankAtmosphericBackground()
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.40),
-                    BlankColors.background.opacity(0.70),
-                    Color.white.opacity(0.26)
+                    Color.white.opacity(0.22),
+                    BlankColors.background.opacity(0.28),
+                    Color.white.opacity(0.14)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -685,22 +677,12 @@ private extension View {
     func liquidGlass(cornerRadius: CGFloat) -> some View {
         self
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .background(Color.white.opacity(0.28), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.72),
-                                BlankColors.ink.opacity(0.055),
-                                Color.white.opacity(0.28)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
+                    .stroke(BlankColors.glassBorder, lineWidth: 1)
             )
-            .shadow(color: BlankColors.ink.opacity(0.045), radius: 18, x: 0, y: 10)
+            .shadow(color: BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
     }
 }
 

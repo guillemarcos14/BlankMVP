@@ -12,7 +12,10 @@ struct SetupView: View {
     @State private var nfcReader = NFCReader()
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
+            BlankAtmosphericBackground()
+
+            VStack(spacing: 0) {
             header
 
             Spacer(minLength: 48)
@@ -79,11 +82,11 @@ struct SetupView: View {
 
             Spacer(minLength: 48)
             stepIndicator
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 42)
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 42)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(BlankColors.warmBackground)
         .foregroundStyle(BlankColors.ink)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
@@ -103,7 +106,7 @@ struct SetupView: View {
     private var header: some View {
         HStack {
             Text("Blank")
-                .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
             Spacer()
             HStack(spacing: 7) {
                 ForEach(0..<3, id: \.self) { index in
@@ -113,6 +116,9 @@ struct SetupView: View {
                 }
             }
         }
+        .padding(.horizontal, 16)
+        .frame(height: 48)
+        .blankGlassCard(cornerRadius: 24, tintOpacity: 0.22)
     }
 
     private var screenTimeDescription: String {
@@ -147,8 +153,9 @@ struct SetupView: View {
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(BlankColors.mutedInk)
             Text(title)
-                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
+                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
+                .lineSpacing(-1)
             Text(body)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(BlankColors.mutedInk)
@@ -181,9 +188,13 @@ struct SetupView: View {
         .foregroundStyle(BlankColors.ink)
         .padding(.horizontal, 16)
         .frame(height: 42)
-        .background(BlankColors.warmSurface)
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(BlankColors.line, lineWidth: 1))
+        .background {
+            ZStack {
+                Capsule().fill(.ultraThinMaterial)
+                Capsule().fill(Color.white.opacity(0.34))
+                Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+            }
+        }
     }
 
     private func authorizeScreenTime() {

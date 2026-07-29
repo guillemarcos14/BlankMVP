@@ -599,6 +599,8 @@ private struct ModesList: View {
         }
         .navigationTitle("Modos")
         .tint(textColor)
+        .scrollContentBackground(.hidden)
+        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
@@ -656,6 +658,8 @@ private struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Ajustes")
+            .scrollContentBackground(.hidden)
+            .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .modes:
@@ -709,32 +713,39 @@ private struct ScheduleEditorContent: View {
     @State private var endMinute = 8 * 60
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Toggle("Activar horario diario", isOn: $enabled)
-                .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+        ZStack {
+            BlankAtmosphericBackground()
 
-            VStack(spacing: 10) {
-                TimeMenuRow(title: "Inicio", minute: $startMinute)
-                TimeMenuRow(title: "Fin", minute: $endMinute)
+            VStack(alignment: .leading, spacing: 18) {
+                Toggle("Activar horario diario", isOn: $enabled)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+
+                VStack(spacing: 10) {
+                    TimeMenuRow(title: "Inicio", minute: $startMinute)
+                    TimeMenuRow(title: "Fin", minute: $endMinute)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Ventana activa")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(BlankColors.mutedInk)
+                    Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
+                        .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
+                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .blankGlassCard(cornerRadius: 22, tintOpacity: 0.32)
+
+                Spacer(minLength: 0)
             }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Ventana activa")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(BlankColors.mutedInk)
-                Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
-                    .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
-                Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-            Spacer(minLength: 0)
+            .padding(24)
         }
-        .padding(24)
         .navigationTitle("Horario")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
@@ -784,7 +795,7 @@ private struct TimeMenuRow: View {
             .foregroundStyle(BlankColors.ink)
             .padding(.horizontal, 18)
             .frame(height: 56)
-            .background(Color.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
         }
     }
 }
@@ -796,7 +807,7 @@ private struct ForgetBlankConfirmSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("He olvidado mi Blank")
-                .font(.blankSerif(size: 40, relativeTo: .largeTitle))
+                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
             Text("Esto desactiva Blank, borra la pieza NFC vinculada y vuelve al onboarding para que puedas registrar una nueva.")
                 .foregroundStyle(.secondary)
             Text("Tus modos y apps seleccionadas se mantienen.")
@@ -818,6 +829,8 @@ private struct ForgetBlankConfirmSheet: View {
             Spacer()
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BlankAtmosphericBackground())
     }
 }
 
@@ -829,7 +842,7 @@ private struct EmergencySheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Emergencia")
-                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
+                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
             Text("Esto desactiva Blank sin usar tu NFC y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
                 .foregroundStyle(.secondary)
             Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos de emergencia esta semana." : "Ya has usado tus 3 desbloqueos de emergencia esta semana.")
@@ -849,6 +862,8 @@ private struct EmergencySheet: View {
             Spacer()
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BlankAtmosphericBackground())
     }
 }
 
@@ -862,7 +877,7 @@ private struct RelinkSheet: View {
     var body: some View {
         VStack(spacing: 18) {
             Text("Nueva pieza NFC")
-                .font(.largeTitle.weight(.bold))
+                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
             Text("Blank mantendra tus apps protegidas y cambiara solo la llave fisica.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -886,6 +901,8 @@ private struct RelinkSheet: View {
             Spacer()
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(BlankAtmosphericBackground())
     }
 }
 
@@ -897,7 +914,7 @@ private struct TimerStartSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
-                .font(.blankSerif(size: 42, relativeTo: .largeTitle))
+                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
             Text("Blank se desactiva automaticamente al terminar. Si quieres salir antes, usa tu NFC o emergencia.")
                 .foregroundStyle(.secondary)
 
@@ -914,6 +931,8 @@ private struct TimerStartSheet: View {
             Spacer()
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BlankAtmosphericBackground())
     }
 
     private func formatDuration(_ minutes: Int) -> String {

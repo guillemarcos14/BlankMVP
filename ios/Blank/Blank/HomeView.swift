@@ -147,10 +147,15 @@ struct HomeView: View {
                     .scaledToFit()
                     .frame(width: 31, height: 31)
                     .frame(width: 47, height: 47)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().fill(glassTint).allowsHitTesting(false))
-                    .overlay(Circle().fill(logoReflection).allowsHitTesting(false))
-                    .overlay(Circle().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
+                    .background {
+                        ZStack {
+                            Circle().fill(.ultraThinMaterial)
+                            Circle().fill(glassTint)
+                            Circle().fill(logoReflection)
+                            Circle().stroke(topNavBorder, lineWidth: 1)
+                        }
+                        .allowsHitTesting(false)
+                    }
                     .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
                     .contentShape(Rectangle())
             }
@@ -169,10 +174,15 @@ struct HomeView: View {
             }
             .padding(.horizontal, 22)
             .frame(width: 236, height: 47)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(glassTint).allowsHitTesting(false))
-            .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
-            .overlay(Capsule().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
+            .background {
+                ZStack {
+                    Capsule().fill(.ultraThinMaterial)
+                    Capsule().fill(glassTint)
+                    Capsule().fill(capsuleReflection)
+                    Capsule().stroke(topNavBorder, lineWidth: 1)
+                }
+                .allowsHitTesting(false)
+            }
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -469,10 +479,15 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .foregroundColor(Color.white)
             .frame(maxWidth: .infinity)
             .frame(height: 50)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(glassTint).allowsHitTesting(false))
-            .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
-            .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1).allowsHitTesting(false))
+            .background {
+                ZStack {
+                    Capsule().fill(.ultraThinMaterial)
+                    Capsule().fill(glassTint)
+                    Capsule().fill(capsuleReflection)
+                    Capsule().stroke(capsuleBorder, lineWidth: 1)
+                }
+                .allowsHitTesting(false)
+            }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }

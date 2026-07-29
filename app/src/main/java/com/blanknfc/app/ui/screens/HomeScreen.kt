@@ -488,11 +488,11 @@ private fun HomeTopNav(
     ) {
         Surface(
             modifier = Modifier.shadow(
-                elevation = 10.dp,
+                elevation = 5.dp,
                 shape = RoundedCornerShape(50.dp),
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.14f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = Color.Black.copy(alpha = 0.05f),
+                spotColor = Color.Black.copy(alpha = 0.04f)
             ),
             color = HomeGlassScrim,
             shape = RoundedCornerShape(50.dp),
@@ -515,11 +515,11 @@ private fun HomeTopNav(
         Spacer(modifier = Modifier.size(8.dp))
         Surface(
             modifier = Modifier.shadow(
-                elevation = 10.dp,
+                elevation = 5.dp,
                 shape = RoundedCornerShape(50.dp),
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.14f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = Color.Black.copy(alpha = 0.05f),
+                spotColor = Color.Black.copy(alpha = 0.04f)
             ),
             color = HomeGlassScrim,
             shape = RoundedCornerShape(50.dp),
@@ -1841,10 +1841,10 @@ private fun HomeBlankearButton(
             .fillMaxWidth()
             .height(47.dp)
             .shadow(
-                elevation = 10.dp,
+                elevation = 5.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.14f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = Color.Black.copy(alpha = 0.05f),
+                spotColor = Color.Black.copy(alpha = 0.04f)
             )
             .background(capsuleReflection, RoundedCornerShape(999.dp))
     ) {

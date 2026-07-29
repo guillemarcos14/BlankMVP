@@ -168,7 +168,7 @@ struct HomeView: View {
                     .background(Circle().fill(glassScrim))
                     .overlay(Circle().fill(logoReflection))
                     .overlay(Circle().stroke(topNavBorder, lineWidth: 1))
-                    .shadow(color: Color.black.opacity(0.12), radius: 10, y: 5)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -190,7 +190,7 @@ struct HomeView: View {
             .background(Capsule().fill(glassScrim))
             .overlay(Capsule().fill(capsuleReflection))
             .overlay(Capsule().stroke(topNavBorder, lineWidth: 1))
-            .shadow(color: Color.black.opacity(0.12), radius: 10, y: 5)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 47)
@@ -482,7 +482,7 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .background(Capsule().fill(glassScrim))
             .overlay(Capsule().fill(capsuleReflection))
             .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1))
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.04 : 0.12), radius: 10, y: 5)
+            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }

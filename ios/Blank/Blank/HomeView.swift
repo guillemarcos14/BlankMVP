@@ -233,7 +233,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .black, relativeTo: .largeTitle))
+                .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -426,7 +426,7 @@ private struct HomeLayoutMetrics {
         let height = max(size.height, 600)
         let topSafeArea = safeAreaInsets.top > 0 ? safeAreaInsets.top : 44
         horizontalPadding = min(max(width * 0.075, 28), 36)
-        topPadding = topSafeArea + 10
+        topPadding = topSafeArea + 18
         configTopPadding = topPadding + 47 + 14
         bottomPadding = max(safeAreaInsets.bottom + 18, 34)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)

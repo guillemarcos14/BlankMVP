@@ -33,8 +33,13 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive)
 
-                topCluster(spacing: layout.topClusterSpacing, horizontalPadding: layout.horizontalPadding)
-                    .padding(.top, layout.topPadding)
+                topBar
+                    .position(x: layout.centerX, y: layout.topBarCenterY)
+                    .zIndex(2)
+
+                configCard
+                    .padding(.horizontal, layout.horizontalPadding)
+                    .padding(.top, layout.configTopPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                 centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
@@ -100,21 +105,12 @@ struct HomeView: View {
         }
     }
 
-    private func topCluster(spacing: CGFloat, horizontalPadding: CGFloat) -> some View {
-        VStack(spacing: spacing) {
-            topBar
-            configCard
-                .padding(.horizontal, horizontalPadding)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     private var topBar: some View {
-        let glassScrim = Color.black.opacity(0.22)
+        let glassScrim = Color.black.opacity(0.14)
         let logoReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.18),
-                Color.white.opacity(0.05),
+                Color.white.opacity(0.22),
+                Color.white.opacity(0.07),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -123,8 +119,8 @@ struct HomeView: View {
         )
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.045),
+                Color.white.opacity(0.20),
+                Color.white.opacity(0.06),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -172,7 +168,7 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, 22)
-            .frame(height: 47)
+            .frame(width: 236, height: 47)
             .background(Capsule().fill(glassScrim))
             .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().fill(capsuleReflection))
@@ -180,8 +176,7 @@ struct HomeView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .frame(height: 47)
-        .zIndex(2)
+        .frame(width: 291, height: 47)
     }
 
     private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -238,7 +233,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .regular, relativeTo: .largeTitle))
+                .font(.blankInter(size: 33, weight: .black, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -418,11 +413,12 @@ struct HomeView: View {
 private struct HomeLayoutMetrics {
     let horizontalPadding: CGFloat
     let topPadding: CGFloat
-    let topClusterSpacing: CGFloat
+    let configTopPadding: CGFloat
     let bottomPadding: CGFloat
     let messageMaxWidth: CGFloat
     let actionWidth: CGFloat
     let centerX: CGFloat
+    let topBarCenterY: CGFloat
     let messageCenterY: CGFloat
 
     init(size: CGSize, safeAreaInsets: EdgeInsets) {
@@ -431,22 +427,23 @@ private struct HomeLayoutMetrics {
         let topSafeArea = safeAreaInsets.top > 0 ? safeAreaInsets.top : 44
         horizontalPadding = min(max(width * 0.075, 28), 36)
         topPadding = topSafeArea + 10
-        topClusterSpacing = 14
+        configTopPadding = topPadding + 47 + 14
         bottomPadding = max(safeAreaInsets.bottom + 18, 34)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
+        topBarCenterY = topPadding + 47 / 2
         messageCenterY = height * 0.50
     }
 }
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.26 : 0.22)
+        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.18 : 0.14)
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.045),
+                Color.white.opacity(0.20),
+                Color.white.opacity(0.06),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,

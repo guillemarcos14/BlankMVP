@@ -436,7 +436,7 @@ private struct HomeLayoutMetrics {
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
         topBarCenterY = topPadding + 47 / 2
-        messageCenterY = height * 0.50
+        messageCenterY = height * 0.52
     }
 }
 

@@ -422,7 +422,7 @@ private fun HomePanelContent(
                 Text(
                     text = HomeTagline,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         fontSize = 34.sp,
                         lineHeight = 39.sp,
                         letterSpacing = 0.sp
@@ -456,8 +456,9 @@ private fun HomeTopNav(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GlassNavSurface(
-            isCircle = true,
+        Surface(
+            color = Color.White.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(50.dp),
             onClick = onSettings
         ) {
             Box(
@@ -472,7 +473,10 @@ private fun HomeTopNav(
             }
         }
         Spacer(modifier = Modifier.size(8.dp))
-        GlassNavSurface {
+        Surface(
+            color = Color.White.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(50.dp)
+        ) {
             Row(
                 modifier = Modifier
                     .height(52.dp)
@@ -483,82 +487,6 @@ private fun HomeTopNav(
                 HomeTopNavButton("Mode", onMode)
                 HomeTopNavButton("Timer", onTimer)
             }
-        }
-    }
-}
-
-@Composable
-private fun GlassNavSurface(
-    modifier: Modifier = Modifier,
-    isCircle: Boolean = false,
-    onClick: (() -> Unit)? = null,
-    content: @Composable () -> Unit
-) {
-    val shape = RoundedCornerShape(50.dp)
-    val clickModifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier
-
-    Surface(
-        modifier = clickModifier.shadow(
-            elevation = 8.dp,
-            shape = shape,
-            ambientColor = Color.Black.copy(alpha = 0.06f),
-            spotColor = Color.Black.copy(alpha = 0.06f)
-        ),
-        color = Color(0xFF7C8FA3).copy(alpha = 0.44f),
-        shape = shape,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
-    ) {
-        Box {
-            content()
-            GlassEdgeHighlight(
-                isCircle = isCircle,
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-    }
-}
-
-@Composable
-private fun GlassEdgeHighlight(isCircle: Boolean, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val strokeWidth = 1.dp.toPx()
-        val highlight = Color.White.copy(alpha = 0.34f)
-        val softHighlight = Color.White.copy(alpha = 0.18f)
-
-        if (isCircle) {
-            drawArc(
-                color = highlight,
-                startAngle = 205f,
-                sweepAngle = 105f,
-                useCenter = false,
-                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-            drawArc(
-                color = softHighlight,
-                startAngle = 18f,
-                sweepAngle = 44f,
-                useCenter = false,
-                topLeft = Offset(strokeWidth / 2, strokeWidth / 2),
-                size = Size(size.width - strokeWidth, size.height - strokeWidth),
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-            )
-        } else {
-            drawLine(
-                color = highlight,
-                start = Offset(size.width * 0.12f, strokeWidth / 2),
-                end = Offset(size.width * 0.62f, strokeWidth / 2),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = softHighlight,
-                start = Offset(strokeWidth / 2, size.height * 0.24f),
-                end = Offset(strokeWidth / 2, size.height * 0.72f),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round
-            )
         }
     }
 }

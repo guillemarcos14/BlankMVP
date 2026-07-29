@@ -33,8 +33,7 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive)
 
-                topCluster(spacing: layout.topClusterSpacing)
-                    .padding(.horizontal, layout.horizontalPadding)
+                topCluster(spacing: layout.topClusterSpacing, horizontalPadding: layout.horizontalPadding)
                     .padding(.top, layout.topPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
@@ -101,19 +100,21 @@ struct HomeView: View {
         }
     }
 
-    private func topCluster(spacing: CGFloat) -> some View {
+    private func topCluster(spacing: CGFloat, horizontalPadding: CGFloat) -> some View {
         VStack(spacing: spacing) {
             topBar
             configCard
+                .padding(.horizontal, horizontalPadding)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var topBar: some View {
-        let glassScrim = Color.white.opacity(0.12)
+        let glassScrim = Color.black.opacity(0.22)
         let logoReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.42),
-                Color.white.opacity(0.12),
+                Color.white.opacity(0.18),
+                Color.white.opacity(0.05),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -122,8 +123,8 @@ struct HomeView: View {
         )
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.36),
-                Color.white.opacity(0.10),
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.045),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -150,8 +151,8 @@ struct HomeView: View {
                     .scaledToFit()
                     .frame(width: 31, height: 31)
                     .frame(width: 47, height: 47)
-                    .background(.ultraThinMaterial, in: Circle())
                     .background(Circle().fill(glassScrim))
+                    .background(.ultraThinMaterial, in: Circle())
                     .overlay(Circle().fill(logoReflection))
                     .overlay(Circle().stroke(topNavBorder, lineWidth: 1))
                     .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
@@ -172,14 +173,13 @@ struct HomeView: View {
             }
             .padding(.horizontal, 22)
             .frame(height: 47)
-            .background(.ultraThinMaterial, in: Capsule())
             .background(Capsule().fill(glassScrim))
+            .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().fill(capsuleReflection))
             .overlay(Capsule().stroke(topNavBorder, lineWidth: 1))
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .frame(maxWidth: .infinity)
         .frame(height: 47)
         .zIndex(2)
     }
@@ -442,11 +442,11 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.white.opacity(configuration.isPressed ? 0.16 : 0.12)
+        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.26 : 0.22)
         let capsuleReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.36),
-                Color.white.opacity(0.10),
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.045),
                 Color.white.opacity(0.00)
             ],
             center: .topLeading,
@@ -469,8 +469,8 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
             .frame(height: 47)
-            .background(.ultraThinMaterial, in: Capsule())
             .background(Capsule().fill(glassScrim))
+            .background(.ultraThinMaterial, in: Capsule())
             .overlay(Capsule().fill(capsuleReflection))
             .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1))
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)

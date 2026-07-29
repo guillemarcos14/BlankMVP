@@ -132,8 +132,7 @@ struct HomeView: View {
                     .scaledToFit()
                     .frame(width: 34, height: 34)
                     .frame(width: 52, height: 52)
-                    .background(Color.white.opacity(0.16))
-                    .clipShape(Circle())
+                    .glassNavSurface(Circle(), shadowRadius: 8)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -151,8 +150,7 @@ struct HomeView: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 52)
-            .background(Color.white.opacity(0.16))
-            .clipShape(Capsule())
+            .glassNavSurface(Capsule(), shadowRadius: 10)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
@@ -208,7 +206,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -382,6 +380,38 @@ struct HomeView: View {
             return "\(hours)h \(minutes)m"
         }
         return "\(minutes)m"
+    }
+}
+
+private extension View {
+    func glassNavSurface<S: InsettableShape>(_ shape: S, shadowRadius: CGFloat) -> some View {
+        self
+            .background(
+                shape
+                    .fill(Color(red: 0.47, green: 0.56, blue: 0.65).opacity(0.44))
+            )
+            .overlay(
+                shape
+                    .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+            )
+            .overlay(
+                shape
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.34),
+                                Color.white.opacity(0.12),
+                                Color.white.opacity(0.03),
+                                Color.white.opacity(0.20)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: shadowRadius, y: 5)
+            .clipShape(shape)
     }
 }
 

@@ -17,7 +17,6 @@ struct HomeView: View {
     @State private var showingModes = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
-    @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -114,16 +113,6 @@ struct HomeView: View {
             }
             .presentationDetents([.medium])
         }
-        .sheet(isPresented: $showingTimer) {
-            TimerStartSheet { minutes in
-                let result = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.activateBlank(durationMinutes: minutes)
-                }
-                screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                setMessage(for: result)
-            }
-            .presentationDetents([.medium])
-        }
     }
 
     private func topCluster(spacing: CGFloat) -> some View {
@@ -134,19 +123,20 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 8) {
             Button {
                 showingSettings = true
             } label: {
                 Image("blank_logo_white")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 44, height: 44)
+                    .frame(width: 34, height: 34)
+                    .frame(width: 52, height: 52)
+                    .background(Color.white.opacity(0.16))
+                    .clipShape(Circle())
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-
-            Spacer(minLength: 10)
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
@@ -156,15 +146,16 @@ struct HomeView: View {
                     showingModes = true
                 }
                 topNavButton("Timer") {
-                    showingTimer = true
+                    showingSchedule = true
                 }
             }
             .padding(.horizontal, 16)
-            .frame(height: 44)
+            .frame(height: 52)
             .background(Color.white.opacity(0.16))
             .clipShape(Capsule())
         }
-        .frame(height: 44)
+        .frame(maxWidth: .infinity)
+        .frame(height: 52)
         .zIndex(2)
     }
 
@@ -174,7 +165,7 @@ struct HomeView: View {
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
                 .frame(minWidth: 58)
-                .frame(height: 44)
+                .frame(height: 52)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -217,10 +208,10 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 37, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 33, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineSpacing(1)
+                .lineSpacing(0)
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 

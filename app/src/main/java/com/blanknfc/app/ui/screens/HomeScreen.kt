@@ -423,8 +423,8 @@ private fun HomePanelContent(
                     text = HomeTagline,
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Medium,
-                        fontSize = 38.sp,
-                        lineHeight = 43.sp,
+                        fontSize = 34.sp,
+                        lineHeight = 39.sp,
                         letterSpacing = 0.sp
                     ),
                     color = Color.White,
@@ -453,23 +453,33 @@ private fun HomeTopNav(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = painterResource(R.drawable.blank_logo_white),
-            contentDescription = "Ajustes",
-            modifier = Modifier
-                .size(44.dp)
-                .clickable(onClick = onSettings)
-        )
+        Surface(
+            color = Color.White.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(50.dp),
+            onClick = onSettings
+        ) {
+            Box(
+                modifier = Modifier.size(52.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.blank_logo_white),
+                    contentDescription = "Ajustes",
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.size(8.dp))
         Surface(
             color = Color.White.copy(alpha = 0.16f),
             shape = RoundedCornerShape(50.dp)
         ) {
             Row(
                 modifier = Modifier
-                    .height(44.dp)
+                    .height(52.dp)
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -485,7 +495,7 @@ private fun HomeTopNav(
 private fun HomeTopNavButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .height(44.dp)
+            .height(52.dp)
             .widthIn(min = 58.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center

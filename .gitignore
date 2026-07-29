@@ -16,5 +16,12 @@ keystore.properties
 
 # Local screenshot/debug dumps
 /blank-*.png
+/screenshots/
 /screenshots/*.xml
 /screenshots/*.preferences_pb
+
+# Generated visual experiments
+/tools/generated_backgrounds/
+/web/landing/assets/blank-green-mascot*
+/web/landing/assets/blank-product-square-*.png
+/web/landing/assets/call_*.png

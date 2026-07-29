@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -112,6 +113,31 @@ private data class ProgressPeriodSummary(
 
 private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
 private const val HomeTagline = "Shaping what we\ncreate with the\npower of time."
+private val HomeGlassScrim = Color.Black.copy(alpha = 0.18f)
+
+private fun homeCapsuleBorder(): BorderStroke = BorderStroke(
+    width = 1.dp,
+    brush = Brush.linearGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.18f),
+            Color.White.copy(alpha = 0.06f),
+            Color.White.copy(alpha = 0.00f),
+            Color.Black.copy(alpha = 0.10f)
+        ),
+        start = Offset(0f, 0f),
+        end = Offset(180f, 180f)
+    )
+)
+
+private fun homeCapsuleReflection(center: Offset, radius: Float): Brush = Brush.radialGradient(
+    colors = listOf(
+        Color.White.copy(alpha = 0.16f),
+        Color.White.copy(alpha = 0.04f),
+        Color.White.copy(alpha = 0.00f)
+    ),
+    center = center,
+    radius = radius
+)
 
 @Composable
 fun HomeScreen(
@@ -422,10 +448,10 @@ private fun HomePanelContent(
                 Text(
                     text = HomeTagline,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Medium,
+                        fontWeight = FontWeight.Bold,
                         fontSize = 34.sp,
                         lineHeight = 39.sp,
-                        letterSpacing = 0.sp
+                        letterSpacing = (-1.9).sp
                     ),
                     color = Color.White,
                     textAlign = TextAlign.Center,
@@ -451,41 +477,64 @@ private fun HomeTopNav(
     onTimer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val logoReflection = homeCapsuleReflection(center = Offset(12f, 8f), radius = 52f)
+    val capsuleReflection = homeCapsuleReflection(center = Offset(34f, 8f), radius = 132f)
+    val topNavBorder = homeCapsuleBorder()
+
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            color = Color.White.copy(alpha = 0.16f),
+            modifier = Modifier.shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(50.dp),
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.14f),
+                spotColor = Color.Black.copy(alpha = 0.12f)
+            ),
+            color = HomeGlassScrim,
             shape = RoundedCornerShape(50.dp),
+            border = topNavBorder,
             onClick = onSettings
         ) {
             Box(
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier
+                    .size(47.dp)
+                    .background(logoReflection, RoundedCornerShape(50.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Image(
                     painter = painterResource(R.drawable.blank_logo_white),
                     contentDescription = "Ajustes",
-                    modifier = Modifier.size(34.dp)
+                    modifier = Modifier.size(31.dp)
                 )
             }
         }
         Spacer(modifier = Modifier.size(8.dp))
         Surface(
-            color = Color.White.copy(alpha = 0.16f),
-            shape = RoundedCornerShape(50.dp)
+            modifier = Modifier.shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(50.dp),
+                clip = false,
+                ambientColor = Color.Black.copy(alpha = 0.14f),
+                spotColor = Color.Black.copy(alpha = 0.12f)
+            ),
+            color = HomeGlassScrim,
+            shape = RoundedCornerShape(50.dp),
+            border = topNavBorder
         ) {
             Row(
                 modifier = Modifier
-                    .height(52.dp)
-                    .padding(horizontal = 16.dp),
+                    .height(47.dp)
+                    .background(capsuleReflection, RoundedCornerShape(50.dp))
+                    .padding(horizontal = 22.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HomeTopNavButton("Stats", onStats)
                 HomeTopNavButton("Mode", onMode)
-                HomeTopNavButton("Timer", onTimer)
+                HomeTopNavButton("Habits", onTimer)
             }
         }
     }
@@ -495,8 +544,8 @@ private fun HomeTopNav(
 private fun HomeTopNavButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .height(52.dp)
-            .widthIn(min = 58.dp)
+            .height(47.dp)
+            .widthIn(min = 64.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -1780,27 +1829,33 @@ private fun HomeBlankearButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Button(
+    val capsuleReflection = homeCapsuleReflection(center = Offset(34f, 8f), radius = 132f)
+    Surface(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
-            contentColor = Color.White,
-            disabledContainerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
-            disabledContentColor = Color.White
-        ),
+        color = HomeGlassScrim,
+        contentColor = Color.White,
+        border = homeCapsuleBorder(),
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp)
+            .height(47.dp)
             .shadow(
                 elevation = 10.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.06f),
-                spotColor = Color.Black.copy(alpha = 0.06f)
+                ambientColor = Color.Black.copy(alpha = 0.14f),
+                spotColor = Color.Black.copy(alpha = 0.12f)
             )
+            .background(capsuleReflection, RoundedCornerShape(999.dp))
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(capsuleReflection, RoundedCornerShape(999.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
+        }
     }
 }
 

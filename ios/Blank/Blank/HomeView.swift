@@ -123,6 +123,38 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
+        let glassScrim = Color.black.opacity(0.18)
+        let logoReflection = RadialGradient(
+            colors: [
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.00)
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: 52
+        )
+        let capsuleReflection = RadialGradient(
+            colors: [
+                Color.white.opacity(0.14),
+                Color.white.opacity(0.035),
+                Color.white.opacity(0.00)
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: 132
+        )
+        let topNavBorder = LinearGradient(
+            colors: [
+                Color.white.opacity(0.18),
+                Color.white.opacity(0.06),
+                Color.white.opacity(0.00),
+                Color.black.opacity(0.10)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+
         HStack(alignment: .center, spacing: 8) {
             Button {
                 showingSettings = true
@@ -130,10 +162,13 @@ struct HomeView: View {
                 Image("blank_logo_white")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 34, height: 34)
-                    .frame(width: 52, height: 52)
-                    .background(Color.white.opacity(0.16))
-                    .clipShape(Circle())
+                    .frame(width: 31, height: 31)
+                    .frame(width: 47, height: 47)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .background(Circle().fill(glassScrim))
+                    .overlay(Circle().fill(logoReflection))
+                    .overlay(Circle().stroke(topNavBorder, lineWidth: 1))
+                    .shadow(color: Color.black.opacity(0.12), radius: 10, y: 5)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -145,17 +180,20 @@ struct HomeView: View {
                 topNavButton("Mode") {
                     showingModes = true
                 }
-                topNavButton("Timer") {
+                topNavButton("Habits") {
                     showingSchedule = true
                 }
             }
-            .padding(.horizontal, 16)
-            .frame(height: 52)
-            .background(Color.white.opacity(0.16))
-            .clipShape(Capsule())
+            .padding(.horizontal, 22)
+            .frame(height: 47)
+            .background(.ultraThinMaterial, in: Capsule())
+            .background(Capsule().fill(glassScrim))
+            .overlay(Capsule().fill(capsuleReflection))
+            .overlay(Capsule().stroke(topNavBorder, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.12), radius: 10, y: 5)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 52)
+        .frame(height: 47)
         .zIndex(2)
     }
 
@@ -164,8 +202,8 @@ struct HomeView: View {
             Text(title)
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
-                .frame(minWidth: 58)
-                .frame(height: 52)
+                .frame(minWidth: 64)
+                .frame(height: 47)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -208,7 +246,8 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 33, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 33, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-2.1)
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
@@ -412,14 +451,38 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
+        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.23 : 0.18)
+        let capsuleReflection = RadialGradient(
+            colors: [
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.00)
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: 132
+        )
+        let capsuleBorder = LinearGradient(
+            colors: [
+                Color.white.opacity(0.18),
+                Color.white.opacity(0.06),
+                Color.white.opacity(0.00),
+                Color.black.opacity(0.10)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+
         configuration.label
             .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
-            .background(Color(red: 0.69, green: 0.70, blue: 0.72).opacity(0.82))
-            .clipShape(Capsule())
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.06), radius: 10, y: 5)
+            .frame(height: 47)
+            .background(.ultraThinMaterial, in: Capsule())
+            .background(Capsule().fill(glassScrim))
+            .overlay(Capsule().fill(capsuleReflection))
+            .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1))
+            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.04 : 0.12), radius: 10, y: 5)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }

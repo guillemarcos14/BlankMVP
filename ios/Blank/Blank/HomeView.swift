@@ -146,16 +146,16 @@ struct HomeView: View {
         )
         let topNavBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.18),
-                Color.white.opacity(0.06),
-                Color.white.opacity(0.00),
-                Color.black.opacity(0.10)
+                Color.white.opacity(0.42),
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.00)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
 
-        HStack(alignment: .center, spacing: 8) {
+        return HStack(alignment: .center, spacing: 8) {
             Button {
                 showingSettings = true
             } label: {
@@ -464,10 +464,10 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
         )
         let capsuleBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.18),
-                Color.white.opacity(0.06),
-                Color.white.opacity(0.00),
-                Color.black.opacity(0.10)
+                Color.white.opacity(0.42),
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.00)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

@@ -119,10 +119,10 @@ private fun homeCapsuleBorder(): BorderStroke = BorderStroke(
     width = 1.dp,
     brush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.18f),
-            Color.White.copy(alpha = 0.06f),
-            Color.White.copy(alpha = 0.00f),
-            Color.Black.copy(alpha = 0.10f)
+            Color.White.copy(alpha = 0.42f),
+            Color.White.copy(alpha = 0.16f),
+            Color.White.copy(alpha = 0.04f),
+            Color.White.copy(alpha = 0.00f)
         ),
         start = Offset(0f, 0f),
         end = Offset(180f, 180f)

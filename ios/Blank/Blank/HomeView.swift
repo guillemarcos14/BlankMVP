@@ -106,7 +106,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassScrim = Color.black.opacity(0.14)
+        let glassScrim = Color.black.opacity(0.10)
         let logoReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.22),
@@ -147,8 +147,8 @@ struct HomeView: View {
                     .scaledToFit()
                     .frame(width: 31, height: 31)
                     .frame(width: 47, height: 47)
-                    .background(Circle().fill(glassScrim))
                     .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().fill(glassScrim).allowsHitTesting(false))
                     .overlay(Circle().fill(logoReflection).allowsHitTesting(false))
                     .overlay(Circle().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
                     .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
@@ -169,8 +169,8 @@ struct HomeView: View {
             }
             .padding(.horizontal, 22)
             .frame(width: 236, height: 47)
-            .background(Capsule().fill(glassScrim))
             .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().fill(glassScrim).allowsHitTesting(false))
             .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
             .overlay(Capsule().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
@@ -440,7 +440,7 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankearButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.18 : 0.14)
+        let glassScrim = Color.black.opacity(configuration.isPressed ? 0.14 : 0.10)
         let capsuleReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.20),
@@ -467,8 +467,8 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .foregroundStyle(Color.white)
             .frame(maxWidth: .infinity)
             .frame(height: 47)
-            .background(Capsule().fill(glassScrim))
             .background(.ultraThinMaterial, in: Capsule())
+            .overlay(Capsule().fill(glassScrim).allowsHitTesting(false))
             .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
             .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-29
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-29: Se ajusto solo iOS el glass de top bar y boton `Blankear` para que se perciba menos solido: el material queda como base visual y el oscurecimiento negro pasa a ser un overlay translucido 0.10/0.14 con `allowsHitTesting(false)`, de modo que el contenido siga pasando a traves pero algo mas oscuro. Pendiente compilar en MacinCloud y revisar visualmente.
 - 2026-07-29: En MacinCloud/RDP se compilo por Terminal el commit `cb7f946` de `codex/ios-device-activity-target` con pulsaciones individuales, sin pegado. Desde `ios/Blank` se ejecuto `git pull --ff-only origin codex/ios-device-activity-target` y `xcodebuild -project blank.xcodeproj build`; el build termino con `** BUILD SUCCEEDED **`. `git rev-parse --short head` confirmo `cb7f946`. Queda pendiente revision visual manual por el usuario en Xcode/simulador.
 - 2026-07-29: Se cambio solo iOS el peso del titular principal de Home de Inter semibold a Inter medium para suavizarlo sin volver a regular. Pendiente compilar en MacinCloud y revisar visualmente.
 - 2026-07-29: Se corrigio solo iOS la interaccion de `Stats`, `Mode` y `Habits` en la top bar: las capas decorativas de glass/reflejo/borde ahora tienen `allowsHitTesting(false)` para no capturar los toques sobre los botones, y cada segmento queda con area tactil fija de 64x47 pt. Pendiente compilar en MacinCloud y confirmar en simulador que cada acceso abre su seccion de Ajustes.

@@ -9,90 +9,130 @@ struct HomeView: View {
     @State private var showingPicker = false
     @State private var nfcReader = NFCReader()
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let homeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
 
     var body: some View {
-        VStack(spacing: 18) {
-            Spacer()
+        ZStack {
+            homeBackground
 
-            Text(sessionStore.isBlankActive ? "BLANKED" : "UNBLANKED")
-                .font(.system(size: 46, weight: .bold))
-                .multilineTextAlignment(.center)
+            VStack(spacing: 16) {
+                Spacer()
 
-            Text(sessionStore.isBlankActive ? "Scan your NFC tag to deactivate Blank mode" : "Scan your NFC tag to activate Blank mode")
-                .font(.body)
-                .foregroundStyle(BrickColors.secondaryText)
-                .multilineTextAlignment(.center)
+                VStack(spacing: 24) {
+                    Text(homeTagline)
+                        .font(.system(size: 37, weight: .semibold))
+                        .lineSpacing(1)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.78)
+                        .foregroundStyle(.white)
 
-            if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
-                Text(elapsedText(since: blankActiveSince))
-                    .font(.system(size: 34, weight: .semibold, design: .monospaced))
-                    .padding(.top, 16)
+                    Button(action: scanTag) {
+                        Text(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: sessionStore.isBlankActive ? 320 : 178)
+                            .frame(height: 48)
+                            .background(Color(red: 0.694, green: 0.702, blue: 0.722).opacity(0.82))
+                            .clipShape(Capsule())
+                            .shadow(color: .black.opacity(0.06), radius: 10, x: 0, y: 8)
+                    }
+                    .buttonStyle(.plain)
 
-                Text("Blanked since \(blankActiveSince.formatted(date: .omitted, time: .shortened))")
-                    .font(.subheadline)
-                    .foregroundStyle(BrickColors.secondaryText.opacity(0.7))
-            }
-
-            if sessionStore.hasSelectedApps {
-                Text("\(selectionCount) selected")
-                    .font(.body)
-                    .foregroundStyle(BrickColors.secondaryText)
-                    .padding(.top, 24)
-            }
-
-            NavigationLink {
-                ReportView()
-            } label: {
-                Text("View weekly report")
-                    .font(.footnote.weight(.semibold))
-                    .underline()
-            }
-            .foregroundStyle(BrickColors.secondaryText)
-
-            Button(action: scanTag) {
-                Text("Scan NFC Tag")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(sessionStore.isBlankActive ? BrickColors.red : BrickColors.green)
-            .padding(.top, 16)
-
-            if !sessionStore.isBlankActive {
-                Button("Edit Apps") {
-                    showingPicker = true
+                    statusBlock
                 }
-                .buttonStyle(.bordered)
-                .tint(BrickColors.text)
+                .frame(maxWidth: 340)
 
-                Button("Forget NFC Tag") {
-                    sessionStore.forgetNfcTag()
-                    screenTimeBlocker.clear()
-                }
-                .foregroundStyle(BrickColors.secondaryText)
+                Spacer()
+
+                bottomLinks
             }
-
-            if let message {
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(BrickColors.secondaryText)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 8)
-            }
-
-            Spacer()
+            .padding(.horizontal, 24)
+            .padding(.vertical, 42)
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(sessionStore.isBlankActive ? BrickColors.redDark : BrickColors.background)
-        .foregroundStyle(BrickColors.text)
+        .foregroundStyle(.white)
+        .preferredColorScheme(.dark)
         .onReceive(timer) { date in
             now = date
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
+        }
+    }
+
+    private var homeBackground: some View {
+        ZStack {
+            LinearGradient(
+                colors: sessionStore.isBlankActive
+                    ? [Color(red: 0.13, green: 0.14, blue: 0.15), Color(red: 0.42, green: 0.45, blue: 0.50)]
+                    : [Color(red: 0.58, green: 0.61, blue: 0.68), Color(red: 0.80, green: 0.80, blue: 0.76)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            RadialGradient(
+                colors: [Color.white.opacity(sessionStore.isBlankActive ? 0.12 : 0.22), .clear],
+                center: .center,
+                startRadius: 40,
+                endRadius: 420
+            )
+        }
+        .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var statusBlock: some View {
+        VStack(spacing: 8) {
+            if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
+                    .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.86))
+
+                Text("Activo desde \(blankActiveSince.formatted(date: .omitted, time: .shortened))")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.70))
+            }
+
+            if sessionStore.hasSelectedApps {
+                Text("\(selectionCount) apps protegidas")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.74))
+            }
+
+            if let message {
+                Text(message)
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.74))
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    private var bottomLinks: some View {
+        VStack(spacing: 10) {
+            NavigationLink {
+                ReportView()
+            } label: {
+                Text("Progreso")
+                    .font(.footnote.weight(.semibold))
+            }
+            .foregroundStyle(.white.opacity(0.74))
+
+            if !sessionStore.isBlankActive {
+                Button("Editar apps") {
+                    showingPicker = true
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.74))
+
+                Button("Olvidar NFC") {
+                    sessionStore.forgetNfcTag()
+                    screenTimeBlocker.clear()
+                }
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.58))
+            }
         }
     }
 

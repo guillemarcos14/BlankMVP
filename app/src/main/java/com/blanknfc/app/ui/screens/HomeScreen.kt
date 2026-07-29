@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -81,7 +82,6 @@ import com.blanknfc.app.util.AppInfo
 import com.blanknfc.app.util.BatteryHelper
 import com.blanknfc.app.util.NfcHelper
 import com.blanknfc.app.util.PackageHelper
-import kotlin.random.Random
 
 private enum class HomePanel {
     HOME,
@@ -113,31 +113,7 @@ private val BackgroundThemes = listOf(
     BackgroundTheme("blank", "Blank", R.string.bg_blank_home_1, R.string.bg_blank_home_2)
 )
 
-private val LightModeMessages = listOf(
-    "Ya sé que solo querías mirar un par de stories.",
-    "No estás perdiéndote nada.",
-    "Nadie te necesita en los próximos minutos.",
-    "El scroll puede esperar.",
-    "Para un momento.",
-    "No pasa nada si no contestas ahora.",
-    "¿Hace cuánto que no miras al frente?",
-    "Venga, toca.",
-    "No te va a llegar nada importante.",
-    "Igual hay algo mejor que hacer."
-)
-
-private val DarkModeMessages = listOf(
-    "¿Ves? No pasaba nada.",
-    "Nadie se ha muerto.",
-    "Nada urgente. Como siempre.",
-    "Bien hecho.",
-    "Llevas un rato sin mirarlo. Eso es mucho.",
-    "No ha llegado nada nuevo. Ya lo decía yo.",
-    "Sigue un poco más.",
-    "El teléfono seguirá ahí.",
-    "Hoy has hecho algo difícil.",
-    "Ya está."
-)
+private const val HomeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
 
 @Composable
 fun HomeScreen(
@@ -378,12 +354,13 @@ private fun AppBackground(
     ) {
         if (!isDark) {
             Crossfade(
-                targetState = if (isBlankActive) backgroundTheme.activeResId else backgroundTheme.idleResId,
+                targetState = if (isBlankActive) R.drawable.blank_home_background_active else R.drawable.blank_home_background_idle,
                 animationSpec = tween(durationMillis = 520),
                 label = "blank_background_image"
-            ) { backgroundResId ->
-                BackgroundImage(
-                    resId = backgroundResId,
+            ) { backgroundImageResId ->
+                Image(
+                    painter = painterResource(backgroundImageResId),
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -449,32 +426,31 @@ private fun HomePanelContent(
                 },
             label = "blank_home_message"
         ) { active ->
-            val messages = if (active) DarkModeMessages else LightModeMessages
-            val message = remember(active) {
-                messages[Random.nextInt(messages.size)]
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = HomeTagline,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 38.sp,
+                        lineHeight = 43.sp
+                    ),
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                HomeBlankearButton(
+                    text = if (active) "Escanear Blank para salir" else "Blankear",
+                    enabled = !active,
+                    modifier = Modifier.widthIn(max = if (active) 342.dp else 178.dp),
+                    onClick = onMainAction
+                )
             }
-
-            Text(
-                text = message,
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
-                color = BlankOnSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
-        }
-        Crossfade(
-            targetState = isBlankActive,
-            animationSpec = tween(durationMillis = 260),
-            label = "blank_home_action",
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) { active ->
-            MainActionButton(
-                text = if (active) "Usa tu NFC para salir" else "Iniciar Blank",
-                enabled = !active,
-                light = !active,
-                onClick = onMainAction
-            )
         }
     }
 }
@@ -1157,6 +1133,37 @@ private fun ScreenHeader(
             modifier = Modifier.weight(1f),
             textAlign = TextAlign.End
         )
+    }
+}
+
+@Composable
+private fun HomeBlankearButton(
+    text: String,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(999.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFFB1B3B8).copy(alpha = 0.82f),
+            disabledContentColor = Color.White
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(999.dp),
+                ambientColor = Color.Black.copy(alpha = 0.06f),
+                spotColor = Color.Black.copy(alpha = 0.06f)
+            )
+    ) {
+        Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold))
     }
 }
 

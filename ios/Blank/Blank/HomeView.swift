@@ -149,8 +149,8 @@ struct HomeView: View {
                     .frame(width: 47, height: 47)
                     .background(Circle().fill(glassScrim))
                     .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().fill(logoReflection))
-                    .overlay(Circle().stroke(topNavBorder, lineWidth: 1))
+                    .overlay(Circle().fill(logoReflection).allowsHitTesting(false))
+                    .overlay(Circle().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
                     .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
                     .contentShape(Rectangle())
             }
@@ -171,8 +171,8 @@ struct HomeView: View {
             .frame(width: 236, height: 47)
             .background(Capsule().fill(glassScrim))
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(capsuleReflection))
-            .overlay(Capsule().stroke(topNavBorder, lineWidth: 1))
+            .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
+            .overlay(Capsule().stroke(topNavBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
@@ -184,10 +184,11 @@ struct HomeView: View {
             Text(title)
                 .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
-                .frame(minWidth: 64)
-                .frame(height: 47)
+                .frame(width: 64, height: 47)
                 .contentShape(Rectangle())
         }
+        .frame(width: 64, height: 47)
+        .contentShape(Rectangle())
         .buttonStyle(.plain)
     }
 
@@ -468,8 +469,8 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             .frame(height: 47)
             .background(Capsule().fill(glassScrim))
             .background(.ultraThinMaterial, in: Capsule())
-            .overlay(Capsule().fill(capsuleReflection))
-            .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1))
+            .overlay(Capsule().fill(capsuleReflection).allowsHitTesting(false))
+            .overlay(Capsule().stroke(capsuleBorder, lineWidth: 1).allowsHitTesting(false))
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }

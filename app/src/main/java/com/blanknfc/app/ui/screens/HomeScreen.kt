@@ -111,7 +111,7 @@ private data class ProgressPeriodSummary(
 )
 
 private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
-private const val HomeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
+private const val HomeTagline = "Shaping what we\ncreate with the\npower of time."
 
 @Composable
 fun HomeScreen(
@@ -220,6 +220,8 @@ fun HomeScreen(
                 configIssues = configIssues,
                 onSettings = { panel = HomePanel.SETTINGS },
                 onStats = { panel = HomePanel.STATS },
+                onMode = { panel = HomePanel.MODES },
+                onTimer = { panel = HomePanel.SCHEDULE },
                 onMainAction = {
                     if (currentMode.packages.isEmpty()) {
                         modeBeingEdited = currentMode
@@ -237,6 +239,9 @@ fun HomeScreen(
                 onModes = { panel = HomePanel.MODES },
                 onSchedule = {
                     panel = HomePanel.SCHEDULE
+                },
+                onStats = {
+                    panel = HomePanel.STATS
                 },
                 onRelink = {
                     panel = HomePanel.RELINK
@@ -384,11 +389,16 @@ private fun HomePanelContent(
     configIssues: List<ConfigIssue>,
     onSettings: () -> Unit,
     onStats: () -> Unit,
+    onMode: () -> Unit,
+    onTimer: () -> Unit,
     onMainAction: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        IconDotsAligned(
-            onClick = onSettings,
+        HomeTopNav(
+            onSettings = onSettings,
+            onStats = onStats,
+            onMode = onMode,
+            onTimer = onTimer,
             modifier = Modifier.align(Alignment.TopCenter)
         )
         if (configIssues.isNotEmpty()) {
@@ -412,9 +422,10 @@ private fun HomePanelContent(
                 Text(
                     text = HomeTagline,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         fontSize = 38.sp,
-                        lineHeight = 43.sp
+                        lineHeight = 43.sp,
+                        letterSpacing = 0.sp
                     ),
                     color = Color.White,
                     textAlign = TextAlign.Center,
@@ -427,16 +438,64 @@ private fun HomePanelContent(
                     modifier = Modifier.widthIn(max = if (isBlankActive) 342.dp else 178.dp),
                     onClick = onMainAction
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                TextButton(onClick = onStats) {
-                    Text(
-                        text = "Progreso",
-                        color = if (isBlankActive) Color.White.copy(alpha = 0.74f) else BlankOnSurface.copy(alpha = 0.72f),
-                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
-                    )
-                }
             }
         }
+    }
+}
+
+@Composable
+private fun HomeTopNav(
+    onSettings: () -> Unit,
+    onStats: () -> Unit,
+    onMode: () -> Unit,
+    onTimer: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(R.drawable.blank_logo_white),
+            contentDescription = "Ajustes",
+            modifier = Modifier
+                .size(44.dp)
+                .clickable(onClick = onSettings)
+        )
+        Surface(
+            color = Color.White.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(50.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .height(44.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HomeTopNavButton("Stats", onStats)
+                HomeTopNavButton("Mode", onMode)
+                HomeTopNavButton("Timer", onTimer)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeTopNavButton(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .height(44.dp)
+            .widthIn(min = 58.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+            color = Color.White,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -580,6 +639,7 @@ private fun SettingsPanel(
     onBack: () -> Unit,
     onModes: () -> Unit,
     onSchedule: () -> Unit,
+    onStats: () -> Unit,
     onRelink: () -> Unit,
     onForget: () -> Unit,
     onEmergency: () -> Unit
@@ -592,6 +652,7 @@ private fun SettingsPanel(
         val items = buildList {
             add(MenuItem("Modo", "Apps", onModes))
             add(MenuItem("Programar mi Blank", "Diario", onSchedule))
+            add(MenuItem("Progreso", "Tiempo", onStats))
             add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
             add(MenuItem("He olvidado mi Blank", "Reset", onForget))
             add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))

@@ -14,13 +14,14 @@ struct HomeView: View {
     @State private var showingSchedule = false
     @State private var showingEmergency = false
     @State private var showingReport = false
+    @State private var showingModes = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var showingTimer = false
     @State private var nfcReader = NFCReader()
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "¿Lo ves? Al final\nno era urgente,\nera costumbre."
+    private let homeTagline = "Shaping what we\ncreate with the\npower of time."
 
     var body: some View {
         GeometryReader { proxy in
@@ -76,6 +77,14 @@ struct HomeView: View {
             }
             .preferredColorScheme(.light)
         }
+        .sheet(isPresented: $showingModes) {
+            NavigationStack {
+                ModesList(showingPicker: $showingPicker) {
+                    showingModes = false
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showingSchedule) {
             ScheduleSheet()
                 .presentationDetents([.medium])
@@ -125,20 +134,50 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        ZStack {
+        HStack(alignment: .center, spacing: 14) {
             Button {
                 showingSettings = true
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.title3.weight(.bold))
+                Image("blank_logo_white")
+                    .resizable()
+                    .scaledToFit()
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
             .buttonStyle(.plain)
+
+            Spacer(minLength: 10)
+
+            HStack(spacing: 0) {
+                topNavButton("Stats") {
+                    showingReport = true
+                }
+                topNavButton("Mode") {
+                    showingModes = true
+                }
+                topNavButton("Timer") {
+                    showingTimer = true
+                }
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 44)
+            .background(Color.white.opacity(0.16))
+            .clipShape(Capsule())
         }
         .frame(height: 44)
         .zIndex(2)
+    }
+
+    private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(Color.white)
+                .frame(minWidth: 58)
+                .frame(height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -178,7 +217,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 24) {
             Text(homeTagline)
-                .font(.blankInter(size: 37, weight: .semibold, relativeTo: .largeTitle))
+                .font(.blankInter(size: 37, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(1)
@@ -254,11 +293,6 @@ struct HomeView: View {
             }
             .buttonStyle(HomeBlankearButtonStyle())
             .frame(width: buttonWidth)
-
-            Button("Progreso") {
-                showingReport = true
-            }
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.74) : BlankColors.mutedInk)
         }
     }
 
@@ -531,6 +565,17 @@ private struct SettingsSheet: View {
                 settingsButton("Programar mi Blank", meta: "Diario") {
                     showingSchedule = true
                     dismiss()
+                }
+                NavigationLink {
+                    ReportView()
+                        .preferredColorScheme(.light)
+                } label: {
+                    HStack {
+                        Text("Progreso")
+                        Spacer()
+                        Text("Tiempo")
+                    }
+                    .foregroundStyle(textColor)
                 }
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {
                     showingRelink = true

@@ -538,41 +538,30 @@ private struct ModesList: View {
     let onFinish: () -> Void
     @State private var newModeName = ""
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
         List {
-            Text("Mode")
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            TopSheetHeader(
+                title: "Mode",
+                subtitle: "Elige el modo activo de bloqueo\ny edita las apps que protege.",
+                titleColor: textColor,
+                subtitleColor: secondaryColor
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 12)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
-            Section {
-                ForEach(sessionStore.focusModes) { mode in
-                    Button {
-                        sessionStore.selectMode(mode.id)
-                        onFinish()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(mode.name)
-                                if mode.id == sessionStore.currentModeId {
-                                    Text("\(sessionStore.selectionCount) selecciones")
-                                        .font(.caption)
-                                        .foregroundStyle(secondaryColor)
-                                }
-                            }
-                            Spacer()
-                            if mode.id == sessionStore.currentModeId {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(textColor)
-                            }
-                        }
-                    }
-                    .foregroundStyle(textColor)
+            ForEach(sessionStore.focusModes) { mode in
+                modeButton(mode)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 5)
+                    .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                     .swipeActions {
                         Button(role: .destructive) {
                             sessionStore.deleteMode(mode.id)
@@ -581,41 +570,93 @@ private struct ModesList: View {
                         }
                         .disabled(sessionStore.focusModes.count <= 1)
                     }
-                }
             }
-            .listRowBackground(Color.clear)
 
-            Section {
+            VStack(spacing: 10) {
                 TextField("Trabajo profundo", text: $newModeName)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(textColor)
-                    .listRowBackground(Color.clear)
-                Button("Crear modo") {
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.24)
+
+                Button {
                     sessionStore.createMode(named: newModeName)
                     newModeName = ""
+                } label: {
+                    TopSheetPrimaryButtonLabel(title: "Crear modo")
                 }
-                .foregroundStyle(textColor)
-                .listRowBackground(Color.clear)
-            } header: {
-                Text("Crear")
-                    .foregroundStyle(textColor)
+                .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                .padding(.top, 2)
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
-            Section {
-                Button("Editar apps del modo actual") {
-                    showingPicker = true
-                    onFinish()
+            Button {
+                showingPicker = true
+                onFinish()
+            } label: {
+                HStack {
+                    Text("Editar apps del modo actual")
+                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    Spacer()
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.body.weight(.semibold))
                 }
                 .foregroundStyle(textColor)
-                .listRowBackground(Color.clear)
+                .padding(.horizontal, 18)
+                .frame(height: 56)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, 34)
+            .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
         .tint(textColor)
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private func modeButton(_ mode: BlankFocusMode) -> some View {
+        Button {
+            sessionStore.selectMode(mode.id)
+            onFinish()
+        } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(mode.name)
+                        .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
+
+                    Text(mode.id == sessionStore.currentModeId ? "\(sessionStore.selectionCount) selecciones protegidas" : "Toca para activar este modo")
+                        .font(.caption)
+                        .foregroundStyle(secondaryColor)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                if mode.id == sessionStore.currentModeId {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(textColor)
+                }
+            }
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 18)
+            .frame(height: 68)
+            .blankGlassCard(cornerRadius: 20, tintOpacity: mode.id == sessionStore.currentModeId ? 0.34 : 0.22)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -729,8 +770,10 @@ private struct ScheduleEditorContent: View {
     var body: some View {
         List {
             VStack(alignment: .center, spacing: 16) {
-                    TechnicalSheetTitle("Habits")
-                    TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
+                TopSheetHeader(
+                    title: "Habits",
+                    subtitle: "Programa cuándo Blank se activa solo\ny guarda tu horario diario."
+                )
 
                     Toggle("Horario diario", isOn: $enabled)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
@@ -754,20 +797,7 @@ private struct ScheduleEditorContent: View {
                     Button {
                         saveSchedule()
                     } label: {
-                        Text("Guardar")
-                            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-                            .foregroundStyle(BlankColors.ink)
-                            .padding(.horizontal, 24)
-                            .frame(height: 46)
-                            .background {
-                                ZStack {
-                                    Capsule().fill(.ultraThinMaterial)
-                                    Capsule().fill(Color.white.opacity(0.34))
-                                    Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
-                                }
-                                .allowsHitTesting(false)
-                            }
-                            .shadow(color: Color.black.opacity(0.025), radius: 4, y: 2)
+                        TopSheetPrimaryButtonLabel(title: "Guardar")
                     }
                     .padding(.top, 6)
             }

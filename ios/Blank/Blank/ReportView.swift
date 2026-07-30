@@ -72,20 +72,12 @@ struct ReportView: View {
     }
 
     private func reportHeader() -> some View {
-        VStack(spacing: 8) {
-            Text("Stats")
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .lineLimit(1)
-
-            Text("Una lectura ligera de lo que Blank te ha devuelto.")
-                .font(.body)
-                .foregroundStyle(reportSecondary)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-                .frame(maxWidth: 330)
-        }
-        .frame(maxWidth: .infinity)
+        TopSheetHeader(
+            title: "Stats",
+            subtitle: "Mide el tiempo que Blank te devuelve\ny resume tu ritmo de protección.",
+            titleColor: reportPrimary,
+            subtitleColor: reportSecondary
+        )
     }
 
     private func minimalHero(
@@ -763,12 +755,21 @@ private struct ReportLiquidBackground: View {
 private extension View {
     func liquidGlass(cornerRadius: CGFloat) -> some View {
         self
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .background(Color.white.opacity(0.28), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .overlay(
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.28))
+                    BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
+                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                }
+                .allowsHitTesting(false)
+            }
+            .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(BlankColors.glassBorder, lineWidth: 1)
-            )
+            }
             .shadow(color: BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
     }
 }

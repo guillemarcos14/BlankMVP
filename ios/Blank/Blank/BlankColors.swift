@@ -166,3 +166,56 @@ extension View {
         modifier(BlankGlassCardModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity))
     }
 }
+
+struct TopSheetHeader: View {
+    let title: String
+    let subtitle: String
+    var titleColor: Color = BlankColors.ink
+    var subtitleColor: Color = BlankColors.mutedInk
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .foregroundStyle(titleColor)
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+
+            Text(subtitle)
+                .font(.body)
+                .foregroundStyle(subtitleColor)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 330)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct TopSheetPrimaryButtonLabel: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+            .foregroundStyle(BlankColors.ink)
+            .padding(.horizontal, 26)
+            .frame(height: 46)
+            .background {
+                ZStack {
+                    Capsule().fill(.ultraThinMaterial)
+                    Capsule().fill(Color.white.opacity(0.34))
+                    BlankGlassCornerHighlight(width: 74, height: 28, xOffset: -44, yOffset: -15)
+                        .clipShape(Capsule())
+                }
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+            }
+            .shadow(color: BlankColors.ink.opacity(0.045), radius: 12, x: 0, y: 7)
+    }
+}

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se corrigio la tanda anterior solo iOS: `Mode` recupera el contenido completo de la seccion (lista de modos, seleccion, borrar por swipe, crear modo y editar apps) manteniendo el titulo `Mode` como texto Inter dentro del contenido; `SessionStore` deja de migrar/borrar modos y vuelve a cargar modos guardados/presets. Para `Stats`/`Habits` se retiro `safeAreaInset` y se cambio la apertura desde top bar para que las secciones sean raiz directa del sheet, no un push programatico desde `Ajustes`; ademas el sheet usa `presentationContentInteraction(.resizes)` en iOS 16.4+ para que al arrastrar se expanda antes de desplazar contenido. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `1becbfb` (`Refine iOS mode stats habits sheets`) usando pulsaciones individuales tras corregir un intento inicial que se transformo en caracteres `^V`. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se ajustaron solo iOS `Stats` y `Habits` para que al abrir desde la top bar en sheet medio se vea la parte superior real de la seccion. Las cabeceras `Stats`/`Habits` pasan a `safeAreaInset(edge: .top)` y el contenido scrollable empieza debajo: en `Stats` queda primero el hero de tiempo recuperado y al expandir aparecen ritmo/tendencia/comportamiento; en `Habits` queda primero `Horario diario` y al expandir aparecen inicio/fin/dias/nota/guardar. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se corrigio solo iOS la pantalla `Mode`: se elimino el titulo duplicado/triplicado, se sustituyo la lista por una cabecera `Mode` + descripcion con la misma tipografia/ancho/interlineado que `Stats`/`Habits` pero alineada a la izquierda, y se dejo un unico modo `Rutina diaria` con accion `Editar apps`. `SessionStore` migra los modos iOS existentes a ese unico modo preservando la seleccion de apps del modo activo. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -312,6 +313,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- La causa probable del fallo visual en `Stats`/`Habits` era la combinacion de sheet mediano + `NavigationStack(path:)` + `onAppear { path = [route] }`, que abria las secciones como destinos empujados en vez de contenido raiz. El enfoque activo elimina ese push programatico para rutas de top bar.
 - MacinCloud compila correctamente por Terminal el commit `1becbfb`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Habits` iOS ya separan cabecera fija superior y contenido scrollable para que el detent medio muestre el inicio de la seccion; pendiente revisar visualmente el comportamiento exacto al expandir.
 - `Mode` iOS queda simplificado a un unico modo `Rutina diaria`; la pantalla usa cabecera `Mode` + descripcion con el mismo bloque visual de `Stats`/`Habits`, solo alineado a la izquierda, y ya no muestra `Estudio`, `Dormir`, creacion ni headers repetidos. Pendiente build/revision visual en MacinCloud/Xcode.
@@ -424,6 +426,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente el nuevo enfoque: `Stats`, `Mode` y `Habits` deben abrir como raiz del sheet desde la top bar, mostrando la parte superior de la seccion; al arrastrar hacia arriba debe expandirse el sheet antes de empezar a scrollear contenido.
 - En MacinCloud/Xcode, compilar y revisar visualmente `Stats` y `Habits` desde la top bar: al abrir en sheet medio debe verse cabecera + primer bloque de la seccion, y al expandir deben aparecer los bloques inferiores sin que el header quede perdido fuera de pantalla.
 - En MacinCloud/Xcode, compilar y revisar visualmente `Mode`: debe verse un solo titulo `Mode`, una descripcion corta con el mismo estilo que `Stats`/`Habits` pero alineada a la izquierda, una unica fila `Rutina diaria` y el boton `Editar apps`; no deben aparecer `Estudio`, `Dormir`, `Crear` ni titulos duplicados.
 - En MacinCloud/Xcode, compilar y revisar visualmente que desaparece el `<` en `Stats`, `Mode` y `Habits`, que `Mode`/`Habits` usan naming coherente y que `Ajustes` tiene titulo Inter medium alineado a la izquierda.
@@ -540,6 +543,7 @@ Ultima actualizacion: 2026-07-30
 - [cerrada] 2026-07-12: El bypass para entrar al Home sin NFC solo puede existir en `DEBUG` y `targetEnvironment(simulator)`, nunca en TestFlight ni produccion.
 
 ## Descartado
+- 2026-07-30: Se descarta usar `safeAreaInset(edge: .top)` para fijar cabeceras de `Stats`/`Habits` porque no resolvio el problema visual y extendio el fallo a `Mode`; la solucion debe atacar la apertura/navegacion del sheet.
 - 2026-07-30: Se descarta la iteracion `75a59a5` de headers unificados, ocultacion de back buttons y cambio visual de `Mode`/`Ajustes` porque el usuario indico que no le gustaba el resultado.
 - 2026-07-29: Se descarta mantener `codex/ios-progress-stats-fix` y sus worktrees locales porque no tenia commits unicos frente a `codex/ios-device-activity-target`.
 - 2026-07-29: Se descartan los assets experimentales sin integrar de landing/mascota/producto y los dumps locales de capturas porque la landing comercial migro a Shopify y esos archivos no forman parte del flujo actual de app, soporte ni App Review.

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4bcb814` (`Refine iOS stats and schedule panels`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo de `4180705` a `4bcb814`, se entro en `ios/blank`, `git rev-parse --short head` confirmo `4bcb814` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se aplicaron solo iOS las anotaciones visuales sobre capturas actuales: `Stats` conserva `Tendencia semanal`, elimina el texto `Cada sesion cuenta...`, mantiene la explicacion del calculo mas tenue, oculta el titulo duplicado de navegacion y pasa `Comportamiento` a tres filas full-width; `Programar` oculta el titulo duplicado, evita solapes con `ScrollView` y mueve `Guardar` debajo del contenido con capsula mas discreta. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4180705` (`Match iOS habits and stats visual structure`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo a `4180705`, se entro en `ios/blank` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se completo solo iOS la aplicacion exacta del planteamiento visual a `Programar/Habits` y `Stats`: `Programar` queda como configuracion rapida con toggle `Horario diario`, filas `Inicio`, `Fin`, `Dias` y nota final; `Stats` queda separado en capsulas hero, ritmo `Hoy/Semana/Mes`, grafica semanal y comportamiento. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -305,6 +306,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud compila correctamente por Terminal el commit `4bcb814`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Programar` iOS ya no tienen doble titulo visible; `Programar` guarda desde una accion inferior y `Comportamiento` usa filas full-width. Falta compilacion MacinCloud de esta ultima tanda.
 - MacinCloud compila correctamente por Terminal el commit `4180705`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Programar/Habits` y `Stats` en iOS ya siguen el planteamiento visual acordado: configuracion rapida sin formulario grande y progreso en piezas flotantes separadas, no tabla densa. Android no se ha tocado.

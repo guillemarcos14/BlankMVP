@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `2f46fa7` (`Refine iOS section naming`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo de `75a59a5` a `2f46fa7`, se entro en `ios/blank`, `git rev-parse --short head` confirmo `2f46fa7` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se aplico una version minima solo iOS tras el revert: `Stats`, `Mode` y `Habits` ocultan el boton de atras; `Mode` abre con naming `Mode`; `Habits` sustituye el titulo `Programar` por `Habits` y anade descripcion corta; `Ajustes` deja de usar el titulo nativo en negrita y muestra `Ajustes` como texto Inter medium dentro del contenido, alineado a la izquierda. Validado en Windows con `git diff --check`; pendiente compilar/revisar en MacinCloud/Xcode.
 - 2026-07-30: Se deshizo la ultima iteracion visual de headers (`75a59a5`) y su registro de build (`5882fa2`) mediante `git revert`, porque el resultado no gustaba. `HomeView.swift` y `ReportView.swift` vuelven a coincidir con el estado de `4bcb814` para esos cambios. Validado en Windows con `git diff --check` y diff Swift vacio contra `4bcb814`; pendiente push y, si se quiere, compilar de nuevo en MacinCloud.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4bcb814` (`Refine iOS stats and schedule panels`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo de `4180705` a `4bcb814`, se entro en `ios/blank`, `git rev-parse --short head` confirmo `4bcb814` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
@@ -308,6 +309,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud compila correctamente por Terminal el commit `2f46fa7`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - Estado visual iOS activo: se conserva la estructura previa a la iteracion descartada, con correcciones puntuales de naming, back button, titulo de `Ajustes` y descripcion en `Habits`. Android no se ha tocado.
 - La ultima iteracion de headers queda revertida; el estado visual activo vuelve al de `4bcb814`: `Stats` pulido, `Programar/Habits` con guardar inferior y `Comportamiento` en filas full-width. Los botones atras/naming/header comun de `75a59a5` ya no estan aplicados.
 - MacinCloud compila correctamente por Terminal el commit `4bcb814`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.

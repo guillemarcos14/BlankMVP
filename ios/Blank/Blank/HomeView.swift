@@ -630,15 +630,15 @@ private struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {
+                settingsButton("Vincular nuevo Blank") {
                     showingRelink = true
                     dismiss()
                 }
-                settingsButton("He olvidado mi Blank", meta: "Reset") {
+                settingsButton("He olvidado mi Blank") {
                     showingForgetConfirm = true
                     dismiss()
                 }
-                settingsButton("Emergencia", meta: "Salida", role: .destructive) {
+                settingsButton("Emergencia", role: .destructive) {
                     showingEmergency = true
                     dismiss()
                 }
@@ -678,7 +678,6 @@ private struct SettingsSheet: View {
 
     private func settingsButton(
         _ label: String,
-        meta: String,
         role: ButtonRole? = nil,
         action: @escaping () -> Void
     ) -> some View {
@@ -686,7 +685,6 @@ private struct SettingsSheet: View {
             HStack {
                 Text(label)
                 Spacer()
-                Text(meta)
             }
         }
         .foregroundStyle(role == .destructive ? Color.red : textColor)
@@ -734,7 +732,7 @@ private struct ScheduleEditorContent: View {
                         .foregroundStyle(BlankColors.mutedInk)
                     Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
                         .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
-                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu NFC.")
+                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu Blank.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -815,7 +813,7 @@ private struct ForgetBlankConfirmSheet: View {
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 12) {
-            Button("Sí, olvidar mi Blank") {
+            Button("He olvidado mi Blank") {
                 onConfirm()
                 dismiss()
             }
@@ -846,12 +844,12 @@ private struct EmergencySheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Emergencia")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text("Esto desactiva Blank sin usar tu NFC y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
+            Text("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
                 .foregroundStyle(.secondary)
-            Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos de emergencia esta semana." : "Ya has usado tus 3 desbloqueos de emergencia esta semana.")
+            Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.")
                 .foregroundStyle(.secondary)
             VStack(spacing: 12) {
-            Button("Confirmar emergencia") {
+            Button("Desbloquear") {
                 if onUnlock() {
                     dismiss()
                 }
@@ -882,18 +880,18 @@ private struct RelinkSheet: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Text("Nueva pieza NFC")
+            Text("Nuevo Blank")
                 .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
-            Text("Blank mantendra tus apps protegidas y cambiara solo la llave fisica.")
+            Text("Escanea el nuevo Blank.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button("Escanear NFC") {
+            Button("Escanear nuevo Blank") {
                 nfcReader.scan { result in
                     Task { @MainActor in
                         switch result {
                         case .success(let uid):
                             sessionStore.nfcTagUid = uid
-                            message = "Nueva pieza NFC vinculada."
+                            message = "Nuevo Blank vinculado."
                             messageAction = nil
                             dismiss()
                         case .failure(let error):
@@ -921,7 +919,7 @@ private struct TimerStartSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text("Blank se desactiva automaticamente al terminar. Si quieres salir antes, usa tu NFC o emergencia.")
+            Text("Blank se desactiva automaticamente al terminar. Si quieres salir antes, usa tu Blank o emergencia.")
                 .foregroundStyle(.secondary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {

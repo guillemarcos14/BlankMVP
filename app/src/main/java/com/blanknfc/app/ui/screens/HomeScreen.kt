@@ -697,9 +697,9 @@ private fun SettingsPanel(
         Text(text = "Ajustes", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
-            add(MenuItem("He olvidado mi Blank", "Reset", onForget))
-            add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))
+            add(MenuItem("Vincular nuevo Blank", onRelink))
+            add(MenuItem("He olvidado mi Blank", onForget))
+            add(MenuItem("Emergencia", onEmergency, destructive = true))
         }
         MenuList(
             buttonLight = buttonLight,
@@ -710,7 +710,6 @@ private fun SettingsPanel(
 
 private data class MenuItem(
     val label: String,
-    val meta: String,
     val action: () -> Unit,
     val destructive: Boolean = false
 )
@@ -719,7 +718,6 @@ private data class MenuItem(
 private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
     val buttonBackground = if (buttonLight) Color.White else Color.Black
     val buttonContent = if (buttonLight) Color.Black else Color.White
-    val metaColor = buttonContent.copy(alpha = 0.72f)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { item ->
             Surface(
@@ -734,7 +732,6 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
                 ) {
                     val labelColor = if (item.destructive) Color(0xFFB3261E) else buttonContent
                     Text(text = item.label, color = labelColor, modifier = Modifier.weight(1f))
-                    Text(text = item.meta, color = metaColor, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -1693,7 +1690,7 @@ private fun ForgetConfirmPanel(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             MainActionButton(
-                text = "Sí, olvidar mi Blank",
+                text = "He olvidado mi Blank",
                 enabled = confirmed,
                 light = buttonLight,
                 onClick = onConfirm
@@ -1754,9 +1751,9 @@ private fun EmergencyPanel(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = if (emergencyUnlocksRemaining > 0)
-                        "Te quedan $emergencyUnlocksRemaining desbloqueos de emergencia esta semana."
+                        "Te quedan $emergencyUnlocksRemaining desbloqueos esta semana."
                     else
-                        "Ya has usado tus 3 desbloqueos de emergencia esta semana.",
+                        "Ya has usado tus 3 desbloqueos esta semana.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = BlankSurface.copy(alpha = 0.72f),
                     textAlign = TextAlign.Center

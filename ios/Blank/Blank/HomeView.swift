@@ -604,8 +604,6 @@ private struct ModesList: View {
                     Text("Editar apps del modo actual")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     Spacer()
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.body.weight(.semibold))
                 }
                 .foregroundStyle(textColor)
                 .padding(.horizontal, 18)
@@ -628,33 +626,29 @@ private struct ModesList: View {
     }
 
     private func modeButton(_ mode: BlankFocusMode) -> some View {
-        Button {
+        let isSelected = mode.id == sessionStore.currentModeId
+
+        return Button {
             sessionStore.selectMode(mode.id)
             onFinish()
         } label: {
-            HStack(spacing: 14) {
+            HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(mode.name)
                         .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
 
-                    Text(mode.id == sessionStore.currentModeId ? "\(sessionStore.selectionCount) selecciones protegidas" : "Toca para activar este modo")
+                    Text(isSelected ? "\(sessionStore.selectionCount) selecciones protegidas" : "Toca para activar este modo")
                         .font(.caption)
-                        .foregroundStyle(secondaryColor)
+                        .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
                         .lineLimit(1)
                 }
 
                 Spacer()
-
-                if mode.id == sessionStore.currentModeId {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(textColor)
-                }
             }
-            .foregroundStyle(textColor)
+            .foregroundStyle(isSelected ? textColor.opacity(0.84) : textColor)
             .padding(.horizontal, 18)
             .frame(height: 68)
-            .blankGlassCard(cornerRadius: 20, tintOpacity: mode.id == sessionStore.currentModeId ? 0.34 : 0.22)
+            .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
         }
         .buttonStyle(.plain)
     }
@@ -787,7 +781,7 @@ private struct ScheduleEditorContent: View {
                         StaticScheduleRow(title: "Días", value: "Todos")
                     }
 
-                    Text("Para salir antes necesitas tu NFC o emergencia.")
+                    Text("Para salir antes necesitas tu Blank o emergencia.")
                         .font(.footnote)
                         .foregroundStyle(BlankColors.mutedInk)
                         .multilineTextAlignment(.center)
@@ -869,9 +863,6 @@ private struct TimeMenuRow: View {
                 Text(formatMinute(minute))
                     .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
                     .monospacedDigit()
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(BlankColors.mutedInk)
             }
             .foregroundStyle(BlankColors.ink)
             .padding(.horizontal, 18)

@@ -803,34 +803,37 @@ private struct ForgetBlankConfirmSheet: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .center, spacing: 18) {
             Text("He olvidado mi Blank")
                 .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
+                .multilineTextAlignment(.center)
             Text("Esto desactiva Blank, borra la pieza vinculada y vuelve al onboarding para que puedas registrar una nueva.")
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Text("Tus modos y apps seleccionadas se mantienen.")
                 .font(.footnote.weight(.medium))
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
 
             VStack(spacing: 12) {
-            Button("He olvidado mi Blank") {
-                onConfirm()
-                dismiss()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle())
+                Button("He olvidado mi Blank") {
+                    onConfirm()
+                    dismiss()
+                }
+                .buttonStyle(BlankPrimaryButtonStyle())
 
-            Button("Cancelar") {
-                dismiss()
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+                Button("Cancelar") {
+                    dismiss()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
 
             Spacer()
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(BlankAtmosphericBackground())
     }
 }
@@ -841,32 +844,35 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .center, spacing: 18) {
             Text("Emergencia")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
+                .multilineTextAlignment(.center)
             Text("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.")
+                .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             VStack(spacing: 12) {
-            Button("Desbloquear") {
-                if onUnlock() {
+                Button("Desbloquear") {
+                    if onUnlock() {
+                        dismiss()
+                    }
+                }
+                .buttonStyle(BlankPrimaryButtonStyle())
+                .disabled(emergencyUnlocksRemaining <= 0)
+                Button("Cancelar") {
                     dismiss()
                 }
-            }
-            .buttonStyle(BlankPrimaryButtonStyle())
-            .disabled(emergencyUnlocksRemaining <= 0)
-            Button("Cancelar") {
-                dismiss()
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Spacer()
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(BlankAtmosphericBackground())
     }
 }
@@ -882,26 +888,36 @@ private struct RelinkSheet: View {
         VStack(spacing: 18) {
             Text("Nuevo Blank")
                 .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
-            Text("Escanea el nuevo Blank.")
+                .multilineTextAlignment(.center)
+            Text("Escanea el nuevo Blank para sustituir el que tienes vinculado. Tus modos y apps protegidas se mantienen.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button("Escanear nuevo Blank") {
-                nfcReader.scan { result in
-                    Task { @MainActor in
-                        switch result {
-                        case .success(let uid):
-                            sessionStore.nfcTagUid = uid
-                            message = "Nuevo Blank vinculado."
-                            messageAction = nil
-                            dismiss()
-                        case .failure(let error):
-                            message = error.localizedDescription
-                            messageAction = nil
+            VStack(spacing: 12) {
+                Button("Escanear nuevo Blank") {
+                    nfcReader.scan { result in
+                        Task { @MainActor in
+                            switch result {
+                            case .success(let uid):
+                                sessionStore.nfcTagUid = uid
+                                message = "Nuevo Blank vinculado."
+                                messageAction = nil
+                                dismiss()
+                            case .failure(let error):
+                                message = error.localizedDescription
+                                messageAction = nil
+                            }
                         }
                     }
                 }
+                .buttonStyle(BlankPrimaryButtonStyle())
+
+                Button("Cancelar") {
+                    dismiss()
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
             }
-            .buttonStyle(BlankPrimaryButtonStyle())
+            .frame(maxWidth: .infinity)
             Spacer()
         }
         .padding(24)

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4180705` (`Match iOS habits and stats visual structure`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo a `4180705`, se entro en `ios/blank` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se completo solo iOS la aplicacion exacta del planteamiento visual a `Programar/Habits` y `Stats`: `Programar` queda como configuracion rapida con toggle `Horario diario`, filas `Inicio`, `Fin`, `Dias` y nota final; `Stats` queda separado en capsulas hero, ritmo `Hoy/Semana/Mes`, grafica semanal y comportamiento. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se extendio solo iOS la nueva arquitectura visual a `Habits` y `Stats`: `ScheduleEditorContent` usa cabecera/descripcion tecnica centrada y `ReportView` usa cabecera `Stats`, hero en glass y estadisticas semanales en capsulas independientes. Se comprobo que Android no tiene diff y `git diff --check` no reporta errores; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se implemento solo iOS la arquitectura visual comun para las hojas tecnicas de Ajustes: `TechnicalSettingsSheetLayout`, `TechnicalSheetTitle`, `TechnicalSheetDescription` y `TechnicalSheetActions`. Los titulos bajan a 34 pt Inter medium con ancho maximo, las descripciones quedan centradas con ancho maximo y las acciones tienen mas aire superior. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -303,6 +304,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud compila correctamente por Terminal el commit `4180705`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Programar/Habits` y `Stats` en iOS ya siguen el planteamiento visual acordado: configuracion rapida sin formulario grande y progreso en piezas flotantes separadas, no tabla densa. Android no se ha tocado.
 - `Habits` y `Stats` en iOS ya reciben la nueva direccion visual inspirada en `Mode`: contenido centrado, titulos Inter medium compactos y superficies/capsulas glass independientes. Android sigue sin cambios en esta tanda.
 - Las hojas tecnicas iOS de Ajustes comparten arquitectura visual: titulo compacto, descripcion centrada de ancho limitado y bloque de acciones consistente. Android sigue fuera de alcance en esta iteracion.

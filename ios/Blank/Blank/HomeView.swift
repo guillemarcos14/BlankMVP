@@ -534,85 +534,79 @@ private struct ModesList: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
-    @State private var newModeName = ""
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        List {
-            Section {
-                ForEach(sessionStore.focusModes) { mode in
-                    Button {
-                        sessionStore.selectMode(mode.id)
-                        onFinish()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(mode.name)
-                                if mode.id == sessionStore.currentModeId {
-                                    Text("\(sessionStore.selectionCount) selecciones")
-                                        .font(.caption)
-                                        .foregroundStyle(secondaryColor)
-                                }
-                            }
-                            Spacer()
-                            if mode.id == sessionStore.currentModeId {
-                                Image(systemName: "checkmark")
+        ZStack {
+            BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    modeHeader
+
+                    VStack(spacing: 14) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Rutina diaria")
+                                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
                                     .foregroundStyle(textColor)
+
+                                Text("\(sessionStore.selectionCount) selecciones")
+                                    .font(.footnote)
+                                    .foregroundStyle(secondaryColor)
                             }
+
+                            Spacer()
+
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(textColor)
                         }
-                    }
-                    .foregroundStyle(textColor)
-                    .listRowBackground(Color.clear)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            sessionStore.deleteMode(mode.id)
+
+                        Button {
+                            showingPicker = true
+                            onFinish()
                         } label: {
-                            Label("Eliminar", systemImage: "trash")
+                            Text("Editar apps")
+                                .frame(maxWidth: .infinity)
                         }
-                        .disabled(sessionStore.focusModes.count <= 1)
+                        .buttonStyle(BlankSecondaryButtonStyle())
                     }
+                    .padding(18)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: sessionStore.isBlankActive ? 0.18 : 0.30)
+                    .padding(.top, 8)
+                    .frame(maxWidth: 342)
                 }
-            } header: {
-                Text("Mode")
-                    .foregroundStyle(textColor)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 34)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .listRowBackground(Color.clear)
-
-            Section {
-                TextField("Trabajo profundo", text: $newModeName)
-                    .foregroundStyle(textColor)
-                    .listRowBackground(Color.clear)
-                Button("Crear modo") {
-                    sessionStore.createMode(named: newModeName)
-                    newModeName = ""
-                }
-                .foregroundStyle(textColor)
-                .listRowBackground(Color.clear)
-            } header: {
-                Text("Crear")
-                    .foregroundStyle(textColor)
-            }
-            .listRowBackground(Color.clear)
-
-            Section {
-                Button("Editar apps del modo actual") {
-                    showingPicker = true
-                    onFinish()
-                }
-                .foregroundStyle(textColor)
-                .listRowBackground(Color.clear)
-            }
-            .listRowBackground(Color.clear)
         }
-        .navigationTitle("Mode")
+        .navigationTitle("")
         .navigationBarBackButtonHidden(true)
         .tint(textColor)
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
         .toolbarBackground(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private var modeHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Mode")
+                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+                .foregroundStyle(textColor)
+
+            Text("Elige que apps bloquea Blank cuando entras en rutina.")
+                .font(.body)
+                .foregroundStyle(secondaryColor)
+                .multilineTextAlignment(.leading)
+                .lineSpacing(2)
+                .frame(maxWidth: 330, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -725,9 +719,6 @@ private struct ScheduleEditorContent: View {
 
             ScrollView {
                 VStack(alignment: .center, spacing: 16) {
-                    TechnicalSheetTitle("Habits")
-                    TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
-
                     Toggle("Horario diario", isOn: $enabled)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                         .padding(.horizontal, 18)
@@ -769,8 +760,18 @@ private struct ScheduleEditorContent: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
-                .padding(.top, 24)
+                .padding(.top, 10)
                 .padding(.bottom, 34)
+            }
+            .safeAreaInset(edge: .top, spacing: 12) {
+                VStack(alignment: .center, spacing: 8) {
+                    TechnicalSheetTitle("Habits")
+                    TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 2)
             }
         }
         .navigationTitle("")

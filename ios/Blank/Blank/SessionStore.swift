@@ -81,12 +81,14 @@ final class SessionStore: ObservableObject {
         }
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
-        let loadedSelection = Self.loadSelection(from: defaults)
-        let loadedFocusModes = Self.loadFocusModes(from: defaults, fallbackSelection: loadedSelection)
         let storedModeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:))
-        let loadedModeId = storedModeId.flatMap { id in loadedFocusModes.first(where: { $0.id == id })?.id }
-            ?? loadedFocusModes.first?.id
-            ?? Self.defaultModeId
+        let loadedSelection = Self.loadSelection(from: defaults)
+        let loadedFocusModes = Self.loadFocusModes(
+            from: defaults,
+            fallbackSelection: loadedSelection,
+            preferredModeId: storedModeId
+        )
+        let loadedModeId = loadedFocusModes.first?.id ?? Self.defaultModeId
 
         selection = loadedSelection
         sessions = Self.loadSessions(from: defaults)
@@ -115,6 +117,10 @@ final class SessionStore: ObservableObject {
         if let currentSelection = Self.selection(from: currentMode.selectionData) {
             selection = currentSelection
         }
+
+        saveSelection(selection)
+        saveFocusModes(focusModes)
+        defaults.set(currentModeId.uuidString, forKey: Keys.currentModeId)
     }
 
     var currentMode: BlankFocusMode {
@@ -387,17 +393,33 @@ final class SessionStore: ObservableObject {
         return decoded
     }
 
-    private static func loadFocusModes(from defaults: UserDefaults, fallbackSelection: FamilyActivitySelection) -> [BlankFocusMode] {
+    private static func loadFocusModes(
+        from defaults: UserDefaults,
+        fallbackSelection: FamilyActivitySelection,
+        preferredModeId: UUID?
+    ) -> [BlankFocusMode] {
+        let fallbackSelectionData = encodedSelection(fallbackSelection)
+
         if let data = defaults.data(forKey: Keys.focusModes),
            let decoded = try? JSONDecoder().decode([BlankFocusMode].self, from: data),
            !decoded.isEmpty {
-            return decoded
+            let sourceMode = preferredModeId.flatMap { id in decoded.first { $0.id == id } }
+                ?? decoded.first { $0.id == Self.defaultModeId }
+                ?? decoded[0]
+
+            return [
+                BlankFocusMode(
+                    id: Self.defaultModeId,
+                    name: "Rutina diaria",
+                    selectionData: sourceMode.selectionData ?? fallbackSelectionData,
+                    createdAt: sourceMode.createdAt,
+                    updatedAt: Date()
+                )
+            ]
         }
 
         return [
-            BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria", selectionData: encodedSelection(fallbackSelection)),
-            BlankFocusMode(name: "Estudio"),
-            BlankFocusMode(name: "Dormir")
+            BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria", selectionData: fallbackSelectionData)
         ]
     }
 

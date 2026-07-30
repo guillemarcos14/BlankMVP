@@ -30,8 +30,6 @@ struct ReportView: View {
 
             ScrollView {
                 VStack(alignment: .center, spacing: 22) {
-                    reportHeader()
-
                     minimalHero(
                         savedTime: savedTime,
                         insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
@@ -62,8 +60,14 @@ struct ReportView: View {
                         .padding(.top, 2)
                 }
                 .padding(.horizontal, 22)
-                .padding(.top, 24)
+                .padding(.top, 10)
                 .padding(.bottom, 34)
+            }
+            .safeAreaInset(edge: .top, spacing: 12) {
+                reportHeader()
+                    .padding(.horizontal, 22)
+                    .padding(.top, 24)
+                    .padding(.bottom, 2)
             }
         }
         .foregroundStyle(reportPrimary)

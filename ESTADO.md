@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se subio el commit `8820bb8` (`Unify top sheet visual style`) con la pasada de uniformidad visual. Se intento compilar en MacinCloud despues del push, pero RDP estaba en pantalla de login; queda pendiente entrar de nuevo y ejecutar la compilacion por Terminal con pulsaciones individuales.
 - 2026-07-30: Se aplico una pasada de uniformidad visual solo iOS sobre las tres secciones top bar: `Stats`, `Mode` y `Habits` comparten cabecera centrada `TopSheetHeader` con subtitulo funcional en dos lineas; `Mode` deja de usar secciones nativas y pasa a filas/cards glass; los botones principales usan `TopSheetPrimaryButtonLabel`; las cards `liquidGlass` de `Stats` incorporan el brillo superior izquierdo de la pantalla principal. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: El usuario confirmo en revision visual que el cambio de `Stats`/`Habits` a `List` como raiz directa sin `ZStack` exterior si soluciono el problema de apertura desde top bar en sheet medio. La causa practica queda cerrada: el `ZStack` exterior alrededor de las listas hacia que la sheet mostrase una posicion inicial incorrecta; `Mode` funcionaba porque ya tenia `List` como raiz directa.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4aeef97` usando pulsaciones individuales. Secuencia efectiva: `cd ../..` desde `ios/blank`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
@@ -327,6 +328,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- El commit remoto pendiente de compilar en MacinCloud es `8820bb8`; no se pudo validar por Terminal porque RDP esta en login.
 - Pendiente compilar/revisar visualmente la pasada de uniformidad: brillo superior izquierdo en cards glass, subtitulos de dos lineas en `Stats`/`Mode`/`Habits` y `Mode` redisenado como panel glass.
 - `Stats` y `Habits` abren correctamente desde la top bar en sheet medio tras quitar el `ZStack` exterior y dejar la `List` como raiz directa, igual que `Mode`.
 - MacinCloud compila correctamente por Terminal el commit `4aeef97`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.

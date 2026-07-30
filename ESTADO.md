@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: El usuario confirmo en revision visual que el cambio de `Stats`/`Habits` a `List` como raiz directa sin `ZStack` exterior si soluciono el problema de apertura desde top bar en sheet medio. La causa practica queda cerrada: el `ZStack` exterior alrededor de las listas hacia que la sheet mostrase una posicion inicial incorrecta; `Mode` funcionaba porque ya tenia `List` como raiz directa.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4aeef97` usando pulsaciones individuales. Secuencia efectiva: `cd ../..` desde `ios/blank`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se subio el commit `240466c` (`Use direct list roots for top sheets`) con `Stats`/`Habits` usando `List` como raiz directa sin `ZStack` exterior. Se intento compilar en MacinCloud despues del push, pero la sesion RDP estaba en pantalla de login; queda pendiente entrar de nuevo y ejecutar la compilacion por Terminal con pulsaciones individuales.
 - 2026-07-30: Como retirar `.presentationContentInteraction(.resizes)` tampoco soluciono el fallo visual, se aplico el siguiente enfoque solo iOS: `Stats` (`ReportView`) y `Habits` (`ScheduleEditorContent`) dejan de estar envueltos por `ZStack`; ahora la `List` es la raiz directa igual que en `Mode`, y el fondo pasa a `.background(... .ignoresSafeArea())`. Se mantiene contenido, titulos, cards y layout interno. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -325,8 +326,8 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- `Stats` y `Habits` abren correctamente desde la top bar en sheet medio tras quitar el `ZStack` exterior y dejar la `List` como raiz directa, igual que `Mode`.
 - MacinCloud compila correctamente por Terminal el commit `4aeef97`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
-- El enfoque activo pendiente de compilar/revisar es igualar la forma raiz de `Stats` y `Habits` a `Mode`: `List` directa como raiz de la seccion, sin `ZStack` exterior.
 - MacinCloud compila correctamente por Terminal el commit `6ad3590`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - El enfoque activo para corregir la apertura de `Stats`/`Habits` desde top bar ya no depende de `.presentationContentInteraction(.resizes)`: ese modificador se retiro del sheet principal porque `List` no resolvio el fallo visual.
 - MacinCloud compila correctamente por Terminal el commit `4ee49e2`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
@@ -546,6 +547,7 @@ Ultima actualizacion: 2026-07-30
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-30: Para secciones top bar en sheets medianos (`Stats`, `Mode`, `Habits`), la raiz visual debe ser la `List` directa; los fondos se aplican con `.background(...)`, no envolviendo la lista en `ZStack`, porque ese envoltorio desplaza/rompe la posicion inicial del contenido.
 - [cerrada] 2026-07-30: `Ajustes` queda reservado para acciones tecnicas/de recuperacion (`Vincular nuevo NFC`, `He olvidado mi Blank`, `Emergencia`); las secciones de uso diario (`Stats`/Progreso, `Mode`/Modos y `Habits`/Programacion) se acceden desde la top bar, no desde la lista principal de Ajustes.
 - [cerrada] 2026-07-29: La seccion superior de Home muestra `Stats`, `Mode` y `Timer` como accesos cortos a la derecha del logo; el logo de Blank abre el resto de `Ajustes`.
 - [cerrada] 2026-07-29: `Progreso` deja de mostrarse como enlace secundario bajo el CTA principal; si aparece en Home, debe ser como acceso corto `Stats` dentro de la top bar.

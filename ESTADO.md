@@ -8,6 +8,8 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Como el commit `4ee49e2` (`Stats`/`Habits` con `List`) compilo pero no corrigio el fallo visual buscado, se ataco el siguiente sospechoso: se elimino `.presentationContentInteraction(.resizes)` del sheet principal de Ajustes/top bar. El sheet mantiene detents `.medium`/`.large` y fondo transparente, pero deja que el contenido scrollable gestione su posicion sin forzar primero el resize. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4ee49e2` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Al comparar `Mode` contra `Stats`/`Habits`, se encontro una diferencia estructural relevante: `Mode` usa `List` y funciona bien en sheet medio, mientras `Stats` y `Habits` usaban `ScrollView` dentro de `ZStack`. Se cambio solo el contenedor scrollable de `Stats` y `Habits` de `ScrollView` a `List` con fondo/row transparentes, manteniendo intacto el contenido visual. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `768337b` (`Remove navigation wrapper from top sheet routes`) usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se repasaron interferencias del fallo persistente en `Stats`/`Habits`. Se identifico que las rutas directas de top bar seguian envueltas por `NavigationStack` y modificadores de navigation bar invisibles; esto podia reservar/ocultar altura superior y dejar el header fuera del sheet medio. Se cambio `SettingsSheet` para que solo `Ajustes` use `NavigationStack`; `Stats`, `Mode` y `Habits` se renderizan sin contenedor de navegacion ni modificadores de barra. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -318,6 +320,8 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- El enfoque activo para corregir la apertura de `Stats`/`Habits` desde top bar ya no depende de `.presentationContentInteraction(.resizes)`: ese modificador se retiro del sheet principal porque `List` no resolvio el fallo visual.
+- MacinCloud compila correctamente por Terminal el commit `4ee49e2`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats`, `Mode` y `Habits` usan ahora `List` como contenedor scrollable cuando se abren desde la top bar; esto elimina la diferencia `ScrollView` vs `List` que podia estar causando que el sheet medio saltase el header en `Stats`/`Habits`.
 - MacinCloud compila correctamente por Terminal el commit `768337b`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - En iOS, `Stats`/`Mode`/`Habits` ya no deberian heredar barra de navegacion invisible al abrir desde la top bar; solo `Ajustes` conserva `NavigationStack`. Falta confirmar visualmente en Xcode/MacinCloud.
@@ -435,8 +439,9 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/RDP, hacer pull del proximo commit y compilar por Terminal con pulsaciones individuales; despues revisar visualmente en Xcode que `Stats` y `Habits` abren desde top bar mostrando cabecera/primer bloque en sheet medio.
 - En MacinCloud/Xcode, compilar y revisar visualmente el cambio `ScrollView -> List` en `Stats` y `Habits`: deben abrir mostrando titulo/descripcion arriba igual que `Mode`.
-- En MacinCloud/Xcode, compilar y revisar visualmente especificamente si al abrir `Stats` y `Habits` se ve el titulo/descripcion arriba; si persiste, el siguiente sospechoso seria `.presentationContentInteraction(.resizes)` o el uso de `ScrollView` dentro de sheet con detent medio.
+- En MacinCloud/Xcode, compilar y revisar visualmente especificamente si al abrir `Stats` y `Habits` se ve el titulo/descripcion arriba tras retirar `.presentationContentInteraction(.resizes)`.
 - En MacinCloud/Xcode, compilar y revisar visualmente el nuevo enfoque: `Stats`, `Mode` y `Habits` deben abrir como raiz del sheet desde la top bar, mostrando la parte superior de la seccion; al arrastrar hacia arriba debe expandirse el sheet antes de empezar a scrollear contenido.
 - En MacinCloud/Xcode, compilar y revisar visualmente `Stats` y `Habits` desde la top bar: al abrir en sheet medio debe verse cabecera + primer bloque de la seccion, y al expandir deben aparecer los bloques inferiores sin que el header quede perdido fuera de pantalla.
 - En MacinCloud/Xcode, compilar y revisar visualmente `Mode`: debe verse un solo titulo `Mode`, una descripcion corta con el mismo estilo que `Stats`/`Habits` pero alineada a la izquierda, una unica fila `Rutina diaria` y el boton `Editar apps`; no deben aparecer `Estudio`, `Dormir`, `Crear` ni titulos duplicados.
@@ -554,6 +559,7 @@ Ultima actualizacion: 2026-07-30
 - [cerrada] 2026-07-12: El bypass para entrar al Home sin NFC solo puede existir en `DEBUG` y `targetEnvironment(simulator)`, nunca en TestFlight ni produccion.
 
 ## Descartado
+- 2026-07-30: Se descarta que igualar `Stats`/`Habits` a `Mode` cambiando solo `ScrollView -> List` sea suficiente, porque el commit `4ee49e2` compilo pero el usuario confirmo que no corrigio los errores visuales buscados.
 - 2026-07-30: Se descarta usar `safeAreaInset(edge: .top)` para fijar cabeceras de `Stats`/`Habits` porque no resolvio el problema visual y extendio el fallo a `Mode`; la solucion debe atacar la apertura/navegacion del sheet.
 - 2026-07-30: Se descarta la iteracion `75a59a5` de headers unificados, ocultacion de back buttons y cambio visual de `Mode`/`Ajustes` porque el usuario indico que no le gustaba el resultado.
 - 2026-07-29: Se descarta mantener `codex/ios-progress-stats-fix` y sus worktrees locales porque no tenia commits unicos frente a `codex/ios-device-activity-target`.

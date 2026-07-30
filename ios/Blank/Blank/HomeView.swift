@@ -79,7 +79,6 @@ struct HomeView: View {
                 showingForgetConfirm: $showingForgetConfirm
             )
             .presentationDetents([.medium, .large])
-            .blankResizablePresentation()
             .blankTransparentPresentation()
         }
         .sheet(isPresented: $showingEmergency) {
@@ -718,14 +717,6 @@ private extension View {
         }
     }
 
-    @ViewBuilder
-    func blankResizablePresentation() -> some View {
-        if #available(iOS 16.4, *) {
-            self.presentationContentInteraction(.resizes)
-        } else {
-            self
-        }
-    }
 }
 
 private struct ScheduleEditorContent: View {

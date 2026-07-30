@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `768337b` (`Remove navigation wrapper from top sheet routes`) usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se repasaron interferencias del fallo persistente en `Stats`/`Habits`. Se identifico que las rutas directas de top bar seguian envueltas por `NavigationStack` y modificadores de navigation bar invisibles; esto podia reservar/ocultar altura superior y dejar el header fuera del sheet medio. Se cambio `SettingsSheet` para que solo `Ajustes` use `NavigationStack`; `Stats`, `Mode` y `Habits` se renderizan sin contenedor de navegacion ni modificadores de barra. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `39aab6a` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se intento compilar en MacinCloud la correccion `2729860`, pero la sesion RDP habia vuelto a pantalla de login y no se pudo continuar sin credenciales. Queda pendiente entrar de nuevo en MacinCloud y ejecutar la secuencia de Terminal con pulsaciones individuales.
@@ -316,6 +317,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- MacinCloud compila correctamente por Terminal el commit `768337b`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - En iOS, `Stats`/`Mode`/`Habits` ya no deberian heredar barra de navegacion invisible al abrir desde la top bar; solo `Ajustes` conserva `NavigationStack`. Falta confirmar visualmente en Xcode/MacinCloud.
 - MacinCloud compila correctamente por Terminal el commit `39aab6a`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - La causa probable del fallo visual en `Stats`/`Habits` era la combinacion de sheet mediano + `NavigationStack(path:)` + `onAppear { path = [route] }`, que abria las secciones como destinos empujados en vez de contenido raiz. El enfoque activo elimina ese push programatico para rutas de top bar.

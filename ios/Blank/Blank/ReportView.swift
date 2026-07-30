@@ -25,11 +25,8 @@ struct ReportView: View {
         let hasRecentActivity = progress.recentActivity.contains { $0.sessionCount > 0 || $0.totalFocusTime > 0 }
         let hasProgress = totalSessionCount > 0 || totalFocusTime > 0 || hasRecentActivity
 
-        ZStack {
-            ReportLiquidBackground()
-
-            List {
-                VStack(alignment: .center, spacing: 22) {
+        List {
+            VStack(alignment: .center, spacing: 22) {
                     reportHeader()
 
                     minimalHero(
@@ -60,18 +57,17 @@ struct ReportView: View {
                         .frame(maxWidth: 340)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.top, 2)
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 24)
-                .padding(.bottom, 34)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
+            .padding(.horizontal, 22)
+            .padding(.top, 24)
+            .padding(.bottom, 34)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(ReportLiquidBackground().ignoresSafeArea())
         .foregroundStyle(reportPrimary)
     }
 

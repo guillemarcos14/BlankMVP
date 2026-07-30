@@ -727,11 +727,8 @@ private struct ScheduleEditorContent: View {
     @State private var endMinute = 8 * 60
 
     var body: some View {
-        ZStack {
-            BlankAtmosphericBackground()
-
-            List {
-                VStack(alignment: .center, spacing: 16) {
+        List {
+            VStack(alignment: .center, spacing: 16) {
                     TechnicalSheetTitle("Habits")
                     TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
 
@@ -773,19 +770,18 @@ private struct ScheduleEditorContent: View {
                             .shadow(color: Color.black.opacity(0.025), radius: 4, y: 2)
                     }
                     .padding(.top, 6)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 34)
-                .listRowInsets(EdgeInsets())
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 34)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(BlankAtmosphericBackground().ignoresSafeArea())
         .onAppear {
             enabled = sessionStore.schedule.enabled
             startMinute = sessionStore.schedule.startMinute

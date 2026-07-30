@@ -714,7 +714,10 @@ private struct ScheduleEditorContent: View {
         ZStack {
             BlankAtmosphericBackground()
 
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .center, spacing: 18) {
+                TechnicalSheetTitle("Habits")
+                TechnicalSheetDescription("Programa cuándo Blank debe activarse solo. Para salir antes sigues necesitando tu Blank.")
+
                 Toggle("Activar horario diario", isOn: $enabled)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .padding(.horizontal, 18)
@@ -726,25 +729,26 @@ private struct ScheduleEditorContent: View {
                     TimeMenuRow(title: "Fin", minute: $endMinute)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .center, spacing: 8) {
                     Text("Ventana activa")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(BlankColors.mutedInk)
                     Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
                         .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
-                    Text("Blank se activa solo en esa franja. Para salir antes sigues necesitando tu Blank.")
+                    Text("Blank se activa solo en esa franja.")
                         .font(.footnote)
+                        .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                 }
                 .padding(18)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .blankGlassCard(cornerRadius: 22, tintOpacity: 0.32)
 
                 Spacer(minLength: 0)
             }
             .padding(24)
         }
-        .navigationTitle("Horario")
+        .navigationTitle("Habits")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {

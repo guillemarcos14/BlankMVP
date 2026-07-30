@@ -29,7 +29,9 @@ struct ReportView: View {
             ReportLiquidBackground()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .center, spacing: 22) {
+                    reportHeader()
+
                     minimalHero(
                         savedTime: savedTime,
                         activityDays: progress.recentActivity,
@@ -75,11 +77,27 @@ struct ReportView: View {
             }
         }
         .foregroundStyle(reportPrimary)
-        .navigationTitle("Progreso")
+        .navigationTitle("Stats")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(reportBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
+    }
+
+    private func reportHeader() -> some View {
+        VStack(spacing: 8) {
+            Text("Stats")
+                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+
+            Text("Una lectura ligera de lo que Blank te ha devuelto.")
+                .font(.body)
+                .foregroundStyle(reportSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .frame(maxWidth: 330)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func minimalHero(
@@ -87,10 +105,10 @@ struct ReportView: View {
         activityDays: [BlankActivityDay],
         insight: String
     ) -> some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 18) {
             VStack(spacing: 8) {
                 Text(formatDuration(savedTime))
-                    .font(.blankInter(size: 64, weight: .semibold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: 58, weight: .semibold, relativeTo: .largeTitle))
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
@@ -111,6 +129,9 @@ struct ReportView: View {
 
             chartPanel(values: savedSeries(from: activityDays))
         }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .liquidGlass(cornerRadius: 30)
     }
 
     private func heroPage(
@@ -143,10 +164,10 @@ struct ReportView: View {
     private func chartPanel(values: [TimeInterval]) -> some View {
         let scale = ChartScale(values: values)
 
-        return VStack(alignment: .leading, spacing: 14) {
+        return VStack(alignment: .center, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 ProgressLineChart(values: values, maxValue: scale.maxValue, primary: reportPrimary, secondary: reportSecondary)
-                    .frame(height: 144)
+                    .frame(height: 118)
 
                 VStack(alignment: .trailing) {
                     Text(formatChartScale(scale.maxValue))
@@ -157,48 +178,45 @@ struct ReportView: View {
                 }
                 .font(.caption2)
                 .foregroundStyle(reportSecondary.opacity(0.88))
-                .frame(height: 144)
+                .frame(height: 118)
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 15)
-        .liquidGlass(cornerRadius: 26)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 4)
     }
 
     private func weeklySummary(
         weekly: BlankWeeklyReport,
         emergencyUnlocksRemaining: Int
     ) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .center, spacing: 14) {
             Text("Esta semana")
-                .font(.headline)
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
-            VStack(spacing: 0) {
-                metricRow(title: "Protegidas", value: formatDuration(weekly.totalFocusTime), caption: "Tiempo en Blank")
-                subtleDivider()
-                metricRow(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Bloques de foco")
-                subtleDivider()
-                metricRow(title: "Emergencias", value: "\(emergencyUnlocksRemaining)", caption: "Restantes")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                statCapsule(title: "Protegidas", value: formatDuration(weekly.totalFocusTime), caption: "Tiempo en Blank")
+                statCapsule(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Bloques de foco")
+                statCapsule(title: "Emergencias", value: "\(emergencyUnlocksRemaining)", caption: "Restantes")
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .liquidGlass(cornerRadius: 22)
+        .frame(maxWidth: .infinity)
     }
 
     private func nextStepCard(progress: BlankProgressReport) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .center, spacing: 8) {
             Text("Siguiente mejora")
-                .font(.headline)
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             Text(nextStepText(progress: progress))
                 .font(.body)
                 .foregroundStyle(reportSecondary)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 330)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(20)
-        .liquidGlass(cornerRadius: 22)
+        .liquidGlass(cornerRadius: 26)
     }
 
     private func detailDisclosure(
@@ -435,6 +453,32 @@ struct ReportView: View {
         }
 
         return "El \(dayName) fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
+    }
+
+    private func statCapsule(title: String, value: String, caption: String) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            Text(value)
+                .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.82))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+        }
+        .frame(maxWidth: .infinity, minHeight: 104)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .liquidGlass(cornerRadius: 24)
     }
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {

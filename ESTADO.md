@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se implemento solo iOS la arquitectura visual comun para las hojas tecnicas de Ajustes: `TechnicalSettingsSheetLayout`, `TechnicalSheetTitle`, `TechnicalSheetDescription` y `TechnicalSheetActions`. Los titulos bajan a 34 pt Inter medium con ancho maximo, las descripciones quedan centradas con ancho maximo y las acciones tienen mas aire superior. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se ajustaron solo iOS las hojas internas de Ajustes (`Nuevo Blank`, `He olvidado mi Blank`, `Emergencia`) para centrar el contenido. `Nuevo Blank` ahora tiene descripcion mas clara y boton `Cancelar` centrado bajo `Escanear nuevo Blank`. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit corregido `c928dd0` (`Keep technical panel polish iOS only`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head` confirmo `c928dd0` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no instalacion/run en simulador ni archive/TestFlight.
 - 2026-07-30: Se corrigio el alcance de la tanda actual a solo iOS: se revirtieron los cambios aplicados por error en Android `HomeScreen.kt`. La revision/compilacion pendiente en MacinCloud debe validar solo `ios/Blank/Blank/HomeView.swift`.
@@ -300,6 +301,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- Las hojas tecnicas iOS de Ajustes comparten arquitectura visual: titulo compacto, descripcion centrada de ancho limitado y bloque de acciones consistente. Android sigue fuera de alcance en esta iteracion.
 - En iOS, el contenido de las hojas tecnicas de Ajustes esta centrado y `Nuevo Blank` ya sigue el patron de accion principal + `Cancelar` debajo.
 - MacinCloud compila correctamente por Terminal el commit corregido `c928dd0`; Android se revirtio al estado previo a la tanda visual y la iteracion actual queda limitada a iOS.
 - La tanda visual de Ajustes/Mode/Emergencia/Olvidar se limita a iOS. Android queda fuera de alcance y no debe usarse como referencia de validacion en esta iteracion.
@@ -400,6 +402,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente la nueva arquitectura comun de las hojas tecnicas iOS: comprobar que los titulos no pesan demasiado, las descripciones no quedan demasiado largas y las acciones mantienen aire suficiente.
 - En MacinCloud/Xcode, compilar y revisar visualmente las hojas iOS de Ajustes: contenido centrado, descripcion de `Nuevo Blank`, y `Cancelar` bajo la accion principal.
 - En MacinCloud, hacer pull del nuevo commit que revierte Android, compilar iOS y revisar visualmente solo la app iOS.
 - En Xcode/MacinCloud, revisar visualmente el commit `aad5391` en simulador o dispositivo: fondos transparentes de `Ajustes`/`Mode`, botones `Cancelar` centrados bajo la accion principal, y lista tecnica de Ajustes sin navegacion general duplicada.

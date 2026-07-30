@@ -803,19 +803,11 @@ private struct ForgetBlankConfirmSheet: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        VStack(alignment: .center, spacing: 18) {
-            Text("He olvidado mi Blank")
-                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-            Text("Esto desactiva Blank, borra la pieza vinculada y vuelve al onboarding para que puedas registrar una nueva.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Text("Tus modos y apps seleccionadas se mantienen.")
-                .font(.footnote.weight(.medium))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 12) {
+        TechnicalSettingsSheetLayout {
+            TechnicalSheetTitle("He olvidado mi Blank")
+            TechnicalSheetDescription("Esto desactiva Blank, borra la pieza vinculada y vuelve al onboarding para que puedas registrar una nueva.")
+            TechnicalSheetDescription("Tus modos y apps seleccionadas se mantienen.", emphasized: true)
+            TechnicalSheetActions {
                 Button("He olvidado mi Blank") {
                     onConfirm()
                     dismiss()
@@ -828,13 +820,7 @@ private struct ForgetBlankConfirmSheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-
-            Spacer()
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(BlankAtmosphericBackground())
     }
 }
 
@@ -844,17 +830,11 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        VStack(alignment: .center, spacing: 18) {
-            Text("Emergencia")
-                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-            Text("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            VStack(spacing: 12) {
+        TechnicalSettingsSheetLayout {
+            TechnicalSheetTitle("Emergencia")
+            TechnicalSheetDescription("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
+            TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.", emphasized: true)
+            TechnicalSheetActions {
                 Button("Desbloquear") {
                     if onUnlock() {
                         dismiss()
@@ -868,12 +848,7 @@ private struct EmergencySheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
-            Spacer()
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(BlankAtmosphericBackground())
     }
 }
 
@@ -885,14 +860,10 @@ private struct RelinkSheet: View {
     @State private var nfcReader = NFCReader()
 
     var body: some View {
-        VStack(spacing: 18) {
-            Text("Nuevo Blank")
-                .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-            Text("Escanea el nuevo Blank para sustituir el que tienes vinculado. Tus modos y apps protegidas se mantienen.")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-            VStack(spacing: 12) {
+        TechnicalSettingsSheetLayout {
+            TechnicalSheetTitle("Nuevo Blank")
+            TechnicalSheetDescription("Escanea el nuevo Blank para sustituir el que tienes vinculado. Tus modos y apps protegidas se mantienen.")
+            TechnicalSheetActions {
                 Button("Escanear nuevo Blank") {
                     nfcReader.scan { result in
                         Task { @MainActor in
@@ -917,12 +888,69 @@ private struct RelinkSheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+private struct TechnicalSettingsSheetLayout<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 18) {
+            content
             Spacer()
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(BlankAtmosphericBackground())
+    }
+}
+
+private struct TechnicalSheetTitle: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .minimumScaleFactor(0.86)
+            .frame(maxWidth: 320)
+    }
+}
+
+private struct TechnicalSheetDescription: View {
+    let text: String
+    var emphasized = false
+
+    init(_ text: String, emphasized: Bool = false) {
+        self.text = text
+        self.emphasized = emphasized
+    }
+
+    var body: some View {
+        Text(text)
+            .font(emphasized ? .footnote.weight(.medium) : .body)
+            .multilineTextAlignment(.center)
+            .foregroundStyle(.secondary)
+            .lineSpacing(2)
+            .frame(maxWidth: 330)
+    }
+}
+
+private struct TechnicalSheetActions<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 12) {
+            content
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 8)
     }
 }
 

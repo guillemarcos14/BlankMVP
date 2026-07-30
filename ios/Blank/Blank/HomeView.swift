@@ -714,50 +714,71 @@ private struct ScheduleEditorContent: View {
         ZStack {
             BlankAtmosphericBackground()
 
-            VStack(alignment: .center, spacing: 16) {
-                TechnicalSheetTitle("Programar")
+            ScrollView {
+                VStack(alignment: .center, spacing: 16) {
+                    TechnicalSheetTitle("Programar")
 
-                Toggle("Horario diario", isOn: $enabled)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .padding(.horizontal, 18)
-                    .frame(height: 56)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+                    Toggle("Horario diario", isOn: $enabled)
+                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                        .padding(.horizontal, 18)
+                        .frame(height: 56)
+                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
 
-                VStack(spacing: 10) {
-                    TimeMenuRow(title: "Inicio", minute: $startMinute)
-                    TimeMenuRow(title: "Fin", minute: $endMinute)
-                    StaticScheduleRow(title: "Días", value: "Todos")
+                    VStack(spacing: 10) {
+                        TimeMenuRow(title: "Inicio", minute: $startMinute)
+                        TimeMenuRow(title: "Fin", minute: $endMinute)
+                        StaticScheduleRow(title: "Días", value: "Todos")
+                    }
+
+                    Text("Para salir antes necesitas tu NFC o emergencia.")
+                        .font(.footnote)
+                        .foregroundStyle(BlankColors.mutedInk)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 280)
+                        .padding(.top, 2)
+
+                    Button {
+                        saveSchedule()
+                    } label: {
+                        Text("Guardar")
+                            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                            .foregroundStyle(BlankColors.ink)
+                            .padding(.horizontal, 24)
+                            .frame(height: 46)
+                            .background {
+                                ZStack {
+                                    Capsule().fill(.ultraThinMaterial)
+                                    Capsule().fill(Color.white.opacity(0.34))
+                                    Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                                }
+                                .allowsHitTesting(false)
+                            }
+                            .shadow(color: Color.black.opacity(0.025), radius: 4, y: 2)
+                    }
+                    .padding(.top, 6)
                 }
-
-                Text("Para salir antes necesitas tu NFC o emergencia.")
-                    .font(.footnote)
-                    .foregroundStyle(BlankColors.mutedInk)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-                    .padding(.top, 2)
-
-                Spacer(minLength: 0)
-            }
-            .padding(24)
-        }
-        .navigationTitle("Programar")
-        .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Guardar") {
-                    sessionStore.schedule = BlankFocusSchedule(
-                        enabled: enabled,
-                        startMinute: startMinute,
-                        endMinute: endMinute
-                    )
-                    dismiss()
-                }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 34)
             }
         }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             enabled = sessionStore.schedule.enabled
             startMinute = sessionStore.schedule.startMinute
             endMinute = sessionStore.schedule.endMinute
         }
+    }
+
+    private func saveSchedule() {
+        sessionStore.schedule = BlankFocusSchedule(
+            enabled: enabled,
+            startMinute: startMinute,
+            endMinute: endMinute
+        )
+        dismiss()
     }
 }
 

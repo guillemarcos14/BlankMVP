@@ -51,19 +51,15 @@ struct ReportView: View {
                         emptyState()
                     }
 
-                    VStack(spacing: 10) {
-                        Text("Cada sesión cuenta. Blank solo mide lo necesario.")
-                            .font(.footnote)
-                            .foregroundStyle(reportSecondary)
-
-                        Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
-                            .font(.caption2)
-                            .foregroundStyle(reportSecondary.opacity(0.78))
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 18)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 2)
+                    Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
+                        .font(.caption2)
+                        .foregroundStyle(reportSecondary.opacity(0.62))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(1)
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: 340)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 2)
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 24)
@@ -71,7 +67,7 @@ struct ReportView: View {
             }
         }
         .foregroundStyle(reportPrimary)
-        .navigationTitle("Stats")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
@@ -215,10 +211,10 @@ struct ReportView: View {
             Text("Comportamiento")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                statCapsule(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
-                statCapsule(title: "Modo más usado", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
-                statCapsule(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+            VStack(spacing: 10) {
+                statCapsule(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly), minHeight: 86)
+                statCapsule(title: "Modo más usado", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress), minHeight: 86)
+                statCapsule(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining), minHeight: 86)
             }
         }
         .frame(maxWidth: .infinity)
@@ -657,7 +653,7 @@ struct ReportView: View {
             let count = sessionCount(sessions: sessions, from: start, to: now)
             return ProgressPeriodSummary(
                 title: title,
-                value: formatDuration(duration),
+                value: formatCompactDuration(duration),
                 caption: count == 1 ? "1 sesión" : "\(count) sesiones"
             )
         }
@@ -719,6 +715,20 @@ struct ReportView: View {
         }
 
         return "\(hours) h \(minutes) min"
+    }
+
+    private func formatCompactDuration(_ duration: TimeInterval) -> String {
+        let totalMinutes = max(0, Int(duration / 60))
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+
+        if hours == 0 {
+            return "\(minutes)m"
+        }
+        if minutes == 0 {
+            return "\(hours)h"
+        }
+        return "\(hours)h \(minutes)m"
     }
 
     private func formatChartScale(_ duration: TimeInterval) -> String {

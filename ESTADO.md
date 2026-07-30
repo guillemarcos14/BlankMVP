@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se aplicaron solo iOS las anotaciones visuales sobre capturas actuales: `Stats` conserva `Tendencia semanal`, elimina el texto `Cada sesion cuenta...`, mantiene la explicacion del calculo mas tenue, oculta el titulo duplicado de navegacion y pasa `Comportamiento` a tres filas full-width; `Programar` oculta el titulo duplicado, evita solapes con `ScrollView` y mueve `Guardar` debajo del contenido con capsula mas discreta. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4180705` (`Match iOS habits and stats visual structure`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo a `4180705`, se entro en `ios/blank` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se completo solo iOS la aplicacion exacta del planteamiento visual a `Programar/Habits` y `Stats`: `Programar` queda como configuracion rapida con toggle `Horario diario`, filas `Inicio`, `Fin`, `Dias` y nota final; `Stats` queda separado en capsulas hero, ritmo `Hoy/Semana/Mes`, grafica semanal y comportamiento. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se extendio solo iOS la nueva arquitectura visual a `Habits` y `Stats`: `ScheduleEditorContent` usa cabecera/descripcion tecnica centrada y `ReportView` usa cabecera `Stats`, hero en glass y estadisticas semanales en capsulas independientes. Se comprobo que Android no tiene diff y `git diff --check` no reporta errores; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -304,6 +305,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- `Stats` y `Programar` iOS ya no tienen doble titulo visible; `Programar` guarda desde una accion inferior y `Comportamiento` usa filas full-width. Falta compilacion MacinCloud de esta ultima tanda.
 - MacinCloud compila correctamente por Terminal el commit `4180705`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Programar/Habits` y `Stats` en iOS ya siguen el planteamiento visual acordado: configuracion rapida sin formulario grande y progreso en piezas flotantes separadas, no tabla densa. Android no se ha tocado.
 - `Habits` y `Stats` en iOS ya reciben la nueva direccion visual inspirada en `Mode`: contenido centrado, titulos Inter medium compactos y superficies/capsulas glass independientes. Android sigue sin cambios en esta tanda.
@@ -408,6 +410,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar la tanda posterior a `4180705` y revisar visualmente que no hay doble titulo, que `Guardar` queda bajo el contenido y que `Comportamiento` no deja huecos.
 - En MacinCloud/Xcode, revisar visualmente que `Programar` se percibe como ajuste rapido y que `Stats` se lee como capsulas independientes: hero, ritmo, tendencia y comportamiento.
 - En MacinCloud/Xcode, hacer `git pull --ff-only origin codex/ios-device-activity-target`, ejecutar Run del scheme `Blank` desde `~/BlankMVP/ios/Blank/Blank.xcodeproj` y revisar visualmente que `Habits` y `Stats` muestran el nuevo estilo; si el simulador sigue mostrando lo antiguo, parar/reinstalar la app antes de revisar.
 - En MacinCloud/Xcode, compilar y revisar visualmente la nueva arquitectura comun de las hojas tecnicas iOS: comprobar que los titulos no pesan demasiado, las descripciones no quedan demasiado largas y las acciones mantienen aire suficiente.

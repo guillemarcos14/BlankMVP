@@ -77,6 +77,7 @@ struct HomeView: View {
                 showingForgetConfirm: $showingForgetConfirm
             )
             .presentationDetents([.medium, .large])
+            .blankTransparentPresentation()
         }
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet(emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining) {
@@ -562,6 +563,7 @@ private struct ModesList: View {
                         }
                     }
                     .foregroundStyle(textColor)
+                    .listRowBackground(Color.clear)
                     .swipeActions {
                         Button(role: .destructive) {
                             sessionStore.deleteMode(mode.id)
@@ -575,19 +577,23 @@ private struct ModesList: View {
                 Text("Modos")
                     .foregroundStyle(textColor)
             }
+            .listRowBackground(Color.clear)
 
             Section {
                 TextField("Trabajo profundo", text: $newModeName)
                     .foregroundStyle(textColor)
+                    .listRowBackground(Color.clear)
                 Button("Crear modo") {
                     sessionStore.createMode(named: newModeName)
                     newModeName = ""
                 }
                 .foregroundStyle(textColor)
+                .listRowBackground(Color.clear)
             } header: {
                 Text("Crear")
                     .foregroundStyle(textColor)
             }
+            .listRowBackground(Color.clear)
 
             Section {
                 Button("Editar apps del modo actual") {
@@ -595,12 +601,16 @@ private struct ModesList: View {
                     onFinish()
                 }
                 .foregroundStyle(textColor)
+                .listRowBackground(Color.clear)
             }
+            .listRowBackground(Color.clear)
         }
         .navigationTitle("Modos")
         .tint(textColor)
+        .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
+        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
+        .toolbarBackground(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
@@ -620,30 +630,6 @@ private struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                NavigationLink(value: SettingsRoute.modes) {
-                    HStack {
-                        Text("Modo")
-                        Spacer()
-                        Text(sessionStore.currentMode.name)
-                    }
-                    .foregroundStyle(textColor)
-                }
-                NavigationLink(value: SettingsRoute.schedule) {
-                    HStack {
-                        Text("Programar mi Blank")
-                        Spacer()
-                        Text("Diario")
-                    }
-                    .foregroundStyle(textColor)
-                }
-                NavigationLink(value: SettingsRoute.report) {
-                    HStack {
-                        Text("Progreso")
-                        Spacer()
-                        Text("Tiempo")
-                    }
-                    .foregroundStyle(textColor)
-                }
                 settingsButton("Vincular nuevo NFC", meta: "Etiqueta") {
                     showingRelink = true
                     dismiss()
@@ -658,8 +644,10 @@ private struct SettingsSheet: View {
                 }
             }
             .navigationTitle("Ajustes")
+            .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
+            .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
                 case .modes:
@@ -702,6 +690,18 @@ private struct SettingsSheet: View {
             }
         }
         .foregroundStyle(role == .destructive ? Color.red : textColor)
+        .listRowBackground(Color.clear)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func blankTransparentPresentation() -> some View {
+        if #available(iOS 16.4, *) {
+            self.presentationBackground(.clear)
+        } else {
+            self
+        }
     }
 }
 
@@ -808,12 +808,13 @@ private struct ForgetBlankConfirmSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("He olvidado mi Blank")
                 .font(.blankInter(size: 36, weight: .medium, relativeTo: .largeTitle))
-            Text("Esto desactiva Blank, borra la pieza NFC vinculada y vuelve al onboarding para que puedas registrar una nueva.")
+            Text("Esto desactiva Blank, borra la pieza vinculada y vuelve al onboarding para que puedas registrar una nueva.")
                 .foregroundStyle(.secondary)
             Text("Tus modos y apps seleccionadas se mantienen.")
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
 
+            VStack(spacing: 12) {
             Button("Sí, olvidar mi Blank") {
                 onConfirm()
                 dismiss()
@@ -825,6 +826,8 @@ private struct ForgetBlankConfirmSheet: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
 
             Spacer()
         }
@@ -847,6 +850,7 @@ private struct EmergencySheet: View {
                 .foregroundStyle(.secondary)
             Text(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos de emergencia esta semana." : "Ya has usado tus 3 desbloqueos de emergencia esta semana.")
                 .foregroundStyle(.secondary)
+            VStack(spacing: 12) {
             Button("Confirmar emergencia") {
                 if onUnlock() {
                     dismiss()
@@ -859,6 +863,8 @@ private struct EmergencySheet: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
             Spacer()
         }
         .padding(24)

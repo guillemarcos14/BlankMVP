@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-29
+Ultima actualizacion: 2026-07-30
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,9 @@ Ultima actualizacion: 2026-07-29
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se ajusto el copy de `He olvidado mi Blank` quitando solo la palabra `NFC` del texto actual de confirmacion, y se centraron los botones `Cancelar` bajo el boton principal en las confirmaciones de olvido/emergencia. En Android se anadio `Cancelar` bajo la accion principal de los paneles equivalentes. Android valida con `gradlew.bat assembleDebug --no-daemon --stacktrace`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode.
+- 2026-07-30: Se corrigio el fondo de `Ajustes` y `Mode/Modos` para que no cambie a negro/blanco al expandir la pagina: en iOS la sheet principal usa presentation background transparente y filas de lista transparentes; en Android `AppBackground` deja de usar fondo base negro/gris y pinta siempre el asset de fondo correspondiente a Blank activo/desactivado. Android valida con `gradlew.bat assembleDebug --no-daemon --stacktrace`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode.
+- 2026-07-30: Se implemento en iOS y Android que `Ajustes` sea solo un panel tecnico/de recuperacion: la lista principal queda con `Vincular nuevo NFC`, `He olvidado mi Blank` y `Emergencia`; `Stats`, `Mode` y `Habits/Timer` siguen como accesos de uso diario desde la top bar. Android valida con `gradlew.bat assembleDebug --no-daemon --stacktrace`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-29: Desde Xcode/MacinCloud se completo `Distribute App > App Store Connect > Upload` para `Blank 1.4 (3)`. Xcode mostro `App upload complete: Blank 1.4 (3) uploaded`. Queda pendiente esperar procesamiento en App Store Connect/TestFlight y comprobar que la build `1.4 (3)` muestra `Encriptacion no exenta: No`, se puede asociar al grupo interno y probar en TestFlight.
 - 2026-07-29: En MacinCloud/RDP se hizo la parte de Terminal para preparar el nuevo archive con export compliance: usando pulsaciones individuales se ejecuto `cd /users/user953323/blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **` y `git rev-parse --short head` confirmo `a5b1564` (`Declare iOS export compliance`). Queda pendiente en Xcode subir el build number a `1.4 (3)` o superior, hacer `Product > Archive` y subir a App Store Connect.
 - 2026-07-29: Se inspecciono App Store Connect/TestFlight de forma autonoma para diagnosticar `1.4 (2)`. La build aparece `Validado` en metadata, pero `Encriptacion no exenta` aparece como `-`; al abrir la URL correcta `/metadata`, se comprobo que no esta declarada la export compliance. En la vista de pruebas de la build no hay controles activos para grupos/testers y en el grupo interno `Pruebas Internas` no aparece boton `Add Builds` ni las builds `1.4`. Se anadio `ITSAppUsesNonExemptEncryption=false` a `ios/Blank/Blank/Info.plist` y `ios/Blank/BlankDeviceActivityMonitor/Info.plist` para que el proximo archive declare explicitamente que no usa encriptacion no exenta. Validado XML de ambos plist en Windows; pendiente compilar/subir nueva build desde MacinCloud/Xcode.
@@ -293,6 +296,9 @@ Ultima actualizacion: 2026-07-29
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- `He olvidado mi Blank` mantiene el copy actual sin mencionar `NFC`; los botones `Cancelar` quedan como accion secundaria centrada bajo el boton principal en las confirmaciones.
+- Los fondos de `Ajustes` y `Mode/Modos` deben permanecer transparentes/atmosfericos al pasar de medium a large y al alternar Blank activo/desactivado; no debe aparecer un plano negro/blanco de sistema detras de la lista.
+- Ajustes iOS/Android ya no duplica navegacion general: `Modo`, `Programar mi Blank` y `Progreso` se mantienen accesibles desde la top bar, mientras Ajustes concentra acciones tecnicas/de recuperacion. Android compila en debug; iOS esta validado por diff estatico en Windows y pendiente de build visual en MacinCloud.
 - MacinCloud compila correctamente por Terminal el commit `f72f0c7` de la rama `codex/ios-device-activity-target`; resultado confirmado: `** BUILD SUCCEEDED **`. Esto valida compilacion local/simulador por Terminal, no archive ni subida TestFlight/App Store.
 - iOS tiene integrados y compilados en MacinCloud los cambios de Home: top bar centrada contra el ancho real de pantalla y glass oscuro/translucido tipo referencia en capsulas y boton. Android no se ha tocado en este bloque.
 - MacinCloud compila correctamente por Terminal el commit `da9f5ce` de la rama `codex/ios-device-activity-target`; resultado confirmado: `** BUILD SUCCEEDED **`. Esto valida compilacion local/simulador por Terminal, no archive ni subida TestFlight/App Store.
@@ -386,12 +392,15 @@ Ultima actualizacion: 2026-07-29
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, revisar visualmente las hojas de `He olvidado mi Blank` y `Emergencia`: confirmar que `Cancelar` queda centrado bajo el boton principal y que el copy de olvido no menciona `NFC`.
+- En MacinCloud/Xcode, expandir `Ajustes` y `Mode/Modos` a tamaño grande con Blank desactivado y activado, y confirmar que el fondo sigue siendo transparente/atmosferico sin plano negro/blanco de sistema.
+- En MacinCloud/Xcode, compilar y revisar visualmente que `Ajustes` solo muestre `Vincular nuevo NFC`, `He olvidado mi Blank` y `Emergencia`, y que `Stats`, `Mode` y `Habits/Timer` sigan abriendo Progreso, Modos y Programacion desde la top bar.
 - En MacinCloud/Xcode, revisar visualmente el commit `f72f0c7`: confirmar que el bloque logo+capsula esta centrado y que el glass oscurece el fondo sin volverse opaco.
-- En MacinCloud/Xcode, revisar visualmente que la top bar queda centrada, el texto+boton queda centrado en pantalla, la tipografia se ve Inter regular, el glass no parece una capsula plana y `Stats`/`Mode`/`Habits` abren sus secciones dentro de `Ajustes`.
+- En MacinCloud/Xcode, revisar visualmente que la top bar queda centrada, el texto+boton queda centrado en pantalla, la tipografia se ve Inter regular, el glass no parece una capsula plana y `Stats`/`Mode`/`Habits` abren sus secciones desde la top bar.
 - En MacinCloud/Xcode, revisar visualmente la app desde el proyecto abierto antes de archivar: Home con logo blanco, top bar `Stats`/`Mode`/`Habits`, titular `power of time`, CTA `Blankear`, nuevo glass neutral, sombras suaves y fondo claro a pantalla completa.
 - En MacinCloud/Xcode, comprobar que `Stats`, `Mode`, `Habits` y logo/Ajustes navegan correctamente; `Habits` debe abrir `Programar mi Blank`.
 - Si la revision visual es correcta, subir Version/Build a un valor aceptado por App Store Connect, hacer `Product > Archive` y despues `Distribute App > App Store Connect > Upload` desde Xcode.
-- En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS tras el cambio de texto/tipografia y la retirada de `Progreso` de la pantalla principal; confirmar que `Progreso` abre correctamente desde `Ajustes`.
+- En MacinCloud/Xcode, compilar y revisar visualmente la Home iOS tras el cambio de texto/tipografia y confirmar que `Progreso` abre correctamente desde `Stats` en la top bar.
 - Redisenar `Progreso` con menos ruido: conservar 1 dato principal, 1 grafica o tendencia, 1 insight accionable y 2-3 metricas secundarias maximo; mover el resto a detalle/diagnostico o eliminarlo si no cambia comportamiento del usuario.
 - En MacinCloud/Xcode, con `~/BlankMVP/ios/Blank/Blank.xcodeproj` abierto y scheme `Blank`, revisar visualmente antes de archivar: Progreso con tarjetas `Hoy`/`Semana`/`Mes`/`Año`, onboarding con status pills/CTA `Hacer mi primer Blank`, hoja de confirmacion de `He olvidado mi Blank`, `Programar mi Blank` con selector compacto, y Home con CTA `Escanear Blank para salir`.
 - Para trabajar desde otros PCs: cerrar primero los cambios locales actuales en commits pequenos o stash, hacer `git fetch`, integrar `origin/codex/ios-device-activity-target` sin perder cambios, pushear la rama y comprobar en GitHub que `ESTADO.md`, `AGENTS.md`, `docs/`, `ios/`, `app/` y `web/landing/` estan actualizados.
@@ -468,6 +477,7 @@ Ultima actualizacion: 2026-07-29
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-07-30: `Ajustes` queda reservado para acciones tecnicas/de recuperacion (`Vincular nuevo NFC`, `He olvidado mi Blank`, `Emergencia`); las secciones de uso diario (`Stats`/Progreso, `Mode`/Modos y `Habits`/Programacion) se acceden desde la top bar, no desde la lista principal de Ajustes.
 - [cerrada] 2026-07-29: La seccion superior de Home muestra `Stats`, `Mode` y `Timer` como accesos cortos a la derecha del logo; el logo de Blank abre el resto de `Ajustes`.
 - [cerrada] 2026-07-29: `Progreso` deja de mostrarse como enlace secundario bajo el CTA principal; si aparece en Home, debe ser como acceso corto `Stats` dentro de la top bar.
 - [cerrada] 2026-07-28: En Progreso, las dos stats principales del hero (`Tiempo recuperado` y `Tiempo blankeado`) se muestran como acumulado global desde el inicio del usuario; las tarjetas `Hoy`/`Semana`/`Mes`/`Año` quedan como contexto temporal secundario.

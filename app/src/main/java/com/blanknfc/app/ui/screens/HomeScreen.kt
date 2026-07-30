@@ -262,13 +262,6 @@ fun HomeScreen(
             HomePanel.SETTINGS -> SettingsPanel(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
-                onModes = { panel = HomePanel.MODES },
-                onSchedule = {
-                    panel = HomePanel.SCHEDULE
-                },
-                onStats = {
-                    panel = HomePanel.STATS
-                },
                 onRelink = {
                     panel = HomePanel.RELINK
                 },
@@ -382,22 +375,20 @@ private fun AppBackground(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color.Black else Color(0xFFE7E7E2))
+            .background(Color.Transparent)
     ) {
-        if (!isDark) {
-            Crossfade(
-                targetState = if (isBlankActive) R.drawable.blank_home_background_active else R.drawable.blank_home_background_idle,
-                animationSpec = tween(durationMillis = 520),
-                label = "blank_background_image"
-            ) { backgroundImageResId ->
-                Image(
-                    painter = painterResource(backgroundImageResId),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                )
-            }
+        Crossfade(
+            targetState = if (isBlankActive) R.drawable.blank_home_background_active else R.drawable.blank_home_background_idle,
+            animationSpec = tween(durationMillis = 520),
+            label = "blank_background_image"
+        ) { backgroundImageResId ->
+            Image(
+                painter = painterResource(backgroundImageResId),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+            )
         }
         Box(
             modifier = Modifier
@@ -696,9 +687,6 @@ private fun IconDots(onClick: () -> Unit) {
 private fun SettingsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit,
-    onModes: () -> Unit,
-    onSchedule: () -> Unit,
-    onStats: () -> Unit,
     onRelink: () -> Unit,
     onForget: () -> Unit,
     onEmergency: () -> Unit
@@ -709,9 +697,6 @@ private fun SettingsPanel(
         Text(text = "Ajustes", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Modo", "Apps", onModes))
-            add(MenuItem("Programar mi Blank", "Diario", onSchedule))
-            add(MenuItem("Progreso", "Tiempo", onStats))
             add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
             add(MenuItem("He olvidado mi Blank", "Reset", onForget))
             add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))
@@ -1682,7 +1667,7 @@ private fun ForgetConfirmPanel(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Se desactivará Blank, se borrará la etiqueta NFC vinculada y volverás al onboarding para registrar una nueva.",
+                    text = "Se desactivará Blank, se borrará la etiqueta vinculada y volverás al onboarding para registrar una nueva.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = BlankOnSurface,
                     textAlign = TextAlign.Center
@@ -1706,12 +1691,18 @@ private fun ForgetConfirmPanel(
                 }
             }
         }
-        MainActionButton(
-            text = "Sí, olvidar mi Blank",
-            enabled = confirmed,
-            light = buttonLight,
-            onClick = onConfirm
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            MainActionButton(
+                text = "Sí, olvidar mi Blank",
+                enabled = confirmed,
+                light = buttonLight,
+                onClick = onConfirm
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            TextButton(onClick = onBack) {
+                Text(text = "Cancelar", color = BlankOnSurface.copy(alpha = 0.68f))
+            }
+        }
     }
 }
 
@@ -1786,12 +1777,18 @@ private fun EmergencyPanel(
                 )
             }
         }
-        MainActionButton(
-            text = stringResource(R.string.emergency_unlock),
-            light = true,
-            enabled = emergencyUnlocksRemaining > 0 && phrase.trim() == expected,
-            onClick = onUnlock
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            MainActionButton(
+                text = stringResource(R.string.emergency_unlock),
+                light = true,
+                enabled = emergencyUnlocksRemaining > 0 && phrase.trim() == expected,
+                onClick = onUnlock
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            TextButton(onClick = onBack) {
+                Text(text = "Cancelar", color = BlankSurface.copy(alpha = 0.74f))
+            }
+        }
     }
 }
 

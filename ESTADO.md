@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se completo solo iOS la aplicacion exacta del planteamiento visual a `Programar/Habits` y `Stats`: `Programar` queda como configuracion rapida con toggle `Horario diario`, filas `Inicio`, `Fin`, `Dias` y nota final; `Stats` queda separado en capsulas hero, ritmo `Hoy/Semana/Mes`, grafica semanal y comportamiento. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se extendio solo iOS la nueva arquitectura visual a `Habits` y `Stats`: `ScheduleEditorContent` usa cabecera/descripcion tecnica centrada y `ReportView` usa cabecera `Stats`, hero en glass y estadisticas semanales en capsulas independientes. Se comprobo que Android no tiene diff y `git diff --check` no reporta errores; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se implemento solo iOS la arquitectura visual comun para las hojas tecnicas de Ajustes: `TechnicalSettingsSheetLayout`, `TechnicalSheetTitle`, `TechnicalSheetDescription` y `TechnicalSheetActions`. Los titulos bajan a 34 pt Inter medium con ancho maximo, las descripciones quedan centradas con ancho maximo y las acciones tienen mas aire superior. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se ajustaron solo iOS las hojas internas de Ajustes (`Nuevo Blank`, `He olvidado mi Blank`, `Emergencia`) para centrar el contenido. `Nuevo Blank` ahora tiene descripcion mas clara y boton `Cancelar` centrado bajo `Escanear nuevo Blank`. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -302,6 +303,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- `Programar/Habits` y `Stats` en iOS ya siguen el planteamiento visual acordado: configuracion rapida sin formulario grande y progreso en piezas flotantes separadas, no tabla densa. Android no se ha tocado.
 - `Habits` y `Stats` en iOS ya reciben la nueva direccion visual inspirada en `Mode`: contenido centrado, titulos Inter medium compactos y superficies/capsulas glass independientes. Android sigue sin cambios en esta tanda.
 - Las hojas tecnicas iOS de Ajustes comparten arquitectura visual: titulo compacto, descripcion centrada de ancho limitado y bloque de acciones consistente. Android sigue fuera de alcance en esta iteracion.
 - En iOS, el contenido de las hojas tecnicas de Ajustes esta centrado y `Nuevo Blank` ya sigue el patron de accion principal + `Cancelar` debajo.
@@ -404,6 +406,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, revisar visualmente que `Programar` se percibe como ajuste rapido y que `Stats` se lee como capsulas independientes: hero, ritmo, tendencia y comportamiento.
 - En MacinCloud/Xcode, hacer `git pull --ff-only origin codex/ios-device-activity-target`, ejecutar Run del scheme `Blank` desde `~/BlankMVP/ios/Blank/Blank.xcodeproj` y revisar visualmente que `Habits` y `Stats` muestran el nuevo estilo; si el simulador sigue mostrando lo antiguo, parar/reinstalar la app antes de revisar.
 - En MacinCloud/Xcode, compilar y revisar visualmente la nueva arquitectura comun de las hojas tecnicas iOS: comprobar que los titulos no pesan demasiado, las descripciones no quedan demasiado largas y las acciones mantienen aire suficiente.
 - En MacinCloud/Xcode, compilar y revisar visualmente las hojas iOS de Ajustes: contenido centrado, descripcion de `Nuevo Blank`, y `Cancelar` bajo la accion principal.

@@ -714,11 +714,10 @@ private struct ScheduleEditorContent: View {
         ZStack {
             BlankAtmosphericBackground()
 
-            VStack(alignment: .center, spacing: 18) {
-                TechnicalSheetTitle("Habits")
-                TechnicalSheetDescription("Programa cuándo Blank debe activarse solo. Para salir antes sigues necesitando tu Blank.")
+            VStack(alignment: .center, spacing: 16) {
+                TechnicalSheetTitle("Programar")
 
-                Toggle("Activar horario diario", isOn: $enabled)
+                Toggle("Horario diario", isOn: $enabled)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .padding(.horizontal, 18)
                     .frame(height: 56)
@@ -727,28 +726,21 @@ private struct ScheduleEditorContent: View {
                 VStack(spacing: 10) {
                     TimeMenuRow(title: "Inicio", minute: $startMinute)
                     TimeMenuRow(title: "Fin", minute: $endMinute)
+                    StaticScheduleRow(title: "Días", value: "Todos")
                 }
 
-                VStack(alignment: .center, spacing: 8) {
-                    Text("Ventana activa")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(BlankColors.mutedInk)
-                    Text("\(formatMinute(startMinute)) - \(formatMinute(endMinute))")
-                        .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title2))
-                    Text("Blank se activa solo en esa franja.")
-                        .font(.footnote)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(18)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .blankGlassCard(cornerRadius: 22, tintOpacity: 0.32)
+                Text("Para salir antes necesitas tu NFC o emergencia.")
+                    .font(.footnote)
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 280)
+                    .padding(.top, 2)
 
                 Spacer(minLength: 0)
             }
             .padding(24)
         }
-        .navigationTitle("Habits")
+        .navigationTitle("Programar")
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Guardar") {
@@ -766,6 +758,25 @@ private struct ScheduleEditorContent: View {
             startMinute = sessionStore.schedule.startMinute
             endMinute = sessionStore.schedule.endMinute
         }
+    }
+}
+
+private struct StaticScheduleRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+            Spacer()
+            Text(value)
+                .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
+        }
+        .foregroundStyle(BlankColors.ink)
+        .padding(.horizontal, 18)
+        .frame(height: 56)
+        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
     }
 }
 

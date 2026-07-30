@@ -34,22 +34,16 @@ struct ReportView: View {
 
                     minimalHero(
                         savedTime: savedTime,
-                        activityDays: progress.recentActivity,
                         insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
                     )
 
                     if hasProgress {
-                        weeklySummary(
-                            weekly: weekly,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
-                        )
+                        periodSummaryCapsule(sessions: sessionStore.sessions)
 
-                        nextStepCard(progress: progress)
+                        graphCapsule(activityDays: progress.recentActivity)
 
-                        detailDisclosure(
+                        behaviorCapsule(
                             weekly: weekly,
-                            totalFocusTime: totalFocusTime,
-                            totalSessionCount: totalSessionCount,
                             progress: progress,
                             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
@@ -102,7 +96,6 @@ struct ReportView: View {
 
     private func minimalHero(
         savedTime: TimeInterval,
-        activityDays: [BlankActivityDay],
         insight: String
     ) -> some View {
         VStack(spacing: 18) {
@@ -126,11 +119,9 @@ struct ReportView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 12)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
-
-            chartPanel(values: savedSeries(from: activityDays))
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, 18)
+        .padding(.vertical, 28)
         .liquidGlass(cornerRadius: 30)
     }
 
@@ -185,21 +176,54 @@ struct ReportView: View {
         .padding(.vertical, 4)
     }
 
-    private func weeklySummary(
-        weekly: BlankWeeklyReport,
-        emergencyUnlocksRemaining: Int
-    ) -> some View {
-        VStack(alignment: .center, spacing: 14) {
-            Text("Esta semana")
+    private func periodSummaryCapsule(sessions: [BlankSession]) -> some View {
+        let summaries = Array(progressPeriodSummaries(sessions: sessions).prefix(3))
+
+        return VStack(alignment: .center, spacing: 14) {
+            Text("Ritmo")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                statCapsule(title: "Protegidas", value: formatDuration(weekly.totalFocusTime), caption: "Tiempo en Blank")
-                statCapsule(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Bloques de foco")
-                statCapsule(title: "Emergencias", value: "\(emergencyUnlocksRemaining)", caption: "Restantes")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(summaries) { summary in
+                    statCapsule(title: summary.title, value: summary.value, caption: summary.caption, minHeight: 96)
+                }
             }
         }
         .frame(maxWidth: .infinity)
+        .padding(18)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func graphCapsule(activityDays: [BlankActivityDay]) -> some View {
+        VStack(alignment: .center, spacing: 14) {
+            Text("Tendencia semanal")
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
+
+            chartPanel(values: savedSeries(from: Array(activityDays.suffix(7))))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(18)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func behaviorCapsule(
+        weekly: BlankWeeklyReport,
+        progress: BlankProgressReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        VStack(alignment: .center, spacing: 14) {
+            Text("Comportamiento")
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                statCapsule(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                statCapsule(title: "Modo más usado", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
+                statCapsule(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(18)
+        .liquidGlass(cornerRadius: 28)
     }
 
     private func nextStepCard(progress: BlankProgressReport) -> some View {
@@ -455,7 +479,18 @@ struct ReportView: View {
         return "El \(dayName) fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
     }
 
-    private func statCapsule(title: String, value: String, caption: String) -> some View {
+    private func mostUsedModeName(progress: BlankProgressReport) -> String {
+        progress.modeActivity.first?.name ?? "Sin datos"
+    }
+
+    private func mostUsedModeCaption(progress: BlankProgressReport) -> String {
+        guard let mode = progress.modeActivity.first else {
+            return "Esta semana"
+        }
+        return "\(formatDuration(mode.totalFocusTime)) · \(mode.sessionCount) sesiones"
+    }
+
+    private func statCapsule(title: String, value: String, caption: String, minHeight: CGFloat = 104) -> some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -475,7 +510,7 @@ struct ReportView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.82)
         }
-        .frame(maxWidth: .infinity, minHeight: 104)
+        .frame(maxWidth: .infinity, minHeight: minHeight)
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
         .liquidGlass(cornerRadius: 24)

@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `6ad3590` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se subio el commit `cb7241b` (`Remove sheet resize interaction`) con la retirada de `.presentationContentInteraction(.resizes)`. Se intento compilar en MacinCloud despues del push, pero la sesion RDP estaba cerrada por cierre de sesion forzado/uso en otra sesion y al recargar volvio a pantalla de login; queda pendiente entrar de nuevo y compilar.
 - 2026-07-30: Como el commit `4ee49e2` (`Stats`/`Habits` con `List`) compilo pero no corrigio el fallo visual buscado, se ataco el siguiente sospechoso: se elimino `.presentationContentInteraction(.resizes)` del sheet principal de Ajustes/top bar. El sheet mantiene detents `.medium`/`.large` y fondo transparente, pero deja que el contenido scrollable gestione su posicion sin forzar primero el resize. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4ee49e2` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
@@ -321,7 +322,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
-- El commit remoto pendiente de compilar en MacinCloud es `cb7241b`; no se pudo validar por Terminal porque RDP volvio a login.
+- MacinCloud compila correctamente por Terminal el commit `6ad3590`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - El enfoque activo para corregir la apertura de `Stats`/`Habits` desde top bar ya no depende de `.presentationContentInteraction(.resizes)`: ese modificador se retiro del sheet principal porque `List` no resolvio el fallo visual.
 - MacinCloud compila correctamente por Terminal el commit `4ee49e2`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats`, `Mode` y `Habits` usan ahora `List` como contenedor scrollable cuando se abren desde la top bar; esto elimina la diferencia `ScrollView` vs `List` que podia estar causando que el sheet medio saltase el header en `Stats`/`Habits`.

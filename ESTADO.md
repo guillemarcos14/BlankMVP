@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se subio el commit `240466c` (`Use direct list roots for top sheets`) con `Stats`/`Habits` usando `List` como raiz directa sin `ZStack` exterior. Se intento compilar en MacinCloud despues del push, pero la sesion RDP estaba en pantalla de login; queda pendiente entrar de nuevo y ejecutar la compilacion por Terminal con pulsaciones individuales.
 - 2026-07-30: Como retirar `.presentationContentInteraction(.resizes)` tampoco soluciono el fallo visual, se aplico el siguiente enfoque solo iOS: `Stats` (`ReportView`) y `Habits` (`ScheduleEditorContent`) dejan de estar envueltos por `ZStack`; ahora la `List` es la raiz directa igual que en `Mode`, y el fondo pasa a `.background(... .ignoresSafeArea())`. Se mantiene contenido, titulos, cards y layout interno. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `6ad3590` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se subio el commit `cb7241b` (`Remove sheet resize interaction`) con la retirada de `.presentationContentInteraction(.resizes)`. Se intento compilar en MacinCloud despues del push, pero la sesion RDP estaba cerrada por cierre de sesion forzado/uso en otra sesion y al recargar volvio a pantalla de login; queda pendiente entrar de nuevo y compilar.
@@ -323,6 +324,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- El commit remoto pendiente de compilar en MacinCloud es `240466c`; no se pudo validar por Terminal porque RDP esta en login.
 - El enfoque activo pendiente de compilar/revisar es igualar la forma raiz de `Stats` y `Habits` a `Mode`: `List` directa como raiz de la seccion, sin `ZStack` exterior.
 - MacinCloud compila correctamente por Terminal el commit `6ad3590`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - El enfoque activo para corregir la apertura de `Stats`/`Habits` desde top bar ya no depende de `.presentationContentInteraction(.resizes)`: ese modificador se retiro del sheet principal porque `List` no resolvio el fallo visual.

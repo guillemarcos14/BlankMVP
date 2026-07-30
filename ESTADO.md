@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se ajustaron solo iOS los apartados `Stats`, `Habits`, `Mode` y `Ajustes` tras revision visual: se ocultaron los botones de atras en los destinos, se unifico naming (`Habits`, `Mode`, `Stats`), se fijaron los headers fuera del scroll para que el titulo/descripcion aparezcan al abrir y al expandir, `Habits` gano descripcion, `Mode` paso a layout glass con titulo/descripcion comun y `Ajustes` usa titulo visual Blank alineado a la izquierda. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4bcb814` (`Refine iOS stats and schedule panels`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo de `4180705` a `4bcb814`, se entro en `ios/blank`, `git rev-parse --short head` confirmo `4bcb814` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se aplicaron solo iOS las anotaciones visuales sobre capturas actuales: `Stats` conserva `Tendencia semanal`, elimina el texto `Cada sesion cuenta...`, mantiene la explicacion del calculo mas tenue, oculta el titulo duplicado de navegacion y pasa `Comportamiento` a tres filas full-width; `Programar` oculta el titulo duplicado, evita solapes con `ScrollView` y mueve `Guardar` debajo del contenido con capsula mas discreta. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4180705` (`Match iOS habits and stats visual structure`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo a `4180705`, se entro en `ios/blank` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
@@ -306,6 +307,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- `Stats`, `Habits`, `Mode` y `Ajustes` iOS comparten cabecera visual Blank; los destinos directos ya no muestran back button y el contenido inferior queda separado del header. Falta compilar esta tanda posterior a `4bcb814`.
 - MacinCloud compila correctamente por Terminal el commit `4bcb814`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Programar` iOS ya no tienen doble titulo visible; `Programar` guarda desde una accion inferior y `Comportamiento` usa filas full-width. Falta compilacion MacinCloud de esta ultima tanda.
 - MacinCloud compila correctamente por Terminal el commit `4180705`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
@@ -412,6 +414,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud/Xcode, compilar y revisar visualmente la tanda de headers: confirmar sin boton atras en `Stats`/`Habits`/`Mode`, naming coherente, header visible al abrir/expandir y `Ajustes` alineado a la izquierda.
 - En MacinCloud/Xcode, compilar la tanda posterior a `4180705` y revisar visualmente que no hay doble titulo, que `Guardar` queda bajo el contenido y que `Comportamiento` no deja huecos.
 - En MacinCloud/Xcode, revisar visualmente que `Programar` se percibe como ajuste rapido y que `Stats` se lee como capsulas independientes: hero, ritmo, tendencia y comportamiento.
 - En MacinCloud/Xcode, hacer `git pull --ff-only origin codex/ios-device-activity-target`, ejecutar Run del scheme `Blank` desde `~/BlankMVP/ios/Blank/Blank.xcodeproj` y revisar visualmente que `Habits` y `Stats` muestran el nuevo estilo; si el simulador sigue mostrando lo antiguo, parar/reinstalar la app antes de revisar.

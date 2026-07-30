@@ -28,47 +28,51 @@ struct ReportView: View {
         ZStack {
             ReportLiquidBackground()
 
-            ScrollView {
-                VStack(alignment: .center, spacing: 22) {
-                    reportHeader()
+            VStack(spacing: 22) {
+                reportHeader()
 
-                    minimalHero(
-                        savedTime: savedTime,
-                        insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
-                    )
-
-                    if hasProgress {
-                        periodSummaryCapsule(sessions: sessionStore.sessions)
-
-                        graphCapsule(activityDays: progress.recentActivity)
-
-                        behaviorCapsule(
-                            weekly: weekly,
-                            progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                ScrollView {
+                    VStack(alignment: .center, spacing: 22) {
+                        minimalHero(
+                            savedTime: savedTime,
+                            insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
                         )
-                    } else {
-                        emptyState()
-                    }
 
-                    Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
-                        .font(.caption2)
-                        .foregroundStyle(reportSecondary.opacity(0.62))
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(1)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: 340)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 2)
+                        if hasProgress {
+                            periodSummaryCapsule(sessions: sessionStore.sessions)
+
+                            graphCapsule(activityDays: progress.recentActivity)
+
+                            behaviorCapsule(
+                                weekly: weekly,
+                                progress: progress,
+                                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                            )
+                        } else {
+                            emptyState()
+                        }
+
+                        Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
+                            .font(.caption2)
+                            .foregroundStyle(reportSecondary.opacity(0.62))
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(1)
+                            .padding(.horizontal, 24)
+                            .frame(maxWidth: 340)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 2)
+                    }
+                    .padding(.bottom, 34)
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 24)
-                .padding(.bottom, 34)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, 22)
+            .padding(.top, 24)
         }
         .foregroundStyle(reportPrimary)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
     }

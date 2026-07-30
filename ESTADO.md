@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se deshizo la ultima iteracion visual de headers (`75a59a5`) y su registro de build (`5882fa2`) mediante `git revert`, porque el resultado no gustaba. `HomeView.swift` y `ReportView.swift` vuelven a coincidir con el estado de `4bcb814` para esos cambios. Validado en Windows con `git diff --check` y diff Swift vacio contra `4bcb814`; pendiente push y, si se quiere, compilar de nuevo en MacinCloud.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4bcb814` (`Refine iOS stats and schedule panels`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo de `4180705` a `4bcb814`, se entro en `ios/blank`, `git rev-parse --short head` confirmo `4bcb814` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
 - 2026-07-30: Se aplicaron solo iOS las anotaciones visuales sobre capturas actuales: `Stats` conserva `Tendencia semanal`, elimina el texto `Cada sesion cuenta...`, mantiene la explicacion del calculo mas tenue, oculta el titulo duplicado de navegacion y pasa `Comportamiento` a tres filas full-width; `Programar` oculta el titulo duplicado, evita solapes con `ScrollView` y mueve `Guardar` debajo del contenido con capsula mas discreta. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `4180705` (`Match iOS habits and stats visual structure`) usando pulsaciones individuales. Se hizo `git pull --ff-only origin codex/ios-device-activity-target`, avanzo a `4180705`, se entro en `ios/blank` y `xcodebuild -project blank.xcodeproj build` termino con `** BUILD SUCCEEDED **`. Esto valida compilacion iOS por Terminal, no Run visual, archive ni TestFlight.
@@ -306,6 +307,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- La ultima iteracion de headers queda revertida; el estado visual activo vuelve al de `4bcb814`: `Stats` pulido, `Programar/Habits` con guardar inferior y `Comportamiento` en filas full-width. Los botones atras/naming/header comun de `75a59a5` ya no estan aplicados.
 - MacinCloud compila correctamente por Terminal el commit `4bcb814`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Programar` iOS ya no tienen doble titulo visible; `Programar` guarda desde una accion inferior y `Comportamiento` usa filas full-width. Falta compilacion MacinCloud de esta ultima tanda.
 - MacinCloud compila correctamente por Terminal el commit `4180705`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
@@ -525,6 +527,7 @@ Ultima actualizacion: 2026-07-30
 - [cerrada] 2026-07-12: El bypass para entrar al Home sin NFC solo puede existir en `DEBUG` y `targetEnvironment(simulator)`, nunca en TestFlight ni produccion.
 
 ## Descartado
+- 2026-07-30: Se descarta la iteracion `75a59a5` de headers unificados, ocultacion de back buttons y cambio visual de `Mode`/`Ajustes` porque el usuario indico que no le gustaba el resultado.
 - 2026-07-29: Se descarta mantener `codex/ios-progress-stats-fix` y sus worktrees locales porque no tenia commits unicos frente a `codex/ios-device-activity-target`.
 - 2026-07-29: Se descartan los assets experimentales sin integrar de landing/mascota/producto y los dumps locales de capturas porque la landing comercial migro a Shopify y esos archivos no forman parte del flujo actual de app, soporte ni App Review.
 - 2026-07-09: No se considera bloqueado por Swift/proyecto porque el build de simulador sin firma en Xcode 26.5 termino con `BUILD SUCCEEDED`.

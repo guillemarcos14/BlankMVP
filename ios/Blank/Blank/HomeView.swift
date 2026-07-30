@@ -574,7 +574,7 @@ private struct ModesList: View {
                     }
                 }
             } header: {
-                Text("Modos")
+                Text("Mode")
                     .foregroundStyle(textColor)
             }
             .listRowBackground(Color.clear)
@@ -605,7 +605,8 @@ private struct ModesList: View {
             }
             .listRowBackground(Color.clear)
         }
-        .navigationTitle("Modos")
+        .navigationTitle("Mode")
+        .navigationBarBackButtonHidden(true)
         .tint(textColor)
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -630,6 +631,13 @@ private struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
+                Text("Ajustes")
+                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+
                 settingsButton("Vincular nuevo Blank") {
                     showingRelink = true
                     dismiss()
@@ -643,7 +651,8 @@ private struct SettingsSheet: View {
                     dismiss()
                 }
             }
-            .navigationTitle("Ajustes")
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
@@ -716,7 +725,8 @@ private struct ScheduleEditorContent: View {
 
             ScrollView {
                 VStack(alignment: .center, spacing: 16) {
-                    TechnicalSheetTitle("Programar")
+                    TechnicalSheetTitle("Habits")
+                    TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
 
                     Toggle("Horario diario", isOn: $enabled)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
@@ -765,6 +775,7 @@ private struct ScheduleEditorContent: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .onAppear {
             enabled = sessionStore.schedule.enabled
             startMinute = sessionStore.schedule.startMinute

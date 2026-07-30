@@ -69,6 +69,7 @@ struct ReportView: View {
         .foregroundStyle(reportPrimary)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.light, for: .navigationBar)
     }

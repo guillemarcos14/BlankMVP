@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-30: Se corrigio el alcance de la tanda actual a solo iOS: se revirtieron los cambios aplicados por error en Android `HomeScreen.kt`. La revision/compilacion pendiente en MacinCloud debe validar solo `ios/Blank/Blank/HomeView.swift`.
 - 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `aad5391` (`Refine technical settings panels`) de `codex/ios-device-activity-target` usando pulsaciones individuales. Secuencia ejecutada: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **` y `git rev-parse --short head` confirmo `aad5391`. Esto valida compilacion por Terminal, no archive ni subida TestFlight/App Store.
 - 2026-07-30: Se ajusto el copy de `He olvidado mi Blank` quitando solo la palabra `NFC` del texto actual de confirmacion, y se centraron los botones `Cancelar` bajo el boton principal en las confirmaciones de olvido/emergencia. En Android se anadio `Cancelar` bajo la accion principal de los paneles equivalentes. Android valida con `gradlew.bat assembleDebug --no-daemon --stacktrace`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode.
 - 2026-07-30: Se corrigio el fondo de `Ajustes` y `Mode/Modos` para que no cambie a negro/blanco al expandir la pagina: en iOS la sheet principal usa presentation background transparente y filas de lista transparentes; en Android `AppBackground` deja de usar fondo base negro/gris y pinta siempre el asset de fondo correspondiente a Blank activo/desactivado. Android valida con `gradlew.bat assembleDebug --no-daemon --stacktrace`; iOS queda pendiente de compilar/revisar visualmente en MacinCloud/Xcode.
@@ -297,6 +298,7 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- La tanda visual de Ajustes/Mode/Emergencia/Olvidar se limita a iOS. Android queda fuera de alcance y no debe usarse como referencia de validacion en esta iteracion.
 - MacinCloud compila correctamente por Terminal el commit `aad5391` de la rama `codex/ios-device-activity-target`; resultado confirmado: `** BUILD SUCCEEDED **`. Esto no equivale a archive firmado ni TestFlight.
 - `He olvidado mi Blank` mantiene el copy actual sin mencionar `NFC`; los botones `Cancelar` quedan como accion secundaria centrada bajo el boton principal en las confirmaciones.
 - Los fondos de `Ajustes` y `Mode/Modos` deben permanecer transparentes/atmosfericos al pasar de medium a large y al alternar Blank activo/desactivado; no debe aparecer un plano negro/blanco de sistema detras de la lista.
@@ -394,6 +396,7 @@ Ultima actualizacion: 2026-07-30
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud, hacer pull del nuevo commit que revierte Android, compilar iOS y revisar visualmente solo la app iOS.
 - En Xcode/MacinCloud, revisar visualmente el commit `aad5391` en simulador o dispositivo: fondos transparentes de `Ajustes`/`Mode`, botones `Cancelar` centrados bajo la accion principal, y lista tecnica de Ajustes sin navegacion general duplicada.
 - En MacinCloud/Xcode, revisar visualmente las hojas de `He olvidado mi Blank` y `Emergencia`: confirmar que `Cancelar` queda centrado bajo el boton principal y que el copy de olvido no menciona `NFC`.
 - En MacinCloud/Xcode, expandir `Ajustes` y `Mode/Modos` a tamaño grande con Blank desactivado y activado, y confirmar que el fondo sigue siendo transparente/atmosferico sin plano negro/blanco de sistema.

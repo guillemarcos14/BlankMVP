@@ -612,13 +612,10 @@ private struct ModesList: View {
             }
             .listRowBackground(Color.clear)
         }
-        .navigationTitle("")
-        .navigationBarBackButtonHidden(true)
         .tint(textColor)
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
-        .toolbarBackground(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
@@ -635,22 +632,33 @@ private struct SettingsSheet: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        NavigationStack {
-            switch initialRoute {
-            case .modes:
-                ModesList(showingPicker: $showingPicker) {
-                    dismiss()
+        Group {
+            if initialRoute == nil {
+                NavigationStack {
+                    settingsContent
                 }
-            case .schedule:
-                ScheduleEditorContent()
-            case .report:
-                ReportView()
-                    .preferredColorScheme(.light)
-            case nil:
-                settingsContent
+            } else {
+                routeContent
             }
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    @ViewBuilder
+    private var routeContent: some View {
+        switch initialRoute {
+        case .modes:
+            ModesList(showingPicker: $showingPicker) {
+                dismiss()
+            }
+        case .schedule:
+            ScheduleEditorContent()
+        case .report:
+            ReportView()
+                .preferredColorScheme(.light)
+        case nil:
+            EmptyView()
+        }
     }
 
     private var settingsContent: some View {
@@ -781,9 +789,6 @@ private struct ScheduleEditorContent: View {
                 .padding(.bottom, 34)
             }
         }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .onAppear {
             enabled = sessionStore.schedule.enabled
             startMinute = sessionStore.schedule.startMinute

@@ -28,7 +28,7 @@ struct ReportView: View {
         ZStack {
             ReportLiquidBackground()
 
-            ScrollView {
+            List {
                 VStack(alignment: .center, spacing: 22) {
                     reportHeader()
 
@@ -64,7 +64,13 @@ struct ReportView: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 24)
                 .padding(.bottom, 34)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
         }
         .foregroundStyle(reportPrimary)
     }

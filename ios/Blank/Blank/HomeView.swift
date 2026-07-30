@@ -739,7 +739,7 @@ private struct ScheduleEditorContent: View {
         ZStack {
             BlankAtmosphericBackground()
 
-            ScrollView {
+            List {
                 VStack(alignment: .center, spacing: 16) {
                     TechnicalSheetTitle("Habits")
                     TechnicalSheetDescription("Programa cuándo Blank debe activarse solo.")
@@ -787,7 +787,13 @@ private struct ScheduleEditorContent: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
                 .padding(.bottom, 34)
+                .listRowInsets(EdgeInsets())
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
         }
         .onAppear {
             enabled = sessionStore.schedule.enabled

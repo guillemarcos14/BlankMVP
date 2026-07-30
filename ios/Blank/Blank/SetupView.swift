@@ -16,15 +16,12 @@ struct SetupView: View {
             BlankAtmosphericBackground()
 
             VStack(spacing: 0) {
-            header
-
-            Spacer(minLength: 48)
+            Spacer(minLength: 96)
 
             Group {
                 switch currentStep {
                 case 0:
                     stepContent(
-                        eyebrow: "Paso 1 de 3",
                         title: "Permite que Blank bloquee.",
                         body: screenTimeDescription,
                         statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time listo" : nil,
@@ -34,12 +31,10 @@ struct SetupView: View {
                     )
                 case 1:
                     stepContent(
-                        eyebrow: "Paso 2 de 3",
                         title: "Elige qué quieres dejar fuera.",
                         body: sessionStore.hasSelectedApps
                             ? "\(sessionStore.selectionCount) selecciones protegidas en \(sessionStore.currentMode.name)."
                             : "Selecciona apps, categorías o dominios. En iOS Apple entrega tokens privados, no nombres de paquetes.",
-                        statusText: sessionStore.hasSelectedApps ? "Apps listas" : nil,
                         primaryTitle: sessionStore.hasSelectedApps ? "Continuar" : "Seleccionar apps",
                         secondaryTitle: sessionStore.hasSelectedApps ? "Editar selección" : nil,
                         primaryAction: selectAppsOrContinue,
@@ -47,7 +42,6 @@ struct SetupView: View {
                     )
                 case 2:
                     stepContent(
-                        eyebrow: "Paso 3 de 3",
                         title: "Vincula tu pieza física.",
                         body: sessionStore.nfcTagUid == nil
                             ? "Escanea el NFC que activará y desactivará Blank en este iPhone."
@@ -104,24 +98,6 @@ struct SetupView: View {
         }
     }
 
-    private var header: some View {
-        HStack {
-            Text("Blank")
-                .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
-            Spacer()
-            HStack(spacing: 7) {
-                ForEach(0..<3, id: \.self) { index in
-                    Capsule()
-                        .fill(index == currentStep ? BlankColors.ink : BlankColors.line)
-                        .frame(width: index == currentStep ? 22 : 8, height: 8)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 48)
-        .blankGlassCard(cornerRadius: 24, tintOpacity: 0.22)
-    }
-
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
             return "Screen Time está autorizado. Blank ya puede proteger las apps que elijas."
@@ -140,7 +116,6 @@ struct SetupView: View {
     }
 
     private func stepContent(
-        eyebrow: String,
         title: String,
         body: String,
         statusText: String? = nil,
@@ -150,9 +125,6 @@ struct SetupView: View {
         secondaryAction: (() -> Void)? = nil
     ) -> some View {
         VStack(spacing: 14) {
-            Text(eyebrow)
-                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(BlankColors.mutedInk)
             Text(title)
                 .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)

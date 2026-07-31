@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-07-30
+Ultima actualizacion: 2026-07-31
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,11 @@ Ultima actualizacion: 2026-07-30
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-07-31: Se ajusto solo iOS la pantalla `Mode` en `HomeView.swift` siguiendo las anotaciones visuales: se mantiene el subtitulo actual, el placeholder de nuevo modo pasa a `Crea un modo personalizado`, el modo activo muestra `X app bloqueada/bloqueadas` y se anade mas separacion vertical entre lista de modos, creacion de modo y accion `Editar apps del modo actual`. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
+- 2026-07-31: En MacinCloud/RDP se compilo por Terminal el commit `90623ac` usando pulsaciones individuales reales via `keypress` caracter a caracter tras descartar un intento inicial que volvio a transformarse en caracteres `^V`. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
+- 2026-07-30: Se ajusto solo iOS el onboarding en `SetupView.swift`: el paso 3 deja de mencionar `NFC` en el copy visible y usa `Escanea tu Blank para que active y desactive las apps adictivas en este iPhone`; tambien cambia los estados visibles a `Blank registrado`/`Blank listo`. Se comprobo que el paso 1 ya usa el componente visual compartido del onboarding actualizado. Validado en Windows con `git diff --check`; pendiente compilar de nuevo en MacinCloud.
+- 2026-07-30: En MacinCloud/RDP se compilo por Terminal el commit `90623ac` usando pulsaciones individuales. Secuencia efectiva: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`. La compilacion termino con `** BUILD SUCCEEDED **`. Esto valida compilacion por Terminal, no Run visual, archive ni TestFlight.
+- 2026-07-30: Se genero una imagen vertical 1080x1920 para historia de Instagram a partir del billboard de referencia: `data` pasa a `time`, el texto tachado pasa de `the NSA` a `Instagram` manteniendo el tachado, y `BitTorrent` pasa a `Blank`. Archivo final guardado en `C:\Users\Guillem\Desktop\blank-instagram-story.png`.
 - 2026-07-30: Se revisaron las capturas actuales del onboarding pasos 2 y 3 frente a la referencia visual de Blank. Se propuso orientar el onboarding hacia una pieza mas hero/premium: top bar mas corta y centrada, logo iconico, tipografia blanca/soft cuando proceda, mayor jerarquia visual, botones glass coherentes y menos copy/debug visible.
 - 2026-07-30: Tras revisar anotaciones del usuario sobre onboarding, la direccion visual queda mas minimalista: cuestionar si la top bar aporta algo, eliminar `Paso X de 3` si ya existen dots, eliminar la pill `Apps listas` por redundante, e ignorar el boton debug porque no aparece en la app real.
 - 2026-07-30: Se aplicaron en iOS los ajustes minimalistas del onboarding en `SetupView.swift`: se elimino la top bar superior, se quitaron los textos `Paso X de 3`, se retiro la pill `Apps listas` del paso de seleccion y se mantiene el boton de simulador solo bajo `DEBUG`/simulador. Validado en Windows con `git diff --check`; pendiente compilar/revisar visualmente en MacinCloud/Xcode.
@@ -335,8 +340,8 @@ Ultima actualizacion: 2026-07-30
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
-- El commit remoto pendiente de compilar en MacinCloud es `8820bb8`; no se pudo validar por Terminal porque RDP esta en login.
-- Pendiente compilar/revisar visualmente la pasada de uniformidad: brillo superior izquierdo en cards glass, subtitulos de dos lineas en `Stats`/`Mode`/`Habits` y `Mode` redisenado como panel glass.
+- La ultima modificacion iOS esta en `SetupView.swift`: copy del paso 3 sin `NFC` visible y paso 1 confirmado con el estilo compartido actualizado.
+- MacinCloud compila correctamente por Terminal el commit `90623ac`, que incluye el ajuste de copy de onboarding; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Habits` abren correctamente desde la top bar en sheet medio tras quitar el `ZStack` exterior y dejar la `List` como raiz directa, igual que `Mode`.
 - MacinCloud compila correctamente por Terminal el commit `4aeef97`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - MacinCloud compila correctamente por Terminal el commit `6ad3590`; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
@@ -460,8 +465,7 @@ Ultima actualizacion: 2026-07-30
 
 ## Proximos pasos concretos
 - Si se retoca onboarding iOS, empezar por una pasada visual de bajo riesgo: unificar top bar, hero typografico, posicion vertical, botones glass y paginador; despues revisar en simulador los pasos 1, 2 y 3 juntos.
-- En MacinCloud/Xcode, compilar y revisar visualmente el onboarding iOS tras retirar top bar, `Paso X de 3` y `Apps listas`; comprobar especialmente que los pasos 1, 2 y 3 quedan centrados y que los dots inferiores bastan como indicador de progreso.
-- En cuanto el control RDP vuelva a funcionar, ejecutar en MacinCloud: `cd blankmvp`, `git pull --ff-only origin codex/ios-device-activity-target`, `git rev-parse --short head`, `cd ios/blank` y `xcodebuild -project blank.xcodeproj build`; confirmar que el hash es `bc65713` o posterior y copiar `BUILD SUCCEEDED` o el primer error util.
+- En MacinCloud/Xcode, revisar visualmente el onboarding iOS ya compilado en `90623ac` tras retirar top bar, `Paso X de 3` y `Apps listas`; comprobar especialmente que los pasos 1, 2 y 3 quedan centrados y que los dots inferiores bastan como indicador de progreso.
 - En MacinCloud/RDP, hacer pull del proximo commit y compilar por Terminal con pulsaciones individuales; despues revisar visualmente en Xcode que `Stats` y `Habits` abren desde top bar mostrando cabecera/primer bloque en sheet medio.
 - En MacinCloud/Xcode, compilar y revisar visualmente el cambio `ScrollView -> List` en `Stats` y `Habits`: deben abrir mostrando titulo/descripcion arriba igual que `Mode`.
 - En MacinCloud/Xcode, compilar y revisar visualmente especificamente si al abrir `Stats` y `Habits` se ve el titulo/descripcion arriba tras retirar `.presentationContentInteraction(.resizes)`.

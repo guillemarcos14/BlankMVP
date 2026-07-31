@@ -44,9 +44,9 @@ struct SetupView: View {
                     stepContent(
                         title: "Vincula tu pieza física.",
                         body: sessionStore.nfcTagUid == nil
-                            ? "Escanea el NFC que activará y desactivará Blank en este iPhone."
-                            : "NFC registrado. Blank ya puede usar tu pieza física.",
-                        statusText: sessionStore.nfcTagUid == nil ? nil : "NFC listo",
+                            ? "Escanea tu Blank para que active y desactive las apps adictivas en este iPhone"
+                            : "Blank registrado. Ya puede activar y desactivar las apps adictivas en este iPhone.",
+                        statusText: sessionStore.nfcTagUid == nil ? nil : "Blank listo",
                         primaryTitle: sessionStore.nfcTagUid == nil ? "Escanear mi Blank" : "Hacer mi primer Blank",
                         secondaryTitle: nil,
                         primaryAction: scanOrFinish
@@ -224,7 +224,7 @@ struct SetupView: View {
                 switch result {
                 case .success(let uid):
                     _ = sessionStore.handleNfcTag(uid: uid)
-                    message = "NFC registrado."
+                    message = "Blank registrado."
                 case .failure(let error):
                     message = error.localizedDescription
                 }

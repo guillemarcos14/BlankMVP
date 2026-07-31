@@ -573,12 +573,12 @@ private struct ModesList: View {
             }
 
             VStack(spacing: 10) {
-                TextField("Trabajo profundo", text: $newModeName)
+                TextField("Crea un modo personalizado", text: $newModeName)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(textColor)
                     .padding(.horizontal, 18)
                     .frame(height: 56)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.24)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
 
                 Button {
                     sessionStore.createMode(named: newModeName)
@@ -591,7 +591,8 @@ private struct ModesList: View {
                 .padding(.top, 2)
             }
             .padding(.horizontal, 24)
-            .padding(.top, 12)
+            .padding(.top, 22)
+            .padding(.bottom, 16)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
@@ -612,7 +613,7 @@ private struct ModesList: View {
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
-            .padding(.top, 8)
+            .padding(.top, 16)
             .padding(.bottom, 34)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
@@ -637,7 +638,7 @@ private struct ModesList: View {
                     Text(mode.name)
                         .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
 
-                    Text(isSelected ? "\(sessionStore.selectionCount) selecciones protegidas" : "Toca para activar este modo")
+                    Text(isSelected ? blockedAppsText : "Toca para activar este modo")
                         .font(.caption)
                         .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
                         .lineLimit(1)
@@ -651,6 +652,11 @@ private struct ModesList: View {
             .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
         }
         .buttonStyle(.plain)
+    }
+
+    private var blockedAppsText: String {
+        let count = sessionStore.selectionCount
+        return "\(count) app \(count == 1 ? "bloqueada" : "bloqueadas")"
     }
 }
 

@@ -10,6 +10,8 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleDisplayName</key>
 	<string>Blank</string>
+	<key>BlankMembershipAPIBaseURL</key>
+	<string>$(BLANK_MEMBERSHIP_API_BASE_URL)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleLocalizations</key>

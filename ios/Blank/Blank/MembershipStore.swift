@@ -1,0 +1,359 @@
+import Combine
+import Foundation
+
+@MainActor
+final class MembershipStore: ObservableObject {
+    @Published private(set) var status: MembershipStatus
+    @Published private(set) var plan: MembershipPlan
+    @Published private(set) var activationCode: String?
+    @Published private(set) var maxDevices: Int
+    @Published private(set) var validUntil: Date?
+    @Published private(set) var lastValidatedAt: Date?
+    @Published private(set) var isChecking: Bool = false
+    @Published var message: String?
+
+    private let defaults: UserDefaults
+    private let client: MembershipClient
+    private let now: () -> Date
+
+    init(
+        defaults: UserDefaults = .standard,
+        client: MembershipClient = MembershipClient(),
+        now: @escaping () -> Date = Date.init
+    ) {
+        self.defaults = defaults
+        self.client = client
+        self.now = now
+        status = MembershipStatus(rawValue: defaults.string(forKey: Keys.status) ?? "") ?? .locked
+        plan = MembershipPlan(rawValue: defaults.string(forKey: Keys.plan) ?? "") ?? .unknown
+        activationCode = defaults.string(forKey: Keys.activationCode)
+        maxDevices = max(1, defaults.integer(forKey: Keys.maxDevices))
+        validUntil = Self.date(forKey: Keys.validUntil, defaults: defaults)
+        lastValidatedAt = Self.date(forKey: Keys.lastValidatedAt, defaults: defaults)
+    }
+
+    var appInstallId: String {
+        if let existing = defaults.string(forKey: Keys.appInstallId), !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString
+        defaults.set(created, forKey: Keys.appInstallId)
+        return created
+    }
+
+    var hasAccess: Bool {
+        guard status.grantsAccess else { return false }
+        guard let validUntil, now() <= validUntil else { return false }
+        if let lastValidatedAt, now().timeIntervalSince(lastValidatedAt) > Self.localValidationTTL {
+            return false
+        }
+        return true
+    }
+
+    var accessLabel: String {
+        switch status {
+        case .trialActive:
+            return "Prueba activa"
+        case .active:
+            return plan.displayName
+        case .pastDue:
+            return "Pago pendiente"
+        case .cancelled:
+            return "Membresia cancelada"
+        case .expired:
+            return "Membresia expirada"
+        case .locked:
+            return "Membresia requerida"
+        }
+    }
+
+    func redeem(code rawCode: String) async {
+        let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard code.count >= 6 else {
+            message = "Introduce un codigo valido."
+            return
+        }
+
+        isChecking = true
+        message = nil
+        defer { isChecking = false }
+
+        do {
+            let entitlement = try await client.redeem(code: code, appInstallId: appInstallId)
+            apply(entitlement: entitlement, activationCode: code)
+            message = nil
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    func refreshIfNeeded(force: Bool = false) async {
+        guard let activationCode else { return }
+        if !force, let lastValidatedAt, now().timeIntervalSince(lastValidatedAt) < Self.minimumRefreshInterval {
+            return
+        }
+
+        isChecking = true
+        defer { isChecking = false }
+
+        do {
+            let entitlement = try await client.status(code: activationCode, appInstallId: appInstallId)
+            apply(entitlement: entitlement, activationCode: activationCode)
+            message = nil
+        } catch {
+            if !hasAccess {
+                message = error.localizedDescription
+            }
+        }
+    }
+
+    func resetLocalActivation() {
+        activationCode = nil
+        status = .locked
+        plan = .unknown
+        maxDevices = 1
+        validUntil = nil
+        lastValidatedAt = nil
+        message = nil
+        persist()
+    }
+
+    private func apply(entitlement: MembershipEntitlement, activationCode: String) {
+        self.activationCode = activationCode
+        status = entitlement.status
+        plan = entitlement.plan
+        maxDevices = max(1, entitlement.maxDevices)
+        validUntil = entitlement.validUntil
+        lastValidatedAt = now()
+        persist()
+    }
+
+    private func persist() {
+        defaults.set(status.rawValue, forKey: Keys.status)
+        defaults.set(plan.rawValue, forKey: Keys.plan)
+        defaults.set(activationCode, forKey: Keys.activationCode)
+        defaults.set(maxDevices, forKey: Keys.maxDevices)
+        defaults.set(validUntil?.timeIntervalSince1970, forKey: Keys.validUntil)
+        defaults.set(lastValidatedAt?.timeIntervalSince1970, forKey: Keys.lastValidatedAt)
+    }
+
+    private static func date(forKey key: String, defaults: UserDefaults) -> Date? {
+        guard let timestamp = defaults.object(forKey: key) as? TimeInterval, timestamp > 0 else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: timestamp)
+    }
+
+    private enum Keys {
+        static let appInstallId = "blankMembershipAppInstallId"
+        static let activationCode = "blankMembershipActivationCode"
+        static let status = "blankMembershipStatus"
+        static let plan = "blankMembershipPlan"
+        static let maxDevices = "blankMembershipMaxDevices"
+        static let validUntil = "blankMembershipValidUntil"
+        static let lastValidatedAt = "blankMembershipLastValidatedAt"
+    }
+
+    private static let localValidationTTL: TimeInterval = 72 * 60 * 60
+    private static let minimumRefreshInterval: TimeInterval = 15 * 60
+}
+
+enum MembershipStatus: String, Codable {
+    case locked
+    case trialActive = "trial_active"
+    case active
+    case pastDue = "past_due"
+    case cancelled
+    case expired
+
+    var grantsAccess: Bool {
+        switch self {
+        case .trialActive, .active:
+            return true
+        case .locked, .pastDue, .cancelled, .expired:
+            return false
+        }
+    }
+}
+
+enum MembershipPlan: String, Codable {
+    case unknown
+    case trial
+    case monthly
+    case annual
+    case family
+
+    var displayName: String {
+        switch self {
+        case .trial:
+            return "Plan de prueba"
+        case .monthly:
+            return "Membresia mensual"
+        case .annual:
+            return "Membresia anual"
+        case .family:
+            return "Membresia familiar"
+        case .unknown:
+            return "Membresia Blank"
+        }
+    }
+}
+
+struct MembershipEntitlement {
+    let status: MembershipStatus
+    let plan: MembershipPlan
+    let maxDevices: Int
+    let validUntil: Date?
+}
+
+struct MembershipClient {
+    private let baseURL: URL?
+    private let session: URLSession
+
+    init(
+        baseURL: URL? = MembershipClient.configuredBaseURL(),
+        session: URLSession = .shared
+    ) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func redeem(code: String, appInstallId: String) async throws -> MembershipEntitlement {
+        #if DEBUG
+        if baseURL == nil {
+            return Self.debugEntitlement(for: code)
+        }
+        #endif
+        return try await request(path: "redeem-code", code: code, appInstallId: appInstallId)
+    }
+
+    func status(code: String, appInstallId: String) async throws -> MembershipEntitlement {
+        #if DEBUG
+        if baseURL == nil {
+            return Self.debugEntitlement(for: code)
+        }
+        #endif
+        return try await request(path: "membership-status", code: code, appInstallId: appInstallId)
+    }
+
+    private func request(path: String, code: String, appInstallId: String) async throws -> MembershipEntitlement {
+        guard let baseURL else {
+            throw MembershipClientError.missingEndpoint
+        }
+
+        let url = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(RequestBody(code: code, app_install_id: appInstallId))
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw MembershipClientError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw MembershipClientError.rejectedCode
+        }
+
+        let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
+        return try decoded.entitlement()
+    }
+
+    private static func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+
+    #if DEBUG
+    private static func debugEntitlement(for code: String) -> MembershipEntitlement {
+        let uppercased = code.uppercased()
+        let plan: MembershipPlan
+        let status: MembershipStatus
+        let maxDevices: Int
+        let validUntil: Date
+
+        if uppercased.hasPrefix("TRIAL") {
+            plan = .trial
+            status = .trialActive
+            maxDevices = 1
+            validUntil = Date().addingTimeInterval(30 * 24 * 60 * 60)
+        } else if uppercased.hasPrefix("MONTHLY") {
+            plan = .monthly
+            status = .active
+            maxDevices = 1
+            validUntil = Date().addingTimeInterval(30 * 24 * 60 * 60)
+        } else if uppercased.hasPrefix("FAMILY") {
+            plan = .family
+            status = .active
+            maxDevices = 5
+            validUntil = Date().addingTimeInterval(365 * 24 * 60 * 60)
+        } else {
+            plan = .annual
+            status = .active
+            maxDevices = 1
+            validUntil = Date().addingTimeInterval(365 * 24 * 60 * 60)
+        }
+
+        return MembershipEntitlement(
+            status: status,
+            plan: plan,
+            maxDevices: maxDevices,
+            validUntil: validUntil
+        )
+    }
+    #endif
+
+    private struct RequestBody: Encodable {
+        let code: String
+        let app_install_id: String
+    }
+
+    private struct ResponseBody: Decodable {
+        let status: MembershipStatus
+        let plan: MembershipPlan
+        let max_devices: Int
+        let trial_ends_at: String?
+        let current_period_ends_at: String?
+
+        func entitlement() throws -> MembershipEntitlement {
+            let validUntilString = trial_ends_at ?? current_period_ends_at
+            let validUntil = try validUntilString.map(Self.parseDate)
+            return MembershipEntitlement(
+                status: status,
+                plan: plan,
+                maxDevices: max_devices,
+                validUntil: validUntil
+            )
+        }
+
+        private static func parseDate(_ value: String) throws -> Date {
+            if let date = ISO8601DateFormatter().date(from: value) {
+                return date
+            }
+            throw MembershipClientError.invalidResponse
+        }
+    }
+}
+
+enum MembershipClientError: LocalizedError {
+    case missingEndpoint
+    case invalidResponse
+    case rejectedCode
+
+    var errorDescription: String? {
+        switch self {
+        case .missingEndpoint:
+            return "No se ha configurado el servidor de membresia."
+        case .invalidResponse:
+            return "No hemos podido validar la membresia."
+        case .rejectedCode:
+            return "Este codigo no es valido o ya no esta activo."
+        }
+    }
+}

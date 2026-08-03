@@ -11,6 +11,11 @@ keystore.properties
 # Local Netlify folder
 .netlify
 
+# Local membership secrets
+.env
+.env.*
+!.env.membership.example
+
 # Generated deploy artifacts
 /web/*.zip
 

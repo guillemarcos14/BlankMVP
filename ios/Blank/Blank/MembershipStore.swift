@@ -249,14 +249,31 @@ struct MembershipClient {
 
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
+            Self.debugLog(path: path, message: "Invalid non-HTTP response")
             throw MembershipClientError.invalidResponse
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
+            Self.debugLog(path: path, statusCode: httpResponse.statusCode, data: data, message: "Rejected activation response")
             throw MembershipClientError.rejectedCode
         }
 
-        let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
-        return try decoded.entitlement()
+        do {
+            let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
+            return try decoded.entitlement()
+        } catch {
+            Self.debugLog(path: path, statusCode: httpResponse.statusCode, data: data, message: "Could not decode activation response: \(error)")
+            throw MembershipClientError.invalidResponse
+        }
+    }
+
+    private static func debugLog(path: String, statusCode: Int? = nil, data: Data? = nil, message: String) {
+        #if DEBUG
+        let statusText = statusCode.map { " status=\($0)" } ?? ""
+        let bodyText = data
+            .flatMap { String(data: $0, encoding: .utf8) }
+            .map { " body=\($0)" } ?? ""
+        print("[BlankMembership] \(path)\(statusText) \(message)\(bodyText)")
+        #endif
     }
 
     private static func configuredBaseURL() -> URL? {

@@ -144,6 +144,10 @@ final class SessionStore: ObservableObject {
         sessions.last { $0.isActive }
     }
 
+    private var activeSessionStartedBySchedule: Bool {
+        activeSession?.forceStarted == true
+    }
+
     var currentWeekReport: BlankWeeklyReport {
         let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: Date())
         return BlankWeeklySessionAggregator.aggregate(sessions: sessions, weekStart: weekStart)
@@ -247,7 +251,7 @@ final class SessionStore: ObservableObject {
 
         if let schedulePausedUntil {
             if date < schedulePausedUntil {
-                if isBlankActive {
+                if isBlankActive, activeSessionStartedBySchedule {
                     _ = deactivateBlank()
                 }
                 return
@@ -257,7 +261,7 @@ final class SessionStore: ObservableObject {
 
         if schedule.contains(date) {
             _ = activateBlank(forceStarted: true)
-        } else if isBlankActive {
+        } else if isBlankActive, activeSessionStartedBySchedule {
             _ = deactivateBlank()
         }
     }

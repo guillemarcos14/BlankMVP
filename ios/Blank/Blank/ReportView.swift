@@ -29,10 +29,7 @@ struct ReportView: View {
             VStack(alignment: .center, spacing: 22) {
                     reportHeader()
 
-                    minimalHero(
-                        savedTime: savedTime,
-                        insight: insightText(totalSessionCount: totalSessionCount, savedTime: savedTime, progress: progress)
-                    )
+                    minimalHero(savedTime: savedTime)
 
                     if hasProgress {
                         periodSummaryCapsule(sessions: sessionStore.sessions)
@@ -80,10 +77,7 @@ struct ReportView: View {
         )
     }
 
-    private func minimalHero(
-        savedTime: TimeInterval,
-        insight: String
-    ) -> some View {
+    private func minimalHero(savedTime: TimeInterval) -> some View {
         VStack(spacing: 18) {
             VStack(spacing: 8) {
                 Text(formatDuration(savedTime))
@@ -91,20 +85,12 @@ struct ReportView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
-                Text("tiempo recuperado")
+                Text("Tiempo Recuperado")
                     .font(.body)
                     .foregroundStyle(reportSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 18)
-
-            Text(insight)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(reportSecondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 12)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 28)
@@ -166,7 +152,7 @@ struct ReportView: View {
         let summaries = Array(progressPeriodSummaries(sessions: sessions).prefix(3))
 
         return VStack(alignment: .center, spacing: 14) {
-            Text("Ritmo")
+            Text("Tiempo Blankeado")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {

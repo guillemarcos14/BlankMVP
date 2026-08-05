@@ -183,6 +183,16 @@ enum MembershipStatus: String, Codable {
     case cancelled
     case expired
 
+    init(apiValue: String) {
+        let normalized = apiValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+
+        self = MembershipStatus(rawValue: normalized) ?? .locked
+    }
+
     var grantsAccess: Bool {
         switch self {
         case .trialActive, .active:
@@ -199,6 +209,27 @@ enum MembershipPlan: String, Codable {
     case monthly
     case annual
     case family
+
+    init(apiValue: String?) {
+        let normalized = (apiValue ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+
+        if normalized.contains("trial") || normalized.contains("prueba") {
+            self = .trial
+        } else if normalized.contains("monthly") || normalized.contains("mensual") || normalized.contains("mes") {
+            self = .monthly
+        } else if normalized.contains("family") || normalized.contains("familiar") {
+            self = .family
+        } else if normalized.contains("annual") || normalized.contains("anual") || normalized.contains("ano") || normalized.contains("year") {
+            self = .annual
+        } else {
+            self = MembershipPlan(rawValue: normalized) ?? .unknown
+        }
+    }
 
     var displayName: String {
         switch self {
@@ -349,28 +380,70 @@ struct MembershipClient {
     }
 
     private struct ResponseBody: Decodable {
-        let status: MembershipStatus
-        let plan: MembershipPlan
-        let max_devices: Int
-        let trial_ends_at: String?
-        let current_period_ends_at: String?
+        let status: String
+        let plan: String?
+        let maxDevices: Int?
+        let trialEndsAt: String?
+        let currentPeriodEndsAt: String?
+
+        enum CodingKeys: String, CodingKey {
+            case status
+            case plan
+            case maxDevices = "max_devices"
+            case trialEndsAt = "trial_ends_at"
+            case currentPeriodEndsAt = "current_period_ends_at"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            status = try container.decode(String.self, forKey: .status)
+            plan = try container.decodeIfPresent(String.self, forKey: .plan)
+            trialEndsAt = try container.decodeIfPresent(String.self, forKey: .trialEndsAt)
+            currentPeriodEndsAt = try container.decodeIfPresent(String.self, forKey: .currentPeriodEndsAt)
+
+            if let value = try? container.decodeIfPresent(Int.self, forKey: .maxDevices) {
+                maxDevices = value
+            } else if let value = try? container.decodeIfPresent(String.self, forKey: .maxDevices) {
+                maxDevices = Int(value)
+            } else {
+                maxDevices = nil
+            }
+        }
 
         func entitlement() throws -> MembershipEntitlement {
-            let validUntilString = trial_ends_at ?? current_period_ends_at
-            let validUntil = try validUntilString.map(Self.parseDate)
+            let decodedStatus = MembershipStatus(apiValue: status)
+            let decodedPlan = MembershipPlan(apiValue: plan)
+            let validUntil = Self.parseFirstValidDate([trialEndsAt, currentPeriodEndsAt])
+                ?? Self.fallbackValidUntil(for: decodedStatus, plan: decodedPlan)
+
             return MembershipEntitlement(
-                status: status,
-                plan: plan,
-                maxDevices: max_devices,
+                status: decodedStatus,
+                plan: decodedPlan,
+                maxDevices: maxDevices ?? 1,
                 validUntil: validUntil
             )
         }
 
-        private static func parseDate(_ value: String) throws -> Date {
-            if let date = isoDateFormatter.date(from: value) ?? isoDateFormatterWithFractionalSeconds.date(from: value) {
-                return date
+        private static func parseFirstValidDate(_ values: [String?]) -> Date? {
+            for value in values.compactMap({ $0 }) {
+                if let date = isoDateFormatter.date(from: value) ?? isoDateFormatterWithFractionalSeconds.date(from: value) {
+                    return date
+                }
             }
-            throw MembershipClientError.invalidResponse
+            return nil
+        }
+
+        private static func fallbackValidUntil(for status: MembershipStatus, plan: MembershipPlan) -> Date? {
+            guard status.grantsAccess else { return nil }
+
+            switch plan {
+            case .trial:
+                return Date().addingTimeInterval(30 * 24 * 60 * 60)
+            case .monthly:
+                return Date().addingTimeInterval(30 * 24 * 60 * 60)
+            case .annual, .family, .unknown:
+                return Date().addingTimeInterval(365 * 24 * 60 * 60)
+            }
         }
 
         private static let isoDateFormatter = ISO8601DateFormatter()

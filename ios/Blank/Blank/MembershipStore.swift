@@ -367,11 +367,19 @@ struct MembershipClient {
         }
 
         private static func parseDate(_ value: String) throws -> Date {
-            if let date = ISO8601DateFormatter().date(from: value) {
+            if let date = isoDateFormatter.date(from: value) ?? isoDateFormatterWithFractionalSeconds.date(from: value) {
                 return date
             }
             throw MembershipClientError.invalidResponse
         }
+
+        private static let isoDateFormatter = ISO8601DateFormatter()
+
+        private static let isoDateFormatterWithFractionalSeconds: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
     }
 }
 

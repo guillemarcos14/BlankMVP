@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct MembershipActivationView: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var membershipStore: MembershipStore
+    @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @State private var code = ""
 
     var body: some View {
@@ -57,6 +59,17 @@ struct MembershipActivationView: View {
                     .disabled(membershipStore.isChecking)
                     .padding(.top, 14)
 
+                    #if DEBUG
+                    #if targetEnvironment(simulator)
+                    Button("Entrar al Home en simulador") {
+                        enterSimulatorHome()
+                    }
+                    .buttonStyle(BlankSecondaryButtonStyle())
+                    .frame(width: 260)
+                    .padding(.top, 2)
+                    #endif
+                    #endif
+
                     if let message = membershipStore.message {
                         Text(message)
                             .font(.blankInter(size: 13, relativeTo: .footnote))
@@ -82,4 +95,15 @@ struct MembershipActivationView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    #if DEBUG
+    #if targetEnvironment(simulator)
+    private func enterSimulatorHome() {
+        membershipStore.grantSimulatorAccess()
+        sessionStore.nfcTagUid = "simulator-nfc-tag"
+        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+        sessionStore.finishSetup()
+    }
+    #endif
+    #endif
 }

@@ -118,6 +118,23 @@ final class MembershipStore: ObservableObject {
         persist()
     }
 
+    #if DEBUG
+    #if targetEnvironment(simulator)
+    func grantSimulatorAccess() {
+        apply(
+            entitlement: MembershipEntitlement(
+                status: .active,
+                plan: .annual,
+                maxDevices: 1,
+                validUntil: now().addingTimeInterval(365 * 24 * 60 * 60)
+            ),
+            activationCode: "SIMULATOR-ACCESS"
+        )
+        message = nil
+    }
+    #endif
+    #endif
+
     private func apply(entitlement: MembershipEntitlement, activationCode: String) {
         self.activationCode = activationCode
         status = entitlement.status

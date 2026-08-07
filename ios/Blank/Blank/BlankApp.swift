@@ -29,7 +29,9 @@ struct BlankApp: App {
                 }
                 .onOpenURL { url in
                     guard url.scheme == "blank" else { return }
-                    if url.host == "configure-block" {
+                    if url.host == "scan-blank" {
+                        sessionStore.requestBlankScanFromWidget()
+                    } else if url.host == "configure-block" {
                         sessionStore.requestBlockConfiguration()
                     }
                 }

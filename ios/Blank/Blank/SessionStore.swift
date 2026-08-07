@@ -72,6 +72,7 @@ final class SessionStore: ObservableObject {
     }
 
     @Published var shouldOpenBlockConfiguration = false
+    @Published var shouldScanBlankFromWidget = false
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -299,6 +300,10 @@ final class SessionStore: ObservableObject {
 
     func requestBlockConfiguration() {
         shouldOpenBlockConfiguration = true
+    }
+
+    func requestBlankScanFromWidget() {
+        shouldScanBlankFromWidget = true
     }
 
     func selectMode(_ modeId: UUID) {

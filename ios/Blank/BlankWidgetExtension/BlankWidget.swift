@@ -74,6 +74,9 @@ struct BlankWidgetView: View {
     private var isActive: Bool { entry.activeState.isActive }
     private var foregroundColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.14, green: 0.14, blue: 0.13) }
     private var secondaryForegroundColor: Color { isActive ? Color.white.opacity(0.76) : Color.black.opacity(0.62) }
+    private var widgetURL: URL? {
+        URL(string: isActive ? "blank://scan-blank" : "blank://configure-block")
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,26 +86,26 @@ struct BlankWidgetView: View {
                 .padding(.top, 1)
                 .padding(.leading, 1)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: isActive ? 6 : 10)
 
-            VStack(spacing: 10) {
+            VStack(spacing: isActive ? 8 : 11) {
                 actionCircle
 
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: isActive ? 14.5 : 15.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(foregroundColor)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
             }
             .frame(maxWidth: .infinity)
-            .offset(y: -3)
+            .offset(y: isActive ? -1 : -3)
 
-            Spacer(minLength: 14)
+            Spacer(minLength: isActive ? 12 : 15)
         }
         .padding(16)
         .blankWidgetBackground(isActive: entry.activeState.isActive)
-        .widgetURL(URL(string: "blank://configure-block"))
+        .widgetURL(widgetURL)
     }
 
     @ViewBuilder
@@ -128,46 +131,63 @@ struct BlankWidgetView: View {
     }
 
     private var idleCircle: some View {
-        Circle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.22, green: 0.22, blue: 0.20),
-                        Color(red: 0.10, green: 0.10, blue: 0.09)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.20, green: 0.20, blue: 0.18),
+                            Color(red: 0.035, green: 0.04, blue: 0.035)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
-            )
-            .overlay {
-                Circle()
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                    .padding(0.5)
+
+            Circle()
+                .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                .padding(-1)
+
+            Circle()
+                .fill(Color.white.opacity(0.13))
+                .frame(width: 46, height: 20)
+                .blur(radius: 12)
+                .offset(y: -19)
+
+            Circle()
+                .fill(Color.black.opacity(0.24))
+                .frame(width: 52, height: 20)
+                .blur(radius: 12)
+                .offset(y: 22)
+        }
+        .frame(width: 70, height: 70)
+        .overlay(alignment: .bottom) {
+            Capsule()
+                .fill(Color.white.opacity(0.10))
+                .frame(width: 22, height: 3)
+                .offset(y: -8)
             }
-            .overlay(alignment: .top) {
-                Circle()
-                    .fill(Color.white.opacity(0.10))
-                    .frame(width: 42, height: 16)
-                    .blur(radius: 10)
-                    .offset(y: 5)
-            }
-            .shadow(color: Color.black.opacity(0.10), radius: 7, x: 0, y: 5)
-            .frame(width: 64, height: 64)
-            .contentShape(Circle())
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 7)
+        .contentShape(Circle())
     }
 
     private var progressCircle: some View {
         ZStack {
             Circle()
-                .fill(Color.white.opacity(0.025))
+                .fill(Color.white.opacity(0.035))
             Circle()
-                .stroke(Color.white.opacity(0.16), lineWidth: 3.25)
+                .stroke(Color.white.opacity(0.18), lineWidth: 3)
             Circle()
                 .trim(from: 0, to: entry.activeState.progress(now: entry.date))
-                .stroke(Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 3.25, lineCap: .round))
+                .stroke(Color.white.opacity(0.94), style: StrokeStyle(lineWidth: 3, lineCap: .butt))
                 .rotationEffect(.degrees(-90))
+
+            Text("\(entry.activeState.remainingMinutes(now: entry.date) ?? 0)")
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.white.opacity(0.92))
+                .monospacedDigit()
         }
-        .frame(width: 64, height: 64)
+        .frame(width: 72, height: 72)
     }
 
     private var title: String {
@@ -186,8 +206,8 @@ private struct BlankWidgetGlassBackground: View {
 
             LinearGradient(
                 colors: [
-                    isActive ? Color.white.opacity(0.08) : Color.white.opacity(0.36),
-                    isActive ? Color.white.opacity(0.00) : Color.white.opacity(0.06)
+                    isActive ? Color.white.opacity(0.10) : Color.white.opacity(0.52),
+                    isActive ? Color.white.opacity(0.00) : Color.white.opacity(0.08)
                 ],
                 startPoint: .top,
                 endPoint: UnitPoint(x: 0.5, y: 0.48)
@@ -206,11 +226,28 @@ private struct BlankWidgetGlassBackground: View {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    isActive ? Color.black.opacity(0.28) : Color.black.opacity(0.028)
+                    isActive ? Color.black.opacity(0.34) : Color.black.opacity(0.018)
                 ],
                 startPoint: UnitPoint(x: 0.50, y: 0.62),
                 endPoint: .bottom
             )
+
+            if isActive {
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.00),
+                                Color.white.opacity(0.045),
+                                Color.white.opacity(0.00)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .rotationEffect(.degrees(-8))
+                    .offset(y: -22)
+            }
 
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(
@@ -234,11 +271,11 @@ private struct BlankWidgetGlassBackground: View {
             .fill(
                 LinearGradient(
                     colors: isActive ? [
-                        Color(red: 0.15, green: 0.16, blue: 0.14),
-                        Color(red: 0.055, green: 0.065, blue: 0.055)
+                        Color(red: 0.17, green: 0.18, blue: 0.16),
+                        Color(red: 0.025, green: 0.035, blue: 0.028)
                     ] : [
-                        Color(red: 0.99, green: 0.99, blue: 0.98),
-                        Color(red: 0.94, green: 0.94, blue: 0.92)
+                        Color.white,
+                        Color(red: 0.965, green: 0.962, blue: 0.945)
                     ],
                     startPoint: .top,
                     endPoint: .bottom

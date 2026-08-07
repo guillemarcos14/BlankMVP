@@ -73,6 +73,13 @@ struct HomeView: View {
             openSettings(.modes)
             sessionStore.shouldOpenBlockConfiguration = false
         }
+        .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
+            guard shouldScan else { return }
+            sessionStore.shouldScanBlankFromWidget = false
+            if sessionStore.isBlankActive {
+                scanTag()
+            }
+        }
         .sheet(isPresented: $showingSettings, onDismiss: {
             settingsRoute = nil
         }) {

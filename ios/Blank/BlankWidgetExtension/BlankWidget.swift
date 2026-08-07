@@ -74,32 +74,35 @@ struct BlankWidgetView: View {
 
     var body: some View {
         ZStack {
-            BlankWidgetGlassBackground()
+            BlankWidgetGlassBackground(isActive: entry.activeState.isActive)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("Blank")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.92))
+                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.96))
+                    .padding(.top, 1)
+                    .padding(.leading, 1)
 
                 Spacer(minLength: 0)
 
-                VStack(spacing: 11) {
+                VStack(spacing: 10) {
                     actionCircle
 
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.95))
+                        .font(.system(size: 15.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.97))
                         .monospacedDigit()
                         .lineLimit(1)
-                        .minimumScaleFactor(0.84)
+                        .minimumScaleFactor(0.86)
                 }
                 .frame(maxWidth: .infinity)
+                .offset(y: -1)
 
-                Spacer(minLength: 0)
+                Spacer(minLength: 8)
             }
             .padding(16)
         }
-        .blankWidgetBackground()
+        .blankWidgetBackground(isActive: entry.activeState.isActive)
         .widgetURL(URL(string: "blank://configure-block"))
     }
 
@@ -127,21 +130,36 @@ struct BlankWidgetView: View {
 
     private var idleCircle: some View {
         Circle()
-            .fill(Color.white.opacity(0.95))
-            .frame(width: 58, height: 58)
+            .fill(Color.white.opacity(0.98))
+            .overlay {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.20),
+                                Color.white.opacity(0.00)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            }
+            .frame(width: 60, height: 60)
             .contentShape(Circle())
     }
 
     private var progressCircle: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.24), lineWidth: 5)
+                .stroke(Color.white.opacity(0.20), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: entry.activeState.progress(now: entry.date))
-                .stroke(Color.white.opacity(0.92), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                .stroke(Color.white.opacity(0.94), style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+            Circle()
+                .fill(Color.white.opacity(0.08))
         }
-        .frame(width: 58, height: 58)
+        .frame(width: 60, height: 60)
     }
 
     private var title: String {
@@ -152,30 +170,66 @@ struct BlankWidgetView: View {
 }
 
 private struct BlankWidgetGlassBackground: View {
+    var isActive = false
+
     var body: some View {
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
+            Rectangle()
+                .fill(Color.white.opacity(isActive ? 0.13 : 0.19))
             LinearGradient(
                 colors: [
-                    Color(red: 0.84, green: 0.88, blue: 0.94).opacity(0.34),
-                    Color(red: 0.18, green: 0.21, blue: 0.26).opacity(0.50)
+                    Color.white.opacity(isActive ? 0.22 : 0.32),
+                    Color.white.opacity(isActive ? 0.05 : 0.12),
+                    Color.black.opacity(isActive ? 0.22 : 0.10)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(isActive ? 0.30 : 0.38),
+                    Color.white.opacity(0.00)
+                ],
+                center: .topLeading,
+                startRadius: 8,
+                endRadius: 120
+            )
+            LinearGradient(
+                colors: [
+                    Color(red: 0.70, green: 0.80, blue: 0.92).opacity(isActive ? 0.20 : 0.12),
+                    Color.clear
+                ],
+                startPoint: .topTrailing,
+                endPoint: .bottomLeading
+            )
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.34),
+                            Color.white.opacity(0.06),
+                            Color.white.opacity(0.00)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+                .padding(0.5)
         }
     }
 }
 
 private extension View {
     @ViewBuilder
-    func blankWidgetBackground() -> some View {
+    func blankWidgetBackground(isActive: Bool) -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
             containerBackground(for: .widget) {
-                BlankWidgetGlassBackground()
+                BlankWidgetGlassBackground(isActive: isActive)
             }
         } else {
-            background(BlankWidgetGlassBackground())
+            background(BlankWidgetGlassBackground(isActive: isActive))
         }
     }
 }

@@ -68,6 +68,11 @@ struct HomeView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
         }
+        .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
+            guard shouldOpen else { return }
+            openSettings(.modes)
+            sessionStore.shouldOpenBlockConfiguration = false
+        }
         .sheet(isPresented: $showingSettings, onDismiss: {
             settingsRoute = nil
         }) {

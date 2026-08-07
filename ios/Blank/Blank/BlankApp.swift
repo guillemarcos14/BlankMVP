@@ -27,6 +27,12 @@ struct BlankApp: App {
                         screenTimeBlocker.refreshAuthorizationStatus()
                     }
                 }
+                .onOpenURL { url in
+                    guard url.scheme == "blank" else { return }
+                    if url.host == "configure-block" {
+                        sessionStore.requestBlockConfiguration()
+                    }
+                }
         }
     }
 }

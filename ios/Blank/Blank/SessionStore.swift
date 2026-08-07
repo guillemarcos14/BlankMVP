@@ -1,20 +1,30 @@
 import FamilyControls
 import Foundation
+import WidgetKit
 
 @MainActor
 final class SessionStore: ObservableObject {
     static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
 
     @Published var isBlankActive: Bool {
-        didSet { defaults.set(isBlankActive, forKey: Keys.isBlankActive) }
+        didSet {
+            defaults.set(isBlankActive, forKey: Keys.isBlankActive)
+            reloadBlankWidget()
+        }
     }
 
     @Published var blankActiveSince: Date? {
-        didSet { defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince) }
+        didSet {
+            defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince)
+            reloadBlankWidget()
+        }
     }
 
     @Published var blankActiveUntil: Date? {
-        didSet { defaults.set(blankActiveUntil?.timeIntervalSince1970, forKey: Keys.blankActiveUntil) }
+        didSet {
+            defaults.set(blankActiveUntil?.timeIntervalSince1970, forKey: Keys.blankActiveUntil)
+            reloadBlankWidget()
+        }
     }
 
     @Published var nfcTagUid: String? {
@@ -29,6 +39,7 @@ final class SessionStore: ObservableObject {
         didSet {
             saveSelection(selection)
             updateCurrentModeSelection(selection)
+            reloadBlankWidget()
         }
     }
 
@@ -60,14 +71,17 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
 
+    @Published var shouldOpenBlockConfiguration = false
+
     #if DEBUG
     private var previewSelectionCount: Int?
     #endif
 
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = BlankSharedState.defaults) {
         self.defaults = defaults
+        Self.migrateLegacyDefaultsIfNeeded(to: defaults)
         isBlankActive = defaults.bool(forKey: Keys.isBlankActive)
         if let timestamp = defaults.object(forKey: Keys.blankActiveSince) as? TimeInterval, timestamp > 0 {
             blankActiveSince = Date(timeIntervalSince1970: timestamp)
@@ -238,6 +252,7 @@ final class SessionStore: ObservableObject {
 
     func applyScheduleWindow(at date: Date = Date()) {
         resetEmergencyUnlocksIfNeeded(for: date)
+        BlankSharedState.finishExpiredBlock(defaults: defaults, now: date)
 
         if let blankActiveUntil, isBlankActive, date >= blankActiveUntil {
             _ = deactivateBlank()
@@ -280,6 +295,10 @@ final class SessionStore: ObservableObject {
 
     func finishSetup() {
         setupComplete = true
+    }
+
+    func requestBlockConfiguration() {
+        shouldOpenBlockConfiguration = true
     }
 
     func selectMode(_ modeId: UUID) {
@@ -439,6 +458,39 @@ final class SessionStore: ObservableObject {
         return "\(components.yearForWeekOfYear ?? 0)-\(components.weekOfYear ?? 0)"
     }
 
+    private static func migrateLegacyDefaultsIfNeeded(to defaults: UserDefaults) {
+        guard defaults !== UserDefaults.standard,
+              defaults.object(forKey: Keys.selection) == nil,
+              defaults.object(forKey: Keys.setupComplete) == nil,
+              (
+                UserDefaults.standard.object(forKey: Keys.selection) != nil ||
+                UserDefaults.standard.object(forKey: Keys.setupComplete) != nil
+              ) else {
+            return
+        }
+
+        [
+            Keys.isBlankActive,
+            Keys.blankActiveSince,
+            Keys.blankActiveUntil,
+            Keys.nfcTagUid,
+            Keys.setupComplete,
+            Keys.selection,
+            Keys.sessions,
+            Keys.focusModes,
+            Keys.currentModeId,
+            Keys.schedule,
+            Keys.deviceActivityTimerScheduled,
+            Keys.schedulePausedUntil,
+            Keys.emergencyUnlockWeekKey,
+            Keys.emergencyUnlocksThisWeek
+        ].forEach { key in
+            if let value = UserDefaults.standard.object(forKey: key) {
+                defaults.set(value, forKey: key)
+            }
+        }
+    }
+
     enum NfcResult {
         case tagRegistered
         case blanked
@@ -449,15 +501,15 @@ final class SessionStore: ObservableObject {
     }
 
     private enum Keys {
-        static let isBlankActive = "isBlankActive"
-        static let blankActiveSince = "blankActiveSince"
-        static let blankActiveUntil = "blankActiveUntil"
+        static let isBlankActive = BlankSharedState.Keys.isBlankActive
+        static let blankActiveSince = BlankSharedState.Keys.blankActiveSince
+        static let blankActiveUntil = BlankSharedState.Keys.blankActiveUntil
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
-        static let selection = "familyActivitySelection"
-        static let sessions = "blankSessions"
+        static let selection = BlankSharedState.Keys.selection
+        static let sessions = BlankSharedState.Keys.sessions
         static let focusModes = "blankFocusModes"
-        static let currentModeId = "blankCurrentModeId"
+        static let currentModeId = BlankSharedState.Keys.currentModeId
         static let schedule = "blankFocusSchedule"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
         static let schedulePausedUntil = "blankSchedulePausedUntil"
@@ -466,6 +518,10 @@ final class SessionStore: ObservableObject {
     }
 
     private static let maxEmergencyUnlocksPerWeek = 3
+
+    private func reloadBlankWidget() {
+        WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
+    }
 }
 
 #if DEBUG

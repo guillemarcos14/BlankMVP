@@ -199,28 +199,3 @@ struct BlankWidgetBundle: WidgetBundle {
         BlankQuickBlockWidget()
     }
 }
-
-#Preview(as: .systemSmall) {
-    BlankQuickBlockWidget()
-} timeline: {
-    BlankWidgetEntry(
-        date: Date(),
-        activeState: BlankSharedState.ActiveState(
-            isActive: false,
-            startedAt: nil,
-            endsAt: nil,
-            totalMinutes: BlankSharedState.quickBlockDurationMinutes
-        ),
-        hasConfiguration: true
-    )
-    BlankWidgetEntry(
-        date: Date(),
-        activeState: BlankSharedState.ActiveState(
-            isActive: true,
-            startedAt: Date().addingTimeInterval(-18 * 60),
-            endsAt: Date().addingTimeInterval(42 * 60),
-            totalMinutes: BlankSharedState.quickBlockDurationMinutes
-        ),
-        hasConfiguration: true
-    )
-}

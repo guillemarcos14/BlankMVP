@@ -3,7 +3,6 @@ import Foundation
 
 enum BlankSharedState {
     static let appGroupIdentifier = "group.com.blanknfc.app.ios"
-    static let quickBlockDurationMinutes = 60
     static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
 
     static var defaults: UserDefaults {
@@ -30,23 +29,20 @@ enum BlankSharedState {
         let isActive = defaults.bool(forKey: Keys.isBlankActive)
         let startedAt = date(forKey: Keys.blankActiveSince, defaults: defaults)
         let endsAt = date(forKey: Keys.blankActiveUntil, defaults: defaults)
-        let totalMinutes = defaults.integer(forKey: Keys.quickBlockDurationMinutes)
-        let normalizedTotal = totalMinutes > 0 ? totalMinutes : quickBlockDurationMinutes
 
         if isActive, let endsAt, now >= endsAt {
-            return ActiveState(isActive: false, startedAt: startedAt, endsAt: endsAt, totalMinutes: normalizedTotal)
+            return ActiveState(isActive: false, startedAt: startedAt, endsAt: endsAt)
         }
 
-        return ActiveState(isActive: isActive, startedAt: startedAt, endsAt: endsAt, totalMinutes: normalizedTotal)
+        return ActiveState(isActive: isActive, startedAt: startedAt, endsAt: endsAt)
     }
 
     static func startQuickBlock(defaults: UserDefaults = Self.defaults, now: Date = Date()) -> Bool {
         guard hasConfiguredBlock(in: defaults) else { return false }
-        let duration = quickBlockDurationMinutes
         defaults.set(true, forKey: Keys.isBlankActive)
         defaults.set(now.timeIntervalSince1970, forKey: Keys.blankActiveSince)
-        defaults.set(now.addingTimeInterval(TimeInterval(duration * 60)).timeIntervalSince1970, forKey: Keys.blankActiveUntil)
-        defaults.set(duration, forKey: Keys.quickBlockDurationMinutes)
+        defaults.removeObject(forKey: Keys.blankActiveUntil)
+        defaults.removeObject(forKey: "blankQuickBlockDurationMinutes")
         appendSession(defaults: defaults, now: now)
         return true
     }
@@ -112,20 +108,10 @@ enum BlankSharedState {
         var isActive: Bool
         var startedAt: Date?
         var endsAt: Date?
-        var totalMinutes: Int
 
-        func remainingMinutes(now: Date = Date()) -> Int? {
-            guard isActive, let endsAt else { return nil }
-            return max(0, Int(ceil(endsAt.timeIntervalSince(now) / 60)))
-        }
-
-        func progress(now: Date = Date()) -> Double {
-            guard isActive, let startedAt, let endsAt, endsAt > startedAt else {
-                return isActive ? 1 : 0
-            }
-            let total = endsAt.timeIntervalSince(startedAt)
-            let elapsed = min(max(now.timeIntervalSince(startedAt), 0), total)
-            return elapsed / total
+        func elapsedSeconds(now: Date = Date()) -> Int {
+            guard isActive, let startedAt else { return 0 }
+            return max(0, Int(now.timeIntervalSince(startedAt)))
         }
     }
 
@@ -136,6 +122,5 @@ enum BlankSharedState {
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
         static let currentModeId = "blankCurrentModeId"
-        static let quickBlockDurationMinutes = "blankQuickBlockDurationMinutes"
     }
 }

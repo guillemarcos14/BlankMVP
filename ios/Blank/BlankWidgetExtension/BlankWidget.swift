@@ -39,8 +39,7 @@ struct BlankWidgetProvider: TimelineProvider {
             activeState: BlankSharedState.ActiveState(
                 isActive: false,
                 startedAt: nil,
-                endsAt: nil,
-                totalMinutes: BlankSharedState.quickBlockDurationMinutes
+                endsAt: nil
             ),
             hasConfiguration: true
         )
@@ -52,7 +51,7 @@ struct BlankWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BlankWidgetEntry>) -> Void) {
         let current = entry()
-        let nextRefresh = current.activeState.endsAt ?? Date().addingTimeInterval(15 * 60)
+        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(60) : Date().addingTimeInterval(15 * 60)
         completion(Timeline(entries: [current], policy: .after(nextRefresh)))
     }
 
@@ -115,14 +114,14 @@ struct BlankWidgetView: View {
             Spacer(minLength: 12)
 
             Text(title)
-                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .font(.system(size: 23, weight: .semibold, design: .rounded))
                 .foregroundStyle(titleColor)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
                 .contentTransition(.opacity)
         }
-        .padding(18)
+        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .contentShape(Rectangle())
     }
@@ -141,45 +140,47 @@ struct BlankWidgetView: View {
     private var idleToken: some View {
         ZStack {
             Circle()
-                .fill(Color.black.opacity(0.055))
+                .fill(Color.white.opacity(0.82))
             Circle()
-                .stroke(Color.black.opacity(0.16), lineWidth: 1)
+                .stroke(Color.black.opacity(0.15), lineWidth: 1)
                 .padding(0.5)
             Circle()
-                .fill(Color.white.opacity(0.34))
-                .frame(width: 32, height: 14)
-                .blur(radius: 10)
-                .offset(y: -15)
+                .fill(Color.black.opacity(0.035))
+                .frame(width: 30, height: 12)
+                .blur(radius: 8)
+                .offset(y: 14)
         }
-        .frame(width: 58, height: 58)
+        .frame(width: 48, height: 48)
         .contentShape(Circle())
     }
 
     private var activeTimeCapsule: some View {
-        Text(activeTimeText)
-            .font(.system(size: 21, weight: .semibold, design: .rounded))
+        Text(elapsedText)
+            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
             .foregroundStyle(Color.white.opacity(0.95))
             .monospacedDigit()
             .lineLimit(1)
-            .minimumScaleFactor(0.78)
-            .padding(.horizontal, 18)
-            .frame(width: 112, height: 58)
+            .minimumScaleFactor(0.62)
+            .frame(width: 60, height: 60)
             .background {
-                Capsule()
-                    .fill(Color.white.opacity(0.12))
-                Capsule()
-                    .stroke(Color.white.opacity(0.20), lineWidth: 1)
+                Circle()
+                    .fill(Color.black.opacity(0.62))
+                Circle()
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
             }
-            .contentShape(Capsule())
+            .contentShape(Circle())
     }
 
     private var title: String {
         entry.activeState.isActive ? "Blankeado" : "Blankear"
     }
 
-    private var activeTimeText: String {
-        let minutes = entry.activeState.remainingMinutes(now: entry.date) ?? 0
-        return "\(minutes)m"
+    private var elapsedText: String {
+        let elapsed = entry.activeState.elapsedSeconds(now: entry.date)
+        let hours = elapsed / 3600
+        let minutes = (elapsed % 3600) / 60
+        let seconds = elapsed % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 

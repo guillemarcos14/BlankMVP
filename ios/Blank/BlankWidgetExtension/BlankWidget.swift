@@ -72,128 +72,114 @@ struct BlankWidgetProvider: TimelineProvider {
 struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
     private var isActive: Bool { entry.activeState.isActive }
-    private var foregroundColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.14, green: 0.14, blue: 0.13) }
-    private var secondaryForegroundColor: Color { isActive ? Color.white.opacity(0.76) : Color.black.opacity(0.62) }
+    private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
     private var widgetURL: URL? {
         URL(string: isActive ? "blank://scan-blank" : "blank://configure-block")
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Blank")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .foregroundStyle(secondaryForegroundColor)
-                .padding(.top, 1)
-                .padding(.leading, 1)
-
-            Spacer(minLength: isActive ? 6 : 10)
-
-            VStack(spacing: isActive ? 8 : 11) {
-                actionCircle
-
-                Text(title)
-                    .font(.system(size: isActive ? 14.5 : 15.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(foregroundColor)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-            }
-            .frame(maxWidth: .infinity)
-            .offset(y: isActive ? -1 : -3)
-
-            Spacer(minLength: isActive ? 12 : 15)
-        }
-        .padding(16)
-        .blankWidgetBackground(isActive: entry.activeState.isActive)
-        .widgetURL(widgetURL)
+        actionContent
+            .buttonStyle(.plain)
+            .blankWidgetBackground(isActive: entry.activeState.isActive)
+            .widgetURL(widgetURL)
+            .animation(.easeInOut(duration: 0.45), value: isActive)
     }
 
     @ViewBuilder
-    private var actionCircle: some View {
+    private var actionContent: some View {
         if entry.activeState.isActive {
-            progressCircle
+            Link(destination: URL(string: "blank://scan-blank")!) {
+                content
+            }
         } else if entry.hasConfiguration {
             if #available(iOSApplicationExtension 17.0, *) {
                 Button(intent: StartQuickBlockIntent()) {
-                    idleCircle
+                    content
                 }
-                .buttonStyle(.plain)
             } else {
                 Link(destination: URL(string: "blank://configure-block")!) {
-                    idleCircle
+                    content
                 }
             }
         } else {
             Link(destination: URL(string: "blank://configure-block")!) {
-                idleCircle
+                content
             }
         }
     }
 
-    private var idleCircle: some View {
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            stateMark
+
+            Spacer(minLength: 12)
+
+            Text(title)
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
+                .foregroundStyle(titleColor)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .contentTransition(.opacity)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var stateMark: some View {
+        if isActive {
+            activeTimeCapsule
+                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
+        } else {
+            idleToken
+                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
+        }
+    }
+
+    private var idleToken: some View {
         ZStack {
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.20, green: 0.20, blue: 0.18),
-                            Color(red: 0.035, green: 0.04, blue: 0.035)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
+                .fill(Color.black.opacity(0.055))
             Circle()
-                .stroke(Color.black.opacity(0.12), lineWidth: 1)
-                .padding(-1)
-
+                .stroke(Color.black.opacity(0.16), lineWidth: 1)
+                .padding(0.5)
             Circle()
-                .fill(Color.white.opacity(0.13))
-                .frame(width: 46, height: 20)
-                .blur(radius: 12)
-                .offset(y: -19)
-
-            Circle()
-                .fill(Color.black.opacity(0.24))
-                .frame(width: 52, height: 20)
-                .blur(radius: 12)
-                .offset(y: 22)
+                .fill(Color.white.opacity(0.34))
+                .frame(width: 32, height: 14)
+                .blur(radius: 10)
+                .offset(y: -15)
         }
-        .frame(width: 70, height: 70)
-        .overlay(alignment: .bottom) {
-            Capsule()
-                .fill(Color.white.opacity(0.10))
-                .frame(width: 22, height: 3)
-                .offset(y: -8)
-            }
-        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 7)
+        .frame(width: 58, height: 58)
         .contentShape(Circle())
     }
 
-    private var progressCircle: some View {
-        ZStack {
-            Circle()
-                .fill(Color.white.opacity(0.035))
-            Circle()
-                .stroke(Color.white.opacity(0.18), lineWidth: 3)
-            Circle()
-                .trim(from: 0, to: entry.activeState.progress(now: entry.date))
-                .stroke(Color.white.opacity(0.94), style: StrokeStyle(lineWidth: 3, lineCap: .butt))
-                .rotationEffect(.degrees(-90))
-
-            Text("\(entry.activeState.remainingMinutes(now: entry.date) ?? 0)")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.white.opacity(0.92))
-                .monospacedDigit()
-        }
-        .frame(width: 72, height: 72)
+    private var activeTimeCapsule: some View {
+        Text(activeTimeText)
+            .font(.system(size: 21, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color.white.opacity(0.95))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 18)
+            .frame(width: 112, height: 58)
+            .background {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                Capsule()
+                    .stroke(Color.white.opacity(0.20), lineWidth: 1)
+            }
+            .contentShape(Capsule())
     }
 
     private var title: String {
-        guard entry.activeState.isActive else { return "Bloquear" }
+        entry.activeState.isActive ? "Blankeado" : "Blankear"
+    }
+
+    private var activeTimeText: String {
         let minutes = entry.activeState.remainingMinutes(now: entry.date) ?? 0
-        return "Activo \(minutes)m"
+        return "\(minutes)m"
     }
 }
 

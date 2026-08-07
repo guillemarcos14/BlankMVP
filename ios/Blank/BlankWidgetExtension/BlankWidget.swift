@@ -71,12 +71,15 @@ struct BlankWidgetProvider: TimelineProvider {
 
 struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
+    private var isActive: Bool { entry.activeState.isActive }
+    private var foregroundColor: Color { isActive ? Color.white : Color.black.opacity(0.78) }
+    private var secondaryForegroundColor: Color { isActive ? Color.white.opacity(0.92) : Color.black.opacity(0.70) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Blank")
                 .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.white.opacity(0.92))
+                .foregroundStyle(secondaryForegroundColor)
                 .padding(.top, 1)
                 .padding(.leading, 1)
 
@@ -87,7 +90,7 @@ struct BlankWidgetView: View {
 
                 Text(title)
                     .font(.system(size: 15.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.94))
+                    .foregroundStyle(foregroundColor)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
@@ -126,13 +129,13 @@ struct BlankWidgetView: View {
 
     private var idleCircle: some View {
         Circle()
-            .fill(Color.white.opacity(0.96))
+            .fill(Color.black.opacity(0.76))
             .overlay {
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.24),
+                                Color.white.opacity(0.16),
                                 Color.white.opacity(0.00)
                             ],
                             startPoint: .top,
@@ -147,13 +150,13 @@ struct BlankWidgetView: View {
     private var progressCircle: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.24), lineWidth: 5)
+                .stroke(Color.white.opacity(0.22), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: entry.activeState.progress(now: entry.date))
                 .stroke(Color.white.opacity(0.94), style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             Circle()
-                .fill(Color.white.opacity(0.08))
+                .fill(Color.white.opacity(0.10))
         }
         .frame(width: 60, height: 60)
     }
@@ -171,16 +174,16 @@ private struct BlankWidgetGlassBackground: View {
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(.ultraThinMaterial)
+                .fill(isActive ? AnyShapeStyle(Color.black.opacity(0.74)) : AnyShapeStyle(.ultraThinMaterial))
 
             Rectangle()
-                .fill(Color.white.opacity(isActive ? 0.06 : 0.09))
+                .fill(isActive ? Color.black.opacity(0.28) : Color.white.opacity(0.68))
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(isActive ? 0.36 : 0.42),
-                    Color.white.opacity(isActive ? 0.10 : 0.15),
-                    Color.black.opacity(isActive ? 0.26 : 0.18)
+                    isActive ? Color.white.opacity(0.10) : Color.white.opacity(0.48),
+                    isActive ? Color.black.opacity(0.08) : Color.white.opacity(0.18),
+                    isActive ? Color.black.opacity(0.32) : Color.black.opacity(0.06)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -188,7 +191,7 @@ private struct BlankWidgetGlassBackground: View {
 
             RadialGradient(
                 colors: [
-                    Color.white.opacity(isActive ? 0.42 : 0.52),
+                    isActive ? Color.white.opacity(0.16) : Color.white.opacity(0.34),
                     Color.white.opacity(0.00)
                 ],
                 center: UnitPoint(x: 0.18, y: 0.06),
@@ -198,7 +201,7 @@ private struct BlankWidgetGlassBackground: View {
 
             RadialGradient(
                 colors: [
-                    Color.black.opacity(isActive ? 0.28 : 0.20),
+                    isActive ? Color.black.opacity(0.26) : Color.white.opacity(0.10),
                     Color.clear
                 ],
                 center: UnitPoint(x: 0.86, y: 0.12),
@@ -208,7 +211,7 @@ private struct BlankWidgetGlassBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.28),
+                    isActive ? Color.white.opacity(0.08) : Color.white.opacity(0.18),
                     Color.clear
                 ],
                 startPoint: .top,
@@ -218,7 +221,7 @@ private struct BlankWidgetGlassBackground: View {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    Color.black.opacity(isActive ? 0.22 : 0.15)
+                    isActive ? Color.black.opacity(0.28) : Color.black.opacity(0.08)
                 ],
                 startPoint: UnitPoint(x: 0.50, y: 0.55),
                 endPoint: .bottom
@@ -228,9 +231,9 @@ private struct BlankWidgetGlassBackground: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.68),
-                            Color.white.opacity(0.26),
-                            Color.white.opacity(0.10)
+                            isActive ? Color.white.opacity(0.28) : Color.white.opacity(0.78),
+                            isActive ? Color.white.opacity(0.12) : Color.white.opacity(0.30),
+                            isActive ? Color.white.opacity(0.06) : Color.black.opacity(0.08)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

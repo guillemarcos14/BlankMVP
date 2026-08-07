@@ -76,7 +76,7 @@ struct BlankWidgetView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Blank")
                 .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.white.opacity(0.96))
+                .foregroundStyle(Color.white.opacity(0.92))
                 .padding(.top, 1)
                 .padding(.leading, 1)
 
@@ -87,7 +87,7 @@ struct BlankWidgetView: View {
 
                 Text(title)
                     .font(.system(size: 15.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.97))
+                    .foregroundStyle(Color.white.opacity(0.94))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.86)
@@ -126,13 +126,13 @@ struct BlankWidgetView: View {
 
     private var idleCircle: some View {
         Circle()
-            .fill(Color.white.opacity(0.98))
+            .fill(Color.white.opacity(0.96))
             .overlay {
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.20),
+                                Color.white.opacity(0.24),
                                 Color.white.opacity(0.00)
                             ],
                             startPoint: .top,
@@ -147,7 +147,7 @@ struct BlankWidgetView: View {
     private var progressCircle: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.20), lineWidth: 5)
+                .stroke(Color.white.opacity(0.24), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: entry.activeState.progress(now: entry.date))
                 .stroke(Color.white.opacity(0.94), style: StrokeStyle(lineWidth: 5, lineCap: .round))
@@ -170,49 +170,74 @@ private struct BlankWidgetGlassBackground: View {
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.ultraThinMaterial)
             Rectangle()
-                .fill(Color.white.opacity(isActive ? 0.13 : 0.19))
+                .fill(.ultraThinMaterial)
+
+            Rectangle()
+                .fill(Color.white.opacity(isActive ? 0.06 : 0.09))
+
             LinearGradient(
                 colors: [
-                    Color.white.opacity(isActive ? 0.22 : 0.32),
-                    Color.white.opacity(isActive ? 0.05 : 0.12),
-                    Color.black.opacity(isActive ? 0.22 : 0.10)
+                    Color.white.opacity(isActive ? 0.36 : 0.42),
+                    Color.white.opacity(isActive ? 0.10 : 0.15),
+                    Color.black.opacity(isActive ? 0.26 : 0.18)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
             RadialGradient(
                 colors: [
-                    Color.white.opacity(isActive ? 0.30 : 0.38),
+                    Color.white.opacity(isActive ? 0.42 : 0.52),
                     Color.white.opacity(0.00)
                 ],
-                center: .topLeading,
-                startRadius: 8,
-                endRadius: 120
+                center: UnitPoint(x: 0.18, y: 0.06),
+                startRadius: 6,
+                endRadius: 116
             )
-            LinearGradient(
+
+            RadialGradient(
                 colors: [
-                    Color(red: 0.70, green: 0.80, blue: 0.92).opacity(isActive ? 0.20 : 0.12),
+                    Color.black.opacity(isActive ? 0.28 : 0.20),
                     Color.clear
                 ],
-                startPoint: .topTrailing,
-                endPoint: .bottomLeading
+                center: UnitPoint(x: 0.86, y: 0.12),
+                startRadius: 4,
+                endRadius: 98
             )
+
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.28),
+                    Color.clear
+                ],
+                startPoint: .top,
+                endPoint: UnitPoint(x: 0.50, y: 0.40)
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.clear,
+                    Color.black.opacity(isActive ? 0.22 : 0.15)
+                ],
+                startPoint: UnitPoint(x: 0.50, y: 0.55),
+                endPoint: .bottom
+            )
+
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.34),
-                            Color.white.opacity(0.06),
-                            Color.white.opacity(0.00)
+                            Color.white.opacity(0.68),
+                            Color.white.opacity(0.26),
+                            Color.white.opacity(0.10)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 1
+                    lineWidth: 1.15
                 )
-                .padding(0.5)
+                .padding(0.6)
         }
     }
 }

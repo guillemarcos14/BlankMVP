@@ -73,35 +73,31 @@ struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
 
     var body: some View {
-        ZStack {
-            BlankWidgetGlassBackground(isActive: entry.activeState.isActive)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Blank")
+                .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.white.opacity(0.96))
+                .padding(.top, 1)
+                .padding(.leading, 1)
 
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Blank")
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.96))
-                    .padding(.top, 1)
-                    .padding(.leading, 1)
+            Spacer(minLength: 0)
 
-                Spacer(minLength: 0)
+            VStack(spacing: 10) {
+                actionCircle
 
-                VStack(spacing: 10) {
-                    actionCircle
-
-                    Text(title)
-                        .font(.system(size: 15.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.97))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-                }
-                .frame(maxWidth: .infinity)
-                .offset(y: -1)
-
-                Spacer(minLength: 8)
+                Text(title)
+                    .font(.system(size: 15.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.97))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
             }
-            .padding(16)
+            .frame(maxWidth: .infinity)
+            .offset(y: -1)
+
+            Spacer(minLength: 8)
         }
+        .padding(16)
         .blankWidgetBackground(isActive: entry.activeState.isActive)
         .widgetURL(URL(string: "blank://configure-block"))
     }

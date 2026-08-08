@@ -31,6 +31,13 @@ struct BlankApp: App {
                     guard url.scheme == "blank" else { return }
                     if url.host == "scan-blank" {
                         sessionStore.requestBlankScanFromWidget()
+                    } else if url.host == "start-blank" {
+                        sessionStore.syncFromSharedDefaults()
+                        let result = sessionStore.activateBlank()
+                        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                        if case .noAppsSelected = result {
+                            sessionStore.requestBlockConfiguration()
+                        }
                     } else if url.host == "configure-block" {
                         sessionStore.requestBlockConfiguration()
                     }

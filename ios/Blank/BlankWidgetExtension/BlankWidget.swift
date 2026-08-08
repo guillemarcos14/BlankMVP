@@ -1,30 +1,5 @@
-import AppIntents
-import FamilyControls
-import ManagedSettings
 import SwiftUI
 import WidgetKit
-
-struct StartQuickBlockIntent: AppIntent {
-    static var title: LocalizedStringResource = "Iniciar Blank"
-    static var description = IntentDescription("Inicia un bloqueo rapido con la configuracion actual de Blank.")
-
-    func perform() async throws -> some IntentResult {
-        let defaults = BlankSharedState.defaults
-        guard BlankSharedState.startQuickBlock(defaults: defaults) else {
-            return .result()
-        }
-
-        if let selection = BlankSharedState.loadSelection(from: defaults) {
-            let store = ManagedSettingsStore()
-            store.shield.applications = selection.applicationTokens
-            store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
-            store.shield.webDomains = selection.webDomainTokens
-        }
-
-        WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
-        return .result()
-    }
-}
 
 struct BlankWidgetEntry: TimelineEntry {
     let date: Date
@@ -57,9 +32,6 @@ struct BlankWidgetProvider: TimelineProvider {
 
     private func entry(date: Date = Date()) -> BlankWidgetEntry {
         let defaults = BlankSharedState.defaults
-        if BlankSharedState.finishExpiredBlock(defaults: defaults, now: date) {
-            ManagedSettingsStore().clearAllSettings()
-        }
         return BlankWidgetEntry(
             date: date,
             activeState: BlankSharedState.loadActiveState(now: date, defaults: defaults),
@@ -73,38 +45,17 @@ struct BlankWidgetView: View {
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
     private var widgetURL: URL? {
-        URL(string: isActive ? "blank://scan-blank" : "blank://configure-block")
+        if isActive {
+            return URL(string: "blank://scan-blank")
+        }
+        return URL(string: entry.hasConfiguration ? "blank://start-blank" : "blank://configure-block")
     }
 
     var body: some View {
-        actionContent
-            .buttonStyle(.plain)
+        content
             .blankWidgetBackground(isActive: entry.activeState.isActive)
             .widgetURL(widgetURL)
             .animation(.easeInOut(duration: 0.45), value: isActive)
-    }
-
-    @ViewBuilder
-    private var actionContent: some View {
-        if entry.activeState.isActive {
-            Link(destination: URL(string: "blank://scan-blank")!) {
-                content
-            }
-        } else if entry.hasConfiguration {
-            if #available(iOSApplicationExtension 17.0, *) {
-                Button(intent: StartQuickBlockIntent()) {
-                    content
-                }
-            } else {
-                Link(destination: URL(string: "blank://configure-block")!) {
-                    content
-                }
-            }
-        } else {
-            Link(destination: URL(string: "blank://configure-block")!) {
-                content
-            }
-        }
     }
 
     private var content: some View {

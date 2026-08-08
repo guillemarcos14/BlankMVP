@@ -303,7 +303,26 @@ final class SessionStore: ObservableObject {
     }
 
     func requestBlankScanFromWidget() {
+        syncFromSharedDefaults()
         shouldScanBlankFromWidget = true
+    }
+
+    func syncFromSharedDefaults(now: Date = Date()) {
+        let activeState = BlankSharedState.loadActiveState(now: now, defaults: defaults)
+        if isBlankActive != activeState.isActive {
+            isBlankActive = activeState.isActive
+        }
+        if blankActiveSince != activeState.startedAt {
+            blankActiveSince = activeState.startedAt
+        }
+        if blankActiveUntil != activeState.endsAt {
+            blankActiveUntil = activeState.endsAt
+        }
+
+        let sharedSessions = Self.loadSessions(from: defaults)
+        if sessions != sharedSessions {
+            sessions = sharedSessions
+        }
     }
 
     func selectMode(_ modeId: UUID) {

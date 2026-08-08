@@ -54,15 +54,20 @@ struct HomeView: View {
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
+            sessionStore.syncFromSharedDefaults(now: date)
             sessionStore.applyScheduleWindow(at: date)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         }
         .onAppear {
+            sessionStore.syncFromSharedDefaults(now: now)
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
             openWidgetScanIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
+            sessionStore.syncFromSharedDefaults()
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
             openWidgetScanIfNeeded()
         }

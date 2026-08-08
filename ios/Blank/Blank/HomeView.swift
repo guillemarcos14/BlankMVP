@@ -394,7 +394,11 @@ struct HomeView: View {
     }
 
     private func openWidgetScanIfNeeded() {
-        guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
+        guard scenePhase == .active else { return }
+        let memoryPendingScan = sessionStore.shouldScanBlankFromWidget
+        let storedPendingScan = sessionStore.consumePendingWidgetScan()
+        let pendingScan = memoryPendingScan || storedPendingScan
+        guard pendingScan else { return }
         guard sessionStore.isBlankActive else {
             sessionStore.shouldScanBlankFromWidget = false
             return

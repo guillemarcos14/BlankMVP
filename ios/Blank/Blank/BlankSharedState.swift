@@ -122,6 +122,7 @@ enum BlankSharedState {
         static let isBlankActive = "isBlankActive"
         static let blankActiveSince = "blankActiveSince"
         static let blankActiveUntil = "blankActiveUntil"
+        static let pendingWidgetScan = "blankPendingWidgetScan"
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
         static let currentModeId = "blankCurrentModeId"

@@ -307,7 +307,18 @@ final class SessionStore: ObservableObject {
 
     func requestBlankScanFromWidget() {
         syncFromSharedDefaults()
+        defaults.set(true, forKey: Keys.pendingWidgetScan)
+        defaults.synchronize()
         shouldScanBlankFromWidget = true
+    }
+
+    func consumePendingWidgetScan() -> Bool {
+        let pending = defaults.bool(forKey: Keys.pendingWidgetScan)
+        if pending {
+            defaults.set(false, forKey: Keys.pendingWidgetScan)
+            defaults.synchronize()
+        }
+        return pending
     }
 
     func syncFromSharedDefaults(now: Date = Date()) {
@@ -534,6 +545,7 @@ final class SessionStore: ObservableObject {
         static let isBlankActive = BlankSharedState.Keys.isBlankActive
         static let blankActiveSince = BlankSharedState.Keys.blankActiveSince
         static let blankActiveUntil = BlankSharedState.Keys.blankActiveUntil
+        static let pendingWidgetScan = BlankSharedState.Keys.pendingWidgetScan
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection

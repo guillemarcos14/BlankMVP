@@ -33,6 +33,7 @@
 		8A0000040000000000000003 /* BlankDomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001B /* BlankDomainModels.swift */; };
 		8A0000040000000000000004 /* BlankWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000040000000000000010 /* BlankWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8A0000040000000000000005 /* inter_variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000022 /* inter_variable.ttf */; };
+		8A0000040000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001F /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -332,6 +333,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8A0000040000000000000006 /* Assets.xcassets in Resources */,
 				8A0000040000000000000005 /* inter_variable.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

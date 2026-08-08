@@ -213,20 +213,13 @@ private struct BlankWidgetGlassBackground: View {
     }
 
     private var baseFill: some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: isActive ? [
-                        Color(red: 0.17, green: 0.18, blue: 0.16),
-                        Color(red: 0.025, green: 0.035, blue: 0.028)
-                    ] : [
-                        Color.white,
-                        Color(red: 0.965, green: 0.962, blue: 0.945)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
+        GeometryReader { proxy in
+            Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+        }
     }
 }
 

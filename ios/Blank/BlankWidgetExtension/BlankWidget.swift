@@ -51,7 +51,7 @@ struct BlankWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BlankWidgetEntry>) -> Void) {
         let current = entry()
-        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(60) : Date().addingTimeInterval(15 * 60)
+        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(10) : Date().addingTimeInterval(60)
         completion(Timeline(entries: [current], policy: .after(nextRefresh)))
     }
 

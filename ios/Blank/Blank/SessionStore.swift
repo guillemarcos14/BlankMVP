@@ -9,6 +9,7 @@ final class SessionStore: ObservableObject {
     @Published var isBlankActive: Bool {
         didSet {
             defaults.set(isBlankActive, forKey: Keys.isBlankActive)
+            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -16,6 +17,7 @@ final class SessionStore: ObservableObject {
     @Published var blankActiveSince: Date? {
         didSet {
             defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince)
+            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -23,6 +25,7 @@ final class SessionStore: ObservableObject {
     @Published var blankActiveUntil: Date? {
         didSet {
             defaults.set(blankActiveUntil?.timeIntervalSince1970, forKey: Keys.blankActiveUntil)
+            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -363,6 +366,7 @@ final class SessionStore: ObservableObject {
     private func saveSelection(_ selection: FamilyActivitySelection) {
         if let data = Self.encodedSelection(selection) {
             defaults.set(data, forKey: Keys.selection)
+            defaults.synchronize()
         }
     }
 
@@ -403,6 +407,8 @@ final class SessionStore: ObservableObject {
     private func saveSessions(_ sessions: [BlankSession]) {
         if let data = try? JSONEncoder().encode(sessions) {
             defaults.set(data, forKey: Keys.sessions)
+            defaults.synchronize()
+            reloadBlankWidget()
         }
     }
 
@@ -545,6 +551,7 @@ final class SessionStore: ObservableObject {
 
     private func reloadBlankWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

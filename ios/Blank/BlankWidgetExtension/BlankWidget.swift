@@ -119,29 +119,17 @@ struct BlankWidgetView: View {
     }
 
     private var activeContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            activeTimeCapsule
-                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
-
-            Spacer(minLength: 12)
-
-            Text(title)
-                .font(.system(size: 23, weight: .semibold, design: .rounded))
-                .foregroundStyle(titleColor)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .contentTransition(.opacity)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        widgetTitle
     }
 
     private var idleContent: some View {
+        widgetTitle
+    }
+
+    private var widgetTitle: some View {
         Text(title)
-            .font(.system(size: 19.5, weight: .semibold, design: .rounded))
+            .font(.custom("Inter", size: 19.5, relativeTo: .headline).weight(.semibold))
             .foregroundStyle(titleColor)
-            .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .contentTransition(.opacity)
@@ -150,33 +138,8 @@ struct BlankWidgetView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
-    private var activeTimeCapsule: some View {
-        Text(elapsedText)
-            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.white.opacity(0.95))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.62)
-            .frame(width: 60, height: 60)
-            .background {
-                Circle()
-                    .fill(Color.black.opacity(0.62))
-                Circle()
-                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-            }
-            .contentShape(Circle())
-    }
-
     private var title: String {
         entry.activeState.isActive ? "Blankeado" : "Blankear"
-    }
-
-    private var elapsedText: String {
-        let elapsed = entry.activeState.elapsedSeconds(now: entry.date)
-        let hours = elapsed / 3600
-        let minutes = (elapsed % 3600) / 60
-        let seconds = elapsed % 60
-        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 }
 

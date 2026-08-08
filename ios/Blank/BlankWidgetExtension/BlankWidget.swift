@@ -108,8 +108,20 @@ struct BlankWidgetView: View {
     }
 
     private var content: some View {
+        Group {
+            if isActive {
+                activeContent
+            } else {
+                idleContent
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var activeContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            stateMark
+            activeTimeCapsule
+                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
 
             Spacer(minLength: 12)
 
@@ -123,35 +135,19 @@ struct BlankWidgetView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .contentShape(Rectangle())
     }
 
-    @ViewBuilder
-    private var stateMark: some View {
-        if isActive {
-            activeTimeCapsule
-                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
-        } else {
-            idleToken
-                .transition(.scale(scale: 0.82, anchor: .leading).combined(with: .opacity))
-        }
-    }
-
-    private var idleToken: some View {
-        ZStack {
-            Circle()
-                .fill(Color.white.opacity(0.82))
-            Circle()
-                .stroke(Color.black.opacity(0.15), lineWidth: 1)
-                .padding(0.5)
-            Circle()
-                .fill(Color.black.opacity(0.035))
-                .frame(width: 30, height: 12)
-                .blur(radius: 8)
-                .offset(y: 14)
-        }
-        .frame(width: 48, height: 48)
-        .contentShape(Circle())
+    private var idleContent: some View {
+        Text(title)
+            .font(.system(size: 19.5, weight: .semibold, design: .rounded))
+            .foregroundStyle(titleColor)
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .contentTransition(.opacity)
+            .padding(.leading, 7)
+            .padding(.bottom, 7)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
     private var activeTimeCapsule: some View {

@@ -59,10 +59,12 @@ struct HomeView: View {
         }
         .onAppear {
             screenTimeBlocker.refreshAuthorizationStatus()
+            openWidgetScanIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             screenTimeBlocker.refreshAuthorizationStatus()
+            openWidgetScanIfNeeded()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
@@ -75,10 +77,7 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
             guard shouldScan else { return }
-            sessionStore.shouldScanBlankFromWidget = false
-            if sessionStore.isBlankActive {
-                scanTag()
-            }
+            openWidgetScanIfNeeded()
         }
         .sheet(isPresented: $showingSettings, onDismiss: {
             settingsRoute = nil
@@ -386,6 +385,18 @@ struct HomeView: View {
                     messageAction = nil
                 }
             }
+        }
+    }
+
+    private func openWidgetScanIfNeeded() {
+        guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
+        guard sessionStore.isBlankActive else {
+            sessionStore.shouldScanBlankFromWidget = false
+            return
+        }
+        sessionStore.shouldScanBlankFromWidget = false
+        DispatchQueue.main.async {
+            scanTag()
         }
     }
 

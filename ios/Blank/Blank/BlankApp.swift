@@ -34,7 +34,7 @@ struct BlankApp: App {
                     } else if url.host == "start-blank" {
                         sessionStore.syncFromSharedDefaults()
                         let result = sessionStore.activateBlank()
-                        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+                        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                         if case .noAppsSelected = result {
                             sessionStore.requestBlockConfiguration()
                         }

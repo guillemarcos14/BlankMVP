@@ -1,5 +1,29 @@
+import AppIntents
+import FamilyControls
+import ManagedSettings
 import SwiftUI
 import WidgetKit
+
+struct StartQuickBlockIntent: AppIntent {
+    static var title: LocalizedStringResource = "Iniciar Blank"
+    static var description = IntentDescription("Inicia Blank sin abrir la app.")
+
+    func perform() async throws -> some IntentResult {
+        let defaults = BlankSharedState.defaults
+        guard BlankSharedState.startQuickBlock(defaults: defaults),
+              let selection = BlankSharedState.loadSelection(from: defaults) else {
+            WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
+            return .result()
+        }
+
+        let store = ManagedSettingsStore()
+        store.shield.applications = selection.applicationTokens
+        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+        store.shield.webDomains = selection.webDomainTokens
+        WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
+        return .result()
+    }
+}
 
 struct BlankWidgetEntry: TimelineEntry {
     let date: Date
@@ -59,8 +83,14 @@ struct BlankWidgetView: View {
                 content
             }
         } else if entry.hasConfiguration {
-            Link(destination: URL(string: "blank://start-blank")!) {
-                content
+            if #available(iOSApplicationExtension 17.0, *) {
+                Button(intent: StartQuickBlockIntent()) {
+                    content
+                }
+            } else {
+                Link(destination: URL(string: "blank://start-blank")!) {
+                    content
+                }
             }
         } else {
             Link(destination: URL(string: "blank://configure-block")!) {

@@ -6,20 +6,21 @@ import WidgetKit
 
 struct StartQuickBlockIntent: AppIntent {
     static var title: LocalizedStringResource = "Iniciar Blank"
-    static var description = IntentDescription("Inicia Blank sin abrir la app.")
+    static var description = IntentDescription("Inicia un bloqueo rapido con la configuracion actual de Blank.")
 
     func perform() async throws -> some IntentResult {
         let defaults = BlankSharedState.defaults
-        guard BlankSharedState.startQuickBlock(defaults: defaults),
-              let selection = BlankSharedState.loadSelection(from: defaults) else {
-            WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
+        guard BlankSharedState.startQuickBlock(defaults: defaults) else {
             return .result()
         }
 
-        let store = ManagedSettingsStore()
-        store.shield.applications = selection.applicationTokens
-        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
-        store.shield.webDomains = selection.webDomainTokens
+        if let selection = BlankSharedState.loadSelection(from: defaults) {
+            let store = ManagedSettingsStore()
+            store.shield.applications = selection.applicationTokens
+            store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+            store.shield.webDomains = selection.webDomainTokens
+        }
+
         WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
         return .result()
     }
@@ -50,12 +51,15 @@ struct BlankWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BlankWidgetEntry>) -> Void) {
         let current = entry()
-        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(10) : Date().addingTimeInterval(60)
+        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(60) : Date().addingTimeInterval(15 * 60)
         completion(Timeline(entries: [current], policy: .after(nextRefresh)))
     }
 
     private func entry(date: Date = Date()) -> BlankWidgetEntry {
         let defaults = BlankSharedState.defaults
+        if BlankSharedState.finishExpiredBlock(defaults: defaults, now: date) {
+            ManagedSettingsStore().clearAllSettings()
+        }
         return BlankWidgetEntry(
             date: date,
             activeState: BlankSharedState.loadActiveState(now: date, defaults: defaults),
@@ -68,11 +72,15 @@ struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
+    private var widgetURL: URL? {
+        URL(string: isActive ? "blank://scan-blank" : "blank://configure-block")
+    }
 
     var body: some View {
         actionContent
             .buttonStyle(.plain)
             .blankWidgetBackground(isActive: entry.activeState.isActive)
+            .widgetURL(widgetURL)
             .animation(.easeInOut(duration: 0.45), value: isActive)
     }
 
@@ -88,7 +96,7 @@ struct BlankWidgetView: View {
                     content
                 }
             } else {
-                Link(destination: URL(string: "blank://start-blank")!) {
+                Link(destination: URL(string: "blank://configure-block")!) {
                     content
                 }
             }
@@ -108,7 +116,6 @@ struct BlankWidgetView: View {
             }
         }
         .contentShape(Rectangle())
-        .unredacted()
     }
 
     private var activeContent: some View {
@@ -129,7 +136,6 @@ struct BlankWidgetView: View {
             .padding(.leading, 7)
             .padding(.bottom, 7)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .unredacted()
     }
 
     private var title: String {
@@ -207,13 +213,20 @@ private struct BlankWidgetGlassBackground: View {
     }
 
     private var baseFill: some View {
-        GeometryReader { proxy in
-            Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
-                .resizable()
-                .scaledToFill()
-                .frame(width: proxy.size.width, height: proxy.size.height)
-                .clipped()
-        }
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: isActive ? [
+                        Color(red: 0.17, green: 0.18, blue: 0.16),
+                        Color(red: 0.025, green: 0.035, blue: 0.028)
+                    ] : [
+                        Color.white,
+                        Color(red: 0.965, green: 0.962, blue: 0.945)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
     }
 }
 

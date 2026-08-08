@@ -44,7 +44,6 @@ enum BlankSharedState {
         defaults.removeObject(forKey: Keys.blankActiveUntil)
         defaults.removeObject(forKey: "blankQuickBlockDurationMinutes")
         appendSession(defaults: defaults, now: now)
-        defaults.synchronize()
         return true
     }
 
@@ -60,7 +59,6 @@ enum BlankSharedState {
         defaults.removeObject(forKey: Keys.blankActiveSince)
         defaults.removeObject(forKey: Keys.blankActiveUntil)
         endActiveSession(defaults: defaults, now: now)
-        defaults.synchronize()
         return true
     }
 
@@ -97,7 +95,6 @@ enum BlankSharedState {
     private static func saveSessions(_ sessions: [BlankSession], defaults: UserDefaults) {
         guard let data = try? JSONEncoder().encode(sessions) else { return }
         defaults.set(data, forKey: Keys.sessions)
-        defaults.synchronize()
     }
 
     private static func date(forKey key: String, defaults: UserDefaults) -> Date? {
@@ -122,7 +119,6 @@ enum BlankSharedState {
         static let isBlankActive = "isBlankActive"
         static let blankActiveSince = "blankActiveSince"
         static let blankActiveUntil = "blankActiveUntil"
-        static let pendingWidgetScan = "blankPendingWidgetScan"
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
         static let currentModeId = "blankCurrentModeId"

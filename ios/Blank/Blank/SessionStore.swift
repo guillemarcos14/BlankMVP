@@ -9,7 +9,6 @@ final class SessionStore: ObservableObject {
     @Published var isBlankActive: Bool {
         didSet {
             defaults.set(isBlankActive, forKey: Keys.isBlankActive)
-            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -17,7 +16,6 @@ final class SessionStore: ObservableObject {
     @Published var blankActiveSince: Date? {
         didSet {
             defaults.set(blankActiveSince?.timeIntervalSince1970, forKey: Keys.blankActiveSince)
-            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -25,7 +23,6 @@ final class SessionStore: ObservableObject {
     @Published var blankActiveUntil: Date? {
         didSet {
             defaults.set(blankActiveUntil?.timeIntervalSince1970, forKey: Keys.blankActiveUntil)
-            defaults.synchronize()
             reloadBlankWidget()
         }
     }
@@ -306,37 +303,7 @@ final class SessionStore: ObservableObject {
     }
 
     func requestBlankScanFromWidget() {
-        syncFromSharedDefaults()
-        defaults.set(true, forKey: Keys.pendingWidgetScan)
-        defaults.synchronize()
         shouldScanBlankFromWidget = true
-    }
-
-    func consumePendingWidgetScan() -> Bool {
-        let pending = defaults.bool(forKey: Keys.pendingWidgetScan)
-        if pending {
-            defaults.set(false, forKey: Keys.pendingWidgetScan)
-            defaults.synchronize()
-        }
-        return pending
-    }
-
-    func syncFromSharedDefaults(now: Date = Date()) {
-        let activeState = BlankSharedState.loadActiveState(now: now, defaults: defaults)
-        if isBlankActive != activeState.isActive {
-            isBlankActive = activeState.isActive
-        }
-        if blankActiveSince != activeState.startedAt {
-            blankActiveSince = activeState.startedAt
-        }
-        if blankActiveUntil != activeState.endsAt {
-            blankActiveUntil = activeState.endsAt
-        }
-
-        let sharedSessions = Self.loadSessions(from: defaults)
-        if sessions != sharedSessions {
-            sessions = sharedSessions
-        }
     }
 
     func selectMode(_ modeId: UUID) {
@@ -377,7 +344,6 @@ final class SessionStore: ObservableObject {
     private func saveSelection(_ selection: FamilyActivitySelection) {
         if let data = Self.encodedSelection(selection) {
             defaults.set(data, forKey: Keys.selection)
-            defaults.synchronize()
         }
     }
 
@@ -418,8 +384,6 @@ final class SessionStore: ObservableObject {
     private func saveSessions(_ sessions: [BlankSession]) {
         if let data = try? JSONEncoder().encode(sessions) {
             defaults.set(data, forKey: Keys.sessions)
-            defaults.synchronize()
-            reloadBlankWidget()
         }
     }
 
@@ -545,7 +509,6 @@ final class SessionStore: ObservableObject {
         static let isBlankActive = BlankSharedState.Keys.isBlankActive
         static let blankActiveSince = BlankSharedState.Keys.blankActiveSince
         static let blankActiveUntil = BlankSharedState.Keys.blankActiveUntil
-        static let pendingWidgetScan = BlankSharedState.Keys.pendingWidgetScan
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection
@@ -563,7 +526,6 @@ final class SessionStore: ObservableObject {
 
     private func reloadBlankWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")
-        WidgetCenter.shared.reloadAllTimelines()
     }
 }
 

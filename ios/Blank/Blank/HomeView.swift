@@ -54,20 +54,15 @@ struct HomeView: View {
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
-            sessionStore.syncFromSharedDefaults(now: date)
             sessionStore.applyScheduleWindow(at: date)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         }
         .onAppear {
-            sessionStore.syncFromSharedDefaults(now: now)
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
             openWidgetScanIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
-            sessionStore.syncFromSharedDefaults()
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
             openWidgetScanIfNeeded()
         }
@@ -394,17 +389,13 @@ struct HomeView: View {
     }
 
     private func openWidgetScanIfNeeded() {
-        guard scenePhase == .active else { return }
-        let memoryPendingScan = sessionStore.shouldScanBlankFromWidget
-        let storedPendingScan = sessionStore.consumePendingWidgetScan()
-        let pendingScan = memoryPendingScan || storedPendingScan
-        guard pendingScan else { return }
+        guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
         guard sessionStore.isBlankActive else {
             sessionStore.shouldScanBlankFromWidget = false
             return
         }
         sessionStore.shouldScanBlankFromWidget = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+        DispatchQueue.main.async {
             scanTag()
         }
     }

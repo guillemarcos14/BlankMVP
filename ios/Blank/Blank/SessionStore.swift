@@ -47,6 +47,10 @@ final class SessionStore: ObservableObject {
         didSet { saveSessions(sessions) }
     }
 
+    @Published private(set) var usageEvents: [BlankUsageEvent] {
+        didSet { saveUsageEvents(usageEvents) }
+    }
+
     @Published var focusModes: [BlankFocusMode] {
         didSet { saveFocusModes(focusModes) }
     }
@@ -105,6 +109,7 @@ final class SessionStore: ObservableObject {
 
         selection = loadedSelection
         sessions = Self.loadSessions(from: defaults)
+        usageEvents = Self.loadUsageEvents(from: defaults)
         focusModes = loadedFocusModes
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
@@ -189,13 +194,17 @@ final class SessionStore: ObservableObject {
             if schedule.enabled, schedule.contains(Date()) {
                 return pauseScheduleWithNfc()
             }
-            return deactivateBlank()
+            return deactivateBlank(entryMode: .nfc, endedReason: .nfc)
         }
 
-        return activateBlank()
+        return activateBlank(entryMode: .nfc)
     }
 
-    func activateBlank(forceStarted: Bool = false, durationMinutes: Int? = nil) -> NfcResult {
+    func activateBlank(
+        forceStarted: Bool = false,
+        durationMinutes: Int? = nil,
+        entryMode: BlankEntryMode = .app
+    ) -> NfcResult {
         guard hasSelectedApps else {
             return .noAppsSelected
         }
@@ -215,17 +224,21 @@ final class SessionStore: ObservableObject {
             blankActiveUntil = nil
             deviceActivityTimerScheduled = false
         }
-        startSession(tag: nfcTagUid, forceStarted: forceStarted)
+        startSession(tag: nfcTagUid, forceStarted: forceStarted, entryMode: entryMode, plannedDurationMinutes: durationMinutes)
         return .blanked
     }
 
     func pauseScheduleWithNfc(minutes: Int = 5) -> NfcResult {
         schedulePausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
-        _ = deactivateBlank()
+        _ = deactivateBlank(entryMode: .nfc, endedReason: .nfc)
         return .schedulePaused
     }
 
-    func deactivateBlank() -> NfcResult {
+    func deactivateBlank(
+        entryMode: BlankEntryMode = .app,
+        endedReason: BlankEndedReason = .unknown,
+        broken: Bool = false
+    ) -> NfcResult {
         guard isBlankActive else {
             return .unblanked
         }
@@ -235,7 +248,7 @@ final class SessionStore: ObservableObject {
         blankActiveUntil = nil
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
-        endActiveSession()
+        endActiveSession(entryMode: entryMode, endedReason: endedReason, broken: broken)
         return .unblanked
     }
 
@@ -247,7 +260,7 @@ final class SessionStore: ObservableObject {
             }
             emergencyUnlocksThisWeek += 1
         }
-        _ = deactivateBlank()
+        _ = deactivateBlank(entryMode: .app, endedReason: .emergency, broken: true)
         return true
     }
 
@@ -256,7 +269,8 @@ final class SessionStore: ObservableObject {
         BlankSharedState.finishExpiredBlock(defaults: defaults, now: date)
 
         if let blankActiveUntil, isBlankActive, date >= blankActiveUntil {
-            _ = deactivateBlank()
+            let reason: BlankEndedReason = activeSession?.plannedDurationMinutes == nil ? .expired : .timer
+            _ = deactivateBlank(entryMode: activeSession?.entryMode ?? .app, endedReason: reason)
             return
         }
 
@@ -268,7 +282,7 @@ final class SessionStore: ObservableObject {
         if let schedulePausedUntil {
             if date < schedulePausedUntil {
                 if isBlankActive, activeSessionStartedBySchedule {
-                    _ = deactivateBlank()
+                    _ = deactivateBlank(entryMode: .schedule, endedReason: .schedule)
                 }
                 return
             }
@@ -276,14 +290,18 @@ final class SessionStore: ObservableObject {
         }
 
         if schedule.contains(date) {
-            _ = activateBlank(forceStarted: true)
+            _ = activateBlank(
+                forceStarted: true,
+                durationMinutes: schedulePlannedDurationMinutes,
+                entryMode: .schedule
+            )
         } else if isBlankActive, activeSessionStartedBySchedule {
-            _ = deactivateBlank()
+            _ = deactivateBlank(entryMode: .schedule, endedReason: .schedule)
         }
     }
 
     func forgetNfcTag() {
-        endActiveSession()
+        endActiveSession(entryMode: .app, endedReason: .unknown, broken: true)
         nfcTagUid = nil
         isBlankActive = false
         blankActiveSince = nil
@@ -322,6 +340,11 @@ final class SessionStore: ObservableObject {
         let sharedSessions = Self.loadSessions(from: defaults)
         if sessions != sharedSessions {
             sessions = sharedSessions
+        }
+
+        let sharedUsageEvents = Self.loadUsageEvents(from: defaults)
+        if usageEvents != sharedUsageEvents {
+            usageEvents = sharedUsageEvents
         }
     }
 
@@ -366,26 +389,103 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func startSession(tag: String?, forceStarted: Bool = false) {
+    private func startSession(
+        tag: String?,
+        forceStarted: Bool = false,
+        entryMode: BlankEntryMode,
+        plannedDurationMinutes: Int? = nil
+    ) {
         if activeSession != nil {
-            endActiveSession()
+            endActiveSession(entryMode: entryMode, endedReason: .unknown)
         }
 
+        let snapshot = currentSelectionSnapshot
         let session = BlankSession(
             profileId: currentModeId,
             strategy: .nfc,
             startTag: tag,
-            forceStarted: forceStarted
+            forceStarted: forceStarted,
+            entryMode: entryMode,
+            selectionSnapshot: snapshot,
+            modeName: currentMode.name,
+            plannedDurationMinutes: plannedDurationMinutes
         )
         sessions.append(session)
+        appendUsageEvent(
+            kind: .blockStarted,
+            sessionId: session.id,
+            entryMode: entryMode,
+            selectionSnapshot: snapshot,
+            modeName: session.modeName,
+            plannedDurationMinutes: plannedDurationMinutes
+        )
     }
 
-    private func endActiveSession() {
+    private func endActiveSession(
+        entryMode: BlankEntryMode,
+        endedReason: BlankEndedReason,
+        broken: Bool = false
+    ) {
         guard let index = sessions.lastIndex(where: { $0.isActive }) else {
             return
         }
 
-        sessions[index].end()
+        let endedAt = Date()
+        sessions[index].end(at: endedAt, endedReason: endedReason)
+        let session = sessions[index]
+        appendUsageEvent(
+            kind: broken ? .blockBroken : .blockEnded,
+            sessionId: session.id,
+            entryMode: entryMode,
+            endedReason: endedReason,
+            duration: session.duration,
+            selectionSnapshot: session.selectionSnapshot ?? currentSelectionSnapshot,
+            modeName: session.modeName,
+            plannedDurationMinutes: session.plannedDurationMinutes
+        )
+    }
+
+    private var schedulePlannedDurationMinutes: Int {
+        let minutes: Int
+        if schedule.startMinute < schedule.endMinute {
+            minutes = schedule.endMinute - schedule.startMinute
+        } else {
+            minutes = (24 * 60 - schedule.startMinute) + schedule.endMinute
+        }
+        return max(1, minutes)
+    }
+
+    private var currentSelectionSnapshot: BlankSelectionSnapshot {
+        BlankSelectionSnapshot(
+            applicationCount: selection.applicationTokens.count,
+            categoryCount: selection.categoryTokens.count,
+            webDomainCount: selection.webDomainTokens.count
+        )
+    }
+
+    private func appendUsageEvent(
+        kind: BlankUsageEventKind,
+        sessionId: UUID?,
+        entryMode: BlankEntryMode,
+        endedReason: BlankEndedReason? = nil,
+        duration: TimeInterval? = nil,
+        selectionSnapshot: BlankSelectionSnapshot,
+        modeName: String? = nil,
+        plannedDurationMinutes: Int? = nil
+    ) {
+        usageEvents.append(BlankUsageEvent(
+            kind: kind,
+            sessionId: sessionId,
+            entryMode: entryMode,
+            endedReason: endedReason,
+            duration: duration,
+            selectionSnapshot: selectionSnapshot,
+            modeName: modeName,
+            plannedDurationMinutes: plannedDurationMinutes
+        ))
+        if usageEvents.count > Self.maxUsageEvents {
+            usageEvents.removeFirst(usageEvents.count - Self.maxUsageEvents)
+        }
     }
 
     private func updateCurrentModeSelection(_ selection: FamilyActivitySelection) {
@@ -403,6 +503,12 @@ final class SessionStore: ObservableObject {
     private func saveSessions(_ sessions: [BlankSession]) {
         if let data = try? JSONEncoder().encode(sessions) {
             defaults.set(data, forKey: Keys.sessions)
+        }
+    }
+
+    private func saveUsageEvents(_ events: [BlankUsageEvent]) {
+        if let data = try? JSONEncoder().encode(events) {
+            defaults.set(data, forKey: Keys.usageEvents)
         }
     }
 
@@ -429,6 +535,14 @@ final class SessionStore: ObservableObject {
     private static func loadSessions(from defaults: UserDefaults) -> [BlankSession] {
         guard let data = defaults.data(forKey: Keys.sessions),
               let decoded = try? JSONDecoder().decode([BlankSession].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+
+    private static func loadUsageEvents(from defaults: UserDefaults) -> [BlankUsageEvent] {
+        guard let data = defaults.data(forKey: Keys.usageEvents),
+              let decoded = try? JSONDecoder().decode([BlankUsageEvent].self, from: data) else {
             return []
         }
         return decoded
@@ -501,6 +615,7 @@ final class SessionStore: ObservableObject {
             Keys.setupComplete,
             Keys.selection,
             Keys.sessions,
+            Keys.usageEvents,
             Keys.focusModes,
             Keys.currentModeId,
             Keys.schedule,
@@ -532,6 +647,7 @@ final class SessionStore: ObservableObject {
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection
         static let sessions = BlankSharedState.Keys.sessions
+        static let usageEvents = BlankSharedState.Keys.usageEvents
         static let focusModes = "blankFocusModes"
         static let currentModeId = BlankSharedState.Keys.currentModeId
         static let schedule = "blankFocusSchedule"
@@ -542,6 +658,7 @@ final class SessionStore: ObservableObject {
     }
 
     private static let maxEmergencyUnlocksPerWeek = 3
+    private static let maxUsageEvents = 500
 
     private func reloadBlankWidget() {
         WidgetCenter.shared.reloadTimelines(ofKind: "BlankQuickBlockWidget")

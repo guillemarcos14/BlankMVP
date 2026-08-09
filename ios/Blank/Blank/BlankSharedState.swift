@@ -14,10 +14,18 @@ enum BlankSharedState {
     }
 
     static func selectionCount(in defaults: UserDefaults = Self.defaults) -> Int {
-        guard let selection = loadSelection(from: defaults) else { return 0 }
-        return selection.applicationTokens.count +
-            selection.categoryTokens.count +
-            selection.webDomainTokens.count
+        selectionSnapshot(in: defaults).totalCount
+    }
+
+    static func selectionSnapshot(in defaults: UserDefaults = Self.defaults) -> BlankSelectionSnapshot {
+        guard let selection = loadSelection(from: defaults) else {
+            return BlankSelectionSnapshot()
+        }
+        return BlankSelectionSnapshot(
+            applicationCount: selection.applicationTokens.count,
+            categoryCount: selection.categoryTokens.count,
+            webDomainCount: selection.webDomainTokens.count
+        )
     }
 
     static func loadSelection(from defaults: UserDefaults = Self.defaults) -> FamilyActivitySelection? {
@@ -43,7 +51,7 @@ enum BlankSharedState {
         defaults.set(now.timeIntervalSince1970, forKey: Keys.blankActiveSince)
         defaults.removeObject(forKey: Keys.blankActiveUntil)
         defaults.removeObject(forKey: "blankQuickBlockDurationMinutes")
-        appendSession(defaults: defaults, now: now)
+        appendSession(defaults: defaults, now: now, entryMode: .widget)
         return true
     }
 
@@ -58,30 +66,60 @@ enum BlankSharedState {
         defaults.set(false, forKey: Keys.isBlankActive)
         defaults.removeObject(forKey: Keys.blankActiveSince)
         defaults.removeObject(forKey: Keys.blankActiveUntil)
-        endActiveSession(defaults: defaults, now: now)
+        endActiveSession(defaults: defaults, now: now, endedReason: .expired)
         return true
     }
 
-    private static func appendSession(defaults: UserDefaults, now: Date) {
+    private static func appendSession(defaults: UserDefaults, now: Date, entryMode: BlankEntryMode) {
         let modeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:)) ?? defaultModeId
+        let modeName = currentModeName(defaults: defaults, modeId: modeId)
+        let snapshot = selectionSnapshot(in: defaults)
         let session = BlankSession(
             profileId: modeId,
             strategy: .manualStartNfcStop,
-            startedAt: now
+            startedAt: now,
+            entryMode: entryMode,
+            selectionSnapshot: snapshot,
+            modeName: modeName
         )
         var sessions = loadSessions(defaults: defaults)
         if let index = sessions.lastIndex(where: { $0.isActive }) {
-            sessions[index].end(at: now)
+            sessions[index].end(at: now, endedReason: .unknown)
+            appendUsageEvent(
+                defaults: defaults,
+                kind: .blockEnded,
+                session: sessions[index],
+                entryMode: entryMode,
+                endedReason: .unknown,
+                now: now
+            )
         }
         sessions.append(session)
         saveSessions(sessions, defaults: defaults)
+        appendUsageEvent(
+            defaults: defaults,
+            kind: .blockStarted,
+            session: session,
+            entryMode: entryMode,
+            now: now,
+            selectionSnapshot: snapshot,
+            modeName: modeName
+        )
     }
 
-    private static func endActiveSession(defaults: UserDefaults, now: Date) {
+    private static func endActiveSession(defaults: UserDefaults, now: Date, endedReason: BlankEndedReason) {
         var sessions = loadSessions(defaults: defaults)
         guard let index = sessions.lastIndex(where: { $0.isActive }) else { return }
-        sessions[index].end(at: now)
+        sessions[index].end(at: now, endedReason: endedReason)
         saveSessions(sessions, defaults: defaults)
+        appendUsageEvent(
+            defaults: defaults,
+            kind: .blockEnded,
+            session: sessions[index],
+            entryMode: sessions[index].entryMode ?? .widget,
+            endedReason: endedReason,
+            now: now
+        )
     }
 
     private static func loadSessions(defaults: UserDefaults) -> [BlankSession] {
@@ -95,6 +133,55 @@ enum BlankSharedState {
     private static func saveSessions(_ sessions: [BlankSession], defaults: UserDefaults) {
         guard let data = try? JSONEncoder().encode(sessions) else { return }
         defaults.set(data, forKey: Keys.sessions)
+    }
+
+    private static func appendUsageEvent(
+        defaults: UserDefaults,
+        kind: BlankUsageEventKind,
+        session: BlankSession,
+        entryMode: BlankEntryMode,
+        endedReason: BlankEndedReason? = nil,
+        now: Date,
+        selectionSnapshot: BlankSelectionSnapshot? = nil,
+        modeName: String? = nil
+    ) {
+        var events = loadUsageEvents(defaults: defaults)
+        events.append(BlankUsageEvent(
+            kind: kind,
+            sessionId: session.id,
+            occurredAt: now,
+            entryMode: entryMode,
+            endedReason: endedReason,
+            duration: kind == .blockStarted ? nil : session.duration,
+            selectionSnapshot: selectionSnapshot ?? session.selectionSnapshot ?? Self.selectionSnapshot(in: defaults),
+            modeName: modeName ?? session.modeName,
+            plannedDurationMinutes: session.plannedDurationMinutes
+        ))
+        if events.count > 500 {
+            events.removeFirst(events.count - 500)
+        }
+        saveUsageEvents(events, defaults: defaults)
+    }
+
+    private static func loadUsageEvents(defaults: UserDefaults) -> [BlankUsageEvent] {
+        guard let data = defaults.data(forKey: Keys.usageEvents),
+              let events = try? JSONDecoder().decode([BlankUsageEvent].self, from: data) else {
+            return []
+        }
+        return events
+    }
+
+    private static func saveUsageEvents(_ events: [BlankUsageEvent], defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(events) else { return }
+        defaults.set(data, forKey: Keys.usageEvents)
+    }
+
+    private static func currentModeName(defaults: UserDefaults, modeId: UUID) -> String? {
+        guard let data = defaults.data(forKey: Keys.focusModes),
+              let modes = try? JSONDecoder().decode([BlankFocusMode].self, from: data) else {
+            return nil
+        }
+        return modes.first { $0.id == modeId }?.name
     }
 
     private static func date(forKey key: String, defaults: UserDefaults) -> Date? {
@@ -121,6 +208,8 @@ enum BlankSharedState {
         static let blankActiveUntil = "blankActiveUntil"
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
+        static let usageEvents = "blankUsageEvents"
         static let currentModeId = "blankCurrentModeId"
+        static let focusModes = "blankFocusModes"
     }
 }

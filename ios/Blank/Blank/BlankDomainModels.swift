@@ -40,6 +40,119 @@ enum BlankStrategyKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum BlankEntryMode: String, Codable {
+    case app
+    case widget
+    case nfc
+    case schedule
+}
+
+enum BlankUsageEventKind: String, Codable {
+    case blockStarted
+    case blockEnded
+    case blockBroken
+}
+
+enum BlankEndedReason: String, Codable {
+    case nfc
+    case timer
+    case schedule
+    case emergency
+    case expired
+    case unknown
+}
+
+struct BlankSelectionSnapshot: Codable, Equatable {
+    var applicationCount: Int
+    var categoryCount: Int
+    var webDomainCount: Int
+
+    var totalCount: Int {
+        applicationCount + categoryCount + webDomainCount
+    }
+
+    init(applicationCount: Int = 0, categoryCount: Int = 0, webDomainCount: Int = 0) {
+        self.applicationCount = applicationCount
+        self.categoryCount = categoryCount
+        self.webDomainCount = webDomainCount
+    }
+}
+
+struct BlankUsageEvent: Codable, Identifiable, Equatable {
+    var id: UUID
+    var kind: BlankUsageEventKind
+    var sessionId: UUID?
+    var occurredAt: Date
+    var entryMode: BlankEntryMode
+    var endedReason: BlankEndedReason?
+    var duration: TimeInterval?
+    var selectionSnapshot: BlankSelectionSnapshot
+    var modeName: String?
+    var localHour: Int
+    var weekday: Int
+    var plannedDurationMinutes: Int?
+
+    init(
+        id: UUID = UUID(),
+        kind: BlankUsageEventKind,
+        sessionId: UUID?,
+        occurredAt: Date = Date(),
+        entryMode: BlankEntryMode,
+        endedReason: BlankEndedReason? = nil,
+        duration: TimeInterval? = nil,
+        selectionSnapshot: BlankSelectionSnapshot = BlankSelectionSnapshot(),
+        modeName: String? = nil,
+        localHour: Int? = nil,
+        weekday: Int? = nil,
+        plannedDurationMinutes: Int? = nil,
+        calendar: Calendar = .current
+    ) {
+        self.id = id
+        self.kind = kind
+        self.sessionId = sessionId
+        self.occurredAt = occurredAt
+        self.entryMode = entryMode
+        self.endedReason = endedReason
+        self.duration = duration
+        self.selectionSnapshot = selectionSnapshot
+        self.modeName = modeName
+        self.localHour = localHour ?? calendar.component(.hour, from: occurredAt)
+        self.weekday = weekday ?? calendar.component(.weekday, from: occurredAt)
+        self.plannedDurationMinutes = plannedDurationMinutes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case sessionId
+        case occurredAt
+        case entryMode
+        case endedReason
+        case duration
+        case selectionSnapshot
+        case modeName
+        case localHour
+        case weekday
+        case plannedDurationMinutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        kind = try container.decode(BlankUsageEventKind.self, forKey: .kind)
+        sessionId = try container.decodeIfPresent(UUID.self, forKey: .sessionId)
+        occurredAt = try container.decodeIfPresent(Date.self, forKey: .occurredAt) ?? Date()
+        entryMode = try container.decodeIfPresent(BlankEntryMode.self, forKey: .entryMode) ?? .app
+        endedReason = try container.decodeIfPresent(BlankEndedReason.self, forKey: .endedReason)
+        duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
+        selectionSnapshot = try container.decodeIfPresent(BlankSelectionSnapshot.self, forKey: .selectionSnapshot) ?? BlankSelectionSnapshot()
+        modeName = try container.decodeIfPresent(String.self, forKey: .modeName)
+        localHour = try container.decodeIfPresent(Int.self, forKey: .localHour) ?? Calendar.current.component(.hour, from: occurredAt)
+        weekday = try container.decodeIfPresent(Int.self, forKey: .weekday) ?? Calendar.current.component(.weekday, from: occurredAt)
+        plannedDurationMinutes = try container.decodeIfPresent(Int.self, forKey: .plannedDurationMinutes)
+    }
+}
+
 struct BlankProfile: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
@@ -146,6 +259,13 @@ struct BlankSession: Codable, Identifiable, Equatable {
     var pauseStartedAt: Date?
     var pauseEndedAt: Date?
     var forceStarted: Bool
+    var entryMode: BlankEntryMode?
+    var endedReason: BlankEndedReason?
+    var selectionSnapshot: BlankSelectionSnapshot?
+    var modeName: String?
+    var localStartHour: Int?
+    var startWeekday: Int?
+    var plannedDurationMinutes: Int?
 
     init(
         id: UUID = UUID(),
@@ -156,7 +276,15 @@ struct BlankSession: Codable, Identifiable, Equatable {
         endedAt: Date? = nil,
         pauseStartedAt: Date? = nil,
         pauseEndedAt: Date? = nil,
-        forceStarted: Bool = false
+        forceStarted: Bool = false,
+        entryMode: BlankEntryMode? = nil,
+        endedReason: BlankEndedReason? = nil,
+        selectionSnapshot: BlankSelectionSnapshot? = nil,
+        modeName: String? = nil,
+        localStartHour: Int? = nil,
+        startWeekday: Int? = nil,
+        plannedDurationMinutes: Int? = nil,
+        calendar: Calendar = .current
     ) {
         self.id = id
         self.profileId = profileId
@@ -167,6 +295,13 @@ struct BlankSession: Codable, Identifiable, Equatable {
         self.pauseStartedAt = pauseStartedAt
         self.pauseEndedAt = pauseEndedAt
         self.forceStarted = forceStarted
+        self.entryMode = entryMode
+        self.endedReason = endedReason
+        self.selectionSnapshot = selectionSnapshot
+        self.modeName = modeName
+        self.localStartHour = localStartHour ?? calendar.component(.hour, from: startedAt)
+        self.startWeekday = startWeekday ?? calendar.component(.weekday, from: startedAt)
+        self.plannedDurationMinutes = plannedDurationMinutes
     }
 
     var isActive: Bool {
@@ -177,8 +312,48 @@ struct BlankSession: Codable, Identifiable, Equatable {
         (endedAt ?? Date()).timeIntervalSince(startedAt)
     }
 
-    mutating func end(at date: Date = Date()) {
+    mutating func end(at date: Date = Date(), endedReason: BlankEndedReason? = nil) {
         endedAt = date
+        self.endedReason = endedReason
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case profileId
+        case strategy
+        case startTag
+        case startedAt
+        case endedAt
+        case pauseStartedAt
+        case pauseEndedAt
+        case forceStarted
+        case entryMode
+        case endedReason
+        case selectionSnapshot
+        case modeName
+        case localStartHour
+        case startWeekday
+        case plannedDurationMinutes
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        profileId = try container.decode(UUID.self, forKey: .profileId)
+        strategy = try container.decode(BlankStrategyKind.self, forKey: .strategy)
+        startTag = try container.decodeIfPresent(String.self, forKey: .startTag)
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt) ?? Date()
+        endedAt = try container.decodeIfPresent(Date.self, forKey: .endedAt)
+        pauseStartedAt = try container.decodeIfPresent(Date.self, forKey: .pauseStartedAt)
+        pauseEndedAt = try container.decodeIfPresent(Date.self, forKey: .pauseEndedAt)
+        forceStarted = try container.decodeIfPresent(Bool.self, forKey: .forceStarted) ?? false
+        entryMode = try container.decodeIfPresent(BlankEntryMode.self, forKey: .entryMode)
+        endedReason = try container.decodeIfPresent(BlankEndedReason.self, forKey: .endedReason)
+        selectionSnapshot = try container.decodeIfPresent(BlankSelectionSnapshot.self, forKey: .selectionSnapshot)
+        modeName = try container.decodeIfPresent(String.self, forKey: .modeName)
+        localStartHour = try container.decodeIfPresent(Int.self, forKey: .localStartHour) ?? Calendar.current.component(.hour, from: startedAt)
+        startWeekday = try container.decodeIfPresent(Int.self, forKey: .startWeekday) ?? Calendar.current.component(.weekday, from: startedAt)
+        plannedDurationMinutes = try container.decodeIfPresent(Int.self, forKey: .plannedDurationMinutes)
     }
 }
 

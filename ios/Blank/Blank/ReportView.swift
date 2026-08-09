@@ -4,6 +4,10 @@ import UIKit
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @State private var selectedHeroPage = 0
+    @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
+    @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
+    @AppStorage("blankWeeklyAIPlanSecond", store: BlankSharedState.defaults) private var storedPlanSecond = ""
+    @AppStorage("blankWeeklyAIPlanThird", store: BlankSharedState.defaults) private var storedPlanThird = ""
 
     private let reportBackground = BlankColors.background
     private let reportPrimary = BlankColors.ink
@@ -225,15 +229,81 @@ struct ReportView: View {
                 Text("Objetivo")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
-                Text(report.goal)
-                    .font(.blankInter(size: 14, weight: .medium, relativeTo: .body))
-                    .fixedSize(horizontal: false, vertical: true)
+                editableAIField(
+                    placeholder: report.goal,
+                    text: Binding(
+                        get: { storedWeeklyGoal.isEmpty ? report.goal : storedWeeklyGoal },
+                        set: { storedWeeklyGoal = $0 }
+                    )
+                )
             }
             .padding(.top, 2)
+
+            editablePlanSection(report: report)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func editablePlanSection(report: WeeklyAIReport) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("Plan")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+
+            editableAIField(
+                placeholder: report.plan[safe: 0] ?? "Bloque corto en tu franja débil.",
+                text: Binding(
+                    get: { storedPlanFirst.isEmpty ? (report.plan[safe: 0] ?? "") : storedPlanFirst },
+                    set: { storedPlanFirst = $0 }
+                )
+            )
+            editableAIField(
+                placeholder: report.plan[safe: 1] ?? "Repite el modo principal sin cambios.",
+                text: Binding(
+                    get: { storedPlanSecond.isEmpty ? (report.plan[safe: 1] ?? "") : storedPlanSecond },
+                    set: { storedPlanSecond = $0 }
+                )
+            )
+            editableAIField(
+                placeholder: report.plan[safe: 2] ?? "Revisa el resultado al final de la semana.",
+                text: Binding(
+                    get: { storedPlanThird.isEmpty ? (report.plan[safe: 2] ?? "") : storedPlanThird },
+                    set: { storedPlanThird = $0 }
+                )
+            )
+
+            Button("Restablecer propuesta") {
+                storedWeeklyGoal = ""
+                storedPlanFirst = ""
+                storedPlanSecond = ""
+                storedPlanThird = ""
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(reportSecondary)
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+        }
+        .padding(.top, 2)
+    }
+
+    private func editableAIField(placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text, axis: .vertical)
+            .font(.blankInter(size: 13, relativeTo: .footnote))
+            .foregroundStyle(reportPrimary.opacity(0.88))
+            .lineLimit(1...3)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.24))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(reportPrimary.opacity(0.07), lineWidth: 1)
+            }
     }
 
     private func aiReportSection(title: String, items: [String]) -> some View {
@@ -770,7 +840,12 @@ struct ReportView: View {
                     "Usa el modo Estudio antes del primer bloque fuerte.",
                     "Evita usar emergencia salvo que sea imprescindible."
                 ],
-                goal: "Completa 3 sesiones esta semana para generar un informe útil."
+                goal: "Completa 3 sesiones esta semana para generar un informe útil.",
+                plan: [
+                    "Hoy: 25 min con tu modo principal.",
+                    "Mañana: repite la misma franja.",
+                    "Viernes: revisa si hubo emergencias."
+                ]
             )
         }
 
@@ -848,13 +923,44 @@ struct ReportView: View {
             goal = "Subir un 15% el tiempo protegido sin emergencia."
         }
 
+        let plan = weeklyPlan(
+            weakHour: weakHour,
+            bestHour: bestHour,
+            modeName: modeName,
+            brokenCount: brokenEvents.count
+        )
+
         return WeeklyAIReport(
             summary: "Generado con tus sesiones reales de esta semana.",
             patterns: Array(patterns.prefix(3)),
             weakSpots: Array(weakSpots.prefix(3)),
             recommendations: Array(recommendations.prefix(3)),
-            goal: goal
+            goal: goal,
+            plan: plan
         )
+    }
+
+    private func weeklyPlan(
+        weakHour: Int?,
+        bestHour: Int?,
+        modeName: String?,
+        brokenCount: Int
+    ) -> [String] {
+        let mode = modeName ?? "principal"
+        let targetHour = weakHour ?? bestHour
+        let firstBlock: String
+        if let targetHour {
+            firstBlock = "3 días: activa Blank a las \(activationTimeText(before: targetHour))."
+        } else {
+            firstBlock = "3 días: bloque de 25 min a la misma hora."
+        }
+
+        let secondBlock = "Modo \(mode): mantén las mismas apps."
+        let thirdBlock = brokenCount > 0
+            ? "Si aparece emergencia, baja duración antes de repetir."
+            : "Domingo: revisa si puedes subir un bloque."
+
+        return [firstBlock, secondBlock, thirdBlock]
     }
 
     private func mostCommonHour(from events: [BlankUsageEvent], sessions: [BlankSession]) -> Int? {
@@ -902,7 +1008,7 @@ struct ReportView: View {
             return "Añade apps concretas si una categoría es demasiado amplia."
         }
         if profile.categoryAverage == 0 {
-            return "Agrupa apps parecidas en una categoria si repites ajustes."
+        return "Agrupa apps parecidas en una categoría si repites ajustes."
         }
         return "Mantén apps/modos una semana más antes de cambiar."
     }
@@ -978,6 +1084,7 @@ private struct WeeklyAIReport {
     let weakSpots: [String]
     let recommendations: [String]
     let goal: String
+    let plan: [String]
 }
 
 private struct SelectionProfile {
@@ -1180,4 +1287,10 @@ private struct ProgressPeriodSummary: Identifiable {
     let caption: String
 
     var id: String { title }
+}
+
+private extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }

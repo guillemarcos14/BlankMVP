@@ -42,7 +42,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
-	<string>Blank usa NFC para vincular y escanear tu etiqueta fisica Blank.</string>
+	<string>Blank usa NFC para vincular y escanear tu etiqueta física Blank.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

@@ -6,7 +6,7 @@ import WidgetKit
 
 struct StartQuickBlockIntent: AppIntent {
     static var title: LocalizedStringResource = "Iniciar Blank"
-    static var description = IntentDescription("Inicia un bloqueo rapido con la configuracion actual de Blank.")
+    static var description = IntentDescription("Inicia un bloqueo rápido con la configuración actual de Blank.")
 
     func perform() async throws -> some IntentResult {
         let defaults = BlankSharedState.defaults
@@ -251,7 +251,7 @@ struct BlankQuickBlockWidget: Widget {
             BlankWidgetView(entry: entry)
         }
         .configurationDisplayName("Blank")
-        .description("Inicia un bloqueo rapido.")
+        .description("Inicia un bloqueo rápido.")
         .supportedFamilies([.systemSmall])
     }
 }

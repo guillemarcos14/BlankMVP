@@ -59,18 +59,18 @@ final class MembershipStore: ObservableObject {
         case .pastDue:
             return "Pago pendiente"
         case .cancelled:
-            return "Membresia cancelada"
+            return "Membresía cancelada"
         case .expired:
-            return "Membresia expirada"
+            return "Membresía expirada"
         case .locked:
-            return "Membresia requerida"
+            return "Membresía requerida"
         }
     }
 
     func redeem(code rawCode: String) async {
         let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard code.count >= 6 else {
-            message = "Introduce un codigo valido."
+            message = "Introduce un código válido."
             return
         }
 
@@ -236,13 +236,13 @@ enum MembershipPlan: String, Codable {
         case .trial:
             return "Plan de prueba"
         case .monthly:
-            return "Membresia mensual"
+            return "Membresía mensual"
         case .annual:
-            return "Membresia anual"
+            return "Membresía anual"
         case .family:
-            return "Membresia familiar"
+            return "Membresía familiar"
         case .unknown:
-            return "Membresia Blank"
+            return "Membresía Blank"
         }
     }
 }
@@ -464,11 +464,11 @@ enum MembershipClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingEndpoint:
-            return "No se ha configurado el servidor de membresia."
+            return "No se ha configurado el servidor de membresía."
         case .invalidResponse:
-            return "No hemos podido validar la membresia."
+            return "No hemos podido validar la membresía."
         case .rejectedCode:
-            return "Este codigo no es valido o ya no esta activo."
+            return "Este código no es válido o ya no está activo."
         }
     }
 }

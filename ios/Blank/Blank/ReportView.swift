@@ -754,23 +754,23 @@ struct ReportView: View {
 
         guard !weeklySessions.isEmpty || !weeklyEvents.isEmpty else {
             return WeeklyAIReport(
-                summary: "Aun no hay datos suficientes esta semana.",
+                summary: "Aún no hay datos suficientes esta semana.",
                 patterns: [
                     "Blank necesita unas sesiones para detectar patrones reales.",
                     "El informe mejora cuando usas varios modos o franjas.",
-                    "Las emergencias ayudaran a detectar momentos fragiles."
+                    "Las emergencias ayudarán a detectar momentos frágiles."
                 ],
                 weakSpots: [
-                    "Aun falta una franja debil clara.",
+                    "Aún falta una franja débil clara.",
                     "Sin rupturas concentradas esta semana.",
-                    "Empieza con 3 apps o categorias clave."
+                    "Empieza con 3 apps o categorías clave."
                 ],
                 recommendations: [
-                    "Haz una sesion de al menos 25 minutos hoy.",
+                    "Haz una sesión de al menos 25 minutos hoy.",
                     "Usa el modo Estudio antes del primer bloque fuerte.",
                     "Evita usar emergencia salvo que sea imprescindible."
                 ],
-                goal: "Completa 3 sesiones esta semana para generar un informe util."
+                goal: "Completa 3 sesiones esta semana para generar un informe útil."
             )
         }
 
@@ -788,16 +788,16 @@ struct ReportView: View {
         var patterns: [String] = []
         patterns.append("\(formatDuration(totalFocus)) protegidos en \(weeklySessions.count) sesiones.")
         if let bestHour {
-            patterns.append("Tu franja mas repetida empieza sobre las \(String(format: "%02d:00", bestHour)).")
+            patterns.append("Tu franja más repetida empieza sobre las \(String(format: "%02d:00", bestHour)).")
         } else if let bestWeekday {
-            patterns.append("El dia con mas uso fue \(weekdayDisplayName(bestWeekday)).")
+            patterns.append("El día con más uso fue \(weekdayDisplayName(bestWeekday)).")
         } else {
-            patterns.append("Aun no hay una franja clara.")
+            patterns.append("Aún no hay una franja clara.")
         }
         if let modeName {
-            patterns.append("El modo mas usado es \(modeName).")
+            patterns.append("El modo más usado es \(modeName).")
         } else {
-            patterns.append("Aun no hay un modo claro.")
+            patterns.append("Aún no hay un modo claro.")
         }
         if brokenEvents.count > 0 {
             patterns[2] = "Has roto \(brokenEvents.count) bloqueo\(brokenEvents.count == 1 ? "" : "s") esta semana."
@@ -805,16 +805,16 @@ struct ReportView: View {
 
         var weakSpots: [String] = []
         if let weakHour {
-            weakSpots.append("Franja debil: \(hourRangeText(weakHour)).")
+            weakSpots.append("Franja débil: \(hourRangeText(weakHour)).")
         } else if let bestHour {
             weakSpots.append("Franja a reforzar: \(hourRangeText(bestHour)).")
         } else {
-            weakSpots.append("Aun falta una franja debil clara.")
+            weakSpots.append("Aún falta una franja débil clara.")
         }
         if let weakWeekday, brokenEvents.count > 0 {
             weakSpots.append("Rupturas concentradas en \(weekdayDisplayName(weakWeekday)).")
         } else if brokenEvents.count > 0 {
-            weakSpots.append("Rupturas detectadas, sin dia dominante.")
+            weakSpots.append("Rupturas detectadas, sin día dominante.")
         } else {
             weakSpots.append("Sin rupturas concentradas esta semana.")
         }
@@ -834,14 +834,14 @@ struct ReportView: View {
             recommendations.append("Mantén el mismo modo si esta semana no necesitaste emergencia.")
         }
         if selectionProfile.totalAverage < 3 {
-            recommendations.append("Anade al menos 3 apps o categorias al modo principal.")
+            recommendations.append("Añade al menos 3 apps o categorías al modo principal.")
         } else {
             recommendations.append("No cambies demasiadas apps a la vez.")
         }
 
         let goal: String
         if brokenEvents.count > 0 {
-            goal = "3 bloqueos sin emergencia en tu franja mas debil."
+            goal = "3 bloqueos sin emergencia en tu franja más débil."
         } else if weeklySessions.count < 5 {
             goal = "Llegar a 5 sesiones protegidas."
         } else {
@@ -896,15 +896,15 @@ struct ReportView: View {
     private func appModeAdjustmentText(profile: SelectionProfile, modeName: String?) -> String {
         let mode = modeName ?? "principal"
         if profile.totalAverage < 3 {
-            return "Refuerza el modo \(mode) con mas apps o categorias."
+            return "Refuerza el modo \(mode) con más apps o categorías."
         }
         if profile.applicationAverage == 0 {
-            return "Anade apps concretas si una categoria es demasiado amplia."
+            return "Añade apps concretas si una categoría es demasiado amplia."
         }
         if profile.categoryAverage == 0 {
             return "Agrupa apps parecidas en una categoria si repites ajustes."
         }
-        return "Manten apps/modos una semana mas antes de cambiar."
+        return "Mantén apps/modos una semana más antes de cambiar."
     }
 
     private func hourRangeText(_ hour: Int) -> String {

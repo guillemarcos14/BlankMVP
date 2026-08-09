@@ -346,14 +346,14 @@ struct HomeView: View {
         if sessionStore.nfcTagUid == nil {
             issues.append(ConfigIssue(
                 title: "NFC sin vincular",
-                body: "Escanea una pieza fisica para poder salir de Blank.",
+                body: "Escanea una pieza física para poder salir de Blank.",
                 action: .relinkNfc
             ))
         }
         if !sessionStore.hasSelectedApps {
             issues.append(ConfigIssue(
                 title: "Sin apps seleccionadas",
-                body: "Elige apps, categorias o dominios antes de iniciar.",
+                body: "Elige apps, categorías o dominios antes de iniciar.",
                 action: .selectApps
             ))
         }
@@ -940,7 +940,7 @@ private struct EmergencySheet: View {
     var body: some View {
         TechnicalSettingsSheetLayout {
             TechnicalSheetTitle("Emergencia")
-            TechnicalSheetDescription("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Usalo solo si necesitas recuperar el acceso ahora.")
+            TechnicalSheetDescription("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Úsalo solo si necesitas recuperar el acceso ahora.")
             TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.", emphasized: true)
             TechnicalSheetActions {
                 Button("Desbloquear") {
@@ -1071,7 +1071,7 @@ private struct TimerStartSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text("Blank se desactiva automaticamente al terminar. Si quieres salir antes, usa tu Blank o emergencia.")
+            Text("Blank se desactiva automáticamente al terminar. Si quieres salir antes, usa tu Blank o emergencia.")
                 .foregroundStyle(.secondary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {

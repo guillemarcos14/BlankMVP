@@ -317,6 +317,16 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
+            if let preventiveAlertText {
+                Text(preventiveAlertText)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.74))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
+                    .frame(maxWidth: 244)
+            }
+
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
             Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
                 if sessionStore.isBlankActive {
@@ -332,6 +342,58 @@ struct HomeView: View {
             .buttonStyle(HomeBlankearButtonStyle())
             .frame(width: buttonWidth)
         }
+    }
+
+    private var preventiveAlertText: String? {
+        guard !sessionStore.isBlankActive,
+              message == nil,
+              configIssues.isEmpty,
+              let weakHour = weakHourThisWeek(),
+              minutesUntilNextHour(weakHour) <= 30 else {
+            return nil
+        }
+
+        return "Se acerca tu franja débil. Activa Blank."
+    }
+
+    private func weakHourThisWeek() -> Int? {
+        let calendar = Calendar.current
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let brokenEventHours = sessionStore.usageEvents
+            .filter { event in
+                event.occurredAt >= weekStart &&
+                event.occurredAt <= now &&
+                (event.kind == .blockBroken || event.endedReason == .emergency)
+            }
+            .map(\.localHour)
+        let emergencySessionHours = sessionStore.sessions
+            .filter { session in
+                let sessionEnd = session.endedAt ?? now
+                return session.startedAt <= now &&
+                sessionEnd >= weekStart &&
+                session.endedReason == .emergency
+            }
+            .compactMap(\.localStartHour)
+
+        return mostCommonValue(brokenEventHours + emergencySessionHours)
+    }
+
+    private func minutesUntilNextHour(_ hour: Int) -> Int {
+        let calendar = Calendar.current
+        let currentHour = calendar.component(.hour, from: now)
+        let currentMinute = calendar.component(.minute, from: now)
+        var minutes = (hour - currentHour) * 60 - currentMinute
+        if minutes < 0 {
+            minutes += 24 * 60
+        }
+        return minutes
+    }
+
+    private func mostCommonValue<T: Hashable>(_ values: [T]) -> T? {
+        let counts = values.reduce(into: [T: Int]()) { counts, value in
+            counts[value, default: 0] += 1
+        }
+        return counts.max { lhs, rhs in lhs.value < rhs.value }?.key
     }
 
     private var configIssues: [ConfigIssue] {

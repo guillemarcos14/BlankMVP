@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
+    @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
@@ -98,7 +99,10 @@ struct HomeView: View {
             .blankTransparentPresentation()
         }
         .sheet(isPresented: $showingEmergency) {
-            EmergencySheet(emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining) {
+            EmergencySheet(
+                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
+                coachMessage: emergencyCoachMessage
+            ) {
                 let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
                     sessionStore.deactivateForEmergency()
                 }
@@ -354,6 +358,27 @@ struct HomeView: View {
         }
 
         return "Se acerca tu franja débil. Activa Blank."
+    }
+
+    private var emergencyCoachMessage: String {
+        if !storedWeeklyGoal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Estás rompiendo tu objetivo semanal."
+        }
+
+        guard let weakHour = weakHourThisWeek() else {
+            return "Haz una pausa de 10 s antes de decidir."
+        }
+
+        let currentHour = Calendar.current.component(.hour, from: now)
+        if weakHour == currentHour {
+            return "Estás en tu franja débil. Prueba 5 min más."
+        }
+
+        if minutesUntilNextHour(weakHour) <= 30 {
+            return "Tu franja débil está cerca. Evita romper ahora."
+        }
+
+        return "Romper ahora cuenta como emergencia semanal."
     }
 
     private func weakHourThisWeek() -> Int? {
@@ -997,11 +1022,13 @@ private struct ForgetBlankConfirmSheet: View {
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
     let emergencyUnlocksRemaining: Int
+    let coachMessage: String
     let onUnlock: () -> Bool
 
     var body: some View {
         TechnicalSettingsSheetLayout {
             TechnicalSheetTitle("Emergencia")
+            TechnicalSheetDescription(coachMessage, emphasized: true)
             TechnicalSheetDescription("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Úsalo solo si necesitas recuperar el acceso ahora.")
             TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.", emphasized: true)
             TechnicalSheetActions {

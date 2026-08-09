@@ -207,10 +207,10 @@ struct ReportView: View {
     }
 
     private func weeklyAIReportCapsule(report: WeeklyAIReport) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Informe semanal AI")
-                    .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(report.summary)
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
@@ -218,6 +218,7 @@ struct ReportView: View {
             }
 
             aiReportSection(title: "Patrones", items: report.patterns)
+            aiReportSection(title: "Apps y franjas", items: report.weakSpots)
             aiReportSection(title: "Recomendaciones", items: report.recommendations)
 
             VStack(alignment: .leading, spacing: 6) {
@@ -225,23 +226,23 @@ struct ReportView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
                 Text(report.goal)
-                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                    .font(.blankInter(size: 14, weight: .medium, relativeTo: .body))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
+        .padding(17)
         .liquidGlass(cornerRadius: 28)
     }
 
     private func aiReportSection(title: String, items: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
 
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 6) {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .top, spacing: 8) {
                         Circle()
@@ -249,7 +250,7 @@ struct ReportView: View {
                             .frame(width: 4, height: 4)
                             .padding(.top, 7)
                         Text(item)
-                            .font(.blankInter(size: 14, relativeTo: .footnote))
+                            .font(.blankInter(size: 13, relativeTo: .footnote))
                             .foregroundStyle(reportPrimary.opacity(0.88))
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -759,6 +760,11 @@ struct ReportView: View {
                     "El informe mejora cuando usas varios modos o franjas.",
                     "Las emergencias ayudaran a detectar momentos fragiles."
                 ],
+                weakSpots: [
+                    "Aun falta una franja debil clara.",
+                    "Sin rupturas concentradas esta semana.",
+                    "Empieza con 3 apps o categorias clave."
+                ],
                 recommendations: [
                     "Haz una sesion de al menos 25 minutos hoy.",
                     "Usa el modo Estudio antes del primer bloque fuerte.",
@@ -770,82 +776,143 @@ struct ReportView: View {
 
         let startedEvents = weeklyEvents.filter { $0.kind == .blockStarted }
         let brokenEvents = weeklyEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }
-        let totalMinutes = Int(focusTime(sessions: weeklySessions, from: weekStart, to: now) / 60)
-        let bestHour = mostCommonHour(from: startedEvents)
-        let bestWeekday = mostCommonWeekday(from: startedEvents)
-        let modeName = mostCommonModeName(from: weeklySessions, events: startedEvents)
-        let protectedAverage = averageProtectedItems(from: startedEvents)
+        let totalFocus = focusTime(sessions: weeklySessions, from: weekStart, to: now)
+        let bestHour = mostCommonHour(from: startedEvents, sessions: weeklySessions)
+        let bestWeekday = mostCommonWeekday(from: startedEvents, sessions: weeklySessions)
+        let weakSessions = weeklySessions.filter { $0.endedReason == .emergency }
+        let weakHour = mostCommonValue(brokenEvents.map(\.localHour)) ?? mostCommonValue(weakSessions.compactMap(\.localStartHour))
+        let weakWeekday = mostCommonValue(brokenEvents.map(\.weekday)) ?? mostCommonValue(weakSessions.compactMap(\.startWeekday))
+        let modeName = mostCommonModeName(from: weeklySessions, events: startedEvents, progress: progress)
+        let selectionProfile = averageSelectionProfile(from: startedEvents, sessions: weeklySessions)
 
         var patterns: [String] = []
-        patterns.append("Has protegido \(totalMinutes) min en \(weeklySessions.count) sesiones esta semana.")
+        patterns.append("\(formatDuration(totalFocus)) protegidos en \(weeklySessions.count) sesiones.")
         if let bestHour {
             patterns.append("Tu franja mas repetida empieza sobre las \(String(format: "%02d:00", bestHour)).")
         } else if let bestWeekday {
-            patterns.append("El dia con mas senal esta semana es \(weekdayDisplayName(bestWeekday)).")
+            patterns.append("El dia con mas uso fue \(weekdayDisplayName(bestWeekday)).")
         } else {
-            patterns.append("Todavia no hay una franja dominante clara.")
+            patterns.append("Aun no hay una franja clara.")
         }
         if let modeName {
             patterns.append("El modo mas usado es \(modeName).")
         } else {
-            patterns.append("Aun no hay un modo dominante.")
+            patterns.append("Aun no hay un modo claro.")
         }
         if brokenEvents.count > 0 {
             patterns[2] = "Has roto \(brokenEvents.count) bloqueo\(brokenEvents.count == 1 ? "" : "s") esta semana."
         }
 
+        var weakSpots: [String] = []
+        if let weakHour {
+            weakSpots.append("Franja debil: \(hourRangeText(weakHour)).")
+        } else if let bestHour {
+            weakSpots.append("Franja a reforzar: \(hourRangeText(bestHour)).")
+        } else {
+            weakSpots.append("Aun falta una franja debil clara.")
+        }
+        if let weakWeekday, brokenEvents.count > 0 {
+            weakSpots.append("Rupturas concentradas en \(weekdayDisplayName(weakWeekday)).")
+        } else if brokenEvents.count > 0 {
+            weakSpots.append("Rupturas detectadas, sin dia dominante.")
+        } else {
+            weakSpots.append("Sin rupturas concentradas esta semana.")
+        }
+        weakSpots.append(appModeAdjustmentText(profile: selectionProfile, modeName: modeName))
+
         var recommendations: [String] = []
-        if let bestHour {
+        if let weakHour {
+            recommendations.append("Activa Blank a las \(activationTimeText(before: weakHour)).")
+        } else if let bestHour {
             recommendations.append("Activa Blank 10 min antes de las \(String(format: "%02d:00", bestHour)).")
         } else {
-            recommendations.append("Programa una primera franja fija para dar datos consistentes.")
+            recommendations.append("Elige una franja fija para medir mejor.")
         }
         if brokenEvents.count > 0 {
-            recommendations.append("Reduce la duracion del siguiente bloqueo para evitar emergencia.")
+            recommendations.append("Reduce el siguiente bloqueo si aparece emergencia.")
         } else {
             recommendations.append("Mantén el mismo modo si esta semana no necesitaste emergencia.")
         }
-        if protectedAverage < 3 {
+        if selectionProfile.totalAverage < 3 {
             recommendations.append("Anade al menos 3 apps o categorias al modo principal.")
         } else {
-            recommendations.append("No cambies demasiadas apps a la vez; mide una semana mas.")
+            recommendations.append("No cambies demasiadas apps a la vez.")
         }
 
         let goal: String
         if brokenEvents.count > 0 {
-            goal = "La semana que viene: 3 bloqueos sin emergencia en tu franja mas debil."
+            goal = "3 bloqueos sin emergencia en tu franja mas debil."
         } else if weeklySessions.count < 5 {
-            goal = "La semana que viene: llegar a 5 sesiones protegidas."
+            goal = "Llegar a 5 sesiones protegidas."
         } else {
-            goal = "La semana que viene: subir un 15% el tiempo protegido sin usar emergencia."
+            goal = "Subir un 15% el tiempo protegido sin emergencia."
         }
 
         return WeeklyAIReport(
             summary: "Generado con tus sesiones reales de esta semana.",
             patterns: Array(patterns.prefix(3)),
+            weakSpots: Array(weakSpots.prefix(3)),
             recommendations: Array(recommendations.prefix(3)),
             goal: goal
         )
     }
 
-    private func mostCommonHour(from events: [BlankUsageEvent]) -> Int? {
-        mostCommonValue(events.map(\.localHour))
+    private func mostCommonHour(from events: [BlankUsageEvent], sessions: [BlankSession]) -> Int? {
+        mostCommonValue(events.map(\.localHour) + sessions.compactMap(\.localStartHour))
     }
 
-    private func mostCommonWeekday(from events: [BlankUsageEvent]) -> Int? {
-        mostCommonValue(events.map(\.weekday))
+    private func mostCommonWeekday(from events: [BlankUsageEvent], sessions: [BlankSession]) -> Int? {
+        mostCommonValue(events.map(\.weekday) + sessions.compactMap(\.startWeekday))
     }
 
-    private func mostCommonModeName(from sessions: [BlankSession], events: [BlankUsageEvent]) -> String? {
+    private func mostCommonModeName(
+        from sessions: [BlankSession],
+        events: [BlankUsageEvent],
+        progress: BlankProgressReport
+    ) -> String? {
         let sessionNames = sessions.compactMap { $0.modeName }
         let eventNames = events.compactMap { $0.modeName }
-        return mostCommonValue(sessionNames + eventNames)
+        return mostCommonValue(sessionNames + eventNames) ?? progress.modeActivity.first?.name
     }
 
-    private func averageProtectedItems(from events: [BlankUsageEvent]) -> Int {
-        guard !events.isEmpty else { return 0 }
-        let total = events.reduce(0) { $0 + $1.selectionSnapshot.totalCount }
-        return total / events.count
+    private func averageSelectionProfile(from events: [BlankUsageEvent], sessions: [BlankSession]) -> SelectionProfile {
+        let snapshots = events.map(\.selectionSnapshot) + sessions.compactMap(\.selectionSnapshot)
+        let activeSnapshots = snapshots.filter { $0.totalCount > 0 }
+        guard !activeSnapshots.isEmpty else {
+            return SelectionProfile(applicationAverage: 1, categoryAverage: 1, webDomainAverage: 0)
+        }
+
+        let count = activeSnapshots.count
+        let appTotal = activeSnapshots.reduce(0) { $0 + $1.applicationCount }
+        let categoryTotal = activeSnapshots.reduce(0) { $0 + $1.categoryCount }
+        let webTotal = activeSnapshots.reduce(0) { $0 + $1.webDomainCount }
+        return SelectionProfile(
+            applicationAverage: appTotal / count,
+            categoryAverage: categoryTotal / count,
+            webDomainAverage: webTotal / count
+        )
+    }
+
+    private func appModeAdjustmentText(profile: SelectionProfile, modeName: String?) -> String {
+        let mode = modeName ?? "principal"
+        if profile.totalAverage < 3 {
+            return "Refuerza el modo \(mode) con mas apps o categorias."
+        }
+        if profile.applicationAverage == 0 {
+            return "Anade apps concretas si una categoria es demasiado amplia."
+        }
+        if profile.categoryAverage == 0 {
+            return "Agrupa apps parecidas en una categoria si repites ajustes."
+        }
+        return "Manten apps/modos una semana mas antes de cambiar."
+    }
+
+    private func hourRangeText(_ hour: Int) -> String {
+        "\(String(format: "%02d:00", hour))-\(String(format: "%02d:00", (hour + 1) % 24))"
+    }
+
+    private func activationTimeText(before hour: Int) -> String {
+        String(format: "%02d:50", (hour + 23) % 24)
     }
 
     private func mostCommonValue<T: Hashable>(_ values: [T]) -> T? {
@@ -908,8 +975,19 @@ struct ReportView: View {
 private struct WeeklyAIReport {
     let summary: String
     let patterns: [String]
+    let weakSpots: [String]
     let recommendations: [String]
     let goal: String
+}
+
+private struct SelectionProfile {
+    let applicationAverage: Int
+    let categoryAverage: Int
+    let webDomainAverage: Int
+
+    var totalAverage: Int {
+        applicationAverage + categoryAverage + webDomainAverage
+    }
 }
 
 private struct ReportLiquidBackground: View {

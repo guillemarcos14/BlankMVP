@@ -46,6 +46,14 @@ struct ReportView: View {
                             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
 
+                        dailyAISummaryCapsule(
+                            summary: dailyAISummary(
+                                events: sessionStore.usageEvents,
+                                sessions: sessionStore.sessions,
+                                progress: progress
+                            )
+                        )
+
                         weeklyAIReportCapsule(
                             report: weeklyAIReport(
                                 events: sessionStore.usageEvents,
@@ -208,6 +216,40 @@ struct ReportView: View {
         .frame(maxWidth: .infinity)
         .padding(18)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func dailyAISummaryCapsule(summary: DailyAISummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Resumen diario")
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
+                Text(summary.status)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                dailySummaryRow(title: "Hoy", value: summary.today)
+                dailySummaryRow(title: "Señal", value: summary.signal)
+                dailySummaryRow(title: "Siguiente", value: summary.nextAction)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func dailySummaryRow(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+            Text(value)
+                .font(.blankInter(size: 13, relativeTo: .footnote))
+                .foregroundStyle(reportPrimary.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func weeklyAIReportCapsule(report: WeeklyAIReport) -> some View {
@@ -808,6 +850,72 @@ struct ReportView: View {
         return formatter.string(from: date).capitalized(with: Locale(identifier: "es_ES"))
     }
 
+    private func dailyAISummary(
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        progress: BlankProgressReport
+    ) -> DailyAISummary {
+        let calendar = Calendar.current
+        let now = Date()
+        let dayStart = calendar.startOfDay(for: now)
+        let todayEvents = events.filter { $0.occurredAt >= dayStart && $0.occurredAt <= now }
+        let todaySessions = sessions.filter { session in
+            let sessionEnd = session.endedAt ?? now
+            return session.startedAt <= now && sessionEnd >= dayStart
+        }
+        let startedEvents = todayEvents.filter { $0.kind == .blockStarted }
+        let brokenEvents = todayEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }
+        let totalFocus = focusTime(sessions: todaySessions, from: dayStart, to: now)
+        let modeName = mostCommonModeName(from: todaySessions, events: startedEvents, progress: progress)
+
+        guard !todaySessions.isEmpty || !todayEvents.isEmpty else {
+            return DailyAISummary(
+                status: "Todavía no hay actividad hoy.",
+                today: "Hoy aún no has usado Blank.",
+                signal: "Sin señal diaria suficiente.",
+                nextAction: "Haz un bloque de 25 min con tu modo principal."
+            )
+        }
+
+        let status: String
+        if brokenEvents.isEmpty {
+            status = "Día estable, sin emergencias registradas."
+        } else {
+            status = "Hoy hubo \(brokenEvents.count) ruptura\(brokenEvents.count == 1 ? "" : "s")."
+        }
+
+        let today = "\(formatDuration(totalFocus)) protegidos en \(todaySessions.count) sesión\(todaySessions.count == 1 ? "" : "es")."
+
+        let signal: String
+        if let hour = mostCommonValue(brokenEvents.map(\.localHour)) {
+            signal = "La franja sensible de hoy fue \(hourRangeText(hour))."
+        } else if let hour = mostCommonHour(from: startedEvents, sessions: todaySessions) {
+            signal = "Hoy recurriste más a Blank sobre las \(String(format: "%02d:00", hour))."
+        } else if let modeName {
+            signal = "El modo activo de hoy fue \(modeName)."
+        } else {
+            signal = "Aún no hay patrón diario claro."
+        }
+
+        let nextAction: String
+        if let hour = mostCommonValue(brokenEvents.map(\.localHour)) {
+            nextAction = "Mañana activa Blank a las \(activationTimeText(before: hour))."
+        } else if totalFocus < 25 * 60 {
+            nextAction = "Completa un bloque corto más antes de cerrar el día."
+        } else if brokenEvents.isEmpty {
+            nextAction = "Repite mañana la misma franja y modo."
+        } else {
+            nextAction = "Reduce duración antes de repetir el bloqueo."
+        }
+
+        return DailyAISummary(
+            status: status,
+            today: today,
+            signal: signal,
+            nextAction: nextAction
+        )
+    }
+
     private func weeklyAIReport(
         events: [BlankUsageEvent],
         sessions: [BlankSession],
@@ -1085,6 +1193,13 @@ private struct WeeklyAIReport {
     let recommendations: [String]
     let goal: String
     let plan: [String]
+}
+
+private struct DailyAISummary {
+    let status: String
+    let today: String
+    let signal: String
+    let nextAction: String
 }
 
 private struct SelectionProfile {

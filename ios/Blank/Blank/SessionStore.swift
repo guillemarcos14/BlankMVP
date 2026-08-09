@@ -667,6 +667,77 @@ final class SessionStore: ObservableObject {
 
 #if DEBUG
 extension SessionStore {
+    func loadAIDemoData(now: Date = Date()) {
+        let calendar = Calendar.current
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let modeName = "Estudio"
+        let snapshot = BlankSelectionSnapshot(applicationCount: 3, categoryCount: 1, webDomainCount: 0)
+        let weakHour = calendar.component(.hour, from: now.addingTimeInterval(20 * 60))
+        let currentWeekday = calendar.component(.weekday, from: now)
+
+        if let studyMode = focusModes.first(where: { $0.name == modeName }) {
+            currentModeId = studyMode.id
+        } else {
+            let studyMode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection))
+            focusModes.append(studyMode)
+            currentModeId = studyMode.id
+        }
+
+        previewSelectionCount = snapshot.totalCount
+        isBlankActive = false
+        blankActiveSince = nil
+        blankActiveUntil = nil
+        deviceActivityTimerScheduled = false
+        schedulePausedUntil = nil
+        setupComplete = true
+
+        let demoSessions: [BlankSession] = [
+            demoSession(hoursAgo: 130, durationMinutes: 70, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 104, durationMinutes: 35, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 80, durationMinutes: 50, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 55, durationMinutes: 40, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 31, durationMinutes: 25, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 26, durationMinutes: 18, endedReason: .emergency, localHour: weakHour, weekday: currentWeekday, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 5, durationMinutes: 55, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 2, durationMinutes: 35, modeName: modeName, snapshot: snapshot, now: now),
+            demoSession(hoursAgo: 1, durationMinutes: 12, endedReason: .emergency, localHour: weakHour, weekday: currentWeekday, modeName: modeName, snapshot: snapshot, now: now)
+        ].filter { $0.startedAt >= weekStart && $0.startedAt <= now }
+
+        let sessionEvents = demoSessions.flatMap { session -> [BlankUsageEvent] in
+            let endDate = session.endedAt ?? session.startedAt
+            return [
+                BlankUsageEvent(
+                    kind: .blockStarted,
+                    sessionId: session.id,
+                    occurredAt: session.startedAt,
+                    entryMode: session.entryMode ?? .app,
+                    selectionSnapshot: snapshot,
+                    modeName: session.modeName,
+                    localHour: session.localStartHour,
+                    weekday: session.startWeekday,
+                    plannedDurationMinutes: session.plannedDurationMinutes
+                ),
+                BlankUsageEvent(
+                    kind: session.endedReason == .emergency ? .blockBroken : .blockEnded,
+                    sessionId: session.id,
+                    occurredAt: endDate,
+                    entryMode: session.entryMode ?? .app,
+                    endedReason: session.endedReason,
+                    duration: session.duration,
+                    selectionSnapshot: snapshot,
+                    modeName: session.modeName,
+                    localHour: session.localStartHour,
+                    weekday: session.startWeekday,
+                    plannedDurationMinutes: session.plannedDurationMinutes
+                )
+            ]
+        }
+
+        sessions = demoSessions
+        usageEvents = sessionEvents
+        emergencyUnlocksThisWeek = min(demoSessions.filter { $0.endedReason == .emergency }.count, Self.maxEmergencyUnlocksPerWeek)
+    }
+
     static func preview(
         isBlankActive: Bool = false,
         protectedSelectionCount: Int = 3,
@@ -690,6 +761,37 @@ extension SessionStore {
         store.deviceActivityTimerScheduled = timedUntil != nil
         store.setupComplete = true
         return store
+    }
+
+    private func demoSession(
+        hoursAgo: Int,
+        durationMinutes: Int,
+        endedReason: BlankEndedReason = .timer,
+        localHour: Int? = nil,
+        weekday: Int? = nil,
+        modeName: String,
+        snapshot: BlankSelectionSnapshot,
+        now: Date
+    ) -> BlankSession {
+        let calendar = Calendar.current
+        let startedAt = now.addingTimeInterval(TimeInterval(-hoursAgo * 60 * 60))
+        let endedAt = startedAt.addingTimeInterval(TimeInterval(durationMinutes * 60))
+        return BlankSession(
+            profileId: currentModeId,
+            strategy: .nfc,
+            startTag: nfcTagUid,
+            startedAt: startedAt,
+            endedAt: min(endedAt, now.addingTimeInterval(-60)),
+            forceStarted: false,
+            entryMode: .app,
+            endedReason: endedReason,
+            selectionSnapshot: snapshot,
+            modeName: modeName,
+            localStartHour: localHour ?? calendar.component(.hour, from: startedAt),
+            startWeekday: weekday ?? calendar.component(.weekday, from: startedAt),
+            plannedDurationMinutes: durationMinutes,
+            calendar: calendar
+        )
     }
 }
 #endif

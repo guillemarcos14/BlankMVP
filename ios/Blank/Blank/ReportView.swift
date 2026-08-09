@@ -65,6 +65,10 @@ struct ReportView: View {
                         emptyState()
                     }
 
+                    #if DEBUG
+                    aiDemoDataButton()
+                    #endif
+
                     Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
                         .font(.caption2)
                         .foregroundStyle(reportSecondary.opacity(0.62))
@@ -329,6 +333,34 @@ struct ReportView: View {
         }
         .padding(.top, 2)
     }
+
+    #if DEBUG
+    private func aiDemoDataButton() -> some View {
+        Button {
+            sessionStore.loadAIDemoData()
+            storedWeeklyGoal = ""
+            storedPlanFirst = ""
+            storedPlanSecond = ""
+            storedPlanThird = ""
+        } label: {
+            Text("Cargar datos demo AI")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background {
+                    Capsule()
+                        .fill(Color.white.opacity(0.20))
+                }
+                .overlay {
+                    Capsule()
+                        .stroke(reportPrimary.opacity(0.07), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Cargar datos demo AI")
+    }
+    #endif
 
     private func editableAIField(placeholder: String, text: Binding<String>) -> some View {
         TextField(placeholder, text: text, axis: .vertical)

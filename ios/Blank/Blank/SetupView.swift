@@ -49,7 +49,25 @@ struct SetupView: View {
             BlankOnboardingBackground()
 
             VStack(spacing: 0) {
-                Spacer(minLength: 18)
+                HStack {
+                    if currentStep != .awareness {
+                        Button {
+                            goBack()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.86))
+                                .frame(width: 42, height: 42)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back")
+                    } else {
+                        Color.clear.frame(width: 42, height: 42)
+                    }
+
+                    Spacer()
+                }
+                .padding(.top, 2)
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 22) {
@@ -84,10 +102,10 @@ struct SetupView: View {
                     .padding(.bottom, 8)
             }
             .padding(.horizontal, 24)
-            .padding(.vertical, 34)
+            .padding(.bottom, 34)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(BlankColors.ink)
+        .foregroundStyle(Color.white)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
             dailyHours = storedDailyHours
@@ -124,7 +142,7 @@ struct SetupView: View {
         case .lifetime:
             simpleStatement(
                 icon: "hourglass",
-                title: "The average person can lose",
+                title: "The average person loses",
                 body: "13 years",
                 bodyColor: BlankColors.red,
                 button: "Continue"
@@ -132,8 +150,8 @@ struct SetupView: View {
         case .dopamine:
             simpleStatement(
                 icon: "brain.head.profile",
-                title: "Short-form feeds are designed to keep your brain asking for more.",
-                body: "Your attention is being trained.",
+                title: "Apps are not neutral.",
+                body: "They are training your attention.",
                 bodyColor: BlankColors.red,
                 button: "Continue"
             )
@@ -180,7 +198,7 @@ struct SetupView: View {
 
             Image(systemName: icon)
                 .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(BlankColors.mutedInk)
+                .foregroundStyle(Color.white.opacity(0.66))
 
             Text(title)
                 .font(.blankInter(size: 25, weight: .semibold, relativeTo: .title))
@@ -212,7 +230,7 @@ struct SetupView: View {
         VStack(spacing: 20) {
             OnboardingHeader(
                 eyebrow: "Your result",
-                title: "Let's calculate what your phone is costing you.",
+                title: "Let's calculate how much life your phone is taking.",
                 body: "What should Blanked call you?"
             )
 
@@ -243,8 +261,8 @@ struct SetupView: View {
         VStack(spacing: 22) {
             OnboardingHeader(
                 eyebrow: "Daily use",
-                title: "How much time do you spend on your phone each day?",
-                body: "Move the slider to your usual average."
+                title: "How much time do you spend on your phone daily?",
+                body: "Use your real average. This only takes a few seconds."
             )
 
             VStack(spacing: 18) {
@@ -274,7 +292,7 @@ struct SetupView: View {
         VStack(spacing: 22) {
             OnboardingHeader(
                 eyebrow: "Your result",
-                title: "This is your projected lost time.",
+                title: "This is your lost time projection.",
                 body: ""
             )
 
@@ -286,7 +304,7 @@ struct SetupView: View {
                     .frame(height: 34)
                     .background(Capsule().fill(BlankColors.red))
 
-                Text("\(displayName), at this pace you could lose")
+                Text("\(displayName), if nothing changes, you could lose")
                     .font(.blankInter(size: 15, relativeTo: .subheadline))
                     .foregroundStyle(BlankColors.mutedInk)
                     .multilineTextAlignment(.center)
@@ -313,29 +331,42 @@ struct SetupView: View {
             .frame(maxWidth: 342)
             .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
 
-            Button("Take back control") {
+            Button("Continue") {
                 onboardingGoal = "Recover control from distracting apps"
                 weakMoment = "When scrolling takes over"
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Take back control"))
+            .frame(width: onboardingButtonWidth(for: "Continue"))
         }
     }
 
     private var accountStep: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             OnboardingHeader(
-                eyebrow: "Account",
-                title: "No account needed to start.",
-                body: "Your free trial runs through the App Store. You can add account sync later."
+                eyebrow: "Start",
+                title: "Create your Blanked account.",
+                body: "Keep your progress and trial tied to you. You can continue without sync for now."
             )
 
-            Button("Continue to trial") {
+            VStack(spacing: 10) {
+                SocialLoginButton(systemName: "apple.logo", title: "Continue with Apple") {
+                    goForward()
+                }
+
+                SocialLoginButton(systemName: "g.circle.fill", title: "Continue with Google") {
+                    goForward()
+                }
+            }
+            .frame(maxWidth: 342)
+
+            Button("Continue without account") {
                 goForward()
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Continue to trial"))
+            .font(.blankInter(size: 14, weight: .medium, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.72))
+            .buttonStyle(.plain)
+            .padding(.top, 4)
         }
     }
 
@@ -374,8 +405,8 @@ struct SetupView: View {
 
             OnboardingHeader(
                 eyebrow: "Notifications",
-                title: "Want Blanked to catch you before you scroll?",
-                body: "Allow reminders for weak moments, trial updates, and block prompts."
+                title: "Can we help you catch the moment before you scroll?",
+                body: "Blanked can remind you before weak hours, trial renewal, and block prompts."
             )
 
             StatusPill(text: "Notifications: \(notificationStatus)")
@@ -518,9 +549,9 @@ struct SetupView: View {
             body: screenTimeDescription,
             statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time ready" : nil,
             primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
-            secondaryTitle: "Back",
+            secondaryTitle: nil,
             primaryAction: authorizeScreenTime,
-            secondaryAction: { goBack() }
+            secondaryAction: nil
         )
     }
 
@@ -533,13 +564,11 @@ struct SetupView: View {
                 : "Pick the apps, categories, or websites that usually steal your time.",
             statusText: sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selected" : nil,
             primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
-            secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : "Back",
+            secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
             primaryAction: selectAppsOrContinue,
             secondaryAction: {
                 if sessionStore.hasSelectedApps {
                     showingPicker = true
-                } else {
-                    goBack()
                 }
             }
         )
@@ -793,7 +822,7 @@ private struct OnboardingHeader: View {
         VStack(spacing: 10) {
             Text(eyebrow.uppercased())
                 .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(BlankColors.mutedInk)
+                .foregroundStyle(Color.white.opacity(0.58))
 
             Text(title)
                 .font(.blankInter(size: 31, weight: .medium, relativeTo: .largeTitle))
@@ -806,7 +835,7 @@ private struct OnboardingHeader: View {
             if !bodyText.isEmpty {
                 Text(bodyText)
                     .font(.blankInter(size: 16, relativeTo: .body))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.68))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .frame(maxWidth: 342)
@@ -820,18 +849,43 @@ private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
             BlankAtmosphericBackground(dimmed: true)
-            Color.white.opacity(0.78).ignoresSafeArea()
+            Color.black.opacity(0.58).ignoresSafeArea()
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.18),
-                    BlankColors.airMist.opacity(0.20),
-                    Color.white.opacity(0.50)
+                    Color.white.opacity(0.05),
+                    BlankColors.airBlue.opacity(0.08),
+                    Color.black.opacity(0.32)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
         }
+    }
+}
+
+private struct SocialLoginButton: View {
+    let systemName: String
+    let title: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: systemName)
+                    .font(.system(size: 17, weight: .semibold))
+                Text(title)
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+            }
+            .foregroundStyle(BlankColors.ink)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(0.88))
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

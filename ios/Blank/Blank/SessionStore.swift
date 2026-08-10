@@ -356,7 +356,7 @@ final class SessionStore: ObservableObject {
 
     func createMode(named name: String) {
         let mode = BlankFocusMode(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Nuevo modo" : name,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New mode" : name,
             selectionData: Self.encodedSelection(selection)
         )
         focusModes.append(mode)

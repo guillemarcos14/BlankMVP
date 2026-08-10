@@ -198,7 +198,7 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
     ) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "Modo"
+            ? "Mode"
             : name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.selectionData = selectionData
         self.createdAt = createdAt
@@ -549,7 +549,7 @@ enum BlankProgressAggregator {
             let value = entry.value
             return BlankModeActivity(
                 modeId: modeId,
-                name: namesById[modeId] ?? "Modo",
+                name: namesById[modeId] ?? "Mode",
                 totalFocusTime: value.duration,
                 sessionCount: value.count
             )

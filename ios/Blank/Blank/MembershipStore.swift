@@ -53,24 +53,24 @@ final class MembershipStore: ObservableObject {
     var accessLabel: String {
         switch status {
         case .trialActive:
-            return "Prueba activa"
+            return "Trial active"
         case .active:
             return plan.displayName
         case .pastDue:
-            return "Pago pendiente"
+            return "Payment pending"
         case .cancelled:
-            return "Membresía cancelada"
+            return "Membership canceled"
         case .expired:
-            return "Membresía expirada"
+            return "Membership expired"
         case .locked:
-            return "Membresía requerida"
+            return "Membership required"
         }
     }
 
     func redeem(code rawCode: String) async {
         let code = rawCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
         guard code.count >= 6 else {
-            message = "Introduce un código válido."
+            message = "Enter a valid code."
             return
         }
 
@@ -236,13 +236,13 @@ enum MembershipPlan: String, Codable {
         case .trial:
             return "Plan de prueba"
         case .monthly:
-            return "Membresía mensual"
+            return "Monthly membership"
         case .annual:
-            return "Membresía anual"
+            return "Annual membership"
         case .family:
-            return "Membresía familiar"
+            return "Family membership"
         case .unknown:
-            return "Membresía Blank"
+            return "Blank membership"
         }
     }
 }
@@ -464,11 +464,11 @@ enum MembershipClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingEndpoint:
-            return "No se ha configurado el servidor de membresía."
+            return "The membership server is not configured."
         case .invalidResponse:
-            return "No hemos podido validar la membresía."
+            return "We could not validate the membership."
         case .rejectedCode:
-            return "Este código no es válido o ya no está activo."
+            return "This code is invalid or no longer active."
         }
     }
 }

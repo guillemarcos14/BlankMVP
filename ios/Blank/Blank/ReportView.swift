@@ -9,9 +9,8 @@ struct ReportView: View {
     @AppStorage("blankWeeklyAIPlanSecond", store: BlankSharedState.defaults) private var storedPlanSecond = ""
     @AppStorage("blankWeeklyAIPlanThird", store: BlankSharedState.defaults) private var storedPlanThird = ""
 
-    private let reportBackground = BlankColors.background
-    private let reportPrimary = BlankColors.ink
-    private let reportSecondary = BlankColors.mutedInk
+    private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
@@ -88,14 +87,15 @@ struct ReportView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(ReportLiquidBackground().ignoresSafeArea())
+        .background(ReportLiquidBackground(isActive: sessionStore.isBlankActive).ignoresSafeArea())
         .foregroundStyle(reportPrimary)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
     private func reportHeader() -> some View {
         TopSheetHeader(
             title: "Stats",
-            subtitle: "Mide el tiempo que Blank te devuelve\ny resume tu ritmo de protección.",
+            subtitle: "Measure the time Blank gives back\nand summarize your protection rhythm.",
             titleColor: reportPrimary,
             subtitleColor: reportSecondary
         )
@@ -109,7 +109,7 @@ struct ReportView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
-                Text("Tiempo Recuperado")
+                Text("Time Recovered")
                     .font(.body)
                     .foregroundStyle(reportSecondary)
             }
@@ -176,7 +176,7 @@ struct ReportView: View {
         let summaries = Array(progressPeriodSummaries(sessions: sessions).prefix(3))
 
         return VStack(alignment: .center, spacing: 14) {
-            Text("Tiempo Blankeado")
+            Text("Time Blanked")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
@@ -192,7 +192,7 @@ struct ReportView: View {
 
     private func graphCapsule(activityDays: [BlankActivityDay]) -> some View {
         VStack(alignment: .center, spacing: 14) {
-            Text("Tendencia semanal")
+            Text("Weekly Trend")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             chartPanel(values: savedSeries(from: Array(activityDays.suffix(7))))
@@ -208,13 +208,13 @@ struct ReportView: View {
         emergencyUnlocksRemaining: Int
     ) -> some View {
         VStack(alignment: .center, spacing: 14) {
-            Text("Comportamiento")
+            Text("Behavior")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             VStack(spacing: 10) {
-                statCapsule(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly), minHeight: 86)
-                statCapsule(title: "Modo más usado", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress), minHeight: 86)
-                statCapsule(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining), minHeight: 86)
+                statCapsule(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly), minHeight: 86)
+                statCapsule(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress), minHeight: 86)
+                statCapsule(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining), minHeight: 86)
             }
         }
         .frame(maxWidth: .infinity)
@@ -225,7 +225,7 @@ struct ReportView: View {
     private func dailyAISummaryCapsule(summary: DailyAISummary) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Resumen diario")
+                Text("Daily Summary")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(summary.status)
                     .font(.caption)
@@ -234,9 +234,9 @@ struct ReportView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                dailySummaryRow(title: "Hoy", value: summary.today)
-                dailySummaryRow(title: "Señal", value: summary.signal)
-                dailySummaryRow(title: "Siguiente", value: summary.nextAction)
+                dailySummaryRow(title: "Today", value: summary.today)
+                dailySummaryRow(title: "Signal", value: summary.signal)
+                dailySummaryRow(title: "Next", value: summary.nextAction)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -259,7 +259,7 @@ struct ReportView: View {
     private func weeklyAIReportCapsule(report: WeeklyAIReport) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Informe semanal AI")
+                Text("Weekly AI Report")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(report.summary)
                     .font(.caption)
@@ -267,12 +267,12 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            aiReportSection(title: "Patrones", items: report.patterns)
-            aiReportSection(title: "Apps y franjas", items: report.weakSpots)
-            aiReportSection(title: "Recomendaciones", items: report.recommendations)
+            aiReportSection(title: "Patterns", items: report.patterns)
+            aiReportSection(title: "Apps and Windows", items: report.weakSpots)
+            aiReportSection(title: "Recommendations", items: report.recommendations)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Objetivo")
+                Text("Goal")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
                 editableAIField(
@@ -299,28 +299,28 @@ struct ReportView: View {
                 .foregroundStyle(reportSecondary)
 
             editableAIField(
-                placeholder: report.plan[safe: 0] ?? "Bloque corto en tu franja débil.",
+                placeholder: report.plan[safe: 0] ?? "Short block in your weak window.",
                 text: Binding(
                     get: { storedPlanFirst.isEmpty ? (report.plan[safe: 0] ?? "") : storedPlanFirst },
                     set: { storedPlanFirst = $0 }
                 )
             )
             editableAIField(
-                placeholder: report.plan[safe: 1] ?? "Repite el modo principal sin cambios.",
+                placeholder: report.plan[safe: 1] ?? "Repeat the main mode unchanged.",
                 text: Binding(
                     get: { storedPlanSecond.isEmpty ? (report.plan[safe: 1] ?? "") : storedPlanSecond },
                     set: { storedPlanSecond = $0 }
                 )
             )
             editableAIField(
-                placeholder: report.plan[safe: 2] ?? "Revisa el resultado al final de la semana.",
+                placeholder: report.plan[safe: 2] ?? "Review the result at the end of the week.",
                 text: Binding(
                     get: { storedPlanThird.isEmpty ? (report.plan[safe: 2] ?? "") : storedPlanThird },
                     set: { storedPlanThird = $0 }
                 )
             )
 
-            Button("Restablecer propuesta") {
+            Button("Reset proposal") {
                 storedWeeklyGoal = ""
                 storedPlanFirst = ""
                 storedPlanSecond = ""
@@ -343,7 +343,7 @@ struct ReportView: View {
             storedPlanSecond = ""
             storedPlanThird = ""
         } label: {
-            Text("Cargar datos demo AI")
+            Text("Load AI demo data")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
                 .frame(maxWidth: .infinity)
@@ -358,7 +358,7 @@ struct ReportView: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Cargar datos demo AI")
+        .accessibilityLabel("Load AI demo data")
     }
     #endif
 
@@ -405,7 +405,7 @@ struct ReportView: View {
 
     private func nextStepCard(progress: BlankProgressReport) -> some View {
         VStack(alignment: .center, spacing: 8) {
-            Text("Siguiente mejora")
+            Text("Next improvement")
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
 
             Text(nextStepText(progress: progress))
@@ -429,13 +429,13 @@ struct ReportView: View {
     ) -> some View {
         DisclosureGroup {
             VStack(spacing: 0) {
-                metricRow(title: "Tiempo blankeado", value: formatDuration(totalFocusTime), caption: "Total protegido")
+                metricRow(title: "Time blanked", value: formatDuration(totalFocusTime), caption: "Total protected")
                 subtleDivider()
-                metricRow(title: "Sesiones totales", value: "\(totalSessionCount)", caption: "Desde el inicio")
+                metricRow(title: "Total sessions", value: "\(totalSessionCount)", caption: "Since the beginning")
                 subtleDivider()
-                metricRow(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
                 subtleDivider()
-                metricRow(title: "Rescates usados", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                metricRow(title: "Rescues used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
 
                 if !progress.modeActivity.isEmpty {
                     subtleDivider()
@@ -449,7 +449,7 @@ struct ReportView: View {
             }
             .padding(.top, 8)
         } label: {
-            Text("Ver detalle")
+            Text("View details")
                 .font(.body.weight(.medium))
         }
         .padding(.horizontal, 18)
@@ -464,19 +464,19 @@ struct ReportView: View {
     ) -> some View {
         VStack(spacing: 0) {
             metricRow(
-                title: "Momento de riesgo",
+                title: "Risk moment",
                 value: riskMomentValue(activityDays: progress.recentActivity),
                 caption: riskMomentCaption(activityDays: progress.recentActivity)
             )
             subtleDivider()
             metricRow(
-                title: "Calidad de protección",
+                title: "Protection quality",
                 value: "\(protectionQualityScore(weekly: weekly, progress: progress, emergencyUnlocksRemaining: emergencyUnlocksRemaining))/100",
                 caption: protectionQualityCaption(weekly: weekly, emergencyUnlocksRemaining: emergencyUnlocksRemaining)
             )
             subtleDivider()
             metricRow(
-                title: "Control recuperado",
+                title: "Recovered control",
                 value: controlRecoveryValue(weekly: weekly, emergencyUnlocksRemaining: emergencyUnlocksRemaining),
                 caption: controlRecoveryCaption(weekly: weekly, emergencyUnlocksRemaining: emergencyUnlocksRemaining)
             )
@@ -518,15 +518,15 @@ struct ReportView: View {
         emergencyUnlocksRemaining: Int
     ) -> some View {
         VStack(spacing: 0) {
-            metricRow(title: "Sesiones", value: "\(weekly.completedSessionCount)", caption: "Protegidas esta semana")
+            metricRow(title: "Sessions", value: "\(weekly.completedSessionCount)", caption: "Protected this week")
             subtleDivider()
-            metricRow(title: "Media protegida", value: formatDuration(weekly.averageSessionDuration), caption: "Por sesión real")
+            metricRow(title: "Average protected", value: formatDuration(weekly.averageSessionDuration), caption: "Per real session")
             subtleDivider()
-            metricRow(title: "Racha", value: "\(progress.currentStreakDays)d", caption: "Días con Blank")
+            metricRow(title: "Streak", value: "\(progress.currentStreakDays)d", caption: "Days with Blank")
             subtleDivider()
-            metricRow(title: "Mejor día", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+            metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
             subtleDivider()
-            metricRow(title: "Emergencias", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+            metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 4)
@@ -556,7 +556,7 @@ struct ReportView: View {
 
     private func modesSection(_ activities: [BlankModeActivity]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Modos esta semana")
+            Text("Modes this week")
                 .font(.headline)
 
             VStack(spacing: 0) {
@@ -581,7 +581,7 @@ struct ReportView: View {
                     .font(.body.weight(.medium))
                     .lineLimit(1)
 
-                Text("\(activity.sessionCount) sesiones")
+                Text("\(activity.sessionCount) sessions")
                     .font(.blankInter(size: 12, relativeTo: .caption))
                     .foregroundStyle(reportSecondary)
             }
@@ -602,10 +602,10 @@ struct ReportView: View {
 
     private func emptyState() -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tu tiempo recuperado aparecerá aquí.")
+            Text("Your recovered time will appear here.")
                 .font(.headline.weight(.semibold))
 
-            Text("Activa Blank y vuelve cuando tengas tu primera sesión protegida.")
+            Text("Start Blank and come back after your first protected session.")
                 .font(.body)
                 .foregroundStyle(reportSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -617,54 +617,54 @@ struct ReportView: View {
 
     private func insightText(totalSessionCount: Int, savedTime: TimeInterval, progress: BlankProgressReport) -> String {
         if totalSessionCount == 0 {
-            return "Blank ya está midiendo esta sesión. Las señales se vuelven más útiles al terminarla."
+            return "Blank is already measuring this session. Signals become more useful when it ends."
         }
 
         if savedTime >= 8 * 60 * 60 {
-            return "Has recuperado casi medio día para ti."
+            return "You have recovered almost half a day for yourself."
         }
 
         if savedTime >= 4 * 60 * 60 {
-            return "Has recuperado varias horas que antes se iban solas."
+            return "You have recovered several hours that used to disappear."
         }
 
         if savedTime >= 60 * 60 {
-            return "Has recuperado más de una hora sin convertirla en otra pantalla."
+            return "You have recovered more than an hour without turning it into another screen."
         }
 
         if progress.currentStreakDays >= 3 {
-            return "Blank te ha protegido \(progress.currentStreakDays) días seguidos."
+            return "Blank has protected you for \(progress.currentStreakDays) days in a row."
         }
 
         if totalSessionCount >= 5 {
-            return "Ya hay \(totalSessionCount) momentos en los que no volviste al bucle."
+            return "There are already \(totalSessionCount) moments where you did not go back to the loop."
         }
 
-        return "Has recuperado tiempo real sin convertirlo en otra pantalla más."
+        return "You have recovered real time without turning it into another screen."
     }
 
     private func nextStepText(progress: BlankProgressReport) -> String {
         guard let riskyDay = riskiestDay(activityDays: progress.recentActivity) else {
-            return "Completa unas sesiones más y Blank detectará qué momento conviene reforzar."
+            return "Complete a few more sessions and Blank will detect which moment to reinforce."
         }
 
-        let dayName = weekdayName(for: riskyDay.date).lowercased(with: Locale(identifier: "es_ES"))
+        let dayName = weekdayName(for: riskyDay.date).lowercased(with: Locale(identifier: "en_US"))
         if riskyDay.sessionCount > 1 {
-            return "Tu momento de riesgo suele ser el \(dayName). Programa Blank antes de esa franja."
+            return "Your risk moment is usually \(dayName). Start Blank before that window."
         }
 
-        return "El \(dayName) fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
+        return "\(dayName) was your most sensitive point. Reinforce that window before the impulse appears."
     }
 
     private func mostUsedModeName(progress: BlankProgressReport) -> String {
-        progress.modeActivity.first?.name ?? "Sin datos"
+        progress.modeActivity.first?.name ?? "No data"
     }
 
     private func mostUsedModeCaption(progress: BlankProgressReport) -> String {
         guard let mode = progress.modeActivity.first else {
-            return "Esta semana"
+            return "This week"
         }
-        return "\(formatDuration(mode.totalFocusTime)) · \(mode.sessionCount) sesiones"
+        return "\(formatDuration(mode.totalFocusTime)) · \(mode.sessionCount) sessions"
     }
 
     private func statCapsule(title: String, value: String, caption: String, minHeight: CGFloat = 104) -> some View {
@@ -704,24 +704,24 @@ struct ReportView: View {
     }
 
     private func savedTimeExplanation(totalFocusTime: TimeInterval, sessionCount: Int) -> String {
-        "Tiempo ahorrado: \(formatDuration(cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: sessionCount))) estimados con 7 min por sesión y un 10% del tiempo protegido, limitado al tiempo real en Blank."
+        "Time saved: \(formatDuration(cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: sessionCount))) estimated with 7 min per session and 10% of protected time, capped at real time in Blank."
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {
         guard let day = riskiestDay(activityDays: activityDays) else {
-            return "Sin patrón"
+            return "No pattern"
         }
         return weekdayName(for: day.date)
     }
 
     private func riskMomentCaption(activityDays: [BlankActivityDay]) -> String {
         guard let day = riskiestDay(activityDays: activityDays) else {
-            return "Con más datos aparecerá tu franja vulnerable"
+            return "Your vulnerable window will appear with more data"
         }
         if day.sessionCount > 1 {
-            return "\(day.sessionCount) sesiones: día donde más recurres a Blank"
+            return "\(day.sessionCount) sessions: day where you use Blank most"
         }
-        return "Día donde más tiempo pediste protección"
+        return "Day where you asked for the most protection"
     }
 
     private func riskiestDay(activityDays: [BlankActivityDay]) -> BlankActivityDay? {
@@ -759,38 +759,38 @@ struct ReportView: View {
 
     private func protectionQualityCaption(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
         guard weekly.completedSessionCount > 0 else {
-            return "Completa una sesión para medirlo"
+            return "Complete one session to measure it"
         }
         let usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if usedEmergencies == 0 {
-            return "Sesiones limpias, sin rescates esta semana"
+            return "Clean sessions, no rescues this week"
         }
         if usedEmergencies < 3 {
-            return "Mejorará al reducir emergencias"
+            return "It will improve as emergency unlocks decrease"
         }
-        return "Semana frágil: ya usaste todas las emergencias"
+        return "Fragile week: you used all emergency unlocks"
     }
 
     private func controlRecoveryValue(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
         let usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if weekly.completedSessionCount > 0 && usedEmergencies == 0 {
-            return "Estable"
+            return "Stable"
         }
         if usedEmergencies < 3 {
-            return "\(3 - usedEmergencies) reservas"
+            return "\(3 - usedEmergencies) reserves"
         }
-        return "Límite"
+        return "Limit"
     }
 
     private func controlRecoveryCaption(weekly: BlankWeeklyReport, emergencyUnlocksRemaining: Int) -> String {
         let usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if weekly.completedSessionCount > 0 && usedEmergencies == 0 {
-            return "Todavía no necesitaste rescates esta semana"
+            return "You have not needed rescues this week"
         }
         if usedEmergencies < 3 {
-            return "Emergencias restantes esta semana"
+            return "Emergency unlocks left this week"
         }
-        return "Toca volver a depender del NFC"
+        return "Use emergency unlock only when it matters"
     }
 
     private func usedEmergencyUnlocks(_ emergencyUnlocksRemaining: Int) -> Int {
@@ -800,33 +800,33 @@ struct ReportView: View {
     private func emergencyCaption(_ emergencyUnlocksRemaining: Int) -> String {
         let used = usedEmergencyUnlocks(emergencyUnlocksRemaining)
         if used == 0 {
-            return "Sin rescates esta semana"
+            return "No rescues this week"
         }
         if emergencyUnlocksRemaining > 0 {
-            return "\(emergencyUnlocksRemaining) disponibles todavía"
+            return "\(emergencyUnlocksRemaining) still available"
         }
-        return "Límite semanal alcanzado"
+        return "Weekly limit reached"
     }
 
     private func bestDayCaption(report: BlankWeeklyReport) -> String {
         guard let bestIndex = report.dailyDurations.indices.max(by: {
             report.dailyDurations[$0] < report.dailyDurations[$1]
         }), report.dailyDurations[bestIndex] > 0 else {
-            return "Esta semana"
+            return "This week"
         }
         let duration = formatDuration(report.dailyDurations[bestIndex])
         let sessions = report.dailySessionCounts[bestIndex]
-        return "\(duration) · \(sessions) sesiones"
+        return "\(duration) · \(sessions) sessions"
     }
 
     private func progressPeriodSummaries(sessions: [BlankSession]) -> [ProgressPeriodSummary] {
         let calendar = Calendar.current
         let now = Date()
         let periods: [(String, Date)] = [
-            ("Hoy", calendar.startOfDay(for: now)),
-            ("Semana", BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)),
-            ("Mes", calendar.dateInterval(of: .month, for: now)?.start ?? calendar.startOfDay(for: now)),
-            ("Año", calendar.dateInterval(of: .year, for: now)?.start ?? calendar.startOfDay(for: now))
+            ("Today", calendar.startOfDay(for: now)),
+            ("Week", BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)),
+            ("Month", calendar.dateInterval(of: .month, for: now)?.start ?? calendar.startOfDay(for: now)),
+            ("Year", calendar.dateInterval(of: .year, for: now)?.start ?? calendar.startOfDay(for: now))
         ]
 
         return periods.map { title, start in
@@ -835,7 +835,7 @@ struct ReportView: View {
             return ProgressPeriodSummary(
                 title: title,
                 value: formatCompactDuration(duration),
-                caption: count == 1 ? "1 sesión" : "\(count) sesiones"
+                caption: count == 1 ? "1 session" : "\(count) sessions"
             )
         }
     }
@@ -861,25 +861,25 @@ struct ReportView: View {
         guard let bestIndex = report.dailyDurations.indices.max(by: {
             report.dailyDurations[$0] < report.dailyDurations[$1]
         }), report.dailyDurations[bestIndex] > 0 else {
-            return "Sin datos"
+            return "No data"
         }
 
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         let symbols = formatter.weekdaySymbols ?? []
         guard !symbols.isEmpty else {
-            return "Sin datos"
+            return "No data"
         }
         let calendarStartIndex = Calendar.current.firstWeekday - 1
         let symbolIndex = (calendarStartIndex + bestIndex) % symbols.count
-        return symbols[symbolIndex].capitalized(with: Locale(identifier: "es_ES"))
+        return symbols[symbolIndex].capitalized(with: Locale(identifier: "en_US"))
     }
 
     private func weekdayName(for date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "EEEE"
-        return formatter.string(from: date).capitalized(with: Locale(identifier: "es_ES"))
+        return formatter.string(from: date).capitalized(with: Locale(identifier: "en_US"))
     }
 
     private func dailyAISummary(
@@ -902,42 +902,42 @@ struct ReportView: View {
 
         guard !todaySessions.isEmpty || !todayEvents.isEmpty else {
             return DailyAISummary(
-                status: "Todavía no hay actividad hoy.",
-                today: "Hoy aún no has usado Blank.",
-                signal: "Sin señal diaria suficiente.",
-                nextAction: "Haz un bloque de 25 min con tu modo principal."
+                status: "No activity yet today.",
+                today: "You have not used Blank today yet.",
+                signal: "Not enough daily signal.",
+                nextAction: "Do a 25 min block with your main mode."
             )
         }
 
         let status: String
         if brokenEvents.isEmpty {
-            status = "Día estable, sin emergencias registradas."
+            status = "Stable day, no emergencies recorded."
         } else {
-            status = "Hoy hubo \(brokenEvents.count) ruptura\(brokenEvents.count == 1 ? "" : "s")."
+            status = "Today had \(brokenEvents.count) break\(brokenEvents.count == 1 ? "" : "s")."
         }
 
-        let today = "\(formatDuration(totalFocus)) protegidos en \(todaySessions.count) sesión\(todaySessions.count == 1 ? "" : "es")."
+        let today = "\(formatDuration(totalFocus)) protected across \(todaySessions.count) session\(todaySessions.count == 1 ? "" : "s")."
 
         let signal: String
         if let hour = mostCommonValue(brokenEvents.map(\.localHour)) {
-            signal = "La franja sensible de hoy fue \(hourRangeText(hour))."
+            signal = "Today sensitive window was \(hourRangeText(hour))."
         } else if let hour = mostCommonHour(from: startedEvents, sessions: todaySessions) {
-            signal = "Hoy recurriste más a Blank sobre las \(String(format: "%02d:00", hour))."
+            signal = "Today you used Blank most around \(String(format: "%02d:00", hour))."
         } else if let modeName {
-            signal = "El modo activo de hoy fue \(modeName)."
+            signal = "Today's active mode was \(modeName)."
         } else {
-            signal = "Aún no hay patrón diario claro."
+            signal = "No clear daily pattern yet."
         }
 
         let nextAction: String
         if let hour = mostCommonValue(brokenEvents.map(\.localHour)) {
-            nextAction = "Mañana activa Blank a las \(activationTimeText(before: hour))."
+            nextAction = "Tomorrow, start Blank at \(activationTimeText(before: hour))."
         } else if totalFocus < 25 * 60 {
-            nextAction = "Completa un bloque corto más antes de cerrar el día."
+            nextAction = "Complete one more short block before the day ends."
         } else if brokenEvents.isEmpty {
-            nextAction = "Repite mañana la misma franja y modo."
+            nextAction = "Repeat the same window and mode tomorrow."
         } else {
-            nextAction = "Reduce duración antes de repetir el bloqueo."
+            nextAction = "Reduce duration before repeating the block."
         }
 
         return DailyAISummary(
@@ -964,27 +964,27 @@ struct ReportView: View {
 
         guard !weeklySessions.isEmpty || !weeklyEvents.isEmpty else {
             return WeeklyAIReport(
-                summary: "Aún no hay datos suficientes esta semana.",
+                summary: "Not enough data this week yet.",
                 patterns: [
-                    "Blank necesita unas sesiones para detectar patrones reales.",
-                    "El informe mejora cuando usas varios modos o franjas.",
-                    "Las emergencias ayudarán a detectar momentos frágiles."
+                    "Blank needs a few sessions to detect real patterns.",
+                    "The report improves when you use several modes or windows.",
+                    "Emergency unlocks help detect fragile moments."
                 ],
                 weakSpots: [
-                    "Aún falta una franja débil clara.",
-                    "Sin rupturas concentradas esta semana.",
-                    "Empieza con 3 apps o categorías clave."
+                    "No clear weak window yet.",
+                    "No concentrated breaks this week.",
+                    "Start with 3 key apps or categories."
                 ],
                 recommendations: [
-                    "Haz una sesión de al menos 25 minutos hoy.",
-                    "Usa el modo Estudio antes del primer bloque fuerte.",
-                    "Evita usar emergencia salvo que sea imprescindible."
+                    "Do a session of at least 25 minutes today.",
+                    "Use Study mode before the first strong block.",
+                    "Avoid Emergency unless it is essential."
                 ],
-                goal: "Completa 3 sesiones esta semana para generar un informe útil.",
+                goal: "Complete 3 sessions this week to generate a useful report.",
                 plan: [
-                    "Hoy: 25 min con tu modo principal.",
-                    "Mañana: repite la misma franja.",
-                    "Viernes: revisa si hubo emergencias."
+                    "Today: 25 min with your main mode.",
+                    "Tomorrow: repeat the same window.",
+                    "Friday: review whether there were emergencies."
                 ]
             )
         }
@@ -1001,66 +1001,66 @@ struct ReportView: View {
         let selectionProfile = averageSelectionProfile(from: startedEvents, sessions: weeklySessions)
 
         var patterns: [String] = []
-        patterns.append("\(formatDuration(totalFocus)) protegidos en \(weeklySessions.count) sesiones.")
+        patterns.append("\(formatDuration(totalFocus)) protected across \(weeklySessions.count) sessions.")
         if let bestHour {
-            patterns.append("Tu franja más repetida empieza sobre las \(String(format: "%02d:00", bestHour)).")
+            patterns.append("Your most repeated window starts around \(String(format: "%02d:00", bestHour)).")
         } else if let bestWeekday {
-            patterns.append("El día con más uso fue \(weekdayDisplayName(bestWeekday)).")
+            patterns.append("The highest-use day was \(weekdayDisplayName(bestWeekday)).")
         } else {
-            patterns.append("Aún no hay una franja clara.")
+            patterns.append("There is no clear window yet.")
         }
         if let modeName {
-            patterns.append("El modo más usado es \(modeName).")
+            patterns.append("The most used mode is \(modeName).")
         } else {
-            patterns.append("Aún no hay un modo claro.")
+            patterns.append("There is no clear mode yet.")
         }
         if brokenEvents.count > 0 {
-            patterns[2] = "Has roto \(brokenEvents.count) bloqueo\(brokenEvents.count == 1 ? "" : "s") esta semana."
+            patterns[2] = "You broke \(brokenEvents.count) block\(brokenEvents.count == 1 ? "" : "s") this week."
         }
 
         var weakSpots: [String] = []
         if let weakHour {
-            weakSpots.append("Franja débil: \(hourRangeText(weakHour)).")
+            weakSpots.append("Weak window: \(hourRangeText(weakHour)).")
         } else if let bestHour {
-            weakSpots.append("Franja a reforzar: \(hourRangeText(bestHour)).")
+            weakSpots.append("Window to reinforce: \(hourRangeText(bestHour)).")
         } else {
-            weakSpots.append("Aún falta una franja débil clara.")
+            weakSpots.append("No clear weak window yet.")
         }
         if let weakWeekday, brokenEvents.count > 0 {
-            weakSpots.append("Rupturas concentradas en \(weekdayDisplayName(weakWeekday)).")
+            weakSpots.append("Breaks concentrated on \(weekdayDisplayName(weakWeekday)).")
         } else if brokenEvents.count > 0 {
-            weakSpots.append("Rupturas detectadas, sin día dominante.")
+            weakSpots.append("Breaks detected, with no dominant day.")
         } else {
-            weakSpots.append("Sin rupturas concentradas esta semana.")
+            weakSpots.append("No concentrated breaks this week.")
         }
         weakSpots.append(appModeAdjustmentText(profile: selectionProfile, modeName: modeName))
 
         var recommendations: [String] = []
         if let weakHour {
-            recommendations.append("Activa Blank a las \(activationTimeText(before: weakHour)).")
+            recommendations.append("Start Blank at \(activationTimeText(before: weakHour)).")
         } else if let bestHour {
-            recommendations.append("Activa Blank 10 min antes de las \(String(format: "%02d:00", bestHour)).")
+            recommendations.append("Start Blank 10 min before \(String(format: "%02d:00", bestHour)).")
         } else {
-            recommendations.append("Elige una franja fija para medir mejor.")
+            recommendations.append("Choose a fixed window to measure better.")
         }
         if brokenEvents.count > 0 {
-            recommendations.append("Reduce el siguiente bloqueo si aparece emergencia.")
+            recommendations.append("Reduce the next block if Emergency appears.")
         } else {
-            recommendations.append("Mantén el mismo modo si esta semana no necesitaste emergencia.")
+            recommendations.append("Keep the same mode if you did not need Emergency this week.")
         }
         if selectionProfile.totalAverage < 3 {
-            recommendations.append("Añade al menos 3 apps o categorías al modo principal.")
+            recommendations.append("Add at least 3 apps or categories to the main mode.")
         } else {
-            recommendations.append("No cambies demasiadas apps a la vez.")
+            recommendations.append("Do not change too many apps at once.")
         }
 
         let goal: String
         if brokenEvents.count > 0 {
-            goal = "3 bloqueos sin emergencia en tu franja más débil."
+            goal = "3 blocks without Emergency in your weakest window."
         } else if weeklySessions.count < 5 {
-            goal = "Llegar a 5 sesiones protegidas."
+            goal = "Reach 5 protected sessions."
         } else {
-            goal = "Subir un 15% el tiempo protegido sin emergencia."
+            goal = "Increase protected time by 15% without Emergency."
         }
 
         let plan = weeklyPlan(
@@ -1071,7 +1071,7 @@ struct ReportView: View {
         )
 
         return WeeklyAIReport(
-            summary: "Generado con tus sesiones reales de esta semana.",
+            summary: "Generated from your real sessions this week.",
             patterns: Array(patterns.prefix(3)),
             weakSpots: Array(weakSpots.prefix(3)),
             recommendations: Array(recommendations.prefix(3)),
@@ -1086,19 +1086,19 @@ struct ReportView: View {
         modeName: String?,
         brokenCount: Int
     ) -> [String] {
-        let mode = modeName ?? "principal"
+        let mode = modeName ?? "main"
         let targetHour = weakHour ?? bestHour
         let firstBlock: String
         if let targetHour {
-            firstBlock = "3 días: activa Blank a las \(activationTimeText(before: targetHour))."
+            firstBlock = "3 days: start Blank at \(activationTimeText(before: targetHour))."
         } else {
-            firstBlock = "3 días: bloque de 25 min a la misma hora."
+            firstBlock = "3 days: 25 min block at the same time."
         }
 
-        let secondBlock = "Modo \(mode): mantén las mismas apps."
+        let secondBlock = "Mode \(mode): keep the same apps."
         let thirdBlock = brokenCount > 0
-            ? "Si aparece emergencia, baja duración antes de repetir."
-            : "Domingo: revisa si puedes subir un bloque."
+            ? "If Emergency appears, reduce duration before repeating."
+            : "Sunday: review whether you can increase one block."
 
         return [firstBlock, secondBlock, thirdBlock]
     }
@@ -1140,17 +1140,17 @@ struct ReportView: View {
     }
 
     private func appModeAdjustmentText(profile: SelectionProfile, modeName: String?) -> String {
-        let mode = modeName ?? "principal"
+        let mode = modeName ?? "main"
         if profile.totalAverage < 3 {
-            return "Refuerza el modo \(mode) con más apps o categorías."
+            return "Reinforce mode \(mode) with more apps or categories."
         }
         if profile.applicationAverage == 0 {
-            return "Añade apps concretas si una categoría es demasiado amplia."
+            return "Add specific apps if a category is too broad."
         }
         if profile.categoryAverage == 0 {
-        return "Agrupa apps parecidas en una categoría si repites ajustes."
+        return "Group similar apps in a category if you repeat adjustments."
         }
-        return "Mantén apps/modos una semana más antes de cambiar."
+        return "Keep apps/modes one more week before changing."
     }
 
     private func hourRangeText(_ hour: Int) -> String {
@@ -1170,10 +1170,10 @@ struct ReportView: View {
 
     private func weekdayDisplayName(_ weekday: Int) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_ES")
+        formatter.locale = Locale(identifier: "en_US")
         let symbols = formatter.weekdaySymbols ?? []
-        guard symbols.indices.contains(weekday - 1) else { return "esta semana" }
-        return symbols[weekday - 1].capitalized(with: Locale(identifier: "es_ES"))
+        guard symbols.indices.contains(weekday - 1) else { return "this week" }
+        return symbols[weekday - 1].capitalized(with: Locale(identifier: "en_US"))
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -1245,15 +1245,17 @@ private struct SelectionProfile {
 }
 
 private struct ReportLiquidBackground: View {
+    let isActive: Bool
+
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground()
+            BlankAtmosphericBackground(dimmed: isActive)
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.22),
-                    BlankColors.background.opacity(0.28),
-                    Color.white.opacity(0.14)
+                    Color.white.opacity(isActive ? 0.04 : 0.22),
+                    (isActive ? BlankColors.ink : BlankColors.background).opacity(isActive ? 0.22 : 0.28),
+                    Color.white.opacity(isActive ? 0.03 : 0.14)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing

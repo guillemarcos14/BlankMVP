@@ -14,7 +14,7 @@ struct MembershipActivationView: View {
                 Spacer(minLength: 96)
 
                 VStack(spacing: 14) {
-                    Text("Activa tu membresía.")
+                    Text("Activate your membership.")
                         .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                         .foregroundStyle(BlankColors.ink)
                         .multilineTextAlignment(.center)
@@ -22,7 +22,7 @@ struct MembershipActivationView: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
 
-                    Text("Introduce el código que recibiste al activar tu plan Blank.")
+                    Text("Enter the code you received when activating your Blank plan.")
                         .font(.blankInter(size: 16, relativeTo: .body))
                         .foregroundStyle(BlankColors.mutedInk)
                         .multilineTextAlignment(.center)
@@ -51,7 +51,7 @@ struct MembershipActivationView: View {
                             ProgressView()
                                 .tint(.white)
                         } else {
-                            Text("Activar Blank")
+                            Text("Activate Blank")
                         }
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
@@ -61,7 +61,7 @@ struct MembershipActivationView: View {
 
                     #if DEBUG
                     #if targetEnvironment(simulator)
-                    Button("Entrar al Home en simulador") {
+                    Button("Enter Home in simulator") {
                         enterSimulatorHome()
                     }
                     .buttonStyle(BlankSecondaryButtonStyle())

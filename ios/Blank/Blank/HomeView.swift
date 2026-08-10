@@ -283,15 +283,15 @@ struct HomeView: View {
                     .foregroundStyle(Color.white.opacity(0.86))
                     .monospacedDigit()
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
-                    Text("Termina en \(remainingText(until: blankActiveUntil))")
+                    Text("Ends in \(remainingText(until: blankActiveUntil))")
                         .font(.blankBody)
                         .foregroundStyle(Color.white.opacity(0.76))
-                    Text(sessionStore.deviceActivityTimerScheduled ? "Timer del sistema activo" : "Timer interno activo")
+                    Text(sessionStore.deviceActivityTimerScheduled ? "System timer active" : "Internal timer active")
                         .font(.blankInter(size: 13, relativeTo: .footnote))
                         .foregroundStyle(Color.white.opacity(0.58))
                 }
                 if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
-                    Text("Horario pausado \(remainingText(until: schedulePausedUntil))")
+                    Text("Schedule paused \(remainingText(until: schedulePausedUntil))")
                         .font(.blankInter(size: 13, relativeTo: .footnote))
                         .foregroundStyle(Color.white.opacity(0.58))
                 }
@@ -391,28 +391,28 @@ struct HomeView: View {
             return nil
         }
 
-        return "Se acerca tu franja débil. Activa Blank."
+        return "Your weak window is coming. Start Blank."
     }
 
     private var emergencyCoachMessage: String {
         if !storedWeeklyGoal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Estás rompiendo tu objetivo semanal."
+            return "You are breaking your weekly goal."
         }
 
         guard let weakHour = weakHourThisWeek() else {
-            return "Haz una pausa de 10 s antes de decidir."
+            return "Pause for 10 seconds before deciding."
         }
 
         let currentHour = Calendar.current.component(.hour, from: now)
         if weakHour == currentHour {
-            return "Estás en tu franja débil. Prueba 5 min más."
+            return "You are in your weak window. Try 5 more minutes."
         }
 
         if minutesUntilNextHour(weakHour) <= 30 {
-            return "Tu franja débil está cerca. Evita romper ahora."
+            return "Your weak window is close. Avoid breaking now."
         }
 
-        return "Romper ahora cuenta como emergencia semanal."
+        return "Breaking now counts as a weekly emergency."
     }
 
     private func weakHourThisWeek() -> Int? {
@@ -459,15 +459,15 @@ struct HomeView: View {
         var issues: [ConfigIssue] = []
         if screenTimeBlocker.authorizationStatus != .approved {
             issues.append(ConfigIssue(
-                title: "Screen Time pendiente",
-                body: "Autoriza Screen Time para que iOS aplique los escudos.",
+                title: "Screen Time pending",
+                body: "Authorize Screen Time so iOS can apply shields.",
                 action: .screenTime
             ))
         }
         if !sessionStore.hasSelectedApps {
             issues.append(ConfigIssue(
-                title: "Sin apps seleccionadas",
-                body: "Elige apps, categorías o dominios antes de iniciar.",
+                title: "No apps selected",
+                body: "Choose apps, categories, or domains before starting.",
                 action: .selectApps
             ))
         }
@@ -479,7 +479,7 @@ struct HomeView: View {
         case .screenTime:
             Task { @MainActor in
                 let approved = await screenTimeBlocker.requestAuthorization()
-                message = approved ? "Screen Time autorizado." : "Screen Time sigue pendiente."
+                message = approved ? "Screen Time authorized." : "Screen Time is still pending."
                 messageAction = approved ? nil : .screenTime
             }
         case .relinkNfc:
@@ -522,19 +522,19 @@ struct HomeView: View {
     private func setMessage(for result: SessionStore.NfcResult) {
         switch result {
         case .tagRegistered:
-            message = "NFC registrado."
+            message = "NFC registered."
             messageAction = nil
         case .blanked, .unblanked:
             message = nil
             messageAction = nil
         case .schedulePaused:
-            message = "Apps desbloqueadas 5 minutos."
+            message = "Apps unlocked for 5 minutes."
             messageAction = nil
         case .wrongTag:
-            message = "Ese NFC no es tu pieza de Blank."
+            message = "That NFC is not your Blank tag."
             messageAction = nil
         case .noAppsSelected:
-            message = "Sin apps seleccionadas"
+            message = "No apps selected"
             messageAction = .selectApps
         }
     }
@@ -686,7 +686,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Mode",
-                subtitle: "Elige el modo activo de bloqueo\ny edita las apps que protege.",
+                subtitle: "Choose the active block mode\nand edit the apps it protects.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -708,14 +708,14 @@ private struct ModesList: View {
                         Button(role: .destructive) {
                             sessionStore.deleteMode(mode.id)
                         } label: {
-                            Label("Eliminar", systemImage: "trash")
+                            Label("Delete", systemImage: "trash")
                         }
                         .disabled(sessionStore.focusModes.count <= 1)
                     }
             }
 
             VStack(spacing: 10) {
-                TextField("Crea un modo personalizado", text: $newModeName)
+                TextField("Create a custom mode", text: $newModeName)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(textColor)
                     .padding(.horizontal, 18)
@@ -726,7 +726,7 @@ private struct ModesList: View {
                     sessionStore.createMode(named: newModeName)
                     newModeName = ""
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Crear modo")
+                    TopSheetPrimaryButtonLabel(title: "Create mode")
                 }
                 .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
@@ -744,7 +744,7 @@ private struct ModesList: View {
                 onFinish()
             } label: {
                 HStack {
-                    Text("Editar apps del modo actual")
+                    Text("Edit current mode apps")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     Spacer()
                 }
@@ -780,7 +780,7 @@ private struct ModesList: View {
                     Text(mode.name)
                         .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
 
-                    Text(isSelected ? blockedAppsText : "Toca para activar este modo")
+                    Text(isSelected ? blockedAppsText : "Tap to activate this mode")
                         .font(.caption)
                         .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
                         .lineLimit(1)
@@ -798,7 +798,7 @@ private struct ModesList: View {
 
     private var blockedAppsText: String {
         let count = sessionStore.selectionCount
-        return "\(count) app \(count == 1 ? "bloqueada" : "bloqueadas")"
+        return "\(count) app \(count == 1 ? "blocked" : "blocked")"
     }
 }
 
@@ -837,7 +837,6 @@ private struct SettingsSheet: View {
             ScheduleEditorContent()
         case .report:
             ReportView()
-                .preferredColorScheme(.light)
         case nil:
             EmptyView()
         }
@@ -845,22 +844,22 @@ private struct SettingsSheet: View {
 
     private var settingsContent: some View {
         List {
-            Text("Ajustes")
+            Text("Settings")
                 .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(textColor)
                 .lineLimit(1)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            settingsButton("Vincular nuevo Blank") {
+            settingsButton("Link new Blank") {
                 showingRelink = true
                 dismiss()
             }
-            settingsButton("He olvidado mi Blank") {
+            settingsButton("I forgot my Blank") {
                 showingForgetConfirm = true
                 dismiss()
             }
-            settingsButton("Emergencia", role: .destructive) {
+            settingsButton("Emergency", role: .destructive) {
                 showingEmergency = true
                 dismiss()
             }
@@ -908,30 +907,35 @@ private struct ScheduleEditorContent: View {
     @State private var enabled = false
     @State private var startMinute = 23 * 60 + 30
     @State private var endMinute = 8 * 60
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
         List {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Habits",
-                    subtitle: "Programa cuándo Blank se activa solo\ny guarda tu horario diario."
+                    subtitle: "Schedule when Blank starts automatically\nand save your daily routine.",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
                 )
 
-                    Toggle("Horario diario", isOn: $enabled)
+                    Toggle("Daily schedule", isOn: $enabled)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(textColor)
                         .padding(.horizontal, 18)
                         .frame(height: 56)
                         .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
 
                     VStack(spacing: 10) {
-                        TimeMenuRow(title: "Inicio", minute: $startMinute)
-                        TimeMenuRow(title: "Fin", minute: $endMinute)
-                        StaticScheduleRow(title: "Días", value: "Todos")
+                        TimeMenuRow(title: "Start", minute: $startMinute, textColor: textColor)
+                        TimeMenuRow(title: "End", minute: $endMinute, textColor: textColor)
+                        StaticScheduleRow(title: "Days", value: "Every day", textColor: textColor)
                     }
 
-                    Text("Para salir antes necesitas tu Blank o emergencia.")
+                    Text("To exit earlier, use Blank or Emergency.")
                         .font(.footnote)
-                        .foregroundStyle(BlankColors.mutedInk)
+                        .foregroundStyle(secondaryColor)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 280)
                         .padding(.top, 2)
@@ -939,7 +943,7 @@ private struct ScheduleEditorContent: View {
                     Button {
                         saveSchedule()
                     } label: {
-                        TopSheetPrimaryButtonLabel(title: "Guardar")
+                        TopSheetPrimaryButtonLabel(title: "Save")
                     }
                     .padding(.top, 6)
             }
@@ -953,7 +957,8 @@ private struct ScheduleEditorContent: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground().ignoresSafeArea())
+        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             enabled = sessionStore.schedule.enabled
             startMinute = sessionStore.schedule.startMinute
@@ -974,6 +979,7 @@ private struct ScheduleEditorContent: View {
 private struct StaticScheduleRow: View {
     let title: String
     let value: String
+    let textColor: Color
 
     var body: some View {
         HStack {
@@ -983,7 +989,7 @@ private struct StaticScheduleRow: View {
             Text(value)
                 .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
         }
-        .foregroundStyle(BlankColors.ink)
+        .foregroundStyle(textColor)
         .padding(.horizontal, 18)
         .frame(height: 56)
         .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
@@ -993,6 +999,7 @@ private struct StaticScheduleRow: View {
 private struct TimeMenuRow: View {
     let title: String
     @Binding var minute: Int
+    let textColor: Color
 
     private let options = stride(from: 0, through: 23 * 60 + 30, by: 30).map { $0 }
 
@@ -1012,7 +1019,7 @@ private struct TimeMenuRow: View {
                     .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
                     .monospacedDigit()
             }
-            .foregroundStyle(BlankColors.ink)
+            .foregroundStyle(textColor)
             .padding(.horizontal, 18)
             .frame(height: 56)
             .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
@@ -1026,17 +1033,17 @@ private struct ForgetBlankConfirmSheet: View {
 
     var body: some View {
         TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("He olvidado mi Blank")
-            TechnicalSheetDescription("Esto desactiva Blank, borra la pieza vinculada y vuelve al onboarding para que puedas registrar una nueva.")
-            TechnicalSheetDescription("Tus modos y apps seleccionadas se mantienen.", emphasized: true)
+            TechnicalSheetTitle("I forgot my Blank")
+            TechnicalSheetDescription("This turns Blank off, removes the linked item, and returns to onboarding so you can register a new one.")
+            TechnicalSheetDescription("Your modes and selected apps stay saved.", emphasized: true)
             TechnicalSheetActions {
-                Button("He olvidado mi Blank") {
+                Button("I forgot my Blank") {
                     onConfirm()
                     dismiss()
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())
 
-                Button("Cancelar") {
+                Button("Cancel") {
                     dismiss()
                 }
                 .buttonStyle(.plain)
@@ -1054,19 +1061,19 @@ private struct EmergencySheet: View {
 
     var body: some View {
         TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("Emergencia")
+            TechnicalSheetTitle("Emergency")
             TechnicalSheetDescription(coachMessage, emphasized: true)
-            TechnicalSheetDescription("Esto desactiva Blank sin usar tu Blank y desbloquea las apps protegidas. Úsalo solo si necesitas recuperar el acceso ahora.")
-            TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "Te quedan \(emergencyUnlocksRemaining) desbloqueos esta semana." : "Ya has usado tus 3 desbloqueos esta semana.", emphasized: true)
+            TechnicalSheetDescription("This turns Blank off without using your Blank and unlocks protected apps. Use it only if you need access now.")
+            TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "You have \(emergencyUnlocksRemaining) unlocks left this week." : "You have used your 3 unlocks this week.", emphasized: true)
             TechnicalSheetActions {
-                Button("Desbloquear") {
+                Button("Unlock") {
                     if onUnlock() {
                         dismiss()
                     }
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())
                 .disabled(emergencyUnlocksRemaining <= 0)
-                Button("Cancelar") {
+                Button("Cancel") {
                     dismiss()
                 }
                 .buttonStyle(.plain)
@@ -1085,16 +1092,16 @@ private struct RelinkSheet: View {
 
     var body: some View {
         TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("Nuevo Blank")
-            TechnicalSheetDescription("Escanea el nuevo Blank para sustituir el que tienes vinculado. Tus modos y apps protegidas se mantienen.")
+            TechnicalSheetTitle("New Blank")
+            TechnicalSheetDescription("Scan the new Blank to replace the one you linked. Your modes and protected apps stay saved.")
             TechnicalSheetActions {
-                Button("Escanear nuevo Blank") {
+                Button("Scan new Blank") {
                     nfcReader.scan { result in
                         Task { @MainActor in
                             switch result {
                             case .success(let uid):
                                 sessionStore.nfcTagUid = uid
-                                message = "Nuevo Blank vinculado."
+                                message = "New Blank linked."
                                 messageAction = nil
                                 dismiss()
                             case .failure(let error):
@@ -1106,7 +1113,7 @@ private struct RelinkSheet: View {
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())
 
-                Button("Cancelar") {
+                Button("Cancel") {
                     dismiss()
                 }
                 .buttonStyle(.plain)
@@ -1117,7 +1124,9 @@ private struct RelinkSheet: View {
 }
 
 private struct TechnicalSettingsSheetLayout<Content: View>: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @ViewBuilder var content: Content
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -1126,7 +1135,9 @@ private struct TechnicalSettingsSheetLayout<Content: View>: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(BlankAtmosphericBackground())
+        .foregroundStyle(textColor)
+        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
 
@@ -1187,7 +1198,7 @@ private struct TimerStartSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text("Blank se desactiva automáticamente al terminar. Si quieres salir antes, usa tu Blank o emergencia.")
+            Text("Blank turns off automatically when the timer ends. To exit earlier, use Blank or Emergency.")
                 .foregroundStyle(.secondary)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -1290,40 +1301,40 @@ private struct HomePreviewScene: View {
     }
 }
 
-#Preview("Home - Reposo") {
-    HomePreviewScene("Home - Reposo")
+#Preview("Home - Idle") {
+    HomePreviewScene("Home - Idle")
 }
 
-#Preview("Home - Sin apps") {
-    HomePreviewScene("Home - Sin apps", protectedSelectionCount: 0)
+#Preview("Home - No apps") {
+    HomePreviewScene("Home - No apps", protectedSelectionCount: 0)
 }
 
-#Preview("Home - NFC pendiente") {
-    HomePreviewScene("Home - NFC pendiente", nfcLinked: false)
+#Preview("Home - NFC pending") {
+    HomePreviewScene("Home - NFC pending", nfcLinked: false)
 }
 
-#Preview("Blank activo") {
-    HomePreviewScene("Blank activo", isBlankActive: true)
+#Preview("Blank active") {
+    HomePreviewScene("Blank active", isBlankActive: true)
 }
 
-#Preview("Blank activo - Timer") {
+#Preview("Blank active - Timer") {
     HomePreviewScene(
-        "Blank activo - Timer",
+        "Blank active - Timer",
         isBlankActive: true,
         timedUntil: Date().addingTimeInterval(38 * 60)
     )
 }
 
-#Preview("Horario pausado") {
+#Preview("Schedule paused") {
     HomePreviewScene(
-        "Horario pausado",
+        "Schedule paused",
         isBlankActive: false,
         schedule: BlankFocusSchedule(enabled: true, startMinute: 0, endMinute: 24 * 60 - 1),
         schedulePausedUntil: Date().addingTimeInterval(5 * 60)
     )
 }
 
-#Preview("Permiso pendiente") {
-    HomePreviewScene("Permiso pendiente", authorizationApproved: false)
+#Preview("Permission pending") {
+    HomePreviewScene("Permission pending", authorizationApproved: false)
 }
 #endif

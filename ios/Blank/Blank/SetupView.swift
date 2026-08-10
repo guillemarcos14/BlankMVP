@@ -134,14 +134,12 @@ struct SetupView: View {
         switch currentStep {
         case .awareness:
             simpleStatement(
-                icon: "iphone.slash",
                 title: "You are losing more time than you think.",
                 body: nil,
                 button: "Continue"
             )
         case .lifetime:
             simpleStatement(
-                icon: "hourglass",
                 title: "The average person loses",
                 body: "13 years",
                 bodyColor: BlankColors.red,
@@ -149,7 +147,6 @@ struct SetupView: View {
             )
         case .dopamine:
             simpleStatement(
-                icon: "brain.head.profile",
                 title: "Apps are not neutral.",
                 body: "They are training your attention.",
                 bodyColor: BlankColors.red,
@@ -163,7 +160,6 @@ struct SetupView: View {
             resultStep
         case .recovery:
             simpleStatement(
-                icon: "target",
                 title: "Blanked can help you recover",
                 body: "+\(recoveredYears) years",
                 bodyColor: Color(red: 0.278, green: 0.780, blue: 0.506),
@@ -187,28 +183,23 @@ struct SetupView: View {
     }
 
     private func simpleStatement(
-        icon: String,
         title: String,
         body: String?,
         bodyColor: Color = BlankColors.ink,
         button: String
     ) -> some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 100)
-
-            Image(systemName: icon)
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.66))
+        VStack(spacing: 24) {
+            Spacer(minLength: 132)
 
             Text(title)
-                .font(.blankInter(size: 25, weight: .semibold, relativeTo: .title))
+                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
-                .lineSpacing(2)
+                .lineSpacing(3)
                 .frame(maxWidth: 342)
 
             if let body {
                 Text(body)
-                    .font(.blankInter(size: 42, weight: .semibold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: 44, weight: .semibold, relativeTo: .largeTitle))
                     .foregroundStyle(bodyColor)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -216,7 +207,7 @@ struct SetupView: View {
                     .frame(maxWidth: 342)
             }
 
-            Spacer(minLength: 88)
+            Spacer(minLength: 96)
 
             Button(button) {
                 goForward()
@@ -373,34 +364,26 @@ struct SetupView: View {
     private var notificationsStep: some View {
         VStack(spacing: 20) {
             VStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(Color.black.opacity(0.18))
-                    .frame(width: 250, height: 178)
-                    .overlay(alignment: .top) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "target")
-                                .font(.system(size: 20, weight: .semibold))
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Blanked")
-                                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                                Text("You are entering your weak hour. Start a block.")
-                                    .font(.blankInter(size: 12, relativeTo: .caption))
-                                    .lineLimit(2)
-                            }
-                            Spacer(minLength: 0)
-                            Text("now")
-                                .font(.blankInter(size: 11, relativeTo: .caption2))
-                                .foregroundStyle(BlankColors.mutedInk)
-                        }
-                        .foregroundStyle(BlankColors.ink)
-                        .padding(12)
-                        .frame(width: 292)
-                        .background {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(Color.white.opacity(0.84))
-                        }
-                        .offset(y: 26)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Blanked")
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                        Spacer()
+                        Text("now")
+                            .font(.blankInter(size: 11, relativeTo: .caption2))
+                            .foregroundStyle(BlankColors.mutedInk)
                     }
+                    Text("You are entering your weak hour. Start a block.")
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .lineLimit(2)
+                }
+                .foregroundStyle(BlankColors.ink)
+                .padding(14)
+                .frame(width: 292, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.86))
+                }
             }
 
             OnboardingHeader(
@@ -475,8 +458,8 @@ struct SetupView: View {
             .frame(maxWidth: 342)
 
             VStack(spacing: 12) {
-                TrialTimelineRow(icon: "lock.open", title: "Today", detail: "Unlock Blanked and set your first block.")
-                TrialTimelineRow(icon: "bell", title: "In 2 days", detail: "We remind you before the trial ends.")
+                TrialTimelineRow(title: "Today", detail: "Unlock Blanked and set your first block.")
+                TrialTimelineRow(title: "In 2 days", detail: "We remind you before the trial ends.")
             }
             .frame(maxWidth: 342)
 
@@ -629,28 +612,22 @@ struct SetupView: View {
         HStack(spacing: 6) {
             ForEach(OnboardingStep.allCases, id: \.rawValue) { step in
                 Capsule()
-                    .fill(step.rawValue <= currentStep.rawValue ? BlankColors.ink : BlankColors.line)
+                    .fill(step.rawValue <= currentStep.rawValue ? Color.white.opacity(0.76) : Color.white.opacity(0.16))
                     .frame(width: step == currentStep ? 18 : 6, height: 6)
             }
         }
     }
 
     private func StatusPill(text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "checkmark")
-                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+        HStack {
             Text(text)
-                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
         }
-        .foregroundStyle(BlankColors.ink)
+        .foregroundStyle(Color.white.opacity(0.76))
         .padding(.horizontal, 16)
-        .frame(height: 42)
+        .frame(height: 38)
         .background {
-            ZStack {
-                Capsule().fill(.ultraThinMaterial)
-                Capsule().fill(Color.white.opacity(0.34))
-                Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
-            }
+            Capsule().fill(Color.white.opacity(0.10))
         }
     }
 
@@ -849,12 +826,12 @@ private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
             BlankAtmosphericBackground(dimmed: true)
-            Color.black.opacity(0.58).ignoresSafeArea()
+            Color.black.opacity(0.38).ignoresSafeArea()
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.05),
-                    BlankColors.airBlue.opacity(0.08),
-                    Color.black.opacity(0.32)
+                    Color.black.opacity(0.06),
+                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.46)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -922,18 +899,11 @@ private struct TrialComparisonCard: View {
 }
 
 private struct TrialTimelineRow: View {
-    let icon: String
     let title: String
     let detail: String
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 30, height: 30)
-                .foregroundStyle(BlankColors.ink)
-                .background(Circle().fill(Color.white.opacity(0.64)))
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
@@ -965,8 +935,14 @@ private struct PlanButton: View {
                     Text(title)
                         .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                     Spacer()
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 16, weight: .semibold))
+                    Circle()
+                        .fill(selected ? BlankColors.ink : Color.clear)
+                        .frame(width: 10, height: 10)
+                        .padding(3)
+                        .overlay {
+                            Circle()
+                                .stroke(selected ? BlankColors.ink : BlankColors.line, lineWidth: 1)
+                        }
                 }
                 Text(price)
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))

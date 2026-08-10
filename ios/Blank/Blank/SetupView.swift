@@ -84,6 +84,19 @@ struct SetupView: View {
 
                         #if DEBUG
                         #if targetEnvironment(simulator)
+                        HStack(spacing: 10) {
+                            Button("Prev") {
+                                goBack()
+                            }
+                            .buttonStyle(BlankSecondaryButtonStyle())
+
+                            Button("Next") {
+                                goForward()
+                            }
+                            .buttonStyle(BlankSecondaryButtonStyle())
+                        }
+                        .frame(maxWidth: 270)
+
                         Button("Enter Home in simulator") {
                             enterSimulatorHome()
                         }
@@ -297,7 +310,7 @@ struct SetupView: View {
 
                 Text("\(displayName), if nothing changes, you could lose")
                     .font(.blankInter(size: 15, relativeTo: .subheadline))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.76))
                     .multilineTextAlignment(.center)
 
                 Text("\(lostDaysThisYear) days")
@@ -306,7 +319,7 @@ struct SetupView: View {
 
                 Text("in the rest of 2026")
                     .font(.blankInter(size: 14, relativeTo: .footnote))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.70))
 
                 Divider().opacity(0.28)
 
@@ -316,11 +329,18 @@ struct SetupView: View {
 
                 Text("over a lifetime")
                     .font(.blankInter(size: 14, relativeTo: .footnote))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.70))
             }
             .padding(20)
             .frame(maxWidth: 342)
-            .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
+            .background {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(Color.black.opacity(0.26))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
 
             Button("Continue") {
                 onboardingGoal = "Recover control from distracting apps"
@@ -439,7 +459,7 @@ struct SetupView: View {
 
             Text(commitmentComplete ? "Done" : "Keep holding")
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                .foregroundStyle(BlankColors.mutedInk)
+                .foregroundStyle(Color.white.opacity(0.72))
         }
     }
 
@@ -881,7 +901,7 @@ private struct TrialComparisonCard: View {
                     .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
                 Text(caption)
                     .font(.blankInter(size: 11, relativeTo: .caption2))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(BlankColors.ink.opacity(0.62))
             }
             HStack(alignment: .bottom, spacing: 7) {
                 ForEach(0..<4, id: \.self) { index in
@@ -894,7 +914,14 @@ private struct TrialComparisonCard: View {
         .foregroundStyle(BlankColors.ink)
         .padding(13)
         .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
-        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.30)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.82))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.32), lineWidth: 1)
+        }
     }
 }
 
@@ -909,15 +936,23 @@ private struct TrialTimelineRow: View {
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 Text(detail)
                     .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(BlankColors.ink.opacity(0.62))
                     .lineLimit(2)
             }
 
             Spacer(minLength: 0)
         }
+        .foregroundStyle(BlankColors.ink)
         .padding(.horizontal, 13)
         .frame(height: 58)
-        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.26)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.82))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.30), lineWidth: 1)
+        }
     }
 }
 
@@ -948,12 +983,19 @@ private struct PlanButton: View {
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                 Text(detail)
                     .font(.blankInter(size: 11, relativeTo: .caption2))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(BlankColors.ink.opacity(0.62))
             }
             .foregroundStyle(BlankColors.ink)
             .padding(13)
             .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
-            .blankGlassCard(cornerRadius: 16, tintOpacity: selected ? 0.48 : 0.26)
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.90 : 0.78))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? BlankColors.ink.opacity(0.42) : Color.white.opacity(0.28), lineWidth: selected ? 1.4 : 1)
+            }
         }
         .buttonStyle(.plain)
     }

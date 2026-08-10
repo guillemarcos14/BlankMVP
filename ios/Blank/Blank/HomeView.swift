@@ -25,9 +25,7 @@ struct HomeView: View {
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private var homeTitle: String {
-        sessionStore.isBlankActive ? "Blanked." : "Ready?"
-    }
+    private let homeTagline = "Shaping what we\ncreate with the\npower of time."
 
     var body: some View {
         GeometryReader { proxy in
@@ -260,7 +258,7 @@ struct HomeView: View {
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 22) {
-            Text(homeTitle)
+            Text(homeTagline)
                 .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
@@ -284,9 +282,17 @@ struct HomeView: View {
                     .foregroundStyle(Color.white.opacity(0.86))
                     .monospacedDigit()
                 if let blankActiveUntil = sessionStore.blankActiveUntil {
-                    Text("Ends in \(remainingText(until: blankActiveUntil))")
+                    Text("Termina en \(remainingText(until: blankActiveUntil))")
                         .font(.blankBody)
                         .foregroundStyle(Color.white.opacity(0.76))
+                    Text(sessionStore.deviceActivityTimerScheduled ? "Timer del sistema activo" : "Timer interno activo")
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.58))
+                }
+                if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
+                    Text("Horario pausado \(remainingText(until: schedulePausedUntil))")
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.58))
                 }
             }
 
@@ -326,25 +332,19 @@ struct HomeView: View {
             }
 
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            if sessionStore.isBlankActive {
-                HoldToUnlockButton(width: buttonWidth) {
-                    let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.unlockWithHold()
-                    }
-                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    setMessage(for: result)
-                }
-            } else {
-                Button("Start Blanked") {
+            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
+                if sessionStore.isBlankActive {
+                    scanTag()
+                } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
                         sessionStore.activateBlank()
                     }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
                 }
-                .buttonStyle(HomeBlankearButtonStyle())
-                .frame(width: buttonWidth)
             }
+            .buttonStyle(HomeBlankearButtonStyle())
+            .frame(width: buttonWidth)
         }
     }
 
@@ -357,7 +357,7 @@ struct HomeView: View {
             return nil
         }
 
-        return "Weak moment soon."
+        return "Se acerca tu franja débil. Activa Blank."
     }
 
     private var emergencyCoachMessage: String {
@@ -425,22 +425,22 @@ struct HomeView: View {
         var issues: [ConfigIssue] = []
         if screenTimeBlocker.authorizationStatus != .approved {
             issues.append(ConfigIssue(
-                title: "Screen Time needed",
-                body: "Allow Screen Time to block apps.",
+                title: "Screen Time pendiente",
+                body: "Autoriza Screen Time para que iOS aplique los escudos.",
                 action: .screenTime
             ))
         }
-        if BlankedRuntimeMode.legacyNfcEnabled && sessionStore.nfcTagUid == nil {
+        if sessionStore.nfcTagUid == nil {
             issues.append(ConfigIssue(
-                title: "Blank not linked",
-                body: "Link a physical Blank.",
+                title: "NFC sin vincular",
+                body: "Escanea una pieza física para poder salir de Blank.",
                 action: .relinkNfc
             ))
         }
         if !sessionStore.hasSelectedApps {
             issues.append(ConfigIssue(
-                title: "Choose apps",
-                body: "Select what Blanked should block.",
+                title: "Sin apps seleccionadas",
+                body: "Elige apps, categorías o dominios antes de iniciar.",
                 action: .selectApps
             ))
         }
@@ -452,7 +452,7 @@ struct HomeView: View {
         case .screenTime:
             Task { @MainActor in
                 let approved = await screenTimeBlocker.requestAuthorization()
-                message = approved ? "Screen Time ready." : "Screen Time pending."
+                message = approved ? "Screen Time autorizado." : "Screen Time sigue pendiente."
                 messageAction = approved ? nil : .screenTime
             }
         case .relinkNfc:
@@ -482,14 +482,6 @@ struct HomeView: View {
 
     private func openWidgetScanIfNeeded() {
         guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
-        if !BlankedRuntimeMode.legacyNfcEnabled {
-            sessionStore.shouldScanBlankFromWidget = false
-            if sessionStore.isBlankActive {
-                message = "Hold to unlock."
-                messageAction = nil
-            }
-            return
-        }
         guard sessionStore.isBlankActive else {
             sessionStore.shouldScanBlankFromWidget = false
             return
@@ -515,7 +507,7 @@ struct HomeView: View {
             message = "Ese NFC no es tu pieza de Blank."
             messageAction = nil
         case .noAppsSelected:
-            message = "Choose apps first."
+            message = "Sin apps seleccionadas"
             messageAction = .selectApps
         }
     }
@@ -563,82 +555,6 @@ private struct HomeLayoutMetrics {
         centerX = width / 2
         topBarCenterY = topPadding + 47 / 2
         messageCenterY = height * 0.52
-    }
-}
-
-private struct HoldToUnlockButton: View {
-    let width: CGFloat
-    let onUnlock: () -> Void
-
-    @State private var holdStartedAt: Date?
-    @State private var progress: CGFloat = 0
-    @State private var didUnlock = false
-
-    private let holdDuration: TimeInterval = 3
-    private let timer = Timer.publish(every: 1.0 / 30.0, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        Text(progress > 0 ? "Keep holding" : "Hold to unlock")
-            .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
-            .foregroundStyle(Color.white)
-            .foregroundColor(Color.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background {
-                ZStack(alignment: .leading) {
-                    Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0).opacity(0.48))
-                    Capsule()
-                        .fill(Color.white.opacity(0.18))
-                        .frame(width: width * progress)
-                    GlassCornerHighlight(width: 78, height: 30, xOffset: -64, yOffset: -16)
-                        .clipShape(Capsule())
-                    Capsule().stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.42),
-                                Color.white.opacity(0.16),
-                                Color.white.opacity(0.04),
-                                Color.white.opacity(0.00)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-                }
-                .allowsHitTesting(false)
-            }
-            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
-            .scaleEffect(holdStartedAt == nil ? 1 : 0.985)
-            .frame(width: width)
-            .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in
-                        if holdStartedAt == nil {
-                            holdStartedAt = Date()
-                            didUnlock = false
-                        }
-                    }
-                    .onEnded { _ in
-                        resetHold()
-                    }
-            )
-            .onReceive(timer) { date in
-                guard let holdStartedAt, !didUnlock else { return }
-                progress = min(1, CGFloat(date.timeIntervalSince(holdStartedAt) / holdDuration))
-                if progress >= 1 {
-                    didUnlock = true
-                    onUnlock()
-                    resetHold()
-                }
-            }
-    }
-
-    private func resetHold() {
-        holdStartedAt = nil
-        progress = 0
     }
 }
 
@@ -902,24 +818,25 @@ private struct SettingsSheet: View {
 
     private var settingsContent: some View {
         List {
-            Text("Settings")
+            Text("Ajustes")
                 .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(textColor)
                 .lineLimit(1)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            if BlankedRuntimeMode.legacyNfcEnabled {
-                settingsButton("Link new Blank") {
-                    showingRelink = true
-                    dismiss()
-                }
-                settingsButton("Forgot my Blank") {
-                    showingForgetConfirm = true
-                    dismiss()
-                }
+            settingsButton("Vincular nuevo Blank") {
+                showingRelink = true
+                dismiss()
             }
-
+            settingsButton("He olvidado mi Blank") {
+                showingForgetConfirm = true
+                dismiss()
+            }
+            settingsButton("Emergencia", role: .destructive) {
+                showingEmergency = true
+                dismiss()
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -970,22 +887,22 @@ private struct ScheduleEditorContent: View {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Habits",
-                    subtitle: "Set when Blanked starts automatically."
+                    subtitle: "Programa cuándo Blank se activa solo\ny guarda tu horario diario."
                 )
 
-                    Toggle("Daily schedule", isOn: $enabled)
+                    Toggle("Horario diario", isOn: $enabled)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                         .padding(.horizontal, 18)
                         .frame(height: 56)
                         .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
 
                     VStack(spacing: 10) {
-                        TimeMenuRow(title: "Start", minute: $startMinute)
-                        TimeMenuRow(title: "End", minute: $endMinute)
-                        StaticScheduleRow(title: "Days", value: "Every day")
+                        TimeMenuRow(title: "Inicio", minute: $startMinute)
+                        TimeMenuRow(title: "Fin", minute: $endMinute)
+                        StaticScheduleRow(title: "Días", value: "Todos")
                     }
 
-                    Text(BlankedRuntimeMode.legacyNfcEnabled ? "Use your Blank to end early." : "Hold the center button to end early.")
+                    Text("Para salir antes necesitas tu Blank o emergencia.")
                         .font(.footnote)
                         .foregroundStyle(BlankColors.mutedInk)
                         .multilineTextAlignment(.center)
@@ -995,7 +912,7 @@ private struct ScheduleEditorContent: View {
                     Button {
                         saveSchedule()
                     } label: {
-                        TopSheetPrimaryButtonLabel(title: "Save")
+                        TopSheetPrimaryButtonLabel(title: "Guardar")
                     }
                     .padding(.top, 6)
             }

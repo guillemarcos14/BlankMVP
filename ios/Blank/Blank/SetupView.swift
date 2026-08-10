@@ -25,7 +25,6 @@ struct SetupView: View {
     @State private var currentStep: OnboardingStep = .promise
     @State private var showingPicker = false
     @State private var message: String?
-    @State private var nfcReader = NFCReader()
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
     @AppStorage("blankOnboardingWeakMoment", store: BlankSharedState.defaults) private var weakMoment = ""
 
@@ -380,30 +379,6 @@ struct SetupView: View {
         sessionStore.finishSetup()
     }
 
-    private func scanOrFinish() {
-        if !BlankedRuntimeMode.legacyNfcEnabled {
-            finishWithoutStarting()
-            return
-        }
-
-        if sessionStore.nfcTagUid != nil {
-            finishWithoutStarting()
-            return
-        }
-
-        nfcReader.scan { result in
-            Task { @MainActor in
-                switch result {
-                case .success(let uid):
-                    _ = sessionStore.handleNfcTag(uid: uid)
-                    message = "Blank linked."
-                case .failure(let error):
-                    message = error.localizedDescription
-                }
-            }
-        }
-    }
-
     private func goForward() {
         guard let next = OnboardingStep(rawValue: min(currentStep.rawValue + 1, OnboardingStep.allCases.count - 1)) else { return }
         currentStep = next
@@ -419,9 +394,6 @@ struct SetupView: View {
     #if DEBUG
     #if targetEnvironment(simulator)
     private func enterSimulatorHome() {
-        if BlankedRuntimeMode.legacyNfcEnabled {
-            sessionStore.nfcTagUid = "simulator-nfc-tag"
-        }
         screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
         sessionStore.finishSetup()
     }
@@ -437,7 +409,13 @@ struct SetupView: View {
 private struct OnboardingHeader: View {
     let eyebrow: String
     let title: String
-    let body: String
+    let bodyText: String
+
+    init(eyebrow: String, title: String, body: String) {
+        self.eyebrow = eyebrow
+        self.title = title
+        self.bodyText = body
+    }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -453,7 +431,7 @@ private struct OnboardingHeader: View {
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: 354)
 
-            Text(body)
+            Text(bodyText)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(BlankColors.mutedInk)
                 .multilineTextAlignment(.center)

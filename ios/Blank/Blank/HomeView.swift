@@ -430,7 +430,7 @@ struct HomeView: View {
                 action: .screenTime
             ))
         }
-        if BlankedRuntimeMode.legacyNfcEnabled && sessionStore.nfcTagUid == nil {
+        if false && sessionStore.nfcTagUid == nil {
             issues.append(ConfigIssue(
                 title: "Blank not linked",
                 body: "Link a physical Blank.",
@@ -482,7 +482,7 @@ struct HomeView: View {
 
     private func openWidgetScanIfNeeded() {
         guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
-        if !BlankedRuntimeMode.legacyNfcEnabled {
+        if true {
             sessionStore.shouldScanBlankFromWidget = false
             if sessionStore.isBlankActive {
                 message = "Hold to unlock."
@@ -909,7 +909,7 @@ private struct SettingsSheet: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            if BlankedRuntimeMode.legacyNfcEnabled {
+            if false {
                 settingsButton("Link new Blank") {
                     showingRelink = true
                     dismiss()
@@ -985,7 +985,7 @@ private struct ScheduleEditorContent: View {
                         StaticScheduleRow(title: "Days", value: "Every day")
                     }
 
-                    Text(BlankedRuntimeMode.legacyNfcEnabled ? "Use your Blank to end early." : "Hold the center button to end early.")
+                    Text("Hold the center button to end early.")
                         .font(.footnote)
                         .foregroundStyle(BlankColors.mutedInk)
                         .multilineTextAlignment(.center)

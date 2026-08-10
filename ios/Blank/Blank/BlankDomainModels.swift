@@ -55,6 +55,7 @@ enum BlankUsageEventKind: String, Codable {
 
 enum BlankEndedReason: String, Codable {
     case nfc
+    case manual
     case timer
     case schedule
     case emergency

@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
+    @GestureState private var isHoldingUnblank = false
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -153,7 +154,7 @@ struct HomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                openSettings()
+                showingEmergency = true
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
@@ -332,9 +333,9 @@ struct HomeView: View {
             }
 
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? "Escanear Blank para salir" : "Blankear") {
+            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start Blank") {
                 if sessionStore.isBlankActive {
-                    scanTag()
+                    return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
                         sessionStore.activateBlank()
@@ -345,6 +346,21 @@ struct HomeView: View {
             }
             .buttonStyle(HomeBlankearButtonStyle())
             .frame(width: buttonWidth)
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 20)
+                    .updating($isHoldingUnblank) { currentValue, state, _ in
+                        state = currentValue
+                    }
+                    .onEnded { _ in
+                        guard sessionStore.isBlankActive else { return }
+                        let result = withAnimation(.easeInOut(duration: 0.65)) {
+                            sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+                        }
+                        screenTimeBlocker.clear()
+                        setMessage(for: result)
+                    }
+            )
+            .opacity(isHoldingUnblank ? 0.72 : 1)
         }
     }
 
@@ -428,13 +444,6 @@ struct HomeView: View {
                 title: "Screen Time pendiente",
                 body: "Autoriza Screen Time para que iOS aplique los escudos.",
                 action: .screenTime
-            ))
-        }
-        if sessionStore.nfcTagUid == nil {
-            issues.append(ConfigIssue(
-                title: "NFC sin vincular",
-                body: "Escanea una pieza física para poder salir de Blank.",
-                action: .relinkNfc
             ))
         }
         if !sessionStore.hasSelectedApps {

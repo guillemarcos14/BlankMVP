@@ -475,8 +475,8 @@ struct SetupView: View {
             .frame(maxWidth: 342)
 
             VStack(spacing: 12) {
-                TrialTimelineRow(icon: "lock.open", title: "Today", body: "Unlock Blanked and set your first block.")
-                TrialTimelineRow(icon: "bell", title: "In 2 days", body: "We remind you before the trial ends.")
+                TrialTimelineRow(icon: "lock.open", title: "Today", detail: "Unlock Blanked and set your first block.")
+                TrialTimelineRow(icon: "bell", title: "In 2 days", detail: "We remind you before the trial ends.")
             }
             .frame(maxWidth: 342)
 
@@ -924,7 +924,7 @@ private struct TrialComparisonCard: View {
 private struct TrialTimelineRow: View {
     let icon: String
     let title: String
-    let body: String
+    let detail: String
 
     var body: some View {
         HStack(spacing: 12) {
@@ -937,7 +937,7 @@ private struct TrialTimelineRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                Text(body)
+                Text(detail)
                     .font(.blankInter(size: 12, relativeTo: .caption))
                     .foregroundStyle(BlankColors.mutedInk)
                     .lineLimit(2)

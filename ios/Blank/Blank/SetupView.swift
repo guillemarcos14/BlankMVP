@@ -1,51 +1,55 @@
 import FamilyControls
 import SwiftUI
+import UserNotifications
 
 private enum OnboardingStep: Int, CaseIterable {
-    case promise
-    case goal
-    case weakMoment
+    case awareness
+    case lifetime
+    case dopamine
+    case name
+    case dailyUse
+    case result
+    case recovery
+    case account
+    case notifications
+    case commitment
+    case trial
     case permission
     case apps
     case firstBlock
 }
 
-private struct OnboardingOption: Identifiable {
-    let id: String
-    let title: String
-    let subtitle: String
-    let icon: String
+private enum OnboardingPlan: String {
+    case annual
+    case monthly
 }
 
 struct SetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var currentStep: OnboardingStep = .promise
+    @State private var currentStep: OnboardingStep = .awareness
     @State private var showingPicker = false
     @State private var message: String?
+    @State private var dailyHours = 4.5
+    @State private var selectedPlan: OnboardingPlan = .annual
+    @State private var commitmentComplete = false
+    @State private var notificationStatus = "Off"
+
+    @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
     @AppStorage("blankOnboardingWeakMoment", store: BlankSharedState.defaults) private var weakMoment = ""
-
-    private let goalOptions = [
-        OnboardingOption(id: "focus", title: "Focus deeply", subtitle: "Protect work, study, or creative time.", icon: "target"),
-        OnboardingOption(id: "scroll", title: "Stop scrolling", subtitle: "Block the apps that pull you back in.", icon: "iphone.slash"),
-        OnboardingOption(id: "sleep", title: "Sleep earlier", subtitle: "Keep nights away from feeds and shorts.", icon: "moon")
-    ]
-
-    private let weakMomentOptions = [
-        OnboardingOption(id: "morning", title: "Morning", subtitle: "Before the day has started.", icon: "sunrise"),
-        OnboardingOption(id: "afternoon", title: "Afternoon", subtitle: "When energy drops.", icon: "sun.max"),
-        OnboardingOption(id: "night", title: "Night", subtitle: "When one minute becomes an hour.", icon: "moon.zzz")
-    ]
+    @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
+    @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
 
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground()
+            BlankOnboardingBackground()
 
             VStack(spacing: 0) {
-                Spacer(minLength: 28)
+                Spacer(minLength: 18)
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 22) {
@@ -71,7 +75,7 @@ struct SetupView: View {
                         #endif
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 44)
+                    .padding(.top, 34)
                     .padding(.bottom, 28)
                 }
 
@@ -79,19 +83,23 @@ struct SetupView: View {
                     .padding(.top, 10)
                     .padding(.bottom, 8)
             }
-            .padding(.horizontal, 26)
+            .padding(.horizontal, 24)
             .padding(.vertical, 34)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(BlankColors.ink)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
+            dailyHours = storedDailyHours
+            await purchaseStore.loadProducts()
             await refreshScreenTimeAndContinueIfApproved()
+            await refreshNotificationStatus()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             Task {
                 await refreshScreenTimeAndContinueIfApproved()
+                await refreshNotificationStatus()
             }
         }
         .onChange(of: sessionStore.selection) { newSelection in
@@ -100,148 +108,454 @@ struct SetupView: View {
                 message = "\(sessionStore.selectionCount) selections protected."
             }
         }
-        .animation(.easeInOut(duration: 0.28), value: currentStep.rawValue)
+        .animation(.easeInOut(duration: 0.26), value: currentStep.rawValue)
     }
 
     @ViewBuilder
     private var content: some View {
         switch currentStep {
-        case .promise:
-            introStep
-        case .goal:
-            optionStep(
-                title: "What do you want back?",
-                body: "Blanked adapts your first block around the habit you want to change.",
-                options: goalOptions,
-                selection: onboardingGoal,
-                onSelect: selectGoal
+        case .awareness:
+            simpleStatement(
+                icon: "iphone.slash",
+                title: "You are losing more time than you think.",
+                body: nil,
+                button: "Continue"
             )
-        case .weakMoment:
-            optionStep(
-                title: "When is it hardest?",
-                body: "This helps Blanked frame your first plan and later AI reports.",
-                options: weakMomentOptions,
-                selection: weakMoment,
-                onSelect: selectWeakMoment
+        case .lifetime:
+            simpleStatement(
+                icon: "hourglass",
+                title: "The average person can lose",
+                body: "13 years",
+                bodyColor: BlankColors.red,
+                button: "Continue"
             )
+        case .dopamine:
+            simpleStatement(
+                icon: "brain.head.profile",
+                title: "Short-form feeds are designed to keep your brain asking for more.",
+                body: "Your attention is being trained.",
+                bodyColor: BlankColors.red,
+                button: "Continue"
+            )
+        case .name:
+            nameStep
+        case .dailyUse:
+            dailyUseStep
+        case .result:
+            resultStep
+        case .recovery:
+            simpleStatement(
+                icon: "target",
+                title: "Blanked can help you recover",
+                body: "+\(recoveredYears) years",
+                bodyColor: Color(red: 0.278, green: 0.780, blue: 0.506),
+                button: "I want those years back"
+            )
+        case .account:
+            accountStep
+        case .notifications:
+            notificationsStep
+        case .commitment:
+            commitmentStep
+        case .trial:
+            trialStep
         case .permission:
-            stepContent(
-                eyebrow: "Required by iOS",
-                title: "Allow Screen Time.",
-                body: screenTimeDescription,
-                statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time ready" : nil,
-                primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
-                secondaryTitle: "Back",
-                primaryAction: authorizeScreenTime,
-                secondaryAction: { goBack() }
-            )
+            permissionStep
         case .apps:
-            stepContent(
-                eyebrow: "Your blocklist",
-                title: sessionStore.hasSelectedApps ? "Your apps are protected." : "Choose what to block.",
-                body: sessionStore.hasSelectedApps
-                    ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
-                    : "Pick the apps, categories, or websites that usually steal your time.",
-                statusText: sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selected" : nil,
-                primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
-                secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : "Back",
-                primaryAction: selectAppsOrContinue,
-                secondaryAction: {
-                    if sessionStore.hasSelectedApps {
-                        showingPicker = true
-                    } else {
-                        goBack()
-                    }
-                }
-            )
+            appsStep
         case .firstBlock:
-            stepContent(
-                eyebrow: "First block",
-                title: "Start with 30 minutes.",
-                body: "Blanked will shield your selected apps now. If you need to stop early, use Emergency Unlock.",
-                statusText: onboardingGoal.isEmpty ? nil : onboardingGoal,
-                primaryTitle: "Start first block",
-                secondaryTitle: "Go to Home",
-                primaryAction: startFirstBlock,
-                secondaryAction: finishWithoutStarting
-            )
+            firstBlockStep
         }
     }
 
-    private var introStep: some View {
-        VStack(spacing: 20) {
-            OnboardingMark()
-                .padding(.bottom, 8)
+    private func simpleStatement(
+        icon: String,
+        title: String,
+        body: String?,
+        bodyColor: Color = BlankColors.ink,
+        button: String
+    ) -> some View {
+        VStack(spacing: 22) {
+            Spacer(minLength: 100)
 
-            Text("Reclaim your time.")
-                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-
-            Text("Blanked blocks distracting apps when you need distance, then shows you where your attention slips.")
-                .font(.blankInter(size: 16, relativeTo: .body))
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .medium))
                 .foregroundStyle(BlankColors.mutedInk)
+
+            Text(title)
+                .font(.blankInter(size: 25, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
-                .lineSpacing(3)
+                .lineSpacing(2)
                 .frame(maxWidth: 342)
 
-            VStack(spacing: 10) {
-                OnboardingBenefit(icon: "lock.shield", title: "Block apps with Screen Time")
-                OnboardingBenefit(icon: "bolt.heart", title: "Use emergency unlock only when needed")
-                OnboardingBenefit(icon: "chart.line.uptrend.xyaxis", title: "Learn your weak moments")
+            if let body {
+                Text(body)
+                    .font(.blankInter(size: 42, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(bodyColor)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.74)
+                    .frame(maxWidth: 342)
             }
-            .padding(.top, 8)
 
-            Button("Get started") {
+            Spacer(minLength: 88)
+
+            Button(button) {
                 goForward()
             }
-            .buttonStyle(BlankPrimaryButtonStyle())
-            .frame(width: onboardingButtonWidth(for: "Get started"))
-            .padding(.top, 10)
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: button))
         }
     }
 
-    private func optionStep(
-        title: String,
-        body: String,
-        options: [OnboardingOption],
-        selection: String,
-        onSelect: @escaping (OnboardingOption) -> Void
-    ) -> some View {
-        VStack(spacing: 16) {
-            OnboardingHeader(eyebrow: "Personalize", title: title, body: body)
+    private var nameStep: some View {
+        VStack(spacing: 20) {
+            OnboardingHeader(
+                eyebrow: "Your result",
+                title: "Let's calculate what your phone is costing you.",
+                body: "What should Blanked call you?"
+            )
 
-            VStack(spacing: 10) {
-                ForEach(options) { option in
-                    OnboardingOptionRow(
-                        option: option,
-                        isSelected: selection == option.title
-                    ) {
-                        onSelect(option)
+            TextField("Your name", text: $name)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .body))
+                .foregroundStyle(BlankColors.ink)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 18)
+                .frame(height: 54)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
+                .frame(maxWidth: 314)
+                .padding(.top, 8)
+
+            Button(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Continue" : "Calculate") {
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    name = "You"
+                }
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Calculate"))
+        }
+    }
+
+    private var dailyUseStep: some View {
+        VStack(spacing: 22) {
+            OnboardingHeader(
+                eyebrow: "Daily use",
+                title: "How much time do you spend on your phone each day?",
+                body: "Move the slider to your usual average."
+            )
+
+            VStack(spacing: 18) {
+                Slider(value: $dailyHours, in: 1...9, step: 0.5)
+                    .tint(BlankColors.ink)
+                    .onChange(of: dailyHours) { value in
+                        storedDailyHours = value
+                    }
+
+                Text("\(formattedHours(dailyHours)) / day")
+                    .font(.blankInter(size: 38, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(BlankColors.red)
+            }
+            .frame(maxWidth: 342)
+            .padding(.top, 12)
+
+            Button("Calculate time lost") {
+                storedDailyHours = dailyHours
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Calculate time lost"))
+        }
+    }
+
+    private var resultStep: some View {
+        VStack(spacing: 22) {
+            OnboardingHeader(
+                eyebrow: "Your result",
+                title: "This is your projected lost time.",
+                body: ""
+            )
+
+            VStack(spacing: 14) {
+                Text("Careful")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, 16)
+                    .frame(height: 34)
+                    .background(Capsule().fill(BlankColors.red))
+
+                Text("\(displayName), at this pace you could lose")
+                    .font(.blankInter(size: 15, relativeTo: .subheadline))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .multilineTextAlignment(.center)
+
+                Text("\(lostDaysThisYear) days")
+                    .font(.blankInter(size: 38, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(BlankColors.red)
+
+                Text("in the rest of 2026")
+                    .font(.blankInter(size: 14, relativeTo: .footnote))
+                    .foregroundStyle(BlankColors.mutedInk)
+
+                Divider().opacity(0.28)
+
+                Text("\(lostLifetimeYears) years")
+                    .font(.blankInter(size: 34, weight: .semibold, relativeTo: .title))
+                    .foregroundStyle(BlankColors.red)
+
+                Text("over a lifetime")
+                    .font(.blankInter(size: 14, relativeTo: .footnote))
+                    .foregroundStyle(BlankColors.mutedInk)
+            }
+            .padding(20)
+            .frame(maxWidth: 342)
+            .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
+
+            Button("Take back control") {
+                onboardingGoal = "Recover control from distracting apps"
+                weakMoment = "When scrolling takes over"
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Take back control"))
+        }
+    }
+
+    private var accountStep: some View {
+        VStack(spacing: 20) {
+            OnboardingHeader(
+                eyebrow: "Account",
+                title: "No account needed to start.",
+                body: "Your free trial runs through the App Store. You can add account sync later."
+            )
+
+            Button("Continue to trial") {
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Continue to trial"))
+        }
+    }
+
+    private var notificationsStep: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.black.opacity(0.18))
+                    .frame(width: 250, height: 178)
+                    .overlay(alignment: .top) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "target")
+                                .font(.system(size: 20, weight: .semibold))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Blanked")
+                                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                                Text("You are entering your weak hour. Start a block.")
+                                    .font(.blankInter(size: 12, relativeTo: .caption))
+                                    .lineLimit(2)
+                            }
+                            Spacer(minLength: 0)
+                            Text("now")
+                                .font(.blankInter(size: 11, relativeTo: .caption2))
+                                .foregroundStyle(BlankColors.mutedInk)
+                        }
+                        .foregroundStyle(BlankColors.ink)
+                        .padding(12)
+                        .frame(width: 292)
+                        .background {
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.84))
+                        }
+                        .offset(y: 26)
+                    }
+            }
+
+            OnboardingHeader(
+                eyebrow: "Notifications",
+                title: "Want Blanked to catch you before you scroll?",
+                body: "Allow reminders for weak moments, trial updates, and block prompts."
+            )
+
+            StatusPill(text: "Notifications: \(notificationStatus)")
+
+            Button("Allow notifications") {
+                requestNotifications()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Allow notifications"))
+
+            Button("Not now") {
+                goForward()
+            }
+            .buttonStyle(BlankSecondaryButtonStyle())
+            .frame(width: 184)
+        }
+    }
+
+    private var commitmentStep: some View {
+        VStack(spacing: 24) {
+            OnboardingHeader(
+                eyebrow: "Commitment",
+                title: "I want to take control of my life.",
+                body: "Hold the button to continue."
+            )
+
+            Button {
+                if commitmentComplete {
+                    goForward()
+                }
+            } label: {
+                Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(BlankColors.ink)
+                    .frame(width: 74, height: 74)
+                    .background(Circle().fill(Color.white.opacity(0.82)))
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 1.2).onEnded { _ in
+                    commitmentComplete = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                        goForward()
+                    }
+                }
+            )
+
+            Text(commitmentComplete ? "Done" : "Keep holding")
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                .foregroundStyle(BlankColors.mutedInk)
+        }
+    }
+
+    private var trialStep: some View {
+        VStack(spacing: 18) {
+            OnboardingHeader(
+                eyebrow: "Free trial",
+                title: "Start your free trial.",
+                body: "Full access today. Cancel any time before the trial ends."
+            )
+
+            HStack(spacing: 10) {
+                TrialComparisonCard(title: "Without Blanked", main: formattedHours(dailyHours), caption: "daily screen time", tallBars: true)
+                TrialComparisonCard(title: "With Blanked", main: formattedHours(max(1.0, dailyHours * 0.38)), caption: "target daily use", tallBars: false)
+            }
+            .frame(maxWidth: 342)
+
+            VStack(spacing: 12) {
+                TrialTimelineRow(icon: "lock.open", title: "Today", body: "Unlock Blanked and set your first block.")
+                TrialTimelineRow(icon: "bell", title: "In 2 days", body: "We remind you before the trial ends.")
+            }
+            .frame(maxWidth: 342)
+
+            HStack(spacing: 10) {
+                PlanButton(
+                    title: "Monthly",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
+                    detail: "35.88 EUR/year",
+                    selected: selectedPlan == .monthly
+                ) {
+                    selectedPlan = .monthly
+                }
+                PlanButton(
+                    title: "Annual",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "19.99 EUR"),
+                    detail: "per year",
+                    selected: selectedPlan == .annual
+                ) {
+                    selectedPlan = .annual
+                }
+            }
+            .frame(maxWidth: 342)
+
+            Button {
+                purchaseSelectedPlan()
+            } label: {
+                if purchaseStore.isPurchasing || purchaseStore.isLoading {
+                    ProgressView()
+                        .tint(BlankColors.ink)
+                } else {
+                    Text("Start my 3-day FREE trial")
+                }
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Start my 3-day FREE trial"))
+
+            Button("Restore purchases") {
+                Task {
+                    await purchaseStore.restorePurchases()
+                    if purchaseStore.hasEntitlement {
+                        trialStarted = true
+                        goForward()
                     }
                 }
             }
-            .frame(maxWidth: 354)
-            .padding(.top, 4)
+            .buttonStyle(BlankSecondaryButtonStyle())
+            .frame(width: 224)
 
-            Button(selection.isEmpty ? "Continue" : "Next") {
-                if selection.isEmpty {
-                    onSelect(options[0])
+            Text("3 days free. Then \(selectedPlan == .annual ? "19.99 EUR/year" : "2.99 EUR/month"). Auto-renewable. Cancel any time in App Store settings. Terms and Privacy apply.")
+                .font(.blankInter(size: 11, relativeTo: .caption2))
+                .foregroundStyle(BlankColors.mutedInk)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .frame(maxWidth: 320)
+
+            if let purchaseMessage = purchaseStore.message {
+                Text(purchaseMessage)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 320)
+            }
+        }
+    }
+
+    private var permissionStep: some View {
+        stepContent(
+            eyebrow: "Required by iOS",
+            title: "Allow Screen Time.",
+            body: screenTimeDescription,
+            statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time ready" : nil,
+            primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
+            secondaryTitle: "Back",
+            primaryAction: authorizeScreenTime,
+            secondaryAction: { goBack() }
+        )
+    }
+
+    private var appsStep: some View {
+        stepContent(
+            eyebrow: "Your blocklist",
+            title: sessionStore.hasSelectedApps ? "Your apps are protected." : "Choose what to block.",
+            body: sessionStore.hasSelectedApps
+                ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
+                : "Pick the apps, categories, or websites that usually steal your time.",
+            statusText: sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selected" : nil,
+            primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
+            secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : "Back",
+            primaryAction: selectAppsOrContinue,
+            secondaryAction: {
+                if sessionStore.hasSelectedApps {
+                    showingPicker = true
                 } else {
-                    goForward()
+                    goBack()
                 }
             }
-            .buttonStyle(BlankPrimaryButtonStyle())
-            .frame(width: onboardingButtonWidth(for: selection.isEmpty ? "Continue" : "Next"))
-            .padding(.top, 8)
+        )
+    }
 
-            Button("Back") {
-                goBack()
-            }
-            .buttonStyle(BlankSecondaryButtonStyle())
-            .frame(width: onboardingButtonWidth(for: "Back"))
-        }
+    private var firstBlockStep: some View {
+        stepContent(
+            eyebrow: "First block",
+            title: "Start with 30 minutes.",
+            body: "Blanked will shield your selected apps now. If you need to stop early, use Emergency Unlock.",
+            statusText: trialStarted ? "Trial started" : nil,
+            primaryTitle: "Start first block",
+            secondaryTitle: "Go to Home",
+            primaryAction: startFirstBlock,
+            secondaryAction: finishWithoutStarting
+        )
     }
 
     private func stepContent(
@@ -263,7 +577,7 @@ struct SetupView: View {
             }
 
             Button(primaryTitle, action: primaryAction)
-                .buttonStyle(BlankPrimaryButtonStyle())
+                .buttonStyle(BlankPrimaryButtonStyle(light: true))
                 .frame(width: onboardingButtonWidth(for: primaryTitle))
                 .padding(.top, 12)
 
@@ -283,11 +597,11 @@ struct SetupView: View {
     }
 
     private var stepIndicator: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             ForEach(OnboardingStep.allCases, id: \.rawValue) { step in
                 Capsule()
                     .fill(step.rawValue <= currentStep.rawValue ? BlankColors.ink : BlankColors.line)
-                    .frame(width: step == currentStep ? 22 : 8, height: 8)
+                    .frame(width: step == currentStep ? 18 : 6, height: 6)
             }
         }
     }
@@ -311,14 +625,72 @@ struct SetupView: View {
         }
     }
 
-    private func selectGoal(_ option: OnboardingOption) {
-        onboardingGoal = option.title
-        goForward()
+    private var displayName: String {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanName.isEmpty ? "You" : cleanName
     }
 
-    private func selectWeakMoment(_ option: OnboardingOption) {
-        weakMoment = option.title
-        goForward()
+    private var lostDaysThisYear: Int {
+        let calendar = Calendar.current
+        let now = Date()
+        let end = calendar.date(from: DateComponents(year: 2027, month: 1, day: 1)) ?? now
+        let days = max(1, calendar.dateComponents([.day], from: now, to: end).day ?? 1)
+        return max(1, Int((Double(days) * dailyHours / 24.0).rounded()))
+    }
+
+    private var lostLifetimeYears: Int {
+        max(1, Int((dailyHours * 75.0 / 24.0).rounded()))
+    }
+
+    private var recoveredYears: Int {
+        max(1, Int((Double(lostLifetimeYears) * 0.38).rounded()))
+    }
+
+    private func formattedHours(_ value: Double) -> String {
+        if value.rounded() == value {
+            return "\(Int(value))h"
+        }
+        return String(format: "%.1fh", value)
+    }
+
+    private func requestNotifications() {
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+                notificationStatus = granted ? "On" : "Off"
+                goForward()
+            } catch {
+                notificationStatus = "Off"
+                message = "Notifications were not enabled. You can turn them on later."
+            }
+        }
+    }
+
+    private func purchaseSelectedPlan() {
+        let productId = selectedPlan == .annual
+            ? StoreKitPurchaseStore.annualProductId
+            : StoreKitPurchaseStore.monthlyProductId
+
+        Task {
+            if await purchaseStore.purchase(productId: productId) {
+                trialStarted = true
+                goForward()
+            }
+        }
+    }
+
+    private func refreshNotificationStatus() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        switch settings.authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            notificationStatus = "On"
+        case .denied:
+            notificationStatus = "Off"
+        case .notDetermined:
+            notificationStatus = "Off"
+        @unknown default:
+            notificationStatus = "Off"
+        }
     }
 
     private func authorizeScreenTime() {
@@ -401,8 +773,8 @@ struct SetupView: View {
     #endif
 
     private func onboardingButtonWidth(for title: String) -> CGFloat {
-        let estimated = CGFloat(title.count) * 8.6 + 64
-        return min(max(estimated, 184), 276)
+        let estimated = CGFloat(title.count) * 8.2 + 66
+        return min(max(estimated, 184), 316)
     }
 }
 
@@ -424,103 +796,135 @@ private struct OnboardingHeader: View {
                 .foregroundStyle(BlankColors.mutedInk)
 
             Text(title)
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 31, weight: .medium, relativeTo: .largeTitle))
                 .multilineTextAlignment(.center)
                 .lineSpacing(1)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
+                .lineLimit(4)
+                .minimumScaleFactor(0.76)
                 .frame(maxWidth: 354)
 
-            Text(bodyText)
-                .font(.blankInter(size: 16, relativeTo: .body))
-                .foregroundStyle(BlankColors.mutedInk)
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-                .padding(.top, 2)
+            if !bodyText.isEmpty {
+                Text(bodyText)
+                    .font(.blankInter(size: 16, relativeTo: .body))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: 342)
+                    .padding(.top, 2)
+            }
         }
     }
 }
 
-private struct OnboardingMark: View {
+private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
-            Circle()
-                .fill(Color.white.opacity(0.32))
-            Circle()
-                .stroke(BlankColors.glassBorder, lineWidth: 1)
-            Image(systemName: "hourglass")
-                .font(.system(size: 25, weight: .medium))
-                .foregroundStyle(BlankColors.ink)
+            BlankAtmosphericBackground(dimmed: true)
+            Color.white.opacity(0.78).ignoresSafeArea()
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.18),
+                    BlankColors.airMist.opacity(0.20),
+                    Color.white.opacity(0.50)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
         }
-        .frame(width: 68, height: 68)
-        .shadow(color: BlankColors.ink.opacity(0.06), radius: 14, y: 8)
     }
 }
 
-private struct OnboardingBenefit: View {
+private struct TrialComparisonCard: View {
+    let title: String
+    let main: String
+    let caption: String
+    let tallBars: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(main)
+                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
+                Text(caption)
+                    .font(.blankInter(size: 11, relativeTo: .caption2))
+                    .foregroundStyle(BlankColors.mutedInk)
+            }
+            HStack(alignment: .bottom, spacing: 7) {
+                ForEach(0..<4, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(index == 2 ? BlankColors.airBlue : BlankColors.ink.opacity(0.28))
+                        .frame(width: 18, height: tallBars ? CGFloat(34 + index * 6) : CGFloat(10 + index * 2))
+                }
+            }
+        }
+        .foregroundStyle(BlankColors.ink)
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.30)
+    }
+}
+
+private struct TrialTimelineRow: View {
     let icon: String
     let title: String
+    let body: String
 
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 15, weight: .semibold))
-                .frame(width: 28, height: 28)
+                .frame(width: 30, height: 30)
                 .foregroundStyle(BlankColors.ink)
-            Text(title)
-                .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
-                .foregroundStyle(BlankColors.ink)
-                .lineLimit(2)
+                .background(Circle().fill(Color.white.opacity(0.64)))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                Text(body)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .lineLimit(2)
+            }
+
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: 342)
-        .frame(height: 52)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+        .padding(.horizontal, 13)
+        .frame(height: 58)
+        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.26)
     }
 }
 
-private struct OnboardingOptionRow: View {
-    let option: OnboardingOption
-    let isSelected: Bool
+private struct PlanButton: View {
+    let title: String
+    let price: String
+    let detail: String
+    let selected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: option.icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(BlankColors.ink)
-                    .frame(width: 34, height: 34)
-                    .background {
-                        Circle()
-                            .fill(Color.white.opacity(isSelected ? 0.58 : 0.30))
-                    }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(option.title)
-                        .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-                        .foregroundStyle(BlankColors.ink)
-                    Text(option.subtitle)
-                        .font(.blankInter(size: 13, relativeTo: .footnote))
-                        .foregroundStyle(BlankColors.mutedInk)
-                        .lineLimit(2)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(title)
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    Spacer()
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16, weight: .semibold))
                 }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "chevron.right")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(isSelected ? BlankColors.ink : BlankColors.mutedInk)
+                Text(price)
+                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                Text(detail)
+                    .font(.blankInter(size: 11, relativeTo: .caption2))
+                    .foregroundStyle(BlankColors.mutedInk)
             }
-            .padding(.horizontal, 15)
-            .frame(height: 72)
-            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .foregroundStyle(BlankColors.ink)
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+            .blankGlassCard(cornerRadius: 16, tintOpacity: selected ? 0.48 : 0.26)
         }
         .buttonStyle(.plain)
-        .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.42 : 0.28)
     }
 }

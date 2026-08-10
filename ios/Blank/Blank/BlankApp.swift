@@ -4,6 +4,7 @@ import SwiftUI
 struct BlankApp: App {
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var membershipStore = MembershipStore()
+    @StateObject private var purchaseStore = StoreKitPurchaseStore()
     @StateObject private var screenTimeBlocker = ScreenTimeBlocker()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -12,17 +13,26 @@ struct BlankApp: App {
             ContentView()
                 .environmentObject(sessionStore)
                 .environmentObject(membershipStore)
+                .environmentObject(purchaseStore)
                 .environmentObject(screenTimeBlocker)
                 .environment(\.font, .blankBody)
                 .task {
-                    await membershipStore.refreshIfNeeded()
+                    await purchaseStore.loadProducts()
+                    if BlankedRuntimeMode.legacyAccessEnabled {
+                        await membershipStore.refreshIfNeeded()
+                    }
                     await screenTimeBlocker.restore(selection: sessionStore.selection)
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 }
+                .task {
+                    await purchaseStore.observeTransactionUpdates()
+                }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
-                        Task {
-                            await membershipStore.refreshIfNeeded(force: true)
+                        if BlankedRuntimeMode.legacyAccessEnabled {
+                            Task {
+                                await membershipStore.refreshIfNeeded(force: true)
+                            }
                         }
                         screenTimeBlocker.refreshAuthorizationStatus()
                     }

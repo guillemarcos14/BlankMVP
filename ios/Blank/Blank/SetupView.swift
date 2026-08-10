@@ -1,5 +1,6 @@
 import FamilyControls
 import SwiftUI
+import UIKit
 import UserNotifications
 
 private enum OnboardingStep: Int, CaseIterable {
@@ -36,6 +37,8 @@ struct SetupView: View {
     @State private var dailyHours = 4.5
     @State private var selectedPlan: OnboardingPlan = .annual
     @State private var commitmentComplete = false
+    @State private var commitmentSeconds = 0
+    @State private var commitmentTimer: Timer?
     @State private var notificationStatus = "Off"
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
@@ -147,21 +150,21 @@ struct SetupView: View {
         switch currentStep {
         case .awareness:
             simpleStatement(
-                title: "You are losing more time than you think.",
+                title: "You are losing more time than you think. And you know it.",
                 body: nil,
                 button: "Continue"
             )
         case .lifetime:
             simpleStatement(
-                title: "The average person loses",
+                title: "The average person loses to their phone screen",
                 body: "13 years",
                 bodyColor: BlankColors.red,
                 button: "Continue"
             )
         case .dopamine:
             simpleStatement(
-                title: "Apps are not neutral.",
-                body: "They are training your attention.",
+                title: "Dopamine is a powerful drug.",
+                body: "Your phone keeps dosing you.",
                 bodyColor: BlankColors.red,
                 button: "Continue"
             )
@@ -233,7 +236,7 @@ struct SetupView: View {
     private var nameStep: some View {
         VStack(spacing: 20) {
             OnboardingHeader(
-                eyebrow: "Your result",
+                eyebrow: "Personalize",
                 title: "Let's calculate how much life your phone is taking.",
                 body: "What should Blanked call you?"
             )
@@ -317,7 +320,7 @@ struct SetupView: View {
                     .font(.blankInter(size: 38, weight: .semibold, relativeTo: .largeTitle))
                     .foregroundStyle(BlankColors.red)
 
-                Text("in the rest of 2026")
+                Text("lost in 2026")
                     .font(.blankInter(size: 14, relativeTo: .footnote))
                     .foregroundStyle(Color.white.opacity(0.70))
 
@@ -433,7 +436,7 @@ struct SetupView: View {
             OnboardingHeader(
                 eyebrow: "Commitment",
                 title: "I want to take control of my life.",
-                body: "Hold the button to continue."
+                body: "Hold the button for 5 seconds."
             )
 
             Button {
@@ -448,16 +451,22 @@ struct SetupView: View {
                     .background(Circle().fill(Color.white.opacity(0.82)))
             }
             .buttonStyle(.plain)
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 1.2).onEnded { _ in
-                    commitmentComplete = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                        goForward()
+            .onLongPressGesture(
+                minimumDuration: 5,
+                maximumDistance: 48,
+                pressing: { isPressing in
+                    if isPressing {
+                        startCommitmentHold()
+                    } else if !commitmentComplete {
+                        cancelCommitmentHold()
                     }
+                },
+                perform: {
+                    completeCommitmentHold()
                 }
             )
 
-            Text(commitmentComplete ? "Done" : "Keep holding")
+            Text(commitmentComplete ? "Done" : "Hold for \(max(0, 5 - commitmentSeconds))s")
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
                 .foregroundStyle(Color.white.opacity(0.72))
         }
@@ -473,7 +482,7 @@ struct SetupView: View {
 
             HStack(spacing: 10) {
                 TrialComparisonCard(title: "Without Blanked", main: formattedHours(dailyHours), caption: "daily screen time", tallBars: true)
-                TrialComparisonCard(title: "With Blanked", main: formattedHours(max(1.0, dailyHours * 0.38)), caption: "target daily use", tallBars: false)
+                TrialComparisonCard(title: "With Blanked", main: formattedHours(max(1.0, dailyHours * 0.70)), caption: "target daily use", tallBars: false)
             }
             .frame(maxWidth: 342)
 
@@ -657,19 +666,15 @@ struct SetupView: View {
     }
 
     private var lostDaysThisYear: Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let end = calendar.date(from: DateComponents(year: 2027, month: 1, day: 1)) ?? now
-        let days = max(1, calendar.dateComponents([.day], from: now, to: end).day ?? 1)
-        return max(1, Int((Double(days) * dailyHours / 24.0).rounded()))
+        max(1, Int((365.0 * dailyHours / 24.0).rounded()))
     }
 
     private var lostLifetimeYears: Int {
-        max(1, Int((dailyHours * 75.0 / 24.0).rounded()))
+        max(1, Int((dailyHours * 84.1 / 24.0).rounded()))
     }
 
     private var recoveredYears: Int {
-        max(1, Int((Double(lostLifetimeYears) * 0.38).rounded()))
+        max(1, Int((dailyHours * 0.30 * 84.1 / 24.0).rounded()))
     }
 
     private func formattedHours(_ value: Double) -> String {
@@ -717,6 +722,39 @@ struct SetupView: View {
         @unknown default:
             notificationStatus = "Off"
         }
+    }
+
+    private func startCommitmentHold() {
+        guard commitmentTimer == nil, !commitmentComplete else { return }
+        commitmentSeconds = 0
+        commitmentTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            commitmentSeconds += 1
+            playCommitmentHaptic()
+            if commitmentSeconds >= 5 {
+                timer.invalidate()
+                commitmentTimer = nil
+            }
+        }
+    }
+
+    private func cancelCommitmentHold() {
+        commitmentTimer?.invalidate()
+        commitmentTimer = nil
+        commitmentSeconds = 0
+    }
+
+    private func completeCommitmentHold() {
+        commitmentTimer?.invalidate()
+        commitmentTimer = nil
+        commitmentSeconds = 5
+        commitmentComplete = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            goForward()
+        }
+    }
+
+    private func playCommitmentHaptic() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func authorizeScreenTime() {

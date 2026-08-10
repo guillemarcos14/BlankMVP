@@ -234,6 +234,13 @@ final class SessionStore: ObservableObject {
         return .schedulePaused
     }
 
+    func unlockWithHold(minutes: Int = 5) -> NfcResult {
+        if schedule.enabled, schedule.contains(Date()) {
+            schedulePausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        }
+        return deactivateBlank(entryMode: .app, endedReason: .unknown, broken: true)
+    }
+
     func deactivateBlank(
         entryMode: BlankEntryMode = .app,
         endedReason: BlankEndedReason = .unknown,

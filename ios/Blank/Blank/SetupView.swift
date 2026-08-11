@@ -8,15 +8,14 @@ private enum OnboardingStep: Int, CaseIterable {
     case lifetime
     case dopamine
     case name
-    case dailyUse
-    case result
-    case recovery
-    case account
     case goal
     case age
     case profile
-    case commitment
+    case dailyUse
+    case result
     case trial
+    case account
+    case commitment
     case permission
     case notifications
     case apps
@@ -48,7 +47,6 @@ struct SetupView: View {
     @State private var dopaminePulsePhase = 0.0
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
-    @State private var animatedRecoveredYears = 0
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -184,24 +182,22 @@ struct SetupView: View {
             dopamineStep
         case .name:
             nameStep
-        case .dailyUse:
-            dailyUseStep
-        case .result:
-            resultStep
-        case .recovery:
-            recoveryStep
         case .goal:
             goalStep
         case .age:
             ageStep
         case .profile:
             profileStep
+        case .dailyUse:
+            dailyUseStep
+        case .result:
+            resultStep
+        case .trial:
+            trialStep
         case .account:
             accountStep
         case .commitment:
             commitmentStep
-        case .trial:
-            trialStep
         case .permission:
             permissionStep
         case .notifications:
@@ -373,6 +369,8 @@ struct SetupView: View {
 
     private var dailyUseStep: some View {
         VStack(spacing: 22) {
+            Spacer(minLength: 54)
+
             OnboardingHeader(
                 eyebrow: "",
                 title: "How much time do you spend on your phone daily?",
@@ -407,6 +405,8 @@ struct SetupView: View {
 
     private var resultStep: some View {
         VStack(spacing: 22) {
+            Spacer(minLength: 54)
+
             OnboardingHeader(
                 eyebrow: "",
                 title: "This is what your phone could cost you.",
@@ -434,59 +434,15 @@ struct SetupView: View {
 
             Spacer(minLength: 28)
 
-            Button("See what I can recover") {
+            Button("Continue") {
                 onboardingGoal = "Recover control from distracting apps"
                 weakMoment = "When scrolling takes over"
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "See what I can recover"))
+            .frame(width: onboardingButtonWidth(for: "Continue"))
         }
         .frame(maxHeight: .infinity)
-    }
-
-    private var recoveryStep: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 96)
-
-            Text("Blanked can help you get that time back.")
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-
-            VStack(spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("+\(animatedRecoveredYears)")
-                        .font(.blankInter(size: 48, weight: .semibold, relativeTo: .largeTitle))
-                        .monospacedDigit()
-
-                    Text("years")
-                        .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
-                        .foregroundStyle(Color(red: 0.278, green: 0.780, blue: 0.506).opacity(0.82))
-                }
-                .foregroundStyle(Color(red: 0.278, green: 0.780, blue: 0.506))
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-
-                Text("recovered over a lifetime")
-                    .font(.blankInter(size: 15, relativeTo: .subheadline))
-                    .foregroundStyle(Color.white.opacity(0.66))
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: 342)
-            .onAppear {
-                startRecoveryCountAnimation()
-            }
-
-            Spacer(minLength: 28)
-
-            Button("Start recovering") {
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Start recovering"))
-        }
     }
 
     private var goalStep: some View {
@@ -856,7 +812,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps, .firstBlock:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .goal, .age, .profile, .notifications, .permission, .apps, .firstBlock:
             return true
         case .account, .commitment, .trial:
             return false
@@ -894,10 +850,6 @@ struct SetupView: View {
         max(1, Int((dailyHours * 84.1 / 24.0).rounded()))
     }
 
-    private var recoveredYears: Int {
-        max(1, Int((dailyHours * 0.30 * 84.1 / 24.0).rounded()))
-    }
-
     private func formattedHours(_ value: Double) -> String {
         if value.rounded() == value {
             return "\(Int(value))h"
@@ -921,21 +873,6 @@ struct SetupView: View {
             }
             animatedLostDays = targetDays
             animatedLostYears = targetYears
-        }
-    }
-
-    private func startRecoveryCountAnimation() {
-        let targetYears = recoveredYears
-        animatedRecoveredYears = 0
-
-        Task { @MainActor in
-            for frame in 1...34 {
-                try? await Task.sleep(nanoseconds: 20_000_000)
-                let progress = Double(frame) / 34.0
-                let easedProgress = 1.0 - pow(1.0 - progress, 3.0)
-                animatedRecoveredYears = Int((Double(targetYears) * easedProgress).rounded())
-            }
-            animatedRecoveredYears = targetYears
         }
     }
 

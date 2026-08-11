@@ -625,9 +625,6 @@ struct SetupView: View {
             )
 
             Button {
-                if commitmentComplete {
-                    goForward()
-                }
             } label: {
                 Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
                     .font(.system(size: 25, weight: .semibold))
@@ -658,42 +655,39 @@ struct SetupView: View {
     }
 
     private var trialStep: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             OnboardingHeader(
-                eyebrow: "Free trial",
-                title: "Start your free trial.",
-                body: "Full access today. Cancel any time before the trial ends."
+                eyebrow: "",
+                title: "Start recovering your time.",
+                body: "Full access today. 3 days free. Then 19.99 EUR/year. Cancel anytime."
             )
 
-            HStack(spacing: 10) {
-                TrialComparisonCard(title: "Without Blanked", main: formattedHours(dailyHours), caption: "daily screen time", tallBars: true)
-                TrialComparisonCard(title: "With Blanked", main: formattedHours(max(1.0, dailyHours * 0.70)), caption: "target daily use", tallBars: false)
-            }
-            .frame(maxWidth: 342)
-
             VStack(spacing: 12) {
-                TrialTimelineRow(title: "Today", detail: "Unlock Blanked and set your first block.")
-                TrialTimelineRow(title: "In 2 days", detail: "We remind you before the trial ends.")
-            }
-            .frame(maxWidth: 342)
-
-            HStack(spacing: 10) {
-                PlanButton(
-                    title: "Monthly",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
-                    detail: "35.88 EUR/year",
-                    selected: selectedPlan == .monthly
-                ) {
-                    selectedPlan = .monthly
-                }
                 PlanButton(
                     title: "Annual",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "19.99 EUR"),
                     detail: "per year",
+                    badge: "Best value",
                     selected: selectedPlan == .annual
                 ) {
                     selectedPlan = .annual
                 }
+
+                PlanButton(
+                    title: "Monthly",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
+                    detail: "per month",
+                    badge: nil,
+                    selected: selectedPlan == .monthly
+                ) {
+                    selectedPlan = .monthly
+                }
+            }
+            .frame(maxWidth: 342)
+
+            HStack(spacing: 10) {
+                TrialTimelineRow(title: "Today", detail: "Start your free trial.")
+                TrialTimelineRow(title: "In 2 days", detail: "We remind you before billing.")
             }
             .frame(maxWidth: 342)
 
@@ -704,11 +698,11 @@ struct SetupView: View {
                     ProgressView()
                         .tint(BlankColors.ink)
                 } else {
-                    Text("Start my 3-day FREE trial")
+                    Text("Start free trial")
                 }
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Start my 3-day FREE trial"))
+            .frame(width: onboardingButtonWidth(for: "Start free trial"))
 
             Button("Restore purchases") {
                 Task {
@@ -722,7 +716,7 @@ struct SetupView: View {
             .buttonStyle(BlankSecondaryButtonStyle())
             .frame(width: 224)
 
-            Text("3 days free. Then \(selectedPlan == .annual ? "19.99 EUR/year" : "2.99 EUR/month"). Auto-renewable. Cancel any time in App Store settings. Terms and Privacy apply.")
+            Text("Full access today. 3 days free. Then \(selectedPlan == .annual ? "19.99 EUR/year" : "2.99 EUR/month"). Cancel anytime in App Store settings. Terms and Privacy apply.")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
                 .foregroundStyle(BlankColors.mutedInk)
                 .multilineTextAlignment(.center)
@@ -1034,9 +1028,7 @@ struct SetupView: View {
         commitmentTimer = nil
         commitmentSeconds = 3
         commitmentComplete = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            goForward()
-        }
+        goForward()
     }
 
     private func playCommitmentHaptic() {
@@ -1362,45 +1354,6 @@ private struct DopamineSignalView: View {
     }
 }
 
-private struct TrialComparisonCard: View {
-    let title: String
-    let main: String
-    let caption: String
-    let tallBars: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(main)
-                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
-                Text(caption)
-                    .font(.blankInter(size: 11, relativeTo: .caption2))
-                    .foregroundStyle(BlankColors.ink.opacity(0.62))
-            }
-            HStack(alignment: .bottom, spacing: 7) {
-                ForEach(0..<4, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(index == 2 ? BlankColors.airBlue : BlankColors.ink.opacity(0.28))
-                        .frame(width: 18, height: tallBars ? CGFloat(34 + index * 6) : CGFloat(10 + index * 2))
-                }
-            }
-        }
-        .foregroundStyle(BlankColors.ink)
-        .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.82))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.32), lineWidth: 1)
-        }
-    }
-}
-
 private struct TrialTimelineRow: View {
     let title: String
     let detail: String
@@ -1436,16 +1389,25 @@ private struct PlanButton: View {
     let title: String
     let price: String
     let detail: String
+    let badge: String?
     let selected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack {
                     Text(title)
                         .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                     Spacer()
+                    if let badge {
+                        Text(badge)
+                            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+                            .foregroundStyle(BlankColors.ink.opacity(0.72))
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .background(Capsule().fill(BlankColors.airMist.opacity(0.50)))
+                    }
                     Circle()
                         .fill(selected ? BlankColors.ink : Color.clear)
                         .frame(width: 10, height: 10)
@@ -1463,7 +1425,7 @@ private struct PlanButton: View {
             }
             .foregroundStyle(BlankColors.ink)
             .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: badge == nil ? 86 : 98, alignment: .topLeading)
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(Color.white.opacity(selected ? 0.90 : 0.78))

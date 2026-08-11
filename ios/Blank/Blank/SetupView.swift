@@ -40,6 +40,9 @@ struct SetupView: View {
     @State private var commitmentSeconds = 0
     @State private var commitmentTimer: Timer?
     @State private var notificationStatus = "Off"
+    @State private var lifetimeRingProgress = 0.0
+    @State private var lifetimeYears = 0
+    @State private var dopaminePulsePhase = 0.0
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -72,45 +75,48 @@ struct SetupView: View {
                 }
                 .padding(.top, 2)
 
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 22) {
-                        content
+                GeometryReader { proxy in
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 22) {
+                            content
+                                .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 96) : nil)
 
-                        if let message {
-                            Text(message)
-                                .font(.blankInter(size: 13, relativeTo: .footnote))
-                                .foregroundStyle(BlankColors.secondaryText)
-                                .multilineTextAlignment(.center)
-                                .lineSpacing(2)
-                                .frame(maxWidth: 330)
-                        }
+                            if let message {
+                                Text(message)
+                                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                                    .foregroundStyle(BlankColors.secondaryText)
+                                    .multilineTextAlignment(.center)
+                                    .lineSpacing(2)
+                                    .frame(maxWidth: 330)
+                            }
 
-                        #if DEBUG
-                        #if targetEnvironment(simulator)
-                        HStack(spacing: 10) {
-                            Button("Prev") {
-                                goBack()
+                            #if DEBUG
+                            #if targetEnvironment(simulator)
+                            HStack(spacing: 10) {
+                                Button("Prev") {
+                                    goBack()
+                                }
+                                .buttonStyle(BlankSecondaryButtonStyle())
+
+                                Button("Next") {
+                                    goForward()
+                                }
+                                .buttonStyle(BlankSecondaryButtonStyle())
+                            }
+                            .frame(maxWidth: 270)
+
+                            Button("Enter Home in simulator") {
+                                enterSimulatorHome()
                             }
                             .buttonStyle(BlankSecondaryButtonStyle())
-
-                            Button("Next") {
-                                goForward()
-                            }
-                            .buttonStyle(BlankSecondaryButtonStyle())
+                            .frame(width: onboardingButtonWidth(for: "Enter Home in simulator"))
+                            #endif
+                            #endif
                         }
-                        .frame(maxWidth: 270)
-
-                        Button("Enter Home in simulator") {
-                            enterSimulatorHome()
-                        }
-                        .buttonStyle(BlankSecondaryButtonStyle())
-                        .frame(width: onboardingButtonWidth(for: "Enter Home in simulator"))
-                        #endif
-                        #endif
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 34)
+                        .padding(.bottom, 28)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 34)
-                    .padding(.bottom, 28)
                 }
 
                 stepIndicator
@@ -136,6 +142,13 @@ struct SetupView: View {
                 await refreshNotificationStatus()
             }
         }
+        .onChange(of: currentStep) { step in
+            if step == .lifetime {
+                startLifetimeAnimation()
+            } else if step == .dopamine {
+                startDopamineAnimation()
+            }
+        }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             if currentStep == .apps, sessionStore.hasSelectedApps {
@@ -150,24 +163,16 @@ struct SetupView: View {
         switch currentStep {
         case .awareness:
             simpleStatement(
-                title: "You are losing more time than you think. And you know it.",
-                body: nil,
+                title: "Your phone is taking more of your life than you think.",
+                body: "Let's see how much.",
+                bodySize: 18,
+                bodyColor: Color.white.opacity(0.68),
                 button: "Continue"
             )
         case .lifetime:
-            simpleStatement(
-                title: "The average person loses to their phone screen",
-                body: "13 years",
-                bodyColor: BlankColors.red,
-                button: "Continue"
-            )
+            lifetimeStep
         case .dopamine:
-            simpleStatement(
-                title: "Dopamine is a powerful drug.",
-                body: "Your phone keeps dosing you.",
-                bodyColor: BlankColors.red,
-                button: "Continue"
-            )
+            dopamineStep
         case .name:
             nameStep
         case .dailyUse:
@@ -201,11 +206,12 @@ struct SetupView: View {
     private func simpleStatement(
         title: String,
         body: String?,
+        bodySize: CGFloat = 44,
         bodyColor: Color = BlankColors.ink,
         button: String
     ) -> some View {
         VStack(spacing: 24) {
-            Spacer(minLength: 132)
+            Spacer(minLength: 96)
 
             Text(title)
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
@@ -215,7 +221,7 @@ struct SetupView: View {
 
             if let body {
                 Text(body)
-                    .font(.blankInter(size: 44, weight: .semibold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: bodySize, weight: .semibold, relativeTo: .largeTitle))
                     .foregroundStyle(bodyColor)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -223,7 +229,7 @@ struct SetupView: View {
                     .frame(maxWidth: 342)
             }
 
-            Spacer(minLength: 96)
+            Spacer(minLength: 28)
 
             Button(button) {
                 goForward()
@@ -234,34 +240,125 @@ struct SetupView: View {
     }
 
     private var nameStep: some View {
-        VStack(spacing: 20) {
-            OnboardingHeader(
-                eyebrow: "Personalize",
-                title: "Let's calculate how much life your phone is taking.",
-                body: "What should Blanked call you?"
-            )
+        VStack(spacing: 22) {
+            Spacer(minLength: 116)
+
+            Text("What should we call you?")
+                .font(.blankInter(size: 31, weight: .medium, relativeTo: .largeTitle))
+                .multilineTextAlignment(.center)
+                .lineSpacing(1)
+                .lineLimit(3)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: 342)
 
             TextField("Your name", text: $name)
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
                 .font(.blankInter(size: 18, weight: .medium, relativeTo: .body))
                 .foregroundStyle(BlankColors.ink)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
                 .padding(.horizontal, 18)
                 .frame(height: 54)
                 .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
                 .frame(maxWidth: 314)
-                .padding(.top, 8)
+                .padding(.top, 2)
 
-            Button(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Continue" : "Calculate") {
+            Spacer(minLength: 28)
+
+            Button("Continue") {
                 if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     name = "You"
                 }
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Calculate"))
+            .frame(width: onboardingButtonWidth(for: "Continue"))
         }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var lifetimeStep: some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 92)
+
+            Text("The average person loses\nto their phone screen")
+                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 342)
+
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.10), lineWidth: 7)
+
+                Circle()
+                    .trim(from: 0, to: lifetimeRingProgress)
+                    .stroke(
+                        Color.white.opacity(0.72),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+
+                VStack(spacing: 5) {
+                    Text("\(lifetimeYears) years")
+                        .font(.blankInter(size: 35, weight: .semibold, relativeTo: .largeTitle))
+                        .foregroundStyle(Color.white)
+
+                    Text("Over a lifetime")
+                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.54))
+                }
+            }
+            .frame(width: 176, height: 176)
+            .padding(.top, 6)
+            .onAppear {
+                startLifetimeAnimation()
+            }
+
+            Spacer(minLength: 28)
+
+            Button("Continue") {
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Continue"))
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var dopamineStep: some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 92)
+
+            Text("Dopamine is a powerful drug.")
+                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 342)
+
+            DopamineSignalView(phase: dopaminePulsePhase)
+                .frame(width: 250, height: 112)
+                .padding(.top, 10)
+                .onAppear {
+                    startDopamineAnimation()
+                }
+
+            Text("Your phone keeps dosing you.")
+                .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
+                .foregroundStyle(Color.white.opacity(0.76))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 310)
+
+            Spacer(minLength: 28)
+
+            Button("Continue") {
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Continue"))
+        }
+        .frame(maxHeight: .infinity)
     }
 
     private var dailyUseStep: some View {
@@ -286,6 +383,8 @@ struct SetupView: View {
             .frame(maxWidth: 342)
             .padding(.top, 12)
 
+            Spacer(minLength: 28)
+
             Button("Calculate time lost") {
                 storedDailyHours = dailyHours
                 goForward()
@@ -293,6 +392,7 @@ struct SetupView: View {
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
             .frame(width: onboardingButtonWidth(for: "Calculate time lost"))
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var resultStep: some View {
@@ -345,6 +445,8 @@ struct SetupView: View {
                     .stroke(Color.white.opacity(0.12), lineWidth: 1)
             }
 
+            Spacer(minLength: 28)
+
             Button("Continue") {
                 onboardingGoal = "Recover control from distracting apps"
                 weakMoment = "When scrolling takes over"
@@ -353,6 +455,7 @@ struct SetupView: View {
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
             .frame(width: onboardingButtonWidth(for: "Continue"))
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var accountStep: some View {
@@ -417,6 +520,8 @@ struct SetupView: View {
 
             StatusPill(text: "Notifications: \(notificationStatus)")
 
+            Spacer(minLength: 28)
+
             Button("Allow notifications") {
                 requestNotifications()
             }
@@ -429,6 +534,7 @@ struct SetupView: View {
             .buttonStyle(BlankSecondaryButtonStyle())
             .frame(width: 184)
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var commitmentStep: some View {
@@ -617,6 +723,8 @@ struct SetupView: View {
                     .padding(.top, 8)
             }
 
+            Spacer(minLength: 28)
+
             Button(primaryTitle, action: primaryAction)
                 .buttonStyle(BlankPrimaryButtonStyle(light: true))
                 .frame(width: onboardingButtonWidth(for: primaryTitle))
@@ -628,6 +736,7 @@ struct SetupView: View {
                     .frame(width: onboardingButtonWidth(for: secondaryTitle))
             }
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var screenTimeDescription: String {
@@ -635,6 +744,15 @@ struct SetupView: View {
             return "Screen Time is enabled. Blanked can now apply shields to the apps you choose."
         }
         return "Apple requires this permission before Blanked can block apps. You choose the apps; Blanked cannot see private usage details."
+    }
+
+    private var usesAnchoredPrimaryAction: Bool {
+        switch currentStep {
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .notifications, .permission, .apps, .firstBlock:
+            return true
+        case .account, .commitment, .trial:
+            return false
+        }
     }
 
     private var stepIndicator: some View {
@@ -721,6 +839,29 @@ struct SetupView: View {
             notificationStatus = "Off"
         @unknown default:
             notificationStatus = "Off"
+        }
+    }
+
+    private func startLifetimeAnimation() {
+        lifetimeRingProgress = 0
+        lifetimeYears = 0
+
+        withAnimation(.easeOut(duration: 0.9)) {
+            lifetimeRingProgress = 0.78
+        }
+
+        Task { @MainActor in
+            for year in 1...13 {
+                try? await Task.sleep(nanoseconds: 42_000_000)
+                lifetimeYears = year
+            }
+        }
+    }
+
+    private func startDopamineAnimation() {
+        dopaminePulsePhase = 0
+        withAnimation(.easeInOut(duration: 1.45).repeatForever(autoreverses: false)) {
+            dopaminePulsePhase = 1
         }
     }
 
@@ -921,6 +1062,86 @@ private struct SocialLoginButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct DopamineSignalView: View {
+    let phase: Double
+
+    var body: some View {
+        VStack(spacing: 16) {
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                let height = proxy.size.height
+                let centerY = height * 0.45
+                let points = [
+                    CGPoint(x: width * 0.16, y: centerY),
+                    CGPoint(x: width * 0.36, y: centerY),
+                    CGPoint(x: width * 0.50, y: height * 0.22),
+                    CGPoint(x: width * 0.64, y: height * 0.68),
+                    CGPoint(x: width * 0.80, y: centerY)
+                ]
+
+                ZStack {
+                    Path { path in
+                        path.move(to: points[0])
+                        points.dropFirst().forEach { point in
+                            path.addLine(to: point)
+                        }
+                    }
+                    .trim(from: 0, to: 0.96)
+                    .stroke(
+                        Color.white.opacity(0.28),
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                    )
+
+                    Path { path in
+                        path.move(to: points[0])
+                        points.dropFirst().forEach { point in
+                            path.addLine(to: point)
+                        }
+                    }
+                    .trim(from: max(0, phase - 0.22), to: phase)
+                    .stroke(
+                        Color.white.opacity(0.88),
+                        style: StrokeStyle(lineWidth: 2.8, lineCap: .round, lineJoin: .round)
+                    )
+
+                    ForEach(0..<3, id: \.self) { index in
+                        let x = [width * 0.16, width * 0.50, width * 0.80][index]
+                        let distance = abs(phase - [0.02, 0.50, 0.94][index])
+                        let active = max(0, 1 - distance * 7)
+
+                        Circle()
+                            .fill(Color.white.opacity(0.42 + active * 0.42))
+                            .frame(width: 8 + active * 4, height: 8 + active * 4)
+                            .position(x: x, y: centerY)
+                    }
+                }
+            }
+            .frame(height: 66)
+
+            HStack {
+                Text("Cue")
+                Spacer()
+                Text("Scroll")
+                Spacer()
+                Text("Reward")
+            }
+            .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+            .foregroundStyle(Color.white.opacity(0.52))
+            .frame(width: 214)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        }
     }
 }
 

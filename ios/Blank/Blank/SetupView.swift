@@ -174,7 +174,7 @@ struct SetupView: View {
         switch currentStep {
         case .awareness:
             simpleStatement(
-                title: "Your phone is taking more of your life than you think.",
+                title: "Your phone is taking more of your life than you think",
                 body: "Let's see how much.",
                 bodySize: 18,
                 bodyColor: Color.white.opacity(0.68),
@@ -342,7 +342,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 92)
 
-            Text("Dopamine is a powerful drug.")
+            Text("Dopamine is a powerful drug")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -355,7 +355,7 @@ struct SetupView: View {
                     startDopamineAnimation()
                 }
 
-            Text("Your phone keeps dosing you.")
+            Text("Your phone keeps dosing you")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -415,7 +415,7 @@ struct SetupView: View {
 
             OnboardingHeader(
                 eyebrow: "",
-                title: "This is what your phone could cost you.",
+                title: "This is what your phone could cost you",
                 body: ""
             )
 
@@ -455,7 +455,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 82)
 
-            Text("Blanked can help you get that time back.")
+            Text("Blanked can help you get that time back")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -544,7 +544,7 @@ struct SetupView: View {
         VStack(spacing: 16) {
             OnboardingHeader(
                 eyebrow: "",
-                title: "Keep your progress safe.",
+                title: "Keep your progress safe",
                 body: "Sync your progress across devices. You can skip this for now."
             )
 
@@ -595,7 +595,7 @@ struct SetupView: View {
 
             OnboardingHeader(
                 eyebrow: "",
-                title: "Stay ahead of the scroll.",
+                title: "Stay ahead of the scroll",
                 body: "Blanked can remind you before your weakest moments."
             )
 
@@ -620,7 +620,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             OnboardingHeader(
                 eyebrow: "",
-                title: "I'm ready to take back control.",
+                title: "I'm ready to take back control",
                 body: "Hold for 3 seconds."
             )
 
@@ -654,7 +654,7 @@ struct SetupView: View {
         VStack(spacing: 16) {
             OnboardingHeader(
                 eyebrow: "",
-                title: "Start recovering your time.",
+                title: "Start recovering your time",
                 body: "Full access today. 3 days free. Then 19.99 EUR/year. Cancel anytime."
             )
 
@@ -681,7 +681,7 @@ struct SetupView: View {
             }
             .frame(maxWidth: 342)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 7) {
                 TrialTimelineRow(title: "Today", detail: "Start your free trial.")
                 TrialTimelineRow(title: "In 2 days", detail: "We remind you before billing.")
             }
@@ -732,7 +732,7 @@ struct SetupView: View {
     private var permissionStep: some View {
         stepContent(
             eyebrow: "Required by iOS",
-            title: "Allow Screen Time.",
+            title: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time",
             body: screenTimeDescription,
             statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time ready" : nil,
             primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
@@ -745,7 +745,7 @@ struct SetupView: View {
     private var appsStep: some View {
         stepContent(
             eyebrow: "Your blocklist",
-            title: sessionStore.hasSelectedApps ? "Your apps are protected." : "Choose what to block.",
+            title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
             body: sessionStore.hasSelectedApps
                 ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
                 : "Pick the apps, categories, or websites that usually steal your time.",
@@ -764,7 +764,7 @@ struct SetupView: View {
     private var firstBlockStep: some View {
         stepContent(
             eyebrow: "First block",
-            title: "Start with 30 minutes.",
+            title: "Start with 30 minutes",
             body: "Blanked will shield your selected apps now. If you need to stop early, use Emergency Unlock.",
             statusText: trialStarted ? "Trial started" : nil,
             primaryTitle: "Start first block",
@@ -846,9 +846,9 @@ struct SetupView: View {
 
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
-            return "Screen Time is enabled. Blanked can now apply shields to the apps you choose."
+            return "Blanked can now shield the apps you choose."
         }
-        return "Apple requires this permission before Blanked can block apps. You choose the apps; Blanked cannot see private usage details."
+        return "Apple requires this permission before Blanked can block distracting apps."
     }
 
     private var usesAnchoredPrimaryAction: Bool {
@@ -1357,13 +1357,13 @@ private struct TrialTimelineRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(title)
-                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(Color.white.opacity(0.88))
+                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(Color.white.opacity(0.74))
                 .frame(width: 66, alignment: .leading)
 
             Text(detail)
-                .font(.blankInter(size: 13, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.58))
+                .font(.blankInter(size: 12, relativeTo: .caption))
+                .foregroundStyle(Color.white.opacity(0.48))
                 .lineLimit(2)
 
             Spacer(minLength: 0)

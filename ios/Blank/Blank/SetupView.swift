@@ -392,7 +392,7 @@ struct SetupView: View {
 
                 Text("\(formattedHours(dailyHours)) / day")
                     .font(.blankInter(size: 38, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(BlankColors.red)
+                    .foregroundStyle(Color.white)
             }
             .frame(maxWidth: 342)
             .padding(.top, 12)
@@ -624,29 +624,25 @@ struct SetupView: View {
                 body: "Hold for 3 seconds."
             )
 
-            Button {
-            } label: {
-                Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(BlankColors.ink)
-                    .frame(width: 74, height: 74)
-                    .background(Circle().fill(Color.white.opacity(0.82)))
-            }
-            .buttonStyle(.plain)
-            .onLongPressGesture(
-                minimumDuration: 3,
-                maximumDistance: 48,
-                pressing: { isPressing in
-                    if isPressing {
-                        startCommitmentHold()
-                    } else if !commitmentComplete {
-                        cancelCommitmentHold()
+            Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
+                .font(.system(size: 25, weight: .semibold))
+                .foregroundStyle(BlankColors.ink)
+                .frame(width: 74, height: 74)
+                .background(Circle().fill(Color.white.opacity(0.82)))
+                .onLongPressGesture(
+                    minimumDuration: 3,
+                    maximumDistance: 48,
+                    pressing: { isPressing in
+                        if isPressing {
+                            startCommitmentHold()
+                        } else if !commitmentComplete {
+                            cancelCommitmentHold()
+                        }
+                    },
+                    perform: {
+                        completeCommitmentHold()
                     }
-                },
-                perform: {
-                    completeCommitmentHold()
-                }
-            )
+                )
 
             Text(commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s")
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
@@ -676,7 +672,7 @@ struct SetupView: View {
                 PlanButton(
                     title: "Monthly",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
-                    detail: "per month",
+                    detail: "35.88 EUR/year",
                     badge: nil,
                     selected: selectedPlan == .monthly
                 ) {
@@ -685,7 +681,7 @@ struct SetupView: View {
             }
             .frame(maxWidth: 342)
 
-            HStack(spacing: 10) {
+            VStack(spacing: 8) {
                 TrialTimelineRow(title: "Today", detail: "Start your free trial.")
                 TrialTimelineRow(title: "In 2 days", detail: "We remind you before billing.")
             }
@@ -1359,29 +1355,20 @@ private struct TrialTimelineRow: View {
     let detail: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                Text(detail)
-                    .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.ink.opacity(0.62))
-                    .lineLimit(2)
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(Color.white.opacity(0.88))
+                .frame(width: 66, alignment: .leading)
+
+            Text(detail)
+                .font(.blankInter(size: 13, relativeTo: .caption))
+                .foregroundStyle(Color.white.opacity(0.58))
+                .lineLimit(2)
 
             Spacer(minLength: 0)
         }
-        .foregroundStyle(BlankColors.ink)
-        .padding(.horizontal, 13)
-        .frame(height: 58)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.82))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.30), lineWidth: 1)
-        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

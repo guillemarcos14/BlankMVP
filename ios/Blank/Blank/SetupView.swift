@@ -13,9 +13,10 @@ private enum OnboardingStep: Int, CaseIterable {
     case profile
     case dailyUse
     case result
+    case recovery
+    case commitment
     case trial
     case account
-    case commitment
     case permission
     case notifications
     case apps
@@ -47,6 +48,7 @@ struct SetupView: View {
     @State private var dopaminePulsePhase = 0.0
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
+    @State private var animatedRecoveredYears = 0
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -86,6 +88,8 @@ struct SetupView: View {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 22) {
                             content
+                                .id(currentStep.rawValue)
+                                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .center)))
                                 .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 96) : nil)
 
                             if let message {
@@ -192,12 +196,14 @@ struct SetupView: View {
             dailyUseStep
         case .result:
             resultStep
+        case .recovery:
+            recoveryStep
+        case .commitment:
+            commitmentStep
         case .trial:
             trialStep
         case .account:
             accountStep
-        case .commitment:
-            commitmentStep
         case .permission:
             permissionStep
         case .notifications:
@@ -434,13 +440,58 @@ struct SetupView: View {
 
             Spacer(minLength: 28)
 
-            Button("Continue") {
+            Button("See what I can recover") {
                 onboardingGoal = "Recover control from distracting apps"
                 weakMoment = "When scrolling takes over"
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Continue"))
+            .frame(width: onboardingButtonWidth(for: "See what I can recover"))
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var recoveryStep: some View {
+        VStack(spacing: 24) {
+            Spacer(minLength: 82)
+
+            Text("Blanked can help you get that time back.")
+                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
+                .multilineTextAlignment(.center)
+                .lineSpacing(3)
+                .frame(maxWidth: 342)
+
+            VStack(spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("+\(animatedRecoveredYears)")
+                        .font(.blankInter(size: 50, weight: .semibold, relativeTo: .largeTitle))
+                        .monospacedDigit()
+
+                    Text("years")
+                        .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
+                        .foregroundStyle(BlankColors.airMist.opacity(0.86))
+                }
+                .foregroundStyle(BlankColors.airMist)
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+
+                Text("recovered over a lifetime")
+                    .font(.blankInter(size: 15, relativeTo: .subheadline))
+                    .foregroundStyle(Color.white.opacity(0.66))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: 342)
+            .onAppear {
+                startRecoveryCountAnimation()
+            }
+
+            Spacer(minLength: 28)
+
+            Button("Start recovering") {
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Start recovering"))
         }
         .frame(maxHeight: .infinity)
     }
@@ -568,9 +619,9 @@ struct SetupView: View {
     private var commitmentStep: some View {
         VStack(spacing: 24) {
             OnboardingHeader(
-                eyebrow: "Commitment",
-                title: "I want to take control of my life.",
-                body: "Hold the button for 5 seconds."
+                eyebrow: "",
+                title: "I'm ready to take back control.",
+                body: "Hold for 3 seconds."
             )
 
             Button {
@@ -586,7 +637,7 @@ struct SetupView: View {
             }
             .buttonStyle(.plain)
             .onLongPressGesture(
-                minimumDuration: 5,
+                minimumDuration: 3,
                 maximumDistance: 48,
                 pressing: { isPressing in
                     if isPressing {
@@ -600,7 +651,7 @@ struct SetupView: View {
                 }
             )
 
-            Text(commitmentComplete ? "Done" : "Hold for \(max(0, 5 - commitmentSeconds))s")
+            Text(commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s")
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
                 .foregroundStyle(Color.white.opacity(0.72))
         }
@@ -812,7 +863,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .goal, .age, .profile, .notifications, .permission, .apps, .firstBlock:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps, .firstBlock:
             return true
         case .account, .commitment, .trial:
             return false
@@ -850,6 +901,10 @@ struct SetupView: View {
         max(1, Int((dailyHours * 84.1 / 24.0).rounded()))
     }
 
+    private var recoveredYears: Int {
+        max(1, Int((dailyHours * 0.30 * 84.1 / 24.0).rounded()))
+    }
+
     private func formattedHours(_ value: Double) -> String {
         if value.rounded() == value {
             return "\(Int(value))h"
@@ -875,6 +930,22 @@ struct SetupView: View {
             animatedLostYears = targetYears
         }
     }
+
+    private func startRecoveryCountAnimation() {
+        let targetYears = recoveredYears
+        animatedRecoveredYears = 0
+
+        Task { @MainActor in
+            for frame in 1...34 {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                let progress = Double(frame) / 34.0
+                let easedProgress = 1.0 - pow(1.0 - progress, 3.0)
+                animatedRecoveredYears = Int((Double(targetYears) * easedProgress).rounded())
+            }
+            animatedRecoveredYears = targetYears
+        }
+    }
+
 
     private func requestNotifications() {
         Task {
@@ -945,7 +1016,7 @@ struct SetupView: View {
         commitmentTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             commitmentSeconds += 1
             playCommitmentHaptic()
-            if commitmentSeconds >= 5 {
+            if commitmentSeconds >= 3 {
                 timer.invalidate()
                 commitmentTimer = nil
             }
@@ -961,7 +1032,7 @@ struct SetupView: View {
     private func completeCommitmentHold() {
         commitmentTimer?.invalidate()
         commitmentTimer = nil
-        commitmentSeconds = 5
+        commitmentSeconds = 3
         commitmentComplete = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             goForward()
@@ -1032,13 +1103,17 @@ struct SetupView: View {
 
     private func goForward() {
         guard let next = OnboardingStep(rawValue: min(currentStep.rawValue + 1, OnboardingStep.allCases.count - 1)) else { return }
-        currentStep = next
+        withAnimation(.easeInOut(duration: 0.38)) {
+            currentStep = next
+        }
         message = nil
     }
 
     private func goBack() {
         guard let previous = OnboardingStep(rawValue: max(currentStep.rawValue - 1, 0)) else { return }
-        currentStep = previous
+        withAnimation(.easeInOut(duration: 0.38)) {
+            currentStep = previous
+        }
         message = nil
     }
 
@@ -1132,7 +1207,7 @@ private struct OnboardingChoiceButton: View {
     let selected: Bool
     let action: () -> Void
 
-    private let accent = Color(red: 0.55, green: 0.94, blue: 0.72)
+    private let accent = BlankColors.airMist
 
     var body: some View {
         Button(action: action) {
@@ -1152,11 +1227,11 @@ private struct OnboardingChoiceButton: View {
             .frame(height: 58)
             .background {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(Color.white.opacity(selected ? 0.13 : 0.075))
+                    .fill(Color.white.opacity(selected ? 0.14 : 0.075))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(Color.white.opacity(selected ? 0.22 : 0.08), lineWidth: 1)
+                    .stroke(selected ? BlankColors.airBlue.opacity(0.30) : Color.white.opacity(0.08), lineWidth: selected ? 1.2 : 1)
             }
         }
         .buttonStyle(.plain)

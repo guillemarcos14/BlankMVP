@@ -20,7 +20,6 @@ private enum OnboardingStep: Int, CaseIterable {
     case permission
     case notifications
     case apps
-    case firstBlock
 }
 
 private enum OnboardingPlan: String {
@@ -210,8 +209,6 @@ struct SetupView: View {
             notificationsStep
         case .apps:
             appsStep
-        case .firstBlock:
-            firstBlockStep
         }
     }
 
@@ -541,14 +538,14 @@ struct SetupView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 22) {
             OnboardingHeader(
                 eyebrow: "",
                 title: "Keep your progress safe",
                 body: "Sync your progress across devices. You can skip this for now."
             )
 
-            VStack(spacing: 10) {
+            VStack(spacing: 12) {
                 SocialLoginButton(systemName: "apple.logo", title: "Continue with Apple") {
                     goForward()
                 }
@@ -564,12 +561,13 @@ struct SetupView: View {
             }
             .buttonStyle(BlankSecondaryButtonStyle())
             .frame(width: onboardingButtonWidth(for: "Skip for now"))
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
+        .padding(.top, 38)
     }
 
     private var notificationsStep: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
             VStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -580,7 +578,7 @@ struct SetupView: View {
                             .font(.blankInter(size: 11, relativeTo: .caption2))
                             .foregroundStyle(BlankColors.mutedInk)
                     }
-                    Text("Your weak hour is coming up.")
+                    Text("Your scroll risk is rising.")
                         .font(.blankInter(size: 12, relativeTo: .caption))
                         .lineLimit(2)
                 }
@@ -593,25 +591,32 @@ struct SetupView: View {
                 }
             }
 
-            OnboardingHeader(
-                eyebrow: "",
-                title: "Stay ahead of the scroll",
-                body: "Blanked can remind you before your weakest moments."
-            )
+            Spacer(minLength: 0)
 
-            Spacer(minLength: 28)
+            VStack(spacing: 22) {
+                OnboardingHeader(
+                    eyebrow: "",
+                    title: "Stay ahead of the scroll",
+                    body: "Blanked can remind you before your weakest moments."
+                )
 
-            Button("Enable reminders") {
-                requestNotifications()
+                VStack(spacing: 15) {
+                    Button("Enable reminders") {
+                        requestNotifications()
+                    }
+                    .buttonStyle(BlankPrimaryButtonStyle(light: true))
+                    .frame(width: onboardingButtonWidth(for: "Enable reminders"))
+
+                    Button("Not now") {
+                        goForward()
+                    }
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.56))
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Enable reminders"))
 
-            Button("Not now") {
-                goForward()
-            }
-            .buttonStyle(BlankSecondaryButtonStyle())
-            .frame(width: 184)
+            Spacer(minLength: 0)
         }
         .frame(maxHeight: .infinity)
     }
@@ -651,18 +656,18 @@ struct SetupView: View {
     }
 
     private var trialStep: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 15) {
             OnboardingHeader(
                 eyebrow: "",
                 title: "Start recovering your time",
-                body: "Full access today. 3 days free. Then 19.99 EUR/year. Cancel anytime."
+                body: "Try every feature free for 3 days. Then 19.99 EUR/year. Cancel anytime."
             )
 
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 PlanButton(
                     title: "Annual",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "19.99 EUR"),
-                    detail: "per year",
+                    detail: "3 days free, then billed yearly",
                     badge: "Best value",
                     selected: selectedPlan == .annual
                 ) {
@@ -672,7 +677,7 @@ struct SetupView: View {
                 PlanButton(
                     title: "Monthly",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
-                    detail: "35.88 EUR/year",
+                    detail: "35.88 EUR/year if paid monthly",
                     badge: nil,
                     selected: selectedPlan == .monthly
                 ) {
@@ -681,9 +686,9 @@ struct SetupView: View {
             }
             .frame(maxWidth: 342)
 
-            VStack(spacing: 7) {
-                TrialTimelineRow(title: "Today", detail: "Start your free trial.")
-                TrialTimelineRow(title: "In 2 days", detail: "We remind you before billing.")
+            VStack(spacing: 8) {
+                TrialTimelineRow(title: "Today", detail: "Full access starts now.")
+                TrialTimelineRow(title: "Day 2", detail: "Reminder before billing.")
             }
             .frame(maxWidth: 342)
 
@@ -698,7 +703,7 @@ struct SetupView: View {
                 }
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Start free trial"))
+            .frame(width: 222)
 
             Button("Restore purchases") {
                 Task {
@@ -710,11 +715,11 @@ struct SetupView: View {
                 }
             }
             .buttonStyle(BlankSecondaryButtonStyle())
-            .frame(width: 224)
+            .frame(width: 204)
 
             Text("Full access today. 3 days free. Then \(selectedPlan == .annual ? "19.99 EUR/year" : "2.99 EUR/month"). Cancel anytime in App Store settings. Terms and Privacy apply.")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
-                .foregroundStyle(BlankColors.mutedInk)
+                .foregroundStyle(Color.white.opacity(0.40))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
                 .frame(maxWidth: 320)
@@ -730,48 +735,68 @@ struct SetupView: View {
     }
 
     private var permissionStep: some View {
-        stepContent(
-            eyebrow: "Required by iOS",
-            title: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time",
-            body: screenTimeDescription,
-            statusText: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time ready" : nil,
-            primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
-            secondaryTitle: nil,
-            primaryAction: authorizeScreenTime,
-            secondaryAction: nil
-        )
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(spacing: 20) {
+                OnboardingHeader(
+                    eyebrow: "",
+                    title: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time",
+                    body: screenTimeDescription
+                )
+
+                if screenTimeBlocker.authorizationStatus == .approved {
+                    StatusPill(text: "Screen Time ready")
+                }
+            }
+
+            Button(screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time", action: authorizeScreenTime)
+                .buttonStyle(BlankPrimaryButtonStyle(light: true))
+                .frame(width: onboardingButtonWidth(for: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time"))
+                .padding(.top, 42)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 22)
     }
 
     private var appsStep: some View {
-        stepContent(
-            eyebrow: "Your blocklist",
-            title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
-            body: sessionStore.hasSelectedApps
-                ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
-                : "Pick the apps, categories, or websites that usually steal your time.",
-            statusText: sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selected" : nil,
-            primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
-            secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
-            primaryAction: selectAppsOrContinue,
-            secondaryAction: {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(spacing: 20) {
+                OnboardingHeader(
+                    eyebrow: "",
+                    title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
+                    body: sessionStore.hasSelectedApps
+                        ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
+                        : "Pick the apps, categories, or websites that usually steal your time."
+                )
+
                 if sessionStore.hasSelectedApps {
-                    showingPicker = true
+                    StatusPill(text: "\(sessionStore.selectionCount) selected")
                 }
             }
-        )
-    }
 
-    private var firstBlockStep: some View {
-        stepContent(
-            eyebrow: "First block",
-            title: "Start with 30 minutes",
-            body: "Blanked will shield your selected apps now. If you need to stop early, use Emergency Unlock.",
-            statusText: trialStarted ? "Trial started" : nil,
-            primaryTitle: "Start first block",
-            secondaryTitle: "Go to Home",
-            primaryAction: startFirstBlock,
-            secondaryAction: finishWithoutStarting
-        )
+            VStack(spacing: 15) {
+                Button(sessionStore.hasSelectedApps ? "Continue" : "Select apps", action: selectAppsOrContinue)
+                    .buttonStyle(BlankPrimaryButtonStyle(light: true))
+                    .frame(width: onboardingButtonWidth(for: sessionStore.hasSelectedApps ? "Continue" : "Select apps"))
+
+                if sessionStore.hasSelectedApps {
+                    Button("Edit selection") {
+                        showingPicker = true
+                    }
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.56))
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 42)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 22)
     }
 
     private func choiceStep(
@@ -853,7 +878,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps, .firstBlock:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps:
             return true
         case .account, .commitment, .trial:
             return false
@@ -1063,30 +1088,11 @@ struct SetupView: View {
 
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
-            goForward()
+            screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+            sessionStore.finishSetup()
         } else {
             showingPicker = true
         }
-    }
-
-    private func startFirstBlock() {
-        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-        let result = sessionStore.activateBlank(durationMinutes: 30, entryMode: .app)
-        switch result {
-        case .blanked:
-            screenTimeBlocker.apply(isBlankActive: true)
-            sessionStore.finishSetup()
-        case .noAppsSelected:
-            currentStep = .apps
-            message = "Choose at least one app, category, or website first."
-        default:
-            sessionStore.finishSetup()
-        }
-    }
-
-    private func finishWithoutStarting() {
-        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-        sessionStore.finishSetup()
     }
 
     private func goForward() {
@@ -1355,15 +1361,19 @@ private struct TrialTimelineRow: View {
     let detail: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(Color.white.opacity(0.62))
+                .frame(width: 5, height: 5)
+
             Text(title)
                 .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.74))
-                .frame(width: 66, alignment: .leading)
+                .foregroundStyle(Color.white.opacity(0.70))
+                .frame(width: 48, alignment: .leading)
 
             Text(detail)
                 .font(.blankInter(size: 12, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.48))
+                .foregroundStyle(Color.white.opacity(0.44))
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -1382,44 +1392,53 @@ private struct PlanButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack {
-                    Text(title)
-                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    Spacer()
-                    if let badge {
-                        Text(badge)
-                            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                            .foregroundStyle(BlankColors.ink.opacity(0.72))
-                            .padding(.horizontal, 8)
-                            .frame(height: 22)
-                            .background(Capsule().fill(BlankColors.airMist.opacity(0.50)))
-                    }
-                    Circle()
-                        .fill(selected ? BlankColors.ink : Color.clear)
-                        .frame(width: 10, height: 10)
-                        .padding(3)
-                        .overlay {
-                            Circle()
-                                .stroke(selected ? BlankColors.ink : BlankColors.line, lineWidth: 1)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                        if let badge {
+                            Text(badge)
+                                .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
+                                .foregroundStyle(BlankColors.ink.opacity(0.72))
+                                .padding(.horizontal, 7)
+                                .frame(height: 20)
+                                .background(Capsule().fill(BlankColors.airMist.opacity(0.58)))
                         }
+                    }
+
+                    Text(price)
+                        .font(.blankInter(size: 19, weight: .semibold, relativeTo: .headline))
+
+                    Text(detail)
+                        .font(.blankInter(size: 11, relativeTo: .caption2))
+                        .foregroundStyle(selected ? BlankColors.ink.opacity(0.58) : Color.white.opacity(0.46))
                 }
-                Text(price)
-                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
-                Text(detail)
-                    .font(.blankInter(size: 11, relativeTo: .caption2))
-                    .foregroundStyle(BlankColors.ink.opacity(0.62))
+
+                Spacer(minLength: 0)
+
+                ZStack {
+                    Circle()
+                        .stroke(selected ? BlankColors.ink.opacity(0.38) : Color.white.opacity(0.26), lineWidth: 1)
+                    if selected {
+                        Circle()
+                            .fill(BlankColors.ink)
+                            .padding(4)
+                    }
+                }
+                .frame(width: 18, height: 18)
             }
-            .foregroundStyle(BlankColors.ink)
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: badge == nil ? 86 : 98, alignment: .topLeading)
+            .foregroundStyle(selected ? BlankColors.ink : Color.white.opacity(0.88))
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white.opacity(selected ? 0.90 : 0.78))
+                    .fill(selected ? Color.white.opacity(0.92) : Color.white.opacity(0.095))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? BlankColors.ink.opacity(0.42) : Color.white.opacity(0.28), lineWidth: selected ? 1.4 : 1)
+                    .stroke(selected ? Color.white.opacity(0.72) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
             }
         }
         .buttonStyle(.plain)

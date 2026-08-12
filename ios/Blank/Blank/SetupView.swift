@@ -44,7 +44,6 @@ struct SetupView: View {
     @State private var notificationStatus = "Off"
     @State private var lifetimeRingProgress = 0.0
     @State private var lifetimeYears = 0
-    @State private var dopaminePulsePhase = 0.0
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
@@ -130,8 +129,6 @@ struct SetupView: View {
         .onChange(of: currentStep) { step in
             if step == .lifetime {
                 startLifetimeAnimation()
-            } else if step == .dopamine {
-                startDopamineAnimation()
             }
         }
         .onChange(of: sessionStore.selection) { newSelection in
@@ -319,13 +316,6 @@ struct SetupView: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 342)
-
-            DopamineSignalView(phase: dopaminePulsePhase)
-                .frame(width: 250, height: 112)
-                .padding(.top, 10)
-                .onAppear {
-                    startDopamineAnimation()
-                }
 
             Text("Studies compare its reward loop to c**aine.")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
@@ -1021,13 +1011,6 @@ struct SetupView: View {
         }
     }
 
-    private func startDopamineAnimation() {
-        dopaminePulsePhase = 0
-        withAnimation(.easeInOut(duration: 1.45).repeatForever(autoreverses: false)) {
-            dopaminePulsePhase = 1
-        }
-    }
-
     private func startCommitmentHold() {
         guard commitmentTimer == nil, !commitmentComplete else { return }
         commitmentSeconds = 0
@@ -1267,94 +1250,6 @@ private struct SocialLoginButton: View {
             }
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct DopamineSignalView: View {
-    let phase: Double
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
-            let center = CGPoint(x: width / 2, y: height / 2)
-            let radiusX = width * 0.31
-            let radiusY = height * 0.30
-            let angle = phase * .pi * 2 - .pi / 2
-            let pulsePosition = CGPoint(
-                x: center.x + CGFloat(cos(angle)) * radiusX,
-                y: center.y + CGFloat(sin(angle)) * radiusY
-            )
-            let nodes: [(label: String, x: CGFloat, y: CGFloat, phase: Double)] = [
-                ("Cue", center.x, center.y - radiusY, 0.00),
-                ("Scroll", center.x + radiusX, center.y, 0.25),
-                ("Reward", center.x, center.y + radiusY, 0.50),
-                ("Craving", center.x - radiusX, center.y, 0.75)
-            ]
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.035))
-
-                Ellipse()
-                    .stroke(
-                        Color.white.opacity(0.14),
-                        style: StrokeStyle(lineWidth: 1.3, lineCap: .round)
-                    )
-                    .frame(width: radiusX * 2, height: radiusY * 2)
-                    .position(center)
-
-                Ellipse()
-                    .trim(from: max(0, phase - 0.18), to: phase)
-                    .stroke(
-                        Color.white.opacity(0.26),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .frame(width: radiusX * 2, height: radiusY * 2)
-                    .position(center)
-                    .blur(radius: 5)
-                    .rotationEffect(.degrees(-90))
-
-                Ellipse()
-                    .trim(from: max(0, phase - 0.18), to: phase)
-                    .stroke(
-                        Color.white.opacity(0.90),
-                        style: StrokeStyle(lineWidth: 2.1, lineCap: .round)
-                    )
-                    .frame(width: radiusX * 2, height: radiusY * 2)
-                    .position(center)
-                    .rotationEffect(.degrees(-90))
-
-                ForEach(0..<nodes.count, id: \.self) { index in
-                    let node = nodes[index]
-                    let rawDistance = abs(phase - node.phase)
-                    let distance = min(rawDistance, 1 - rawDistance)
-                    let active = max(0, 1 - distance * 7)
-
-                    VStack(spacing: 5) {
-                        Circle()
-                            .fill(Color.white.opacity(0.38 + active * 0.48))
-                            .frame(width: 6 + active * 4, height: 6 + active * 4)
-                            .shadow(color: Color.white.opacity(active * 0.30), radius: 8)
-
-                        Text(node.label)
-                            .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
-                            .foregroundStyle(Color.white.opacity(0.42 + active * 0.34))
-                    }
-                    .position(x: node.x, y: node.y)
-                }
-
-                Circle()
-                    .fill(Color.white.opacity(0.94))
-                    .frame(width: 8, height: 8)
-                    .shadow(color: Color.white.opacity(0.38), radius: 10)
-                    .position(pulsePosition)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
-            }
-        }
     }
 }
 

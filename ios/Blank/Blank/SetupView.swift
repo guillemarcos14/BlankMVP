@@ -100,28 +100,6 @@ struct SetupView: View {
                                     .frame(maxWidth: 330)
                             }
 
-                            #if DEBUG
-                            #if targetEnvironment(simulator)
-                            HStack(spacing: 10) {
-                                Button("Prev") {
-                                    goBack()
-                                }
-                                .buttonStyle(BlankSecondaryButtonStyle())
-
-                                Button("Next") {
-                                    goForward()
-                                }
-                                .buttonStyle(BlankSecondaryButtonStyle())
-                            }
-                            .frame(maxWidth: 270)
-
-                            Button("Enter Home in simulator") {
-                                enterSimulatorHome()
-                            }
-                            .buttonStyle(BlankSecondaryButtonStyle())
-                            .frame(width: onboardingButtonWidth(for: "Enter Home in simulator"))
-                            #endif
-                            #endif
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 34)
@@ -129,9 +107,6 @@ struct SetupView: View {
                     }
                 }
 
-                stepIndicator
-                    .padding(.top, 10)
-                    .padding(.bottom, 8)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 34)
@@ -339,7 +314,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 92)
 
-            Text("Dopamine is a powerful drug")
+            Text("Algorithms are engineered to hit your reward system just as a powerful drug does")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -352,7 +327,7 @@ struct SetupView: View {
                     startDopamineAnimation()
                 }
 
-            Text("Your phone keeps dosing you")
+            Text("Studies compare its effects to those of c******.")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -660,13 +635,13 @@ struct SetupView: View {
             OnboardingHeader(
                 eyebrow: "",
                 title: "Start recovering your time",
-                body: "Try every feature free for 3 days. Then 19.99 EUR/year. Cancel anytime."
+                body: "Try every feature free for 3 days. Then the App Store price. Cancel anytime."
             )
 
             VStack(spacing: 9) {
                 PlanButton(
                     title: "Annual",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "19.99 EUR"),
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "App Store price"),
                     detail: "3 days free, then billed yearly",
                     badge: "Best value",
                     selected: selectedPlan == .annual
@@ -676,8 +651,8 @@ struct SetupView: View {
 
                 PlanButton(
                     title: "Monthly",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "2.99 EUR"),
-                    detail: "35.88 EUR/year if paid monthly",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "App Store price"),
+                    detail: "3 days free, then billed monthly",
                     badge: nil,
                     selected: selectedPlan == .monthly
                 ) {
@@ -717,7 +692,15 @@ struct SetupView: View {
             .buttonStyle(BlankSecondaryButtonStyle())
             .frame(width: 204)
 
-            Text("Full access today. 3 days free. Then \(selectedPlan == .annual ? "19.99 EUR/year" : "2.99 EUR/month"). Cancel anytime in App Store settings. Terms and Privacy apply.")
+            if isReviewDemoAccessAvailable {
+                Button("Continue in demo mode") {
+                    continueWithReviewDemoAccess()
+                }
+                .buttonStyle(BlankSecondaryButtonStyle())
+                .frame(width: 236)
+            }
+
+            Text("Full access today. \(selectedPlanRenewalDisclosure) Terms and Privacy apply.")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
                 .foregroundStyle(Color.white.opacity(0.40))
                 .multilineTextAlignment(.center)
@@ -876,22 +859,31 @@ struct SetupView: View {
         return "Apple requires this permission before Blanked can block distracting apps."
     }
 
+    private var selectedPlanRenewalDisclosure: String {
+        let productId = selectedPlan == .annual
+            ? StoreKitPurchaseStore.annualProductId
+            : StoreKitPurchaseStore.monthlyProductId
+        let period = selectedPlan == .annual ? "year" : "month"
+        let price = purchaseStore.priceText(for: productId, fallback: "the App Store price")
+        return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings."
+    }
+
+    private var isReviewDemoAccessAvailable: Bool {
+        #if DEBUG
+        #if targetEnvironment(simulator)
+        return true
+        #endif
+        #endif
+
+        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
         case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps:
             return true
         case .account, .commitment, .trial:
             return false
-        }
-    }
-
-    private var stepIndicator: some View {
-        HStack(spacing: 6) {
-            ForEach(OnboardingStep.allCases, id: \.rawValue) { step in
-                Capsule()
-                    .fill(step.rawValue <= currentStep.rawValue ? Color.white.opacity(0.76) : Color.white.opacity(0.16))
-                    .frame(width: step == currentStep ? 18 : 6, height: 6)
-            }
         }
     }
 
@@ -986,6 +978,11 @@ struct SetupView: View {
                 goForward()
             }
         }
+    }
+
+    private func continueWithReviewDemoAccess() {
+        message = nil
+        goForward()
     }
 
     private func refreshNotificationStatus() async {
@@ -1110,15 +1107,6 @@ struct SetupView: View {
         }
         message = nil
     }
-
-    #if DEBUG
-    #if targetEnvironment(simulator)
-    private func enterSimulatorHome() {
-        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-        sessionStore.finishSetup()
-    }
-    #endif
-    #endif
 
     private func onboardingButtonWidth(for title: String) -> CGFloat {
         let estimated = CGFloat(title.count) * 8.2 + 66
@@ -1280,78 +1268,79 @@ private struct DopamineSignalView: View {
     let phase: Double
 
     var body: some View {
-        VStack(spacing: 16) {
-            GeometryReader { proxy in
-                let width = proxy.size.width
-                let height = proxy.size.height
-                let centerY = height * 0.45
-                let points = [
-                    CGPoint(x: width * 0.16, y: centerY),
-                    CGPoint(x: width * 0.36, y: centerY),
-                    CGPoint(x: width * 0.50, y: height * 0.22),
-                    CGPoint(x: width * 0.64, y: height * 0.68),
-                    CGPoint(x: width * 0.80, y: centerY)
-                ]
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let height = proxy.size.height
+            let nodePositions: [(x: CGFloat, y: CGFloat, phase: Double)] = [
+                (width * 0.16, height * 0.58, 0.04),
+                (width * 0.38, height * 0.34, 0.30),
+                (width * 0.62, height * 0.66, 0.62),
+                (width * 0.84, height * 0.42, 0.90)
+            ]
 
-                ZStack {
-                    Path { path in
-                        path.move(to: points[0])
-                        points.dropFirst().forEach { point in
-                            path.addLine(to: point)
-                        }
-                    }
-                    .trim(from: 0, to: 0.96)
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(0.035))
+
+                signalPath(width: width, height: height)
                     .stroke(
-                        Color.white.opacity(0.28),
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        Color.white.opacity(0.16),
+                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round)
                     )
 
-                    Path { path in
-                        path.move(to: points[0])
-                        points.dropFirst().forEach { point in
-                            path.addLine(to: point)
-                        }
-                    }
-                    .trim(from: max(0, phase - 0.22), to: phase)
+                signalPath(width: width, height: height)
+                    .trim(from: max(0, phase - 0.20), to: phase)
                     .stroke(
-                        Color.white.opacity(0.88),
-                        style: StrokeStyle(lineWidth: 2.8, lineCap: .round, lineJoin: .round)
+                        Color.white.opacity(0.30),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
+                    )
+                    .blur(radius: 5)
+
+                signalPath(width: width, height: height)
+                    .trim(from: max(0, phase - 0.20), to: phase)
+                    .stroke(
+                        Color.white.opacity(0.92),
+                        style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round)
                     )
 
-                    ForEach(0..<3, id: \.self) { index in
-                        let x = [width * 0.16, width * 0.50, width * 0.80][index]
-                        let distance = abs(phase - [0.02, 0.50, 0.94][index])
-                        let active = max(0, 1 - distance * 7)
+                ForEach(0..<nodePositions.count, id: \.self) { index in
+                    let node = nodePositions[index]
+                    let rawDistance = abs(phase - node.phase)
+                    let distance = min(rawDistance, 1 - rawDistance)
+                    let active = max(0, 1 - distance * 8)
 
-                        Circle()
-                            .fill(Color.white.opacity(0.42 + active * 0.42))
-                            .frame(width: 8 + active * 4, height: 8 + active * 4)
-                            .position(x: x, y: centerY)
-                    }
+                    Circle()
+                        .fill(Color.white.opacity(0.34 + active * 0.50))
+                        .frame(width: 7 + active * 5, height: 7 + active * 5)
+                        .shadow(color: Color.white.opacity(active * 0.34), radius: 9)
+                        .position(x: node.x, y: node.y)
                 }
             }
-            .frame(height: 66)
-
-            HStack {
-                Text("Cue")
-                Spacer()
-                Text("Scroll")
-                Spacer()
-                Text("Reward")
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
             }
-            .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-            .foregroundStyle(Color.white.opacity(0.52))
-            .frame(width: 214)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 16)
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.white.opacity(0.045))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+    }
+
+    private func signalPath(width: CGFloat, height: CGFloat) -> Path {
+        Path { path in
+            path.move(to: CGPoint(x: width * 0.10, y: height * 0.58))
+            path.addCurve(
+                to: CGPoint(x: width * 0.38, y: height * 0.34),
+                control1: CGPoint(x: width * 0.18, y: height * 0.54),
+                control2: CGPoint(x: width * 0.27, y: height * 0.24)
+            )
+            path.addCurve(
+                to: CGPoint(x: width * 0.62, y: height * 0.66),
+                control1: CGPoint(x: width * 0.48, y: height * 0.44),
+                control2: CGPoint(x: width * 0.50, y: height * 0.76)
+            )
+            path.addCurve(
+                to: CGPoint(x: width * 0.90, y: height * 0.42),
+                control1: CGPoint(x: width * 0.72, y: height * 0.56),
+                control2: CGPoint(x: width * 0.78, y: height * 0.32)
+            )
         }
     }
 }

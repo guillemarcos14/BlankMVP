@@ -593,37 +593,44 @@ struct SetupView: View {
     }
 
     private var commitmentStep: some View {
-        VStack(spacing: 24) {
-            OnboardingHeader(
-                eyebrow: "",
-                title: "I'm ready to take back control",
-                body: "Hold for 3 seconds."
-            )
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
 
-            Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
-                .font(.system(size: 25, weight: .semibold))
-                .foregroundStyle(BlankColors.ink)
-                .frame(width: 74, height: 74)
-                .background(Circle().fill(Color.white.opacity(0.82)))
-                .onLongPressGesture(
-                    minimumDuration: 3,
-                    maximumDistance: 48,
-                    pressing: { isPressing in
-                        if isPressing {
-                            startCommitmentHold()
-                        } else if !commitmentComplete {
-                            cancelCommitmentHold()
-                        }
-                    },
-                    perform: {
-                        completeCommitmentHold()
-                    }
+            VStack(spacing: 24) {
+                OnboardingHeader(
+                    eyebrow: "",
+                    title: "I'm ready to take back control",
+                    body: "Hold for 3 seconds."
                 )
 
-            Text(commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s")
-                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.72))
+                Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(BlankColors.ink)
+                    .frame(width: 74, height: 74)
+                    .background(Circle().fill(Color.white.opacity(0.82)))
+                    .onLongPressGesture(
+                        minimumDuration: 3,
+                        maximumDistance: 48,
+                        pressing: { isPressing in
+                            if isPressing {
+                                startCommitmentHold()
+                            } else if !commitmentComplete {
+                                cancelCommitmentHold()
+                            }
+                        },
+                        perform: {
+                            completeCommitmentHold()
+                        }
+                    )
+
+                Text(commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.72))
+            }
+
+            Spacer(minLength: 0)
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var trialStep: some View {
@@ -871,9 +878,9 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .account, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .account, .commitment, .notifications, .permission, .apps:
             return true
-        case .commitment, .trial:
+        case .trial:
             return false
         }
     }

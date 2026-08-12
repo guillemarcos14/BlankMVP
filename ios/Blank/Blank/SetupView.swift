@@ -39,7 +39,6 @@ struct SetupView: View {
     @State private var dailyHours = 4.5
     @State private var selectedPlan: OnboardingPlan = .annual
     @State private var commitmentComplete = false
-    @State private var commitmentIsPressing = false
     @State private var commitmentSeconds = 0
     @State private var commitmentTimer: Timer?
     @State private var notificationStatus = "Off"
@@ -49,7 +48,6 @@ struct SetupView: View {
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
-    @State private var isCompletingSetup = false
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -112,13 +110,6 @@ struct SetupView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 34)
-            .opacity(isCompletingSetup ? 0 : 1)
-            .scaleEffect(isCompletingSetup ? 1.025 : 1)
-
-            Color.black
-                .opacity(isCompletingSetup ? 1 : 0)
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -336,7 +327,7 @@ struct SetupView: View {
                     startDopamineAnimation()
                 }
 
-            Text("Studies compare its effects to those of c**aine.")
+            Text("Studies compare its effects to those of c******.")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -522,32 +513,34 @@ struct SetupView: View {
     }
 
     private var accountStep: some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 0) {
             Spacer(minLength: 0)
 
-            OnboardingHeader(
-                eyebrow: "",
-                title: "Keep your progress safe",
-                body: "Sync your progress across devices. You can skip this for now."
-            )
+            VStack(spacing: 22) {
+                OnboardingHeader(
+                    eyebrow: "",
+                    title: "Keep your progress safe",
+                    body: "Sync your progress across devices. You can skip this for now."
+                )
 
-            VStack(spacing: 12) {
-                SocialLoginButton(systemName: "apple.logo", title: "Continue with Apple") {
+                VStack(spacing: 12) {
+                    SocialLoginButton(systemName: "apple.logo", title: "Continue with Apple") {
+                        goForward()
+                    }
+
+                    SocialLoginButton(systemName: "g.circle.fill", title: "Continue with Google") {
+                        goForward()
+                    }
+                }
+                .frame(maxWidth: 342)
+
+                Button("Skip for now") {
                     goForward()
                 }
-
-                SocialLoginButton(systemName: "g.circle.fill", title: "Continue with Google") {
-                    goForward()
-                }
+                .buttonStyle(BlankSecondaryButtonStyle())
+                .frame(width: onboardingButtonWidth(for: "Skip for now"))
+                .padding(.top, 2)
             }
-            .frame(maxWidth: 342)
-
-            Button("Skip for now") {
-                goForward()
-            }
-            .buttonStyle(BlankSecondaryButtonStyle())
-            .frame(width: onboardingButtonWidth(for: "Skip for now"))
-            .padding(.top, 2)
 
             Spacer(minLength: 0)
         }
@@ -621,16 +614,11 @@ struct SetupView: View {
                 .font(.system(size: 25, weight: .semibold))
                 .foregroundStyle(BlankColors.ink)
                 .frame(width: 74, height: 74)
-                .background(Circle().fill(Color.white.opacity(commitmentIsPressing ? 0.76 : 0.82)))
-                .scaleEffect(commitmentIsPressing ? 0.985 : 1)
-                .animation(.easeOut(duration: 0.14), value: commitmentIsPressing)
+                .background(Circle().fill(Color.white.opacity(0.82)))
                 .onLongPressGesture(
                     minimumDuration: 3,
                     maximumDistance: 48,
                     pressing: { isPressing in
-                        withAnimation(.easeOut(duration: 0.14)) {
-                            commitmentIsPressing = isPressing
-                        }
                         if isPressing {
                             startCommitmentHold()
                         } else if !commitmentComplete {
@@ -1104,7 +1092,7 @@ struct SetupView: View {
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-            completeSetupSmoothly()
+            sessionStore.finishSetup()
         } else {
             showingPicker = true
         }
@@ -1124,18 +1112,6 @@ struct SetupView: View {
             currentStep = previous
         }
         message = nil
-    }
-
-    private func completeSetupSmoothly() {
-        guard !isCompletingSetup else { return }
-        withAnimation(.easeInOut(duration: 0.46)) {
-            isCompletingSetup = true
-        }
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 460_000_000)
-            sessionStore.finishSetup()
-        }
     }
 
     private func onboardingButtonWidth(for title: String) -> CGFloat {

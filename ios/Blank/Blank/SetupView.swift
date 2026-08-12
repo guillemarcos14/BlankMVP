@@ -631,7 +631,7 @@ struct SetupView: View {
             OnboardingHeader(
                 eyebrow: "",
                 title: "Start recovering your time",
-                body: "Try every feature free for 3 days. Then the App Store price. Cancel anytime."
+                body: "Full access starts today. Try every feature free for 3 days, then renews at the App Store price. Cancel anytime in App Store settings."
             )
 
             VStack(spacing: 9) {
@@ -654,12 +654,6 @@ struct SetupView: View {
                 ) {
                     selectedPlan = .monthly
                 }
-            }
-            .frame(maxWidth: 342)
-
-            VStack(spacing: 8) {
-                TrialTimelineRow(title: "Today", detail: "Full access starts now.")
-                TrialTimelineRow(title: "Day 2", detail: "Reminder before billing.")
             }
             .frame(maxWidth: 342)
 
@@ -1250,32 +1244,6 @@ private struct SocialLoginButton: View {
             }
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct TrialTimelineRow: View {
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(Color.white.opacity(0.62))
-                .frame(width: 5, height: 5)
-
-            Text(title)
-                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.70))
-                .frame(width: 48, alignment: .leading)
-
-            Text(detail)
-                .font(.blankInter(size: 12, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.44))
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

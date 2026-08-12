@@ -314,7 +314,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 92)
 
-            Text("Algorithms are engineered to hit your reward system just as a powerful drug does")
+            Text("Your brain is not weak. The feed is engineered.")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -327,7 +327,7 @@ struct SetupView: View {
                     startDopamineAnimation()
                 }
 
-            Text("Studies compare its effects to those of c******.")
+            Text("Studies compare its reward loop to c**aine.")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -1277,76 +1277,83 @@ private struct DopamineSignalView: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let nodePositions: [(x: CGFloat, y: CGFloat, phase: Double)] = [
-                (width * 0.16, height * 0.58, 0.04),
-                (width * 0.38, height * 0.34, 0.30),
-                (width * 0.62, height * 0.66, 0.62),
-                (width * 0.84, height * 0.42, 0.90)
+            let center = CGPoint(x: width / 2, y: height / 2)
+            let radiusX = width * 0.31
+            let radiusY = height * 0.30
+            let angle = phase * .pi * 2 - .pi / 2
+            let pulsePosition = CGPoint(
+                x: center.x + CGFloat(cos(angle)) * radiusX,
+                y: center.y + CGFloat(sin(angle)) * radiusY
+            )
+            let nodes: [(label: String, x: CGFloat, y: CGFloat, phase: Double)] = [
+                ("Cue", center.x, center.y - radiusY, 0.00),
+                ("Scroll", center.x + radiusX, center.y, 0.25),
+                ("Reward", center.x, center.y + radiusY, 0.50),
+                ("Craving", center.x - radiusX, center.y, 0.75)
             ]
 
             ZStack {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(Color.white.opacity(0.035))
 
-                signalPath(width: width, height: height)
+                Ellipse()
                     .stroke(
-                        Color.white.opacity(0.16),
-                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round)
+                        Color.white.opacity(0.14),
+                        style: StrokeStyle(lineWidth: 1.3, lineCap: .round)
                     )
+                    .frame(width: radiusX * 2, height: radiusY * 2)
+                    .position(center)
 
-                signalPath(width: width, height: height)
-                    .trim(from: max(0, phase - 0.20), to: phase)
+                Ellipse()
+                    .trim(from: max(0, phase - 0.18), to: phase)
                     .stroke(
-                        Color.white.opacity(0.30),
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
+                        Color.white.opacity(0.26),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
                     )
+                    .frame(width: radiusX * 2, height: radiusY * 2)
+                    .position(center)
                     .blur(radius: 5)
+                    .rotationEffect(.degrees(-90))
 
-                signalPath(width: width, height: height)
-                    .trim(from: max(0, phase - 0.20), to: phase)
+                Ellipse()
+                    .trim(from: max(0, phase - 0.18), to: phase)
                     .stroke(
-                        Color.white.opacity(0.92),
-                        style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round)
+                        Color.white.opacity(0.90),
+                        style: StrokeStyle(lineWidth: 2.1, lineCap: .round)
                     )
+                    .frame(width: radiusX * 2, height: radiusY * 2)
+                    .position(center)
+                    .rotationEffect(.degrees(-90))
 
-                ForEach(0..<nodePositions.count, id: \.self) { index in
-                    let node = nodePositions[index]
+                ForEach(0..<nodes.count, id: \.self) { index in
+                    let node = nodes[index]
                     let rawDistance = abs(phase - node.phase)
                     let distance = min(rawDistance, 1 - rawDistance)
-                    let active = max(0, 1 - distance * 8)
+                    let active = max(0, 1 - distance * 7)
 
-                    Circle()
-                        .fill(Color.white.opacity(0.34 + active * 0.50))
-                        .frame(width: 7 + active * 5, height: 7 + active * 5)
-                        .shadow(color: Color.white.opacity(active * 0.34), radius: 9)
-                        .position(x: node.x, y: node.y)
+                    VStack(spacing: 5) {
+                        Circle()
+                            .fill(Color.white.opacity(0.38 + active * 0.48))
+                            .frame(width: 6 + active * 4, height: 6 + active * 4)
+                            .shadow(color: Color.white.opacity(active * 0.30), radius: 8)
+
+                        Text(node.label)
+                            .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
+                            .foregroundStyle(Color.white.opacity(0.42 + active * 0.34))
+                    }
+                    .position(x: node.x, y: node.y)
                 }
+
+                Circle()
+                    .fill(Color.white.opacity(0.94))
+                    .frame(width: 8, height: 8)
+                    .shadow(color: Color.white.opacity(0.38), radius: 10)
+                    .position(pulsePosition)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             }
-        }
-    }
-
-    private func signalPath(width: CGFloat, height: CGFloat) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: width * 0.10, y: height * 0.58))
-            path.addCurve(
-                to: CGPoint(x: width * 0.38, y: height * 0.34),
-                control1: CGPoint(x: width * 0.18, y: height * 0.54),
-                control2: CGPoint(x: width * 0.27, y: height * 0.24)
-            )
-            path.addCurve(
-                to: CGPoint(x: width * 0.62, y: height * 0.66),
-                control1: CGPoint(x: width * 0.48, y: height * 0.44),
-                control2: CGPoint(x: width * 0.50, y: height * 0.76)
-            )
-            path.addCurve(
-                to: CGPoint(x: width * 0.90, y: height * 0.42),
-                control1: CGPoint(x: width * 0.72, y: height * 0.56),
-                control2: CGPoint(x: width * 0.78, y: height * 0.32)
-            )
         }
     }
 }

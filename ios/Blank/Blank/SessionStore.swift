@@ -130,7 +130,7 @@ final class SessionStore: ObservableObject {
 
         let currentMode = loadedFocusModes.first { $0.id == loadedModeId }
             ?? loadedFocusModes.first
-            ?? BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria")
+            ?? BlankFocusMode(id: Self.defaultModeId, name: "Routine")
 
         if let currentSelection = Self.selection(from: currentMode.selectionData) {
             selection = currentSelection
@@ -140,7 +140,7 @@ final class SessionStore: ObservableObject {
     var currentMode: BlankFocusMode {
         focusModes.first { $0.id == currentModeId }
             ?? focusModes.first
-            ?? BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria")
+            ?? BlankFocusMode(id: Self.defaultModeId, name: "Routine")
     }
 
     var hasSelectedApps: Bool {
@@ -552,13 +552,26 @@ final class SessionStore: ObservableObject {
         if let data = defaults.data(forKey: Keys.focusModes),
            let decoded = try? JSONDecoder().decode([BlankFocusMode].self, from: data),
            !decoded.isEmpty {
-            return decoded
+            return decoded.map { mode in
+                var updated = mode
+                switch mode.name {
+                case "Rutina diaria":
+                    updated.name = "Routine"
+                case "Estudio":
+                    updated.name = "Focus"
+                case "Dormir":
+                    updated.name = "Sleep"
+                default:
+                    break
+                }
+                return updated
+            }
         }
 
         return [
-            BlankFocusMode(id: Self.defaultModeId, name: "Rutina diaria", selectionData: encodedSelection(fallbackSelection)),
-            BlankFocusMode(name: "Estudio"),
-            BlankFocusMode(name: "Dormir")
+            BlankFocusMode(id: Self.defaultModeId, name: "Routine", selectionData: encodedSelection(fallbackSelection)),
+            BlankFocusMode(name: "Focus"),
+            BlankFocusMode(name: "Sleep")
         ]
     }
 
@@ -670,7 +683,7 @@ extension SessionStore {
     func loadAIDemoData(now: Date = Date()) {
         let calendar = Calendar.current
         let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
-        let modeName = "Estudio"
+        let modeName = "Focus"
         let snapshot = BlankSelectionSnapshot(applicationCount: 3, categoryCount: 1, webDomainCount: 0)
         let weakHour = calendar.component(.hour, from: now.addingTimeInterval(20 * 60))
         let currentWeekday = calendar.component(.weekday, from: now)

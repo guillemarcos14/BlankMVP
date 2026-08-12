@@ -39,6 +39,7 @@ struct SetupView: View {
     @State private var dailyHours = 4.5
     @State private var selectedPlan: OnboardingPlan = .annual
     @State private var commitmentComplete = false
+    @State private var commitmentIsPressing = false
     @State private var commitmentSeconds = 0
     @State private var commitmentTimer: Timer?
     @State private var notificationStatus = "Off"
@@ -48,6 +49,7 @@ struct SetupView: View {
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
+    @State private var isCompletingSetup = false
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -110,6 +112,13 @@ struct SetupView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 34)
+            .opacity(isCompletingSetup ? 0 : 1)
+            .scaleEffect(isCompletingSetup ? 1.025 : 1)
+
+            Color.black
+                .opacity(isCompletingSetup ? 1 : 0)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -327,7 +336,7 @@ struct SetupView: View {
                     startDopamineAnimation()
                 }
 
-            Text("Studies compare its effects to those of c******.")
+            Text("Studies compare its effects to those of coca**e.")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -514,6 +523,8 @@ struct SetupView: View {
 
     private var accountStep: some View {
         VStack(spacing: 22) {
+            Spacer(minLength: 0)
+
             OnboardingHeader(
                 eyebrow: "",
                 title: "Keep your progress safe",
@@ -537,8 +548,10 @@ struct SetupView: View {
             .buttonStyle(BlankSecondaryButtonStyle())
             .frame(width: onboardingButtonWidth(for: "Skip for now"))
             .padding(.top, 2)
+
+            Spacer(minLength: 0)
         }
-        .padding(.top, 38)
+        .frame(maxHeight: .infinity)
     }
 
     private var notificationsStep: some View {
@@ -604,15 +617,41 @@ struct SetupView: View {
                 body: "Hold for 3 seconds."
             )
 
-            Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
-                .font(.system(size: 25, weight: .semibold))
-                .foregroundStyle(BlankColors.ink)
-                .frame(width: 74, height: 74)
-                .background(Circle().fill(Color.white.opacity(0.82)))
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(commitmentIsPressing ? 0.74 : 0.82))
+                    .frame(width: 74, height: 74)
+                    .shadow(
+                        color: Color.black.opacity(commitmentIsPressing ? 0.10 : 0.22),
+                        radius: commitmentIsPressing ? 4 : 16,
+                        x: 0,
+                        y: commitmentIsPressing ? 2 : 12
+                    )
+                    .scaleEffect(x: commitmentIsPressing ? 1.10 : 1, y: commitmentIsPressing ? 0.84 : 1, anchor: .bottom)
+                    .offset(y: commitmentIsPressing ? 7 : 0)
+
+                Circle()
+                    .trim(from: 0, to: CGFloat(commitmentSeconds) / 3.0)
+                    .stroke(Color.white.opacity(0.72), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 86, height: 86)
+                    .rotationEffect(.degrees(-90))
+                    .opacity(commitmentIsPressing ? 1 : 0)
+
+                Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
+                    .font(.system(size: 25, weight: .semibold))
+                    .foregroundStyle(BlankColors.ink)
+                    .offset(y: commitmentIsPressing ? 5 : 0)
+            }
+                .frame(width: 92, height: 92)
+                .animation(.spring(response: 0.24, dampingFraction: 0.66), value: commitmentIsPressing)
+                .animation(.easeInOut(duration: 0.18), value: commitmentSeconds)
                 .onLongPressGesture(
                     minimumDuration: 3,
                     maximumDistance: 48,
                     pressing: { isPressing in
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.66)) {
+                            commitmentIsPressing = isPressing
+                        }
                         if isPressing {
                             startCommitmentHold()
                         } else if !commitmentComplete {
@@ -880,9 +919,9 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .account, .notifications, .permission, .apps:
             return true
-        case .account, .commitment, .trial:
+        case .commitment, .trial:
             return false
         }
     }
@@ -1086,7 +1125,7 @@ struct SetupView: View {
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-            sessionStore.finishSetup()
+            completeSetupSmoothly()
         } else {
             showingPicker = true
         }
@@ -1106,6 +1145,18 @@ struct SetupView: View {
             currentStep = previous
         }
         message = nil
+    }
+
+    private func completeSetupSmoothly() {
+        guard !isCompletingSetup else { return }
+        withAnimation(.easeInOut(duration: 0.46)) {
+            isCompletingSetup = true
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 460_000_000)
+            sessionStore.finishSetup()
+        }
     }
 
     private func onboardingButtonWidth(for title: String) -> CGFloat {
@@ -1271,76 +1322,55 @@ private struct DopamineSignalView: View {
         GeometryReader { proxy in
             let width = proxy.size.width
             let height = proxy.size.height
-            let nodePositions: [(x: CGFloat, y: CGFloat, phase: Double)] = [
-                (width * 0.16, height * 0.58, 0.04),
-                (width * 0.38, height * 0.34, 0.30),
-                (width * 0.62, height * 0.66, 0.62),
-                (width * 0.84, height * 0.42, 0.90)
-            ]
 
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.035))
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(Color.white.opacity(0.055))
 
-                signalPath(width: width, height: height)
-                    .stroke(
-                        Color.white.opacity(0.16),
-                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round)
-                    )
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                    .frame(width: width * 0.34, height: height * 0.72)
+                    .overlay(alignment: .bottom) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: width * 0.10, height: 3)
+                            .padding(.bottom, 7)
+                    }
 
-                signalPath(width: width, height: height)
-                    .trim(from: max(0, phase - 0.20), to: phase)
-                    .stroke(
-                        Color.white.opacity(0.30),
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
-                    )
-                    .blur(radius: 5)
-
-                signalPath(width: width, height: height)
-                    .trim(from: max(0, phase - 0.20), to: phase)
-                    .stroke(
-                        Color.white.opacity(0.92),
-                        style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round)
-                    )
-
-                ForEach(0..<nodePositions.count, id: \.self) { index in
-                    let node = nodePositions[index]
-                    let rawDistance = abs(phase - node.phase)
-                    let distance = min(rawDistance, 1 - rawDistance)
-                    let active = max(0, 1 - distance * 8)
+                ForEach(0..<3, id: \.self) { index in
+                    let delay = Double(index) * 0.18
+                    let localPhase = (phase + delay).truncatingRemainder(dividingBy: 1)
+                    let scale = CGFloat(0.62 + localPhase * 0.72)
+                    let opacity = max(0, 0.30 - localPhase * 0.30)
 
                     Circle()
-                        .fill(Color.white.opacity(0.34 + active * 0.50))
-                        .frame(width: 7 + active * 5, height: 7 + active * 5)
-                        .shadow(color: Color.white.opacity(active * 0.34), radius: 9)
-                        .position(x: node.x, y: node.y)
+                        .stroke(Color.white.opacity(opacity), lineWidth: 1.2)
+                        .frame(width: width * scale, height: width * scale)
                 }
+
+                Circle()
+                    .fill(Color.white.opacity(0.92))
+                    .frame(width: 10, height: 10)
+                    .shadow(color: Color.white.opacity(0.42), radius: 12)
+                    .offset(
+                        x: CGFloat(cos(phase * .pi * 2)) * width * 0.23,
+                        y: CGFloat(sin(phase * .pi * 2)) * height * 0.18
+                    )
+
+                HStack(spacing: 10) {
+                    ForEach(0..<5, id: \.self) { index in
+                        let barPhase = (phase + Double(index) * 0.12).truncatingRemainder(dividingBy: 1)
+                        Capsule()
+                            .fill(Color.white.opacity(0.22 + 0.50 * max(0, 1 - abs(barPhase - 0.5) * 2)))
+                            .frame(width: 5, height: 18 + CGFloat(max(0, 1 - abs(barPhase - 0.5) * 2)) * 34)
+                    }
+                }
+                .frame(width: width * 0.48, height: height * 0.58, alignment: .center)
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
             }
-        }
-    }
-
-    private func signalPath(width: CGFloat, height: CGFloat) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: width * 0.10, y: height * 0.58))
-            path.addCurve(
-                to: CGPoint(x: width * 0.38, y: height * 0.34),
-                control1: CGPoint(x: width * 0.18, y: height * 0.54),
-                control2: CGPoint(x: width * 0.27, y: height * 0.24)
-            )
-            path.addCurve(
-                to: CGPoint(x: width * 0.62, y: height * 0.66),
-                control1: CGPoint(x: width * 0.48, y: height * 0.44),
-                control2: CGPoint(x: width * 0.50, y: height * 0.76)
-            )
-            path.addCurve(
-                to: CGPoint(x: width * 0.90, y: height * 0.42),
-                control1: CGPoint(x: width * 0.72, y: height * 0.56),
-                control2: CGPoint(x: width * 0.78, y: height * 0.32)
-            )
         }
     }
 }

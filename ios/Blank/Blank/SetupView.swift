@@ -679,8 +679,9 @@ struct SetupView: View {
                     }
                 }
             }
-            .buttonStyle(BlankSecondaryButtonStyle())
-            .frame(width: 204)
+            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.56))
+            .buttonStyle(.plain)
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {

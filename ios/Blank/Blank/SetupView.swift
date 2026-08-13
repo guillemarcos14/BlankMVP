@@ -135,7 +135,7 @@ struct SetupView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             if currentStep == .apps, sessionStore.hasSelectedApps {
-                message = "\(sessionStore.selectionCount) selections protected."
+                message = "\(sessionStore.selectionCount) selections protected"
             }
         }
         .animation(.easeInOut(duration: 0.26), value: currentStep.rawValue)
@@ -147,7 +147,7 @@ struct SetupView: View {
         case .awareness:
             simpleStatement(
                 title: "Your phone is taking more of your life than you think",
-                body: "Let's see how much.",
+                body: "Let's see how much",
                 bodySize: 18,
                 bodyColor: Color.white.opacity(0.68),
                 button: "Continue"
@@ -312,13 +312,13 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 92)
 
-            Text("Your feed is engineered. You've been drugged by algorithms.")
+            Text("Your feed is engineered")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
                 .frame(maxWidth: 342)
 
-            Text("Studies compare its reward loop to c**aine.")
+            Text("Studies compare its reward loop to c**aine. You've been drugged by algorithms")
                 .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
                 .foregroundStyle(Color.white.opacity(0.76))
                 .multilineTextAlignment(.center)
@@ -343,7 +343,7 @@ struct SetupView: View {
             OnboardingHeader(
                 eyebrow: "",
                 title: "How much time do you spend on your phone daily?",
-                body: "Use your real daily average."
+                body: "Use your real daily average"
             )
 
             VStack(spacing: 18) {
@@ -511,7 +511,7 @@ struct SetupView: View {
                 OnboardingHeader(
                     eyebrow: "",
                     title: "Keep your progress safe",
-                    body: "Sync your progress across devices. You can skip this for now."
+                    body: "Sync your progress across devices. You can skip this for now"
                 )
 
                 VStack(spacing: 12) {
@@ -550,7 +550,7 @@ struct SetupView: View {
                             .font(.blankInter(size: 11, relativeTo: .caption2))
                             .foregroundStyle(BlankColors.mutedInk)
                     }
-                    Text("Your scroll risk is rising.")
+                    Text("Your scroll risk is rising")
                         .font(.blankInter(size: 12, relativeTo: .caption))
                         .lineLimit(2)
                 }
@@ -569,7 +569,7 @@ struct SetupView: View {
                 OnboardingHeader(
                     eyebrow: "",
                     title: "Stay ahead of the scroll",
-                    body: "Blanked can remind you before your weakest moments."
+                    body: "Blanked can remind you before your weakest moments"
                 )
 
                 VStack(spacing: 15) {
@@ -601,7 +601,7 @@ struct SetupView: View {
                 OnboardingHeader(
                     eyebrow: "",
                     title: "I'm ready to take back control",
-                    body: "Hold for 3 seconds."
+                    body: "Hold for 3 seconds"
                 )
 
                 Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
@@ -641,7 +641,7 @@ struct SetupView: View {
             OnboardingHeader(
                 eyebrow: "",
                 title: "Start taking back your time",
-                body: "Block the apps that steal your focus. Try Blanked free for 3 days."
+                body: "Block the apps that steal your focus. Try Blanked free for 3 days"
             )
 
             VStack(spacing: 9) {
@@ -701,7 +701,7 @@ struct SetupView: View {
                 .frame(width: 236)
             }
 
-            Text("Full access today. \(selectedPlanRenewalDisclosure) Terms and Privacy apply.")
+            Text("Full access today. \(selectedPlanRenewalDisclosure) Terms and Privacy apply")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
                 .foregroundStyle(Color.white.opacity(0.40))
                 .multilineTextAlignment(.center)
@@ -753,8 +753,8 @@ struct SetupView: View {
                     eyebrow: "",
                     title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
                     body: sessionStore.hasSelectedApps
-                        ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)."
-                        : "Pick the apps, categories, or websites that usually steal your time."
+                        ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)"
+                        : "Pick the apps, categories, or websites that usually steal your time"
                 )
 
                 if sessionStore.hasSelectedApps {
@@ -855,9 +855,9 @@ struct SetupView: View {
 
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
-            return "Blanked can now shield the apps you choose."
+            return "Blanked can now shield the apps you choose"
         }
-        return "Apple requires this permission before Blanked can block distracting apps."
+        return "Apple requires this permission before Blanked can block distracting apps"
     }
 
     private var selectedPlanRenewalDisclosure: String {
@@ -866,7 +866,7 @@ struct SetupView: View {
             : StoreKitPurchaseStore.monthlyProductId
         let period = selectedPlan == .annual ? "year" : "month"
         let price = purchaseStore.priceText(for: productId, fallback: "the App Store price")
-        return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings."
+        return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
     }
 
     private var isReviewDemoAccessAvailable: Bool {
@@ -963,7 +963,7 @@ struct SetupView: View {
                 goForward()
             } catch {
                 notificationStatus = "Off"
-                message = "Notifications were not enabled. You can turn them on later."
+                message = "Notifications were not enabled. You can turn them on later"
             }
         }
     }
@@ -1061,7 +1061,7 @@ struct SetupView: View {
                 goForward()
                 message = nil
             } else {
-                let status = "iOS status: \(screenTimeBlocker.authorizationStatusLabel)."
+                let status = "iOS status: \(screenTimeBlocker.authorizationStatusLabel)"
                 if let lastErrorMessage = screenTimeBlocker.lastErrorMessage {
                     message = "\(lastErrorMessage) \(status)"
                 } else {

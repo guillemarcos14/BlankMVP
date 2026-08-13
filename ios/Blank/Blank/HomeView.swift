@@ -22,7 +22,7 @@ struct HomeView: View {
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
-    @GestureState private var isHoldingUnblank = false
+    @State private var unblankHoldProgress = 0.0
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -364,21 +364,44 @@ struct HomeView: View {
             }
             .buttonStyle(HomeBlankearButtonStyle())
             .frame(width: buttonWidth)
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 20)
-                    .updating($isHoldingUnblank) { currentValue, state, _ in
-                        state = currentValue
+            .overlay(alignment: .leading) {
+                if sessionStore.isBlankActive {
+                    GeometryReader { proxy in
+                        Capsule()
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: proxy.size.width * unblankHoldProgress)
+                            .frame(maxHeight: .infinity, alignment: .leading)
                     }
-                    .onEnded { _ in
-                        guard sessionStore.isBlankActive else { return }
-                        let result = withAnimation(.easeInOut(duration: 0.65)) {
-                            sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+                    .clipShape(Capsule())
+                    .allowsHitTesting(false)
+                }
+            }
+            .onLongPressGesture(
+                minimumDuration: 20,
+                maximumDistance: 48,
+                pressing: { isPressing in
+                    guard sessionStore.isBlankActive else { return }
+                    if isPressing {
+                        unblankHoldProgress = 0
+                        withAnimation(.linear(duration: 20)) {
+                            unblankHoldProgress = 1
                         }
-                        screenTimeBlocker.clear()
-                        setMessage(for: result)
+                    } else {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            unblankHoldProgress = 0
+                        }
                     }
+                },
+                perform: {
+                    guard sessionStore.isBlankActive else { return }
+                    let result = withAnimation(.easeInOut(duration: 0.65)) {
+                        sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+                    }
+                    screenTimeBlocker.clear()
+                    unblankHoldProgress = 0
+                    setMessage(for: result)
+                }
             )
-            .opacity(isHoldingUnblank ? 0.72 : 1)
         }
     }
 

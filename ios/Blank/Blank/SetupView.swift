@@ -563,7 +563,7 @@ struct SetupView: View {
                 OnboardingHeader(
                     eyebrow: "",
                     title: "I'm ready to take back control",
-                    body: "Hold for 3 seconds"
+                    body: commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s"
                 )
 
                 Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
@@ -588,9 +588,6 @@ struct SetupView: View {
                         }
                     )
 
-                Text(commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.72))
             }
 
             Spacer(minLength: 0)

@@ -860,7 +860,7 @@ struct SetupView: View {
     }
 
     private var onboardingConsentText: String {
-        "Required: I agree to share my onboarding answers with Blanked to improve the product"
+        "I agree to the Privacy Policy and Terms"
     }
 
     private var isReviewDemoAccessAvailable: Bool {

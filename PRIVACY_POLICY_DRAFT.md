@@ -14,6 +14,8 @@ Blank stores the following data locally on your device:
 - The time Blank mode was activated.
 - Whether setup has been completed.
 
+Blank may also collect the answers you provide during onboarding, such as your name, age range, goals, profile, estimated daily phone use, selected plan, locale, app version, and an anonymous user identifier. Blank uses this information to understand onboarding performance, improve the product, and make the experience more relevant. Blank does not collect the exact apps you choose to block.
+
 ## Accessibility Use
 
 Blank uses Android Accessibility events to detect when the foreground app changes. If Blank mode is active and the foreground app is in your blocked list, Blank opens its blocking screen.
@@ -28,7 +30,7 @@ If Firebase, Sentry, or another analytics/crash provider is added later, this po
 
 ## Sharing
 
-This MVP does not send your Blank data to a server and does not share it with third parties.
+Blank may send onboarding responses to its backend for product analytics and improvement. Blank does not sell this data and does not share it with third-party advertisers.
 
 ## Permissions
 

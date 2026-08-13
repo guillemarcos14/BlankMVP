@@ -5,6 +5,7 @@ import WidgetKit
 @MainActor
 final class SessionStore: ObservableObject {
     static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
+    private static let manualUnblankCooldown: TimeInterval = 3
 
     @Published var isBlankActive: Bool {
         didSet {
@@ -83,6 +84,7 @@ final class SessionStore: ObservableObject {
     #endif
 
     private let defaults: UserDefaults
+    private var lastManualUnblankedAt: Date?
 
     init(defaults: UserDefaults = BlankSharedState.defaults) {
         self.defaults = defaults
@@ -211,6 +213,10 @@ final class SessionStore: ObservableObject {
         guard !isBlankActive else {
             return .blanked
         }
+        if let lastManualUnblankedAt,
+           Date().timeIntervalSince(lastManualUnblankedAt) < Self.manualUnblankCooldown {
+            return .unblanked
+        }
 
         isBlankActive = true
         blankActiveSince = Date()
@@ -246,6 +252,9 @@ final class SessionStore: ObservableObject {
         isBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
+        if endedReason == .manual {
+            lastManualUnblankedAt = Date()
+        }
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
         endActiveSession(entryMode: entryMode, endedReason: endedReason, broken: broken)

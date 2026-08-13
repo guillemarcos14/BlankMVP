@@ -41,6 +41,7 @@ struct SetupView: View {
     @State private var commitmentComplete = false
     @State private var commitmentSeconds = 0
     @State private var commitmentTimer: Timer?
+    @State private var isCommitmentPressing = false
     @State private var notificationStatus = "Off"
     @State private var lifetimeRingProgress = 0.0
     @State private var lifetimeYears = 0
@@ -311,7 +312,7 @@ struct SetupView: View {
         VStack(spacing: 24) {
             Spacer(minLength: 92)
 
-            Text("Your brain is not weak. The feed is engineered.")
+            Text("Your feed is engineered. You've been drugged by algorithms.")
                 .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -607,11 +608,13 @@ struct SetupView: View {
                     .font(.system(size: 25, weight: .semibold))
                     .foregroundStyle(BlankColors.ink)
                     .frame(width: 74, height: 74)
-                    .background(Circle().fill(Color.white.opacity(0.82)))
+                    .background(Circle().fill(Color.white.opacity(isCommitmentPressing ? 0.62 : 0.82)))
+                    .scaleEffect(isCommitmentPressing ? 0.985 : 1)
                     .onLongPressGesture(
                         minimumDuration: 3,
                         maximumDistance: 48,
                         pressing: { isPressing in
+                            isCommitmentPressing = isPressing
                             if isPressing {
                                 startCommitmentHold()
                             } else if !commitmentComplete {
@@ -637,8 +640,8 @@ struct SetupView: View {
         VStack(spacing: 15) {
             OnboardingHeader(
                 eyebrow: "",
-                title: "Start recovering your time",
-                body: "Full access starts today. Try every feature free for 3 days, then renews at the App Store price. Cancel anytime in App Store settings."
+                title: "Start taking back your time",
+                body: "Block the apps that steal your focus. Try Blanked free for 3 days."
             )
 
             VStack(spacing: 9) {
@@ -1027,12 +1030,14 @@ struct SetupView: View {
     }
 
     private func cancelCommitmentHold() {
+        isCommitmentPressing = false
         commitmentTimer?.invalidate()
         commitmentTimer = nil
         commitmentSeconds = 0
     }
 
     private func completeCommitmentHold() {
+        isCommitmentPressing = false
         commitmentTimer?.invalidate()
         commitmentTimer = nil
         commitmentSeconds = 3

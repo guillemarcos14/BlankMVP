@@ -21,3 +21,5 @@ create table if not exists onboarding_responses (
 
 create index if not exists onboarding_responses_user_idx on onboarding_responses(anonymous_user_id);
 create index if not exists onboarding_responses_submitted_idx on onboarding_responses(submitted_at desc);
+
+alter table onboarding_responses enable row level security;

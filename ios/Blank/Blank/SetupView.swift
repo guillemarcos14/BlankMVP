@@ -16,7 +16,6 @@ private enum OnboardingStep: Int, CaseIterable {
     case recovery
     case commitment
     case trial
-    case account
     case permission
     case notifications
     case apps
@@ -174,8 +173,6 @@ struct SetupView: View {
             commitmentStep
         case .trial:
             trialStep
-        case .account:
-            accountStep
         case .permission:
             permissionStep
         case .notifications:
@@ -501,41 +498,6 @@ struct SetupView: View {
             ],
             selection: selectedProfile
         ) { selectedProfile = $0 }
-    }
-
-    private var accountStep: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            VStack(spacing: 22) {
-                OnboardingHeader(
-                    eyebrow: "",
-                    title: "Keep your progress safe",
-                    body: "Sync your progress across devices. You can skip this for now"
-                )
-
-                VStack(spacing: 12) {
-                    SocialLoginButton(systemName: "apple.logo", title: "Continue with Apple") {
-                        goForward()
-                    }
-
-                    SocialLoginButton(systemName: "g.circle.fill", title: "Continue with Google") {
-                        goForward()
-                    }
-                }
-                .frame(maxWidth: 342)
-
-                Button("Skip for now") {
-                    goForward()
-                }
-                .buttonStyle(BlankSecondaryButtonStyle())
-                .frame(width: onboardingButtonWidth(for: "Skip for now"))
-                .padding(.top, 2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxHeight: .infinity)
     }
 
     private var notificationsStep: some View {
@@ -881,7 +843,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .account, .commitment, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
             return true
         case .trial:
             return false
@@ -1232,31 +1194,6 @@ private struct BlankOnboardingBackground: View {
             )
             .ignoresSafeArea()
         }
-    }
-}
-
-private struct SocialLoginButton: View {
-    let systemName: String
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: systemName)
-                    .font(.system(size: 17, weight: .semibold))
-                Text(title)
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-            }
-            .foregroundStyle(BlankColors.ink)
-            .frame(maxWidth: .infinity)
-            .frame(height: 50)
-            .background {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.88))
-            }
-        }
-        .buttonStyle(.plain)
     }
 }
 

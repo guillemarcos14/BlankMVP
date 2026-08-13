@@ -667,8 +667,6 @@ struct SetupView: View {
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
             .frame(width: 222)
-            .opacity(onboardingDataConsent ? 1 : 0.54)
-            .disabled(!onboardingDataConsent)
 
             Button("Restore purchases") {
                 Task {
@@ -964,7 +962,7 @@ struct SetupView: View {
 
     private func purchaseSelectedPlan() {
         guard onboardingDataConsent else {
-            message = "Please accept the required data checkbox to start your trial"
+            message = "Please agree to the Privacy Policy and Terms to continue"
             return
         }
 

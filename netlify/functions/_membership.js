@@ -408,6 +408,7 @@ module.exports = {
   recordGrantsAccess,
   requireMethod,
   sendActivationEmail,
+  supabaseFetch,
   timingSafeEqual,
   touchDevice,
   verifyShopifyWebhook,

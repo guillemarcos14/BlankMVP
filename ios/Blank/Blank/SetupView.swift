@@ -1,4 +1,5 @@
 import FamilyControls
+import Foundation
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -47,6 +48,7 @@ struct SetupView: View {
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
+    @State private var onboardingDataConsent = false
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -56,6 +58,7 @@ struct SetupView: View {
     @AppStorage("blankOnboardingProfile", store: BlankSharedState.defaults) private var selectedProfile = ""
     @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
+    @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var anonymousUserId = ""
 
     var body: some View {
         ZStack {
@@ -627,6 +630,32 @@ struct SetupView: View {
             .frame(maxWidth: 342)
 
             Button {
+                onboardingDataConsent.toggle()
+                if onboardingDataConsent {
+                    message = nil
+                    Task {
+                        await submitOnboardingResponses()
+                    }
+                }
+            } label: {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: onboardingDataConsent ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(onboardingDataConsent ? 0.88 : 0.52))
+                        .frame(width: 18, height: 18)
+
+                    Text(onboardingConsentText)
+                        .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption2))
+                        .foregroundStyle(Color.white.opacity(0.58))
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(2)
+                }
+                .frame(maxWidth: 318, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Required onboarding data consent")
+
+            Button {
                 purchaseSelectedPlan()
             } label: {
                 if purchaseStore.isPurchasing || purchaseStore.isLoading {
@@ -638,6 +667,8 @@ struct SetupView: View {
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
             .frame(width: 222)
+            .opacity(onboardingDataConsent ? 1 : 0.54)
+            .disabled(!onboardingDataConsent)
 
             Button("Restore purchases") {
                 Task {
@@ -828,6 +859,10 @@ struct SetupView: View {
         return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
     }
 
+    private var onboardingConsentText: String {
+        "Required: I agree to share my onboarding answers with Blanked to improve the product"
+    }
+
     private var isReviewDemoAccessAvailable: Bool {
         #if DEBUG
         #if targetEnvironment(simulator)
@@ -928,16 +963,53 @@ struct SetupView: View {
     }
 
     private func purchaseSelectedPlan() {
+        guard onboardingDataConsent else {
+            message = "Please accept the required data checkbox to start your trial"
+            return
+        }
+
         let productId = selectedPlan == .annual
             ? StoreKitPurchaseStore.annualProductId
             : StoreKitPurchaseStore.monthlyProductId
 
         Task {
+            await submitOnboardingResponses()
             if await purchaseStore.purchase(productId: productId) {
                 trialStarted = true
                 goForward()
             }
         }
+    }
+
+    @MainActor
+    private func submitOnboardingResponses() async {
+        let selectedPlanText = selectedPlan == .annual ? "annual" : "monthly"
+        let response = OnboardingResponsePayload(
+            anonymousUserId: stableAnonymousUserId(),
+            name: name,
+            ageRange: selectedAgeRange,
+            goal: selectedOnboardingGoal,
+            profile: selectedProfile,
+            dailyHours: storedDailyHours,
+            aiGoal: onboardingGoal,
+            weakMoment: weakMoment,
+            selectedPlan: selectedPlanText,
+            locale: Locale.current.identifier,
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            buildNumber: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+            consentText: onboardingConsentText
+        )
+        await OnboardingFunnelClient().submit(response)
+    }
+
+    private func stableAnonymousUserId() -> String {
+        let existing = anonymousUserId.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString
+        anonymousUserId = created
+        return created
     }
 
     private func continueWithReviewDemoAccess() {
@@ -1254,5 +1326,98 @@ private struct PlanButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct OnboardingResponsePayload: Encodable {
+    let anonymousUserId: String
+    let name: String
+    let ageRange: String
+    let goal: String
+    let profile: String
+    let dailyHours: Double
+    let aiGoal: String
+    let weakMoment: String
+    let selectedPlan: String
+    let locale: String
+    let appVersion: String
+    let buildNumber: String
+    let consentText: String
+
+    enum CodingKeys: String, CodingKey {
+        case anonymousUserId = "anonymous_user_id"
+        case name
+        case ageRange = "age_range"
+        case goal
+        case profile
+        case dailyHours = "daily_hours"
+        case aiGoal = "ai_goal"
+        case weakMoment = "weak_moment"
+        case selectedPlan = "selected_plan"
+        case locale
+        case appVersion = "app_version"
+        case buildNumber = "build_number"
+        case consentText = "consent_text"
+        case dataConsent = "data_consent"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(anonymousUserId, forKey: .anonymousUserId)
+        try container.encode(name, forKey: .name)
+        try container.encode(ageRange, forKey: .ageRange)
+        try container.encode(goal, forKey: .goal)
+        try container.encode(profile, forKey: .profile)
+        try container.encode(dailyHours, forKey: .dailyHours)
+        try container.encode(aiGoal, forKey: .aiGoal)
+        try container.encode(weakMoment, forKey: .weakMoment)
+        try container.encode(selectedPlan, forKey: .selectedPlan)
+        try container.encode(locale, forKey: .locale)
+        try container.encode(appVersion, forKey: .appVersion)
+        try container.encode(buildNumber, forKey: .buildNumber)
+        try container.encode(consentText, forKey: .consentText)
+        try container.encode(true, forKey: .dataConsent)
+    }
+}
+
+private struct OnboardingFunnelClient {
+    private let baseURL: URL?
+    private let session: URLSession
+
+    init(baseURL: URL? = Self.configuredBaseURL(), session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func submit(_ payload: OnboardingResponsePayload) async {
+        guard let baseURL else { return }
+
+        do {
+            let url = baseURL.appendingPathComponent("onboarding-responses")
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 6
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(payload)
+
+            let (_, response) = try await session.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                return
+            }
+        } catch {
+            return
+        }
+    }
+
+    private static func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
     }
 }

@@ -352,23 +352,8 @@ struct HomeView: View {
                     .frame(maxWidth: 244)
             }
 
-            if !sessionStore.isBlankActive, message == nil, configIssues.isEmpty {
-                VStack(spacing: 4) {
-                    Text(recommendation.title)
-                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(Color.white.opacity(0.86))
-                    Text(recommendation.detail)
-                        .font(.blankInter(size: 12, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.66))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                }
-                .frame(maxWidth: 276)
-            }
-
-            let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 224)
-            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start smart block") {
+            let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
+            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start Blank") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
@@ -423,6 +408,16 @@ struct HomeView: View {
                         }
                     }
             )
+
+            if !sessionStore.isBlankActive, message == nil, configIssues.isEmpty {
+                Text("Recommended: \(recommendation.durationMinutes) min focus block")
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+                    .frame(maxWidth: 244)
+            }
         }
     }
 

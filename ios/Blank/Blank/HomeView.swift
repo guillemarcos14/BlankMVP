@@ -24,7 +24,6 @@ struct HomeView: View {
     @State private var nfcReader = NFCReader()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
-    @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
@@ -103,7 +102,7 @@ struct HomeView: View {
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet(
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-                coachMessage: emergencyCoachMessage
+                intervention: relapseIntervention
             ) {
                 let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
                     sessionStore.deactivateForEmergency()
@@ -340,6 +339,8 @@ struct HomeView: View {
     }
 
     private func bottomAction(width: CGFloat) -> some View {
+        let recommendation = smartBlockRecommendation
+
         VStack(spacing: 12) {
             if let preventiveAlertText {
                 Text(preventiveAlertText)
@@ -351,13 +352,28 @@ struct HomeView: View {
                     .frame(maxWidth: 244)
             }
 
-            let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start Blank") {
+            if !sessionStore.isBlankActive, message == nil, configIssues.isEmpty {
+                VStack(spacing: 4) {
+                    Text(recommendation.title)
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(Color.white.opacity(0.86))
+                    Text(recommendation.detail)
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.66))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
+                }
+                .frame(maxWidth: 276)
+            }
+
+            let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 224)
+            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start smart block") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank()
+                        sessionStore.activateBlank(durationMinutes: recommendation.durationMinutes)
                     }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
@@ -414,55 +430,30 @@ struct HomeView: View {
         guard !sessionStore.isBlankActive,
               message == nil,
               configIssues.isEmpty,
-              let weakHour = weakHourThisWeek(),
+              let weakHour = DigitalWellnessAI.weakHour(events: sessionStore.usageEvents, sessions: sessionStore.sessions, now: now),
               minutesUntilNextHour(weakHour) <= 30 else {
             return nil
         }
 
-        return "Your weak window is coming. Start Blank."
+        return "Your weak window is coming."
     }
 
-    private var emergencyCoachMessage: String {
-        if !storedWeeklyGoal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "You are breaking your weekly goal."
-        }
-
-        guard let weakHour = weakHourThisWeek() else {
-            return "Pause for 10 seconds before deciding."
-        }
-
-        let currentHour = Calendar.current.component(.hour, from: now)
-        if weakHour == currentHour {
-            return "You are in your weak window. Try 5 more minutes."
-        }
-
-        if minutesUntilNextHour(weakHour) <= 30 {
-            return "Your weak window is close. Avoid breaking now."
-        }
-
-        return "Breaking now counts as a weekly emergency."
+    private var smartBlockRecommendation: SmartBlockRecommendation {
+        DigitalWellnessAI.smartBlockRecommendation(
+            events: sessionStore.usageEvents,
+            sessions: sessionStore.sessions,
+            selectionCount: sessionStore.selectionCount,
+            now: now
+        )
     }
 
-    private func weakHourThisWeek() -> Int? {
-        let calendar = Calendar.current
-        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
-        let brokenEventHours = sessionStore.usageEvents
-            .filter { event in
-                event.occurredAt >= weekStart &&
-                event.occurredAt <= now &&
-                (event.kind == .blockBroken || event.endedReason == .emergency)
-            }
-            .map(\.localHour)
-        let emergencySessionHours = sessionStore.sessions
-            .filter { session in
-                let sessionEnd = session.endedAt ?? now
-                return session.startedAt <= now &&
-                sessionEnd >= weekStart &&
-                session.endedReason == .emergency
-            }
-            .compactMap(\.localStartHour)
-
-        return mostCommonValue(brokenEventHours + emergencySessionHours)
+    private var relapseIntervention: RelapseIntervention {
+        DigitalWellnessAI.relapseIntervention(
+            events: sessionStore.usageEvents,
+            sessions: sessionStore.sessions,
+            selectionCount: sessionStore.selectionCount,
+            now: now
+        )
     }
 
     private func minutesUntilNextHour(_ hour: Int) -> Int {
@@ -1084,13 +1075,15 @@ private struct ForgetBlankConfirmSheet: View {
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
     let emergencyUnlocksRemaining: Int
-    let coachMessage: String
+    let intervention: RelapseIntervention
     let onUnlock: () -> Bool
 
     var body: some View {
         TechnicalSettingsSheetLayout {
             TechnicalSheetTitle("Emergency")
-            TechnicalSheetDescription(coachMessage, emphasized: true)
+            TechnicalSheetDescription(intervention.headline, emphasized: true)
+            TechnicalSheetDescription(intervention.cost)
+            TechnicalSheetDescription(intervention.alternative, emphasized: true)
             TechnicalSheetDescription("This turns Blank off without using your Blank and unlocks protected apps. Use it only if you need access now.")
             TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "You have \(emergencyUnlocksRemaining) unlocks left this week." : "You have used your 3 unlocks this week.", emphasized: true)
             TechnicalSheetActions {

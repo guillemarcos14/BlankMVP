@@ -27,12 +27,27 @@ struct ReportView: View {
         let savedTime = cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount)
         let hasRecentActivity = progress.recentActivity.contains { $0.sessionCount > 0 || $0.totalFocusTime > 0 }
         let hasProgress = totalSessionCount > 0 || totalFocusTime > 0 || hasRecentActivity
+        let diagnosis = DigitalWellnessAI.currentDiagnosis(
+            events: sessionStore.usageEvents,
+            sessions: sessionStore.sessions,
+            selectionCount: sessionStore.selectionCount
+        )
+        let recommendation = DigitalWellnessAI.smartBlockRecommendation(
+            events: sessionStore.usageEvents,
+            sessions: sessionStore.sessions,
+            selectionCount: sessionStore.selectionCount
+        )
 
         List {
             VStack(alignment: .center, spacing: 22) {
                     reportHeader()
 
                     minimalHero(savedTime: savedTime)
+
+                    digitalWellnessDiagnosisCapsule(
+                        diagnosis: diagnosis,
+                        recommendation: recommendation
+                    )
 
                     if hasProgress {
                         periodSummaryCapsule(sessions: sessionStore.sessions)
@@ -94,8 +109,8 @@ struct ReportView: View {
 
     private func reportHeader() -> some View {
         TopSheetHeader(
-            title: "Stats",
-            subtitle: "Measure the time Blank gives back\nand summarize your protection rhythm.",
+            title: "Digital Wellness",
+            subtitle: "Understand your patterns\nand follow your next best block.",
             titleColor: reportPrimary,
             subtitleColor: reportSecondary
         )
@@ -244,6 +259,43 @@ struct ReportView: View {
         .liquidGlass(cornerRadius: 28)
     }
 
+    private func digitalWellnessDiagnosisCapsule(
+        diagnosis: DigitalWellnessDiagnosis,
+        recommendation: SmartBlockRecommendation
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(diagnosis.archetype)
+                    .font(.blankInter(size: 19, weight: .medium, relativeTo: .headline))
+                Text(diagnosis.riskTitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+                Text(diagnosis.riskBody)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(reportPrimary.opacity(0.88))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                statCapsule(title: "Risk window", value: diagnosis.weakMoment, caption: "First plan", minHeight: 82)
+                statCapsule(title: "Smart block", value: "\(recommendation.durationMinutes)m", caption: recommendation.title, minHeight: 82)
+            }
+
+            aiReportSection(
+                title: "7-day plan",
+                items: diagnosis.plan.prefix(3).map { "\($0.title): \($0.action)" }
+            )
+
+            Text("Full plan adapts as real sessions and emergency unlocks appear.")
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
     private func dailySummaryRow(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
@@ -259,7 +311,7 @@ struct ReportView: View {
     private func weeklyAIReportCapsule(report: WeeklyAIReport) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Weekly AI Report")
+                Text("Digital Wellness Report")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(report.summary)
                     .font(.caption)

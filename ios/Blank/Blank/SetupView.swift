@@ -1111,6 +1111,12 @@ struct SetupView: View {
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+            DigitalWellnessAI.saveInitialDiagnosis(
+                goal: selectedOnboardingGoal,
+                profile: selectedProfile,
+                dailyHours: storedDailyHours,
+                selectionCount: sessionStore.selectionCount
+            )
             sessionStore.finishSetup()
         } else {
             showingPicker = true

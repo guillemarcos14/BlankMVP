@@ -341,7 +341,7 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         let recommendation = smartBlockRecommendation
 
-        VStack(spacing: 12) {
+        return VStack(spacing: 12) {
             if let preventiveAlertText {
                 Text(preventiveAlertText)
                     .font(.blankInter(size: 13, relativeTo: .footnote))

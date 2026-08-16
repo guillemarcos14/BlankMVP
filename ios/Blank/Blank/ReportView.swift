@@ -3,6 +3,7 @@ import UIKit
 
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
     @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
@@ -37,6 +38,11 @@ struct ReportView: View {
             sessions: sessionStore.sessions,
             selectionCount: sessionStore.selectionCount
         )
+        let healthInsights = healthDigitalWellnessInsights(
+            summaries: healthKitStore.summaries,
+            sessions: sessionStore.sessions,
+            events: sessionStore.usageEvents
+        )
 
         List {
             VStack(alignment: .center, spacing: 22) {
@@ -48,6 +54,8 @@ struct ReportView: View {
                         diagnosis: diagnosis,
                         recommendation: recommendation
                     )
+
+                    healthSignalsCapsule(insights: healthInsights)
 
                     if hasProgress {
                         periodSummaryCapsule(sessions: sessionStore.sessions)
@@ -105,6 +113,9 @@ struct ReportView: View {
         .background(ReportLiquidBackground(isActive: sessionStore.isBlankActive).ignoresSafeArea())
         .foregroundStyle(reportPrimary)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .onAppear {
+            healthKitStore.refresh()
+        }
     }
 
     private func reportHeader() -> some View {
@@ -287,6 +298,73 @@ struct ReportView: View {
             )
 
             Text("Full plan adapts as real sessions and emergency unlocks appear.")
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func healthSignalsCapsule(insights: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Health Signals")
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
+                Text(healthSignalsSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            switch healthKitStore.state {
+            case .unavailable:
+                Text("Apple Health is not available on this device.")
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(reportPrimary.opacity(0.84))
+                    .fixedSize(horizontal: false, vertical: true)
+            case .notRequested, .failed(_):
+                Button {
+                    healthKitStore.requestAccess()
+                } label: {
+                    Text("Connect Apple Health")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background {
+                            Capsule()
+                                .fill(Color.white.opacity(0.24))
+                        }
+                        .overlay {
+                            Capsule()
+                                .stroke(reportPrimary.opacity(0.08), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+            case .requesting:
+                Text("Opening Apple Health permissions...")
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(reportPrimary.opacity(0.84))
+            case .connected:
+                if healthKitStore.summaries.isEmpty {
+                    Text("Connected. Insights appear after Apple Health has sleep, activity or heart data.")
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(reportPrimary.opacity(0.84))
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    if let latest = healthKitStore.summaries.last {
+                        HStack(spacing: 10) {
+                            statCapsule(title: "Sleep", value: sleepValue(latest.sleepMinutes), caption: "Last signal", minHeight: 82)
+                            statCapsule(title: "Steps", value: stepsValue(latest.steps), caption: "Last signal", minHeight: 82)
+                        }
+                    }
+                    aiReportSection(title: "Wellness insights", items: insights)
+                }
+            }
+
+            Text("For digital wellness only. Blanked does not provide medical diagnosis.")
                 .font(.caption2)
                 .foregroundStyle(reportSecondary.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
@@ -757,6 +835,92 @@ struct ReportView: View {
 
     private func savedTimeExplanation(totalFocusTime: TimeInterval, sessionCount: Int) -> String {
         "Time saved: \(formatDuration(cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: sessionCount))) estimated with 7 min per session and 10% of protected time, capped at real time in Blank."
+    }
+
+    private var healthSignalsSubtitle: String {
+        switch healthKitStore.state {
+        case .connected:
+            return "Optional Apple Health context for your digital habits."
+        case .notRequested:
+            return "Optional. Sleep, activity and heart signals stay local."
+        case .requesting:
+            return "Waiting for Apple Health permission."
+        case .unavailable:
+            return "Apple Health is unavailable here."
+        case .failed(_):
+            return "Permission can be retried any time."
+        }
+    }
+
+    private func sleepValue(_ minutes: Int?) -> String {
+        guard let minutes else { return "No data" }
+        let hours = minutes / 60
+        let remaining = minutes % 60
+        return remaining == 0 ? "\(hours)h" : "\(hours)h \(remaining)m"
+    }
+
+    private func stepsValue(_ steps: Int?) -> String {
+        guard let steps else { return "No data" }
+        if steps >= 1000 {
+            return String(format: "%.1fk", Double(steps) / 1000)
+        }
+        return "\(steps)"
+    }
+
+    private func healthDigitalWellnessInsights(
+        summaries: [HealthDaySummary],
+        sessions: [BlankSession],
+        events: [BlankUsageEvent]
+    ) -> [String] {
+        let calendar = Calendar.current
+        let recentSummaries = Array(summaries.suffix(7))
+        guard !recentSummaries.isEmpty else {
+            return [
+                "Connect Apple Health to compare sleep and activity with your screen habit patterns.",
+                "Blanked only uses this for digital wellness insights.",
+                "No medical diagnosis is generated."
+            ]
+        }
+
+        let sleepValues = recentSummaries.compactMap(\.sleepMinutes)
+        let stepValues = recentSummaries.compactMap(\.steps)
+        let hrvValues = recentSummaries.compactMap(\.hrvSDNN)
+        let averageSleep = sleepValues.isEmpty ? nil : sleepValues.reduce(0, +) / sleepValues.count
+        let averageSteps = stepValues.isEmpty ? nil : stepValues.reduce(0, +) / stepValues.count
+        let averageHRV = hrvValues.isEmpty ? nil : hrvValues.reduce(0, +) / hrvValues.count
+        let lowSleepDays = Set(recentSummaries.filter { ($0.sleepMinutes ?? 999) < 6 * 60 }.map { calendar.startOfDay(for: $0.date) })
+        let brokenDays = Set(events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }.map { calendar.startOfDay(for: $0.occurredAt) })
+        let nightSessionCount = sessions.filter { session in
+            let hour = session.localStartHour ?? calendar.component(.hour, from: session.startedAt)
+            return hour >= 21 || hour <= 3
+        }.count
+
+        var insights: [String] = []
+        if !lowSleepDays.isDisjoint(with: brokenDays) {
+            insights.append("Low-sleep days overlap with break attempts. Protect the evening window earlier.")
+        } else if let averageSleep {
+            insights.append("Average sleep signal: \(sleepValue(averageSleep)). Compare it with evening blocks this week.")
+        } else {
+            insights.append("Sleep data is not available yet. Evening patterns will improve when it appears.")
+        }
+
+        if let averageSteps, averageSteps < 3500 {
+            insights.append("Low-activity days may need shorter blocks and earlier starts.")
+        } else if let averageSteps {
+            insights.append("Average activity signal: \(stepsValue(averageSteps)) steps. Keep the same block window for cleaner learning.")
+        } else {
+            insights.append("Activity data is not available yet. Steps can help spot low-energy relapse days.")
+        }
+
+        if nightSessionCount > 0 {
+            insights.append("Night blocks are active. Keep the final hour before sleep protected.")
+        } else if let averageHRV {
+            insights.append("HRV signal averages \(averageHRV) ms. Use it as context, not a medical score.")
+        } else {
+            insights.append("Heart signals are optional context for recovery, not a score or diagnosis.")
+        }
+
+        return Array(insights.prefix(3))
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {

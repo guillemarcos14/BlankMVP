@@ -102,6 +102,47 @@ final class HealthKitStore: ObservableObject {
         state = HKHealthStore.isHealthDataAvailable() ? .notRequested : .unavailable
     }
 
+    #if DEBUG
+    func loadSyntheticAppleWatchData(days: Int = 14) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        summaries = (0..<days).compactMap { offset -> HealthDaySummary? in
+            guard let date = calendar.date(byAdding: .day, value: offset - (days - 1), to: today) else {
+                return nil
+            }
+
+            let dayIndex = offset + 1
+            let shortSleepDay = dayIndex == 4 || dayIndex == 9 || dayIndex == 13
+            let activeDay = dayIndex == 2 || dayIndex == 6 || dayIndex == 11
+            let lateBedtime = shortSleepDay || dayIndex == 8
+            let sleepMinutes = shortSleepDay ? 315 + (dayIndex % 2) * 18 : 430 + (dayIndex % 3) * 22
+            let steps = activeDay ? 10400 + dayIndex * 110 : 2800 + dayIndex * 360
+            let workoutMinutes = activeDay ? 36 + dayIndex % 4 * 6 : (dayIndex % 5 == 0 ? 18 : nil)
+            let bedtimeMinute = lateBedtime ? 1 * 60 + 15 + dayIndex * 3 : 22 * 60 + 35 + dayIndex * 4
+            let wakeMinute = shortSleepDay ? 6 * 60 + 35 : 7 * 60 + 20 + dayIndex % 4 * 8
+
+            return HealthDaySummary(
+                date: date,
+                inBedMinutes: sleepMinutes + 34,
+                sleepMinutes: sleepMinutes,
+                bedtimeMinute: bedtimeMinute % (24 * 60),
+                wakeMinute: wakeMinute,
+                steps: steps,
+                distanceMeters: Int(Double(steps) * 0.78),
+                activeEnergyKcal: activeDay ? 680 + dayIndex * 8 : 240 + dayIndex * 13,
+                basalEnergyKcal: 1540 + dayIndex * 3,
+                workoutMinutes: workoutMinutes,
+                mindfulMinutes: dayIndex % 3 == 0 ? 8 + dayIndex % 4 : nil,
+                averageHeartRate: 76 - dayIndex % 5,
+                restingHeartRate: shortSleepDay ? 68 + dayIndex % 3 : 58 + dayIndex % 4,
+                hrvSDNN: shortSleepDay ? 31 + dayIndex % 5 : 54 + dayIndex % 8
+            )
+        }
+        state = .connected
+    }
+    #endif
+
     func refresh(days: Int = 14) {
         guard HKHealthStore.isHealthDataAvailable() else {
             state = .unavailable

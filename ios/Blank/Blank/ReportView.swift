@@ -384,6 +384,27 @@ struct ReportView: View {
                 }
             }
 
+            #if DEBUG
+            Button {
+                healthKitStore.loadSyntheticAppleWatchData()
+            } label: {
+                Text("Load Apple Watch demo data")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background {
+                        Capsule()
+                            .fill(Color.white.opacity(0.16))
+                    }
+                    .overlay {
+                        Capsule()
+                            .stroke(reportPrimary.opacity(0.08), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            #endif
+
             Text("For digital wellness only. Blanked does not provide medical diagnosis.")
                 .font(.caption2)
                 .foregroundStyle(reportSecondary.opacity(0.72))

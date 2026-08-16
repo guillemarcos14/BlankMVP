@@ -16,7 +16,7 @@ Blank stores the following data locally on your device:
 
 Blank may also collect the answers you provide during onboarding, such as your name, age range, goals, profile, estimated daily phone use, selected plan, locale, app version, and an anonymous user identifier. Blank uses this information to understand onboarding performance, improve the product, and make the experience more relevant. Blank does not collect the exact apps you choose to block.
 
-On iPhone, Blank may optionally read Apple Health data that you explicitly allow, such as sleep, steps, active energy, resting energy, heart rate, resting heart rate, and heart rate variability. Blank uses this data locally to generate digital wellness insights about screen habits. Blank does not use Apple Health data for medical diagnosis and does not send Apple Health data to its backend in the current implementation.
+On iPhone, Blank may optionally read Apple Health data that you explicitly allow, such as sleep, time in bed, steps, walking/running distance, active energy, resting energy, workouts, mindful minutes, heart rate, resting heart rate, and heart rate variability. Blank uses this data locally to generate digital wellness insights about screen habits. Blank does not use Apple Health data for medical diagnosis and does not send Apple Health data to its backend in the current implementation.
 
 ## Accessibility Use
 
@@ -38,7 +38,7 @@ Blank may send onboarding responses to its backend for product analytics and imp
 
 Blank requires NFC to pair and read your physical tag. Blank requires Accessibility access to detect blocked apps. Blank may request battery optimization exclusion so Android does not stop the app while Blank mode is active.
 
-On iPhone, Apple Health access is optional and can be declined without blocking the app.
+On iPhone, Apple Health access is optional and can be declined without blocking the app. You can stop Blank from using Apple Health inside the app, and you can revoke Health permissions in iOS Settings or Apple Health.
 
 ## iPhone Version
 

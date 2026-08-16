@@ -44,7 +44,7 @@
 	<key>NFCReaderUsageDescription</key>
 	<string>Blank uses NFC to link and scan your physical Blank tag.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Blanked reads Apple Health data you allow, such as sleep, activity and heart signals, to generate digital wellness insights. It does not provide medical diagnosis.</string>
+	<string>Blanked reads Apple Health data you allow, such as sleep, activity, workouts, mindful minutes and heart signals, to generate digital wellness insights. It does not provide medical diagnosis.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

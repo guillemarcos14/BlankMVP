@@ -38,10 +38,12 @@ struct ReportView: View {
             sessions: sessionStore.sessions,
             selectionCount: sessionStore.selectionCount
         )
+        let healthContext = healthRecoveryContext(summaries: healthKitStore.summaries)
         let healthInsights = healthDigitalWellnessInsights(
             summaries: healthKitStore.summaries,
             sessions: sessionStore.sessions,
-            events: sessionStore.usageEvents
+            events: sessionStore.usageEvents,
+            context: healthContext
         )
 
         List {
@@ -55,7 +57,7 @@ struct ReportView: View {
                         recommendation: recommendation
                     )
 
-                    healthSignalsCapsule(insights: healthInsights)
+                    healthSignalsCapsule(insights: healthInsights, context: healthContext)
 
                     if hasProgress {
                         periodSummaryCapsule(sessions: sessionStore.sessions)
@@ -80,7 +82,8 @@ struct ReportView: View {
                             report: weeklyAIReport(
                                 events: sessionStore.usageEvents,
                                 sessions: sessionStore.sessions,
-                                progress: progress
+                                progress: progress,
+                                healthContext: healthContext
                             )
                         )
                     } else {
@@ -307,7 +310,7 @@ struct ReportView: View {
         .liquidGlass(cornerRadius: 28)
     }
 
-    private func healthSignalsCapsule(insights: [String]) -> some View {
+    private func healthSignalsCapsule(insights: [String], context: HealthRecoveryContext) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Health Signals")
@@ -360,7 +363,24 @@ struct ReportView: View {
                             statCapsule(title: "Steps", value: stepsValue(latest.steps), caption: "Last signal", minHeight: 82)
                         }
                     }
+                    HStack(spacing: 10) {
+                        statCapsule(title: "Recovery", value: recoveryValue(context.recoveryScore), caption: "Context only", minHeight: 82)
+                        statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
+                    }
+                    aiReportSection(title: "Phone Impact", items: phoneImpactInsights(context: context, sessions: sessionStore.sessions, events: sessionStore.usageEvents))
+                    aiReportSection(title: "Recovery Patterns", items: recoveryPatternInsights(context: context, events: sessionStore.usageEvents))
                     aiReportSection(title: "Wellness insights", items: insights)
+                    aiReportSection(title: "Suggested Next Step", items: [healthSuggestedNextStep(context: context, events: sessionStore.usageEvents, sessions: sessionStore.sessions)])
+
+                    Button {
+                        healthKitStore.disconnect()
+                    } label: {
+                        Text("Stop using Apple Health")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(reportSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
                 }
             }
 
@@ -867,10 +887,26 @@ struct ReportView: View {
         return "\(steps)"
     }
 
+    private func recoveryValue(_ score: Int?) -> String {
+        guard let score else { return "Learning" }
+        if score < 45 { return "Light" }
+        if score >= 75 { return "Strong" }
+        return "Stable"
+    }
+
+    private func driftValue(_ minutes: Int?) -> String {
+        guard let minutes else { return "Learning" }
+        if minutes < 60 { return "<1h" }
+        let hours = minutes / 60
+        let remaining = minutes % 60
+        return remaining == 0 ? "\(hours)h" : "\(hours)h \(remaining)m"
+    }
+
     private func healthDigitalWellnessInsights(
         summaries: [HealthDaySummary],
         sessions: [BlankSession],
-        events: [BlankUsageEvent]
+        events: [BlankUsageEvent],
+        context: HealthRecoveryContext
     ) -> [String] {
         let calendar = Calendar.current
         let recentSummaries = Array(summaries.suffix(7))
@@ -896,7 +932,9 @@ struct ReportView: View {
         }.count
 
         var insights: [String] = []
-        if !lowSleepDays.isDisjoint(with: brokenDays) {
+        if let bedtimeDrift = context.bedtimeDriftMinutes, bedtimeDrift >= 75 {
+            insights.append("Sleep timing is irregular. Keep tonight's block short and start it before your usual drift.")
+        } else if !lowSleepDays.isDisjoint(with: brokenDays) {
             insights.append("Low-sleep days overlap with break attempts. Protect the evening window earlier.")
         } else if let averageSleep {
             insights.append("Average sleep signal: \(sleepValue(averageSleep)). Compare it with evening blocks this week.")
@@ -904,7 +942,9 @@ struct ReportView: View {
             insights.append("Sleep data is not available yet. Evening patterns will improve when it appears.")
         }
 
-        if let averageSteps, averageSteps < 3500 {
+        if let workoutMinutes = context.averageWorkoutMinutes, workoutMinutes >= 20 {
+            insights.append("Higher-activity days are good candidates for your longer focus block.")
+        } else if let averageSteps, averageSteps < 3500 {
             insights.append("Low-activity days may need shorter blocks and earlier starts.")
         } else if let averageSteps {
             insights.append("Average activity signal: \(stepsValue(averageSteps)) steps. Keep the same block window for cleaner learning.")
@@ -912,7 +952,9 @@ struct ReportView: View {
             insights.append("Activity data is not available yet. Steps can help spot low-energy relapse days.")
         }
 
-        if nightSessionCount > 0 {
+        if let score = context.recoveryScore, score < 45 {
+            insights.append("Recovery context looks light. Use a simple block today instead of increasing difficulty.")
+        } else if nightSessionCount > 0 {
             insights.append("Night blocks are active. Keep the final hour before sleep protected.")
         } else if let averageHRV {
             insights.append("HRV signal averages \(averageHRV) ms. Use it as context, not a medical score.")
@@ -921,6 +963,108 @@ struct ReportView: View {
         }
 
         return Array(insights.prefix(3))
+    }
+
+    private func healthRecoveryContext(summaries: [HealthDaySummary]) -> HealthRecoveryContext {
+        let recent = Array(summaries.suffix(7))
+        let sleepValues = recent.compactMap(\.sleepMinutes)
+        let stepsValues = recent.compactMap(\.steps)
+        let workoutValues = recent.compactMap(\.workoutMinutes)
+        let hrvValues = recent.compactMap(\.hrvSDNN)
+        let restingHeartRateValues = recent.compactMap(\.restingHeartRate)
+        let bedtimeValues = recent.compactMap(\.bedtimeMinute)
+        let wakeValues = recent.compactMap(\.wakeMinute)
+
+        let averageSleep = average(sleepValues)
+        let averageSteps = average(stepsValues)
+        let averageWorkoutMinutes = average(workoutValues)
+        let averageHRV = average(hrvValues)
+        let averageRestingHeartRate = average(restingHeartRateValues)
+        let bedtimeDrift = circularMinuteDrift(bedtimeValues)
+        let wakeDrift = circularMinuteDrift(wakeValues)
+
+        var scoreParts: [Int] = []
+        if let averageSleep {
+            scoreParts.append(min(100, max(0, Int(Double(averageSleep) / (8 * 60) * 100))))
+        }
+        if let averageSteps {
+            scoreParts.append(min(100, max(0, Int(Double(averageSteps) / 8000 * 100))))
+        }
+        if let averageWorkoutMinutes {
+            scoreParts.append(min(100, max(0, Int(Double(averageWorkoutMinutes) / 30 * 100))))
+        }
+        if let bedtimeDrift {
+            scoreParts.append(max(0, 100 - min(100, bedtimeDrift)))
+        }
+        if averageHRV != nil || averageRestingHeartRate != nil {
+            scoreParts.append(70)
+        }
+
+        return HealthRecoveryContext(
+            averageSleepMinutes: averageSleep,
+            averageSteps: averageSteps,
+            averageWorkoutMinutes: averageWorkoutMinutes,
+            averageHRV: averageHRV,
+            averageRestingHeartRate: averageRestingHeartRate,
+            bedtimeDriftMinutes: bedtimeDrift,
+            wakeDriftMinutes: wakeDrift,
+            recoveryScore: average(scoreParts)
+        )
+    }
+
+    private func phoneImpactInsights(
+        context: HealthRecoveryContext,
+        sessions: [BlankSession],
+        events: [BlankUsageEvent]
+    ) -> [String] {
+        let calendar = Calendar.current
+        let nightSessions = sessions.filter { session in
+            let hour = session.localStartHour ?? calendar.component(.hour, from: session.startedAt)
+            return hour >= 21 || hour <= 3
+        }.count
+        let breaks = events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }.count
+
+        if nightSessions > 0, let bedtimeDrift = context.bedtimeDriftMinutes, bedtimeDrift >= 75 {
+            return ["Late blocks and irregular sleep timing overlap. Treat the final hour as protected."]
+        }
+        if breaks > 0, let averageSleep = context.averageSleepMinutes, averageSleep < 6 * 60 {
+            return ["Break attempts are appearing while sleep is short. Lower friction before increasing duration."]
+        }
+        if nightSessions > 0 {
+            return ["Night protection is active. Keep measuring whether it improves sleep regularity."]
+        }
+        return ["Blanked is learning how your phone windows relate to sleep and energy."]
+    }
+
+    private func recoveryPatternInsights(context: HealthRecoveryContext, events: [BlankUsageEvent]) -> [String] {
+        let brokenCount = events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }.count
+        if let recoveryScore = context.recoveryScore, recoveryScore < 45 {
+            return ["Recovery context is light. Choose consistency over intensity for the next block."]
+        }
+        if let averageWorkoutMinutes = context.averageWorkoutMinutes, averageWorkoutMinutes >= 20, brokenCount == 0 {
+            return ["Higher-activity days look compatible with stronger protection windows."]
+        }
+        if let averageHRV = context.averageHRV {
+            return ["HRV averages \(averageHRV) ms. Use it only as context for digital habits."]
+        }
+        return ["Recovery patterns need a few more Health samples before becoming useful."]
+    }
+
+    private func healthSuggestedNextStep(
+        context: HealthRecoveryContext,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession]
+    ) -> String {
+        if let recoveryScore = context.recoveryScore, recoveryScore < 45 {
+            return "Tonight: start a 25-30 min block before your usual weak window."
+        }
+        if let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions) {
+            return "Next block: start at \(activationTimeText(before: weakHour)) and keep the same apps."
+        }
+        if let bedtimeDrift = context.bedtimeDriftMinutes, bedtimeDrift >= 75 {
+            return "This week: protect the same bedtime window for 3 nights."
+        }
+        return "Repeat your strongest window one more day before changing the plan."
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {
@@ -1167,7 +1311,8 @@ struct ReportView: View {
     private func weeklyAIReport(
         events: [BlankUsageEvent],
         sessions: [BlankSession],
-        progress: BlankProgressReport
+        progress: BlankProgressReport,
+        healthContext: HealthRecoveryContext
     ) -> WeeklyAIReport {
         let calendar = Calendar.current
         let now = Date()
@@ -1218,7 +1363,9 @@ struct ReportView: View {
 
         var patterns: [String] = []
         patterns.append("\(formatDuration(totalFocus)) protected across \(weeklySessions.count) sessions.")
-        if let bestHour {
+        if let bedtimeDrift = healthContext.bedtimeDriftMinutes, bedtimeDrift >= 75 {
+            patterns.append("Sleep timing varies by about \(bedtimeDrift) min across recent Health data.")
+        } else if let bestHour {
             patterns.append("Your most repeated window starts around \(String(format: "%02d:00", bestHour)).")
         } else if let bestWeekday {
             patterns.append("The highest-use day was \(weekdayDisplayName(bestWeekday)).")
@@ -1254,6 +1401,8 @@ struct ReportView: View {
         var recommendations: [String] = []
         if let weakHour {
             recommendations.append("Start Blank at \(activationTimeText(before: weakHour)).")
+        } else if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
+            recommendations.append("Keep today's block short: 25-30 min before the risky window.")
         } else if let bestHour {
             recommendations.append("Start Blank 10 min before \(String(format: "%02d:00", bestHour)).")
         } else {
@@ -1283,7 +1432,8 @@ struct ReportView: View {
             weakHour: weakHour,
             bestHour: bestHour,
             modeName: modeName,
-            brokenCount: brokenEvents.count
+            brokenCount: brokenEvents.count,
+            healthContext: healthContext
         )
 
         return WeeklyAIReport(
@@ -1300,12 +1450,15 @@ struct ReportView: View {
         weakHour: Int?,
         bestHour: Int?,
         modeName: String?,
-        brokenCount: Int
+        brokenCount: Int,
+        healthContext: HealthRecoveryContext
     ) -> [String] {
         let mode = modeName ?? "main"
         let targetHour = weakHour ?? bestHour
         let firstBlock: String
-        if let targetHour {
+        if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
+            firstBlock = "3 days: keep blocks at 25-30 min while recovery is light."
+        } else if let targetHour {
             firstBlock = "3 days: start Blank at \(activationTimeText(before: targetHour))."
         } else {
             firstBlock = "3 days: 25 min block at the same time."
@@ -1384,6 +1537,17 @@ struct ReportView: View {
         return counts.max { lhs, rhs in lhs.value < rhs.value }?.key
     }
 
+    private func average(_ values: [Int]) -> Int? {
+        values.isEmpty ? nil : values.reduce(0, +) / values.count
+    }
+
+    private func circularMinuteDrift(_ minutes: [Int]) -> Int? {
+        guard minutes.count >= 2 else { return nil }
+        let normalized = minutes.map { $0 < 12 * 60 ? $0 + 24 * 60 : $0 }
+        guard let minValue = normalized.min(), let maxValue = normalized.max() else { return nil }
+        return maxValue - minValue
+    }
+
     private func weekdayDisplayName(_ weekday: Int) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US")
@@ -1458,6 +1622,17 @@ private struct SelectionProfile {
     var totalAverage: Int {
         applicationAverage + categoryAverage + webDomainAverage
     }
+}
+
+private struct HealthRecoveryContext {
+    let averageSleepMinutes: Int?
+    let averageSteps: Int?
+    let averageWorkoutMinutes: Int?
+    let averageHRV: Int?
+    let averageRestingHeartRate: Int?
+    let bedtimeDriftMinutes: Int?
+    let wakeDriftMinutes: Int?
+    let recoveryScore: Int?
 }
 
 private struct ReportLiquidBackground: View {

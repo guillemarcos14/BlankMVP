@@ -5,23 +5,42 @@ import HealthKit
 struct HealthDaySummary: Identifiable, Equatable {
     var id: Date { date }
     var date: Date
+    var inBedMinutes: Int?
     var sleepMinutes: Int?
+    var bedtimeMinute: Int?
+    var wakeMinute: Int?
     var steps: Int?
+    var distanceMeters: Int?
     var activeEnergyKcal: Int?
     var basalEnergyKcal: Int?
+    var workoutMinutes: Int?
+    var mindfulMinutes: Int?
     var averageHeartRate: Int?
     var restingHeartRate: Int?
     var hrvSDNN: Int?
 
     var hasSignals: Bool {
+        inBedMinutes != nil ||
         sleepMinutes != nil ||
+        bedtimeMinute != nil ||
+        wakeMinute != nil ||
         steps != nil ||
+        distanceMeters != nil ||
         activeEnergyKcal != nil ||
         basalEnergyKcal != nil ||
+        workoutMinutes != nil ||
+        mindfulMinutes != nil ||
         averageHeartRate != nil ||
         restingHeartRate != nil ||
         hrvSDNN != nil
     }
+}
+
+private struct HealthSleepSummary {
+    var inBedMinutes: Int?
+    var sleepMinutes: Int?
+    var bedtimeMinute: Int?
+    var wakeMinute: Int?
 }
 
 enum HealthKitConnectionState: Equatable {
@@ -77,6 +96,12 @@ final class HealthKitStore: ObservableObject {
         }
     }
 
+    func disconnect() {
+        defaults.set(false, forKey: requestedKey)
+        summaries = []
+        state = HKHealthStore.isHealthDataAvailable() ? .notRequested : .unavailable
+    }
+
     func refresh(days: Int = 14) {
         guard HKHealthStore.isHealthDataAvailable() else {
             state = .unavailable
@@ -92,10 +117,13 @@ final class HealthKitStore: ObservableObject {
         }
 
         let group = DispatchGroup()
-        var sleepByDay: [Date: Int] = [:]
+        var sleepByDay: [Date: HealthSleepSummary] = [:]
         var stepsByDay: [Date: Int] = [:]
+        var distanceByDay: [Date: Int] = [:]
         var activeEnergyByDay: [Date: Int] = [:]
         var basalEnergyByDay: [Date: Int] = [:]
+        var workoutMinutesByDay: [Date: Int] = [:]
+        var mindfulMinutesByDay: [Date: Int] = [:]
         var heartRateByDay: [Date: Int] = [:]
         var restingHeartRateByDay: [Date: Int] = [:]
         var hrvByDay: [Date: Int] = [:]
@@ -114,6 +142,14 @@ final class HealthKitStore: ObservableObject {
             }
         }
 
+        if let type = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning) {
+            group.enter()
+            readDailySum(type: type, unit: .meter(), start: start, end: end, calendar: calendar) { values in
+                distanceByDay = values
+                group.leave()
+            }
+        }
+
         if let type = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) {
             group.enter()
             readDailySum(type: type, unit: .kilocalorie(), start: start, end: end, calendar: calendar) { values in
@@ -126,6 +162,20 @@ final class HealthKitStore: ObservableObject {
             group.enter()
             readDailySum(type: type, unit: .kilocalorie(), start: start, end: end, calendar: calendar) { values in
                 basalEnergyByDay = values
+                group.leave()
+            }
+        }
+
+        group.enter()
+        readWorkoutMinutes(start: start, end: end, calendar: calendar) { values in
+            workoutMinutesByDay = values
+            group.leave()
+        }
+
+        if let type = HKObjectType.categoryType(forIdentifier: .mindfulSession) {
+            group.enter()
+            readCategoryMinutes(type: type, acceptedValues: nil, start: start, end: end, calendar: calendar) { values in
+                mindfulMinutesByDay = values
                 group.leave()
             }
         }
@@ -161,10 +211,16 @@ final class HealthKitStore: ObservableObject {
                 let day = calendar.startOfDay(for: date)
                 return HealthDaySummary(
                     date: day,
-                    sleepMinutes: sleepByDay[day],
+                    inBedMinutes: sleepByDay[day]?.inBedMinutes,
+                    sleepMinutes: sleepByDay[day]?.sleepMinutes,
+                    bedtimeMinute: sleepByDay[day]?.bedtimeMinute,
+                    wakeMinute: sleepByDay[day]?.wakeMinute,
                     steps: stepsByDay[day],
+                    distanceMeters: distanceByDay[day],
                     activeEnergyKcal: activeEnergyByDay[day],
                     basalEnergyKcal: basalEnergyByDay[day],
+                    workoutMinutes: workoutMinutesByDay[day],
+                    mindfulMinutes: mindfulMinutesByDay[day],
                     averageHeartRate: heartRateByDay[day],
                     restingHeartRate: restingHeartRateByDay[day],
                     hrvSDNN: hrvByDay[day]
@@ -180,8 +236,11 @@ final class HealthKitStore: ObservableObject {
         [
             HKObjectType.categoryType(forIdentifier: .sleepAnalysis),
             HKQuantityType.quantityType(forIdentifier: .stepCount),
+            HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning),
             HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
             HKQuantityType.quantityType(forIdentifier: .basalEnergyBurned),
+            HKObjectType.workoutType(),
+            HKObjectType.categoryType(forIdentifier: .mindfulSession),
             HKQuantityType.quantityType(forIdentifier: .heartRate),
             HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
             HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)
@@ -197,7 +256,7 @@ final class HealthKitStore: ObservableObject {
         start: Date,
         end: Date,
         calendar: Calendar,
-        completion: @escaping ([Date: Int]) -> Void
+        completion: @escaping ([Date: HealthSleepSummary]) -> Void
     ) {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
             completion([:])
@@ -205,11 +264,75 @@ final class HealthKitStore: ObservableObject {
         }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
         let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+            var asleepTotals: [Date: TimeInterval] = [:]
+            var inBedTotals: [Date: TimeInterval] = [:]
+            var bedtimeByDay: [Date: Int] = [:]
+            var wakeByDay: [Date: Int] = [:]
+            for sample in samples as? [HKCategorySample] ?? [] {
+                let day = calendar.startOfDay(for: sample.startDate)
+                if sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue {
+                    inBedTotals[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+                }
+                guard Self.isAsleepValue(sample.value) else { continue }
+                asleepTotals[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+                let startMinute = Self.minuteOfDay(sample.startDate, calendar: calendar)
+                let endMinute = Self.minuteOfDay(sample.endDate, calendar: calendar)
+                bedtimeByDay[day] = Self.earlierSleepStart(current: bedtimeByDay[day], candidate: startMinute)
+                wakeByDay[day] = Self.laterWake(current: wakeByDay[day], candidate: endMinute)
+            }
+            let days = Set(asleepTotals.keys)
+                .union(inBedTotals.keys)
+                .union(bedtimeByDay.keys)
+                .union(wakeByDay.keys)
+            let summaries = Dictionary(uniqueKeysWithValues: days.map { day in
+                (
+                    day,
+                    HealthSleepSummary(
+                        inBedMinutes: inBedTotals[day].map { Int(($0 / 60).rounded()) },
+                        sleepMinutes: asleepTotals[day].map { Int(($0 / 60).rounded()) },
+                        bedtimeMinute: bedtimeByDay[day],
+                        wakeMinute: wakeByDay[day]
+                    )
+                )
+            })
+            completion(summaries)
+        }
+        healthStore.execute(query)
+    }
+
+    private func readCategoryMinutes(
+        type: HKCategoryType,
+        acceptedValues: Set<Int>?,
+        start: Date,
+        end: Date,
+        calendar: Calendar,
+        completion: @escaping ([Date: Int]) -> Void
+    ) {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
             var totals: [Date: TimeInterval] = [:]
             for sample in samples as? [HKCategorySample] ?? [] {
-                guard Self.isAsleepValue(sample.value) else { continue }
+                if let acceptedValues = acceptedValues, !acceptedValues.contains(sample.value) { continue }
                 let day = calendar.startOfDay(for: sample.startDate)
                 totals[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+            }
+            completion(totals.mapValues { Int(($0 / 60).rounded()) })
+        }
+        healthStore.execute(query)
+    }
+
+    private func readWorkoutMinutes(
+        start: Date,
+        end: Date,
+        calendar: Calendar,
+        completion: @escaping ([Date: Int]) -> Void
+    ) {
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let query = HKSampleQuery(sampleType: HKObjectType.workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
+            var totals: [Date: TimeInterval] = [:]
+            for workout in samples as? [HKWorkout] ?? [] {
+                let day = calendar.startOfDay(for: workout.startDate)
+                totals[day, default: 0] += workout.duration
             }
             completion(totals.mapValues { Int(($0 / 60).rounded()) })
         }
@@ -269,5 +392,23 @@ final class HealthKitStore: ObservableObject {
     private static func isAsleepValue(_ value: Int) -> Bool {
         value != HKCategoryValueSleepAnalysis.inBed.rawValue &&
         value != HKCategoryValueSleepAnalysis.awake.rawValue
+    }
+
+    private static func minuteOfDay(_ date: Date, calendar: Calendar) -> Int {
+        calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+    }
+
+    private static func earlierSleepStart(current: Int?, candidate: Int) -> Int {
+        guard let current else { return candidate }
+        let currentScore = current < 12 * 60 ? current + 24 * 60 : current
+        let candidateScore = candidate < 12 * 60 ? candidate + 24 * 60 : candidate
+        return candidateScore < currentScore ? candidate : current
+    }
+
+    private static func laterWake(current: Int?, candidate: Int) -> Int {
+        guard let current else { return candidate }
+        let currentScore = current < 12 * 60 ? current : current - 24 * 60
+        let candidateScore = candidate < 12 * 60 ? candidate : candidate - 24 * 60
+        return candidateScore > currentScore ? candidate : current
     }
 }

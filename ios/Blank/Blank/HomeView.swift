@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
+    @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
     @AppStorage("hasSeenFirstFocusBlockNudge", store: BlankSharedState.defaults)
@@ -67,6 +68,7 @@ struct HomeView: View {
             sessionStore.syncFromSharedDefaults(now: now)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
+            healthKitStore.refresh()
             openWidgetScanIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
@@ -74,6 +76,7 @@ struct HomeView: View {
             sessionStore.syncFromSharedDefaults()
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             screenTimeBlocker.refreshAuthorizationStatus()
+            healthKitStore.refresh()
             openWidgetScanIfNeeded()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
@@ -479,8 +482,15 @@ struct HomeView: View {
     private var preventiveAlertText: String? {
         guard !sessionStore.isBlankActive,
               message == nil,
-              configIssues.isEmpty,
-              let weakHour = DigitalWellnessAI.weakHour(events: sessionStore.usageEvents, sessions: sessionStore.sessions, now: now),
+              configIssues.isEmpty else {
+            return nil
+        }
+
+        if let recoveryScore = homeRecoveryScore(), recoveryScore < 45 {
+            return "Recovery looks light. Keep the next block simple."
+        }
+
+        guard let weakHour = DigitalWellnessAI.weakHour(events: sessionStore.usageEvents, sessions: sessionStore.sessions, now: now),
               minutesUntilNextHour(weakHour) <= 30 else {
             return nil
         }
@@ -489,12 +499,43 @@ struct HomeView: View {
     }
 
     private var relapseIntervention: RelapseIntervention {
-        DigitalWellnessAI.relapseIntervention(
+        let base = DigitalWellnessAI.relapseIntervention(
             events: sessionStore.usageEvents,
             sessions: sessionStore.sessions,
             selectionCount: sessionStore.selectionCount,
             now: now
         )
+        guard let recoveryScore = homeRecoveryScore(), recoveryScore < 45 else {
+            return base
+        }
+        return RelapseIntervention(
+            headline: "Make this easier, not broken.",
+            cost: "Low recovery days are when automatic scrolling wins faster.",
+            alternative: "Hold 5 more minutes, then do a shorter next block."
+        )
+    }
+
+    private func homeRecoveryScore() -> Int? {
+        let recent = Array(healthKitStore.summaries.suffix(7))
+        var scoreParts: [Int] = []
+        let sleepValues = recent.compactMap(\.sleepMinutes)
+        let stepValues = recent.compactMap(\.steps)
+        let workoutValues = recent.compactMap(\.workoutMinutes)
+
+        if let averageSleep = average(sleepValues) {
+            scoreParts.append(min(100, max(0, Int(Double(averageSleep) / (8 * 60) * 100))))
+        }
+        if let averageSteps = average(stepValues) {
+            scoreParts.append(min(100, max(0, Int(Double(averageSteps) / 8000 * 100))))
+        }
+        if let averageWorkout = average(workoutValues) {
+            scoreParts.append(min(100, max(0, Int(Double(averageWorkout) / 30 * 100))))
+        }
+        return average(scoreParts)
+    }
+
+    private func average(_ values: [Int]) -> Int? {
+        values.isEmpty ? nil : values.reduce(0, +) / values.count
     }
 
     private func minutesUntilNextHour(_ hour: Int) -> Int {

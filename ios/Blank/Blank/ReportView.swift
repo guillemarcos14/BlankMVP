@@ -384,7 +384,6 @@ struct ReportView: View {
                 }
             }
 
-            #if DEBUG || targetEnvironment(simulator)
             Button {
                 healthKitStore.loadSyntheticAppleWatchData()
             } label: {
@@ -403,7 +402,6 @@ struct ReportView: View {
                     }
             }
             .buttonStyle(.plain)
-            #endif
 
             Text("For digital wellness only. Blanked does not provide medical diagnosis.")
                 .font(.caption2)

@@ -412,17 +412,61 @@ struct HomeView: View {
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
                 } label: {
-                    Text("Try a 45 min focus block")
-                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.68))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-                        .frame(maxWidth: 244)
+                    firstFocusBlockNotification
                 }
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var firstFocusBlockNotification: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(BlankColors.ink.opacity(0.92))
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.white)
+            }
+            .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text("BLANKED")
+                        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+                        .foregroundStyle(BlankColors.ink.opacity(0.76))
+                    Text("now")
+                        .font(.blankInter(size: 11, relativeTo: .caption2))
+                        .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
+                    Spacer(minLength: 0)
+                }
+
+                Text("Try a 45 min focus block")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(BlankColors.ink.opacity(0.94))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.86)
+
+                Text("A gentle first session is ready.")
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(BlankColors.mutedInk.opacity(0.88))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.84)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 286)
+        .background {
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .fill(Color.white.opacity(0.64))
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .stroke(Color.white.opacity(0.54), lineWidth: 1)
+        }
+        .shadow(color: BlankColors.ink.opacity(0.12), radius: 18, x: 0, y: 10)
+        .accessibilityLabel("Try a 45 minute focus block")
     }
 
     private var shouldShowFirstFocusBlockNudge: Bool {

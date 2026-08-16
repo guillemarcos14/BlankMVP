@@ -102,7 +102,7 @@ final class HealthKitStore: ObservableObject {
         state = HKHealthStore.isHealthDataAvailable() ? .notRequested : .unavailable
     }
 
-    #if DEBUG
+    #if DEBUG || targetEnvironment(simulator)
     func loadSyntheticAppleWatchData(days: Int = 14) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())

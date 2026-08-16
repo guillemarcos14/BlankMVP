@@ -384,7 +384,7 @@ struct ReportView: View {
                 }
             }
 
-            #if DEBUG
+            #if DEBUG || targetEnvironment(simulator)
             Button {
                 healthKitStore.loadSyntheticAppleWatchData()
             } label: {

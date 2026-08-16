@@ -24,9 +24,12 @@ struct HomeView: View {
     @State private var nfcReader = NFCReader()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
+    @AppStorage("hasSeenFirstFocusBlockNudge", store: BlankSharedState.defaults)
+    private var hasSeenFirstFocusBlockNudge = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
+    private let firstFocusBlockMinutes = 45
 
     var body: some View {
         GeometryReader { proxy in
@@ -278,18 +281,10 @@ struct HomeView: View {
     private var centerStatus: some View {
         VStack(spacing: 8) {
             if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
-                Text(elapsedText(since: blankActiveSince))
+                Text(activeTimerText(since: blankActiveSince, until: sessionStore.blankActiveUntil))
                     .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
                     .foregroundStyle(Color.white.opacity(0.86))
                     .monospacedDigit()
-                if let blankActiveUntil = sessionStore.blankActiveUntil {
-                    Text("Ends in \(remainingText(until: blankActiveUntil))")
-                        .font(.blankBody)
-                        .foregroundStyle(Color.white.opacity(0.76))
-                    Text(sessionStore.deviceActivityTimerScheduled ? "System timer active" : "Internal timer active")
-                        .font(.blankInter(size: 13, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.58))
-                }
                 if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
                     Text("Schedule paused \(remainingText(until: schedulePausedUntil))")
                         .font(.blankInter(size: 13, relativeTo: .footnote))
@@ -339,9 +334,7 @@ struct HomeView: View {
     }
 
     private func bottomAction(width: CGFloat) -> some View {
-        let recommendation = smartBlockRecommendation
-
-        return VStack(spacing: 12) {
+        VStack(spacing: 12) {
             if let preventiveAlertText {
                 Text(preventiveAlertText)
                     .font(.blankInter(size: 13, relativeTo: .footnote))
@@ -358,8 +351,9 @@ struct HomeView: View {
                     return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank(durationMinutes: recommendation.durationMinutes)
+                        sessionStore.activateBlank()
                     }
+                    hasSeenFirstFocusBlockNudge = true
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
                 }
@@ -409,16 +403,33 @@ struct HomeView: View {
                     }
             )
 
-            if !sessionStore.isBlankActive, message == nil, configIssues.isEmpty {
-                Text("Recommended: \(recommendation.durationMinutes) min focus block")
-                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-                    .frame(maxWidth: 244)
+            if shouldShowFirstFocusBlockNudge {
+                Button {
+                    let result = withAnimation(.easeInOut(duration: 0.65)) {
+                        sessionStore.activateBlank(durationMinutes: firstFocusBlockMinutes)
+                    }
+                    hasSeenFirstFocusBlockNudge = true
+                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    setMessage(for: result)
+                } label: {
+                    Text("Try a 45 min focus block")
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.68))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.86)
+                        .frame(maxWidth: 244)
+                }
+                .buttonStyle(.plain)
             }
         }
+    }
+
+    private var shouldShowFirstFocusBlockNudge: Bool {
+        !hasSeenFirstFocusBlockNudge &&
+        !sessionStore.isBlankActive &&
+        message == nil &&
+        configIssues.isEmpty
     }
 
     private var preventiveAlertText: String? {
@@ -431,15 +442,6 @@ struct HomeView: View {
         }
 
         return "Your weak window is coming."
-    }
-
-    private var smartBlockRecommendation: SmartBlockRecommendation {
-        DigitalWellnessAI.smartBlockRecommendation(
-            events: sessionStore.usageEvents,
-            sessions: sessionStore.sessions,
-            selectionCount: sessionStore.selectionCount,
-            now: now
-        )
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -559,6 +561,24 @@ struct HomeView: View {
         let minutes = (elapsed % 3600) / 60
         let seconds = elapsed % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func activeTimerText(since startDate: Date, until endDate: Date?) -> String {
+        guard let endDate else {
+            return elapsedText(since: startDate)
+        }
+        return countdownText(until: endDate)
+    }
+
+    private func countdownText(until date: Date) -> String {
+        let remaining = max(0, Int(date.timeIntervalSince(now)))
+        let hours = remaining / 3600
+        let minutes = (remaining % 3600) / 60
+        let seconds = remaining % 60
+        if hours > 0 {
+            return String(format: "%01d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     private func remainingText(until date: Date) -> String {

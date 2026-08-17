@@ -27,9 +27,26 @@ private enum OnboardingPlan: String {
     case monthly
 }
 
-enum BlankLegalURL {
-    static let termsOfUse = URL(string: "https://blanked.app/policies/terms-of-service")!
-    static let privacyPolicy = URL(string: "https://blanked.app/policies/privacy-policy")!
+private enum BlankLegalDocument: Identifiable {
+    case termsOfUse
+    case privacyPolicy
+
+    var id: String {
+        title
+    }
+
+    var title: String {
+        switch self {
+        case .termsOfUse:
+            return "Terms of Use"
+        case .privacyPolicy:
+            return "Privacy Policy"
+        }
+    }
+
+    var updatedAt: String {
+        "Last updated: August 17, 2026"
+    }
 }
 
 struct SetupView: View {
@@ -54,6 +71,7 @@ struct SetupView: View {
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
     @State private var onboardingDataConsent = false
+    @State private var presentedLegalDocument: BlankLegalDocument?
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -144,6 +162,9 @@ struct SetupView: View {
             if currentStep == .apps, sessionStore.hasSelectedApps {
                 message = "\(sessionStore.selectionCount) selections protected"
             }
+        }
+        .sheet(item: $presentedLegalDocument) { document in
+            LegalDocumentView(document: document)
         }
         .animation(.easeInOut(duration: 0.26), value: currentStep.rawValue)
     }
@@ -694,13 +715,7 @@ struct SetupView: View {
                 .frame(width: 236)
             }
 
-            Text("Full access today. \(selectedPlanRenewalDisclosure) [Terms of Use](\(BlankLegalURL.termsOfUse.absoluteString)) and [Privacy Policy](\(BlankLegalURL.privacyPolicy.absoluteString)) apply")
-                .font(.blankInter(size: 11, relativeTo: .caption2))
-                .foregroundStyle(Color.white.opacity(0.40))
-                .tint(Color.white.opacity(0.72))
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-                .frame(maxWidth: 320)
+            legalDisclosure
 
             if let purchaseMessage = purchaseStore.message {
                 Text(purchaseMessage)
@@ -861,6 +876,33 @@ struct SetupView: View {
         let period = selectedPlan == .annual ? "year" : "month"
         let price = purchaseStore.priceText(for: productId, fallback: selectedPlan == .annual ? "€19.99" : "€2.99")
         return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
+    }
+
+    private var legalDisclosure: some View {
+        VStack(spacing: 3) {
+            Text("Full access today. \(selectedPlanRenewalDisclosure)")
+                .multilineTextAlignment(.center)
+
+            HStack(spacing: 3) {
+                legalButton("Terms of Use", document: .termsOfUse)
+                Text("and")
+                legalButton("Privacy Policy", document: .privacyPolicy)
+                Text("apply")
+            }
+        }
+        .font(.blankInter(size: 11, relativeTo: .caption2))
+        .foregroundStyle(Color.white.opacity(0.40))
+        .lineSpacing(2)
+        .frame(maxWidth: 320)
+    }
+
+    private func legalButton(_ title: String, document: BlankLegalDocument) -> some View {
+        Button(title) {
+            presentedLegalDocument = document
+        }
+        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+        .foregroundStyle(Color.white.opacity(0.72))
+        .buttonStyle(.plain)
     }
 
     private var onboardingConsentText: String {
@@ -1330,6 +1372,109 @@ private struct PlanButton: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct LegalDocumentView: View {
+    let document: BlankLegalDocument
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    Text(document.updatedAt)
+                        .font(.blankInter(size: 13, relativeTo: .footnote))
+                        .foregroundStyle(.secondary)
+
+                    ForEach(sections, id: \.title) { section in
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text(section.title)
+                                .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+
+                            Text(section.body)
+                                .font(.blankInter(size: 14, relativeTo: .body))
+                                .foregroundStyle(.secondary)
+                                .lineSpacing(3)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(22)
+            }
+            .navigationTitle(document.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var sections: [(title: String, body: String)] {
+        switch document {
+        case .termsOfUse:
+            return [
+                (
+                    "Agreement",
+                    "By using Blanked, you agree to these Terms of Use and Apple's Standard End User License Agreement. If these terms conflict with Apple's Standard EULA, Apple's Standard EULA applies where required by Apple."
+                ),
+                (
+                    "Subscription",
+                    "Blanked offers auto-renewable subscriptions through the App Store. If you start a free trial, it lasts 3 days. After the trial, Apple charges the price shown on the App Store purchase sheet for the selected plan unless you cancel before the trial ends."
+                ),
+                (
+                    "Renewal And Cancellation",
+                    "Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel your subscription in App Store account settings. Apple handles billing, renewals, refunds, and payment method changes."
+                ),
+                (
+                    "Use Of The App",
+                    "Blanked helps you block distracting apps and websites using Apple's Screen Time frameworks. You are responsible for choosing what to block and for keeping access to essential apps, contacts, and services available when needed."
+                ),
+                (
+                    "No Medical Advice",
+                    "Blanked may provide digital wellness insights, but it is not a medical device and does not provide diagnosis, treatment, or medical advice."
+                ),
+                (
+                    "Contact",
+                    "For support or legal questions, contact hola@blankeate.com."
+                )
+            ]
+        case .privacyPolicy:
+            return [
+                (
+                    "Overview",
+                    "Blanked is a digital wellness app that helps you block distracting apps and websites. We collect only the data needed to provide the app, process subscriptions, improve onboarding, and generate optional wellness insights."
+                ),
+                (
+                    "Data Stored On Device",
+                    "Blanked stores setup state, blocking status, selected Screen Time categories, session timing, onboarding progress, and app settings on your device. Your exact Screen Time app and website selections stay on your device."
+                ),
+                (
+                    "Onboarding Data",
+                    "If you agree on the paywall, Blanked may send onboarding answers to its backend, including name, age range, goal, profile, estimated daily phone use, selected plan, locale, app version, build number, and an anonymous user identifier. This is used for product analytics and improvement."
+                ),
+                (
+                    "Apple Health",
+                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to generate local digital wellness insights. Blanked does not send Apple Health data to its backend in the current implementation."
+                ),
+                (
+                    "Purchases",
+                    "Subscriptions are processed by Apple through the App Store. Blanked can check whether you have an active entitlement, but Apple handles payment details and billing."
+                ),
+                (
+                    "Sharing",
+                    "Blanked does not sell your personal data and does not share it with third-party advertisers. Backend onboarding data may be stored with service providers used to operate the product."
+                ),
+                (
+                    "Your Choices",
+                    "You can decline optional Apple Health access, revoke permissions in iOS Settings, cancel your subscription in App Store settings, or contact hola@blankeate.com for privacy requests."
+                )
+            ]
+        }
     }
 }
 

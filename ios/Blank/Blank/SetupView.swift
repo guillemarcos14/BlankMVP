@@ -883,11 +883,9 @@ struct SetupView: View {
             Text("Full access today. \(selectedPlanRenewalDisclosure)")
                 .multilineTextAlignment(.center)
 
-            HStack(spacing: 3) {
+            HStack(spacing: 8) {
                 legalButton("Terms of Use", document: .termsOfUse)
-                Text("and")
                 legalButton("Privacy Policy", document: .privacyPolicy)
-                Text("apply")
             }
         }
         .font(.blankInter(size: 11, relativeTo: .caption2))
@@ -901,8 +899,10 @@ struct SetupView: View {
             presentedLegalDocument = document
         }
         .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-        .foregroundStyle(Color.white.opacity(0.72))
+        .foregroundStyle(Color.white.opacity(0.86))
+        .underline(true, color: Color.white.opacity(0.68))
         .buttonStyle(.plain)
+        .accessibilityHint("Opens \(title) in the app")
     }
 
     private var onboardingConsentText: String {

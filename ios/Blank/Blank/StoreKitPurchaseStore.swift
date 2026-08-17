@@ -11,6 +11,7 @@ final class StoreKitPurchaseStore: ObservableObject {
     @Published private(set) var purchasedProductIds: Set<String> = []
     @Published private(set) var isLoading = false
     @Published private(set) var isPurchasing = false
+    @Published private(set) var hasLoadedProducts = false
     @Published var message: String?
 
     private let productIds = [monthlyProductId, annualProductId]
@@ -30,7 +31,10 @@ final class StoreKitPurchaseStore: ObservableObject {
     func loadProducts() async {
         guard products.isEmpty else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoadedProducts = true
+        }
 
         do {
             let loadedProducts = try await Product.products(for: productIds)
@@ -102,7 +106,10 @@ final class StoreKitPurchaseStore: ObservableObject {
     }
 
     func priceText(for productId: String, fallback: String) -> String {
-        product(for: productId)?.displayPrice ?? fallback
+        if let displayPrice = product(for: productId)?.displayPrice {
+            return displayPrice
+        }
+        return hasLoadedProducts ? fallback : "Loading..."
     }
 
     private func product(for productId: String) -> Product? {

@@ -81,7 +81,6 @@ struct SetupView: View {
     @AppStorage("blankOnboardingProfile", store: BlankSharedState.defaults) private var selectedProfile = ""
     @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
-    @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var anonymousUserId = ""
 
     var body: some View {
         ZStack {
@@ -659,9 +658,6 @@ struct SetupView: View {
                 onboardingDataConsent.toggle()
                 if onboardingDataConsent {
                     message = nil
-                    Task {
-                        await submitOnboardingResponses()
-                    }
                 }
             } label: {
                 HStack(alignment: .top, spacing: 9) {
@@ -1024,43 +1020,11 @@ struct SetupView: View {
             : StoreKitPurchaseStore.monthlyProductId
 
         Task {
-            await submitOnboardingResponses()
             if await purchaseStore.purchase(productId: productId) {
                 trialStarted = true
                 goForward()
             }
         }
-    }
-
-    @MainActor
-    private func submitOnboardingResponses() async {
-        let selectedPlanText = selectedPlan == .annual ? "annual" : "monthly"
-        let response = OnboardingResponsePayload(
-            anonymousUserId: stableAnonymousUserId(),
-            name: name,
-            ageRange: selectedAgeRange,
-            goal: selectedOnboardingGoal,
-            profile: selectedProfile,
-            dailyHours: storedDailyHours,
-            aiGoal: onboardingGoal,
-            weakMoment: weakMoment,
-            selectedPlan: selectedPlanText,
-            locale: Locale.current.identifier,
-            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            buildNumber: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
-            consentText: onboardingConsentText
-        )
-        await OnboardingFunnelClient().submit(response)
-    }
-
-    private func stableAnonymousUserId() -> String {
-        let existing = anonymousUserId.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !existing.isEmpty {
-            return existing
-        }
-        let created = UUID().uuidString
-        anonymousUserId = created
-        return created
     }
 
     private func continueWithReviewDemoAccess() {
@@ -1452,7 +1416,7 @@ private struct LegalDocumentView: View {
             return [
                 (
                     "Overview",
-                    "Blanked is a digital wellness app that helps you block distracting apps and websites. We collect only the data needed to provide the app, process subscriptions, improve onboarding, and generate optional wellness insights."
+                    "Blanked is a digital wellness app that helps you block distracting apps and websites. In this version, Blanked does not collect personal data through its own backend."
                 ),
                 (
                     "Data Stored On Device",
@@ -1460,11 +1424,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Onboarding Data",
-                    "If you agree on the paywall, Blanked may send onboarding answers to its backend, including name, age range, goal, profile, estimated daily phone use, selected plan, locale, app version, build number, and an anonymous user identifier. This is used for product analytics and improvement."
-                ),
-                (
-                    "Apple Health",
-                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to generate local digital wellness insights. Blanked does not send Apple Health data to its backend in the current implementation."
+                    "Your onboarding answers are used inside the app to personalize the experience and are stored locally on your device. Blanked does not send onboarding answers to its own backend in this version."
                 ),
                 (
                     "Purchases",
@@ -1472,106 +1432,13 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Sharing",
-                    "Blanked does not sell your personal data and does not share it with third-party advertisers. Backend onboarding data may be stored with service providers used to operate the product."
+                    "Blanked does not sell your personal data and does not share it with third-party advertisers."
                 ),
                 (
                     "Your Choices",
-                    "You can decline optional Apple Health access, revoke permissions in iOS Settings, cancel your subscription in App Store settings, or contact hola@blankeate.com for privacy requests."
+                    "You can revoke Screen Time permissions in iOS Settings, cancel your subscription in App Store settings, or contact hola@blankeate.com for privacy requests."
                 )
             ]
         }
-    }
-}
-
-private struct OnboardingResponsePayload: Encodable {
-    let anonymousUserId: String
-    let name: String
-    let ageRange: String
-    let goal: String
-    let profile: String
-    let dailyHours: Double
-    let aiGoal: String
-    let weakMoment: String
-    let selectedPlan: String
-    let locale: String
-    let appVersion: String
-    let buildNumber: String
-    let consentText: String
-
-    enum CodingKeys: String, CodingKey {
-        case anonymousUserId = "anonymous_user_id"
-        case name
-        case ageRange = "age_range"
-        case goal
-        case profile
-        case dailyHours = "daily_hours"
-        case aiGoal = "ai_goal"
-        case weakMoment = "weak_moment"
-        case selectedPlan = "selected_plan"
-        case locale
-        case appVersion = "app_version"
-        case buildNumber = "build_number"
-        case consentText = "consent_text"
-        case dataConsent = "data_consent"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(anonymousUserId, forKey: .anonymousUserId)
-        try container.encode(name, forKey: .name)
-        try container.encode(ageRange, forKey: .ageRange)
-        try container.encode(goal, forKey: .goal)
-        try container.encode(profile, forKey: .profile)
-        try container.encode(dailyHours, forKey: .dailyHours)
-        try container.encode(aiGoal, forKey: .aiGoal)
-        try container.encode(weakMoment, forKey: .weakMoment)
-        try container.encode(selectedPlan, forKey: .selectedPlan)
-        try container.encode(locale, forKey: .locale)
-        try container.encode(appVersion, forKey: .appVersion)
-        try container.encode(buildNumber, forKey: .buildNumber)
-        try container.encode(consentText, forKey: .consentText)
-        try container.encode(true, forKey: .dataConsent)
-    }
-}
-
-private struct OnboardingFunnelClient {
-    private let baseURL: URL?
-    private let session: URLSession
-
-    init(baseURL: URL? = Self.configuredBaseURL(), session: URLSession = .shared) {
-        self.baseURL = baseURL
-        self.session = session
-    }
-
-    func submit(_ payload: OnboardingResponsePayload) async {
-        guard let baseURL else { return }
-
-        do {
-            let url = baseURL.appendingPathComponent("onboarding-responses")
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.timeoutInterval = 6
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(payload)
-
-            let (_, response) = try await session.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode) else {
-                return
-            }
-        } catch {
-            return
-        }
-    }
-
-    private static func configuredBaseURL() -> URL? {
-        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
-            return nil
-        }
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
-            return nil
-        }
-        return URL(string: trimmed)
     }
 }

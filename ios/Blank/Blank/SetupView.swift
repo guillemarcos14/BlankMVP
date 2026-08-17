@@ -27,6 +27,11 @@ private enum OnboardingPlan: String {
     case monthly
 }
 
+enum BlankLegalURL {
+    static let termsOfUse = URL(string: "https://blanked.app/policies/terms-of-service")!
+    static let privacyPolicy = URL(string: "https://blanked.app/policies/privacy-policy")!
+}
+
 struct SetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
@@ -609,7 +614,7 @@ struct SetupView: View {
             VStack(spacing: 9) {
                 PlanButton(
                     title: "Annual",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "App Store price"),
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
                     detail: "3 days free, then billed yearly",
                     badge: "Best value",
                     selected: selectedPlan == .annual
@@ -619,7 +624,7 @@ struct SetupView: View {
 
                 PlanButton(
                     title: "Monthly",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "App Store price"),
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "€2.99"),
                     detail: "3 days free, then billed monthly",
                     badge: nil,
                     selected: selectedPlan == .monthly
@@ -689,9 +694,10 @@ struct SetupView: View {
                 .frame(width: 236)
             }
 
-            Text("Full access today. \(selectedPlanRenewalDisclosure) Terms and Privacy apply")
+            Text("Full access today. \(selectedPlanRenewalDisclosure) [Terms of Use](\(BlankLegalURL.termsOfUse.absoluteString)) and [Privacy Policy](\(BlankLegalURL.privacyPolicy.absoluteString)) apply")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
                 .foregroundStyle(Color.white.opacity(0.40))
+                .tint(Color.white.opacity(0.72))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
                 .frame(maxWidth: 320)
@@ -853,7 +859,7 @@ struct SetupView: View {
             ? StoreKitPurchaseStore.annualProductId
             : StoreKitPurchaseStore.monthlyProductId
         let period = selectedPlan == .annual ? "year" : "month"
-        let price = purchaseStore.priceText(for: productId, fallback: "the App Store price")
+        let price = purchaseStore.priceText(for: productId, fallback: selectedPlan == .annual ? "€19.99" : "€2.99")
         return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
     }
 

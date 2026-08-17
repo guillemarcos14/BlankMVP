@@ -879,17 +879,17 @@ struct SetupView: View {
     }
 
     private var legalDisclosure: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 7) {
             Text("Full access today. \(selectedPlanRenewalDisclosure)")
                 .multilineTextAlignment(.center)
+                .font(.blankInter(size: 11, relativeTo: .caption2))
+                .foregroundStyle(Color.white.opacity(0.42))
 
-            HStack(spacing: 8) {
+            HStack(spacing: 16) {
                 legalButton("Terms of Use", document: .termsOfUse)
                 legalButton("Privacy Policy", document: .privacyPolicy)
             }
         }
-        .font(.blankInter(size: 11, relativeTo: .caption2))
-        .foregroundStyle(Color.white.opacity(0.40))
         .lineSpacing(2)
         .frame(maxWidth: 320)
     }
@@ -898,9 +898,9 @@ struct SetupView: View {
         Button(title) {
             presentedLegalDocument = document
         }
-        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-        .foregroundStyle(Color.white.opacity(0.86))
-        .underline(true, color: Color.white.opacity(0.68))
+        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+        .foregroundStyle(Color.white.opacity(0.94))
+        .underline(true, color: Color.white.opacity(0.82))
         .buttonStyle(.plain)
         .accessibilityHint("Opens \(title) in the app")
     }

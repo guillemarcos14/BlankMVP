@@ -45,6 +45,12 @@ struct ReportView: View {
             events: sessionStore.usageEvents,
             context: healthContext
         )
+        let controlForecast = healthControlForecast(
+            context: healthContext,
+            events: sessionStore.usageEvents,
+            sessions: sessionStore.sessions,
+            diagnosis: diagnosis
+        )
 
         List {
             VStack(alignment: .center, spacing: 22) {
@@ -57,7 +63,7 @@ struct ReportView: View {
                         recommendation: recommendation
                     )
 
-                    healthSignalsCapsule(insights: healthInsights, context: healthContext)
+                    healthSignalsCapsule(insights: healthInsights, context: healthContext, forecast: controlForecast)
 
                     if hasProgress {
                         periodSummaryCapsule(sessions: sessionStore.sessions)
@@ -310,10 +316,14 @@ struct ReportView: View {
         .liquidGlass(cornerRadius: 28)
     }
 
-    private func healthSignalsCapsule(insights: [String], context: HealthRecoveryContext) -> some View {
+    private func healthSignalsCapsule(
+        insights: [String],
+        context: HealthRecoveryContext,
+        forecast: ControlForecast
+    ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Health Signals")
+                Text("Control Forecast")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(healthSignalsSubtitle)
                     .font(.caption)
@@ -376,6 +386,8 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary.opacity(0.84))
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
+                    controlForecastCard(forecast)
+
                     if let latest = healthKitStore.summaries.last {
                         HStack(spacing: 10) {
                             statCapsule(title: "Sleep", value: sleepValue(latest.sleepMinutes), caption: "Last signal", minHeight: 82)
@@ -386,10 +398,9 @@ struct ReportView: View {
                         statCapsule(title: "Recovery", value: recoveryValue(context.recoveryScore), caption: "Context only", minHeight: 82)
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
                     }
-                    aiReportSection(title: "Phone Impact", items: phoneImpactInsights(context: context, sessions: sessionStore.sessions, events: sessionStore.usageEvents))
-                    aiReportSection(title: "Recovery Patterns", items: recoveryPatternInsights(context: context, events: sessionStore.usageEvents))
+                    aiReportSection(title: "Why", items: forecast.reasons)
+                    aiReportSection(title: "Adaptive Plan", items: forecast.plan)
                     aiReportSection(title: "Wellness insights", items: insights)
-                    aiReportSection(title: "Suggested Next Step", items: [healthSuggestedNextStep(context: context, events: sessionStore.usageEvents, sessions: sessionStore.sessions)])
 
                     Button {
                         healthKitStore.disconnect()
@@ -411,6 +422,92 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func controlForecastCard(_ forecast: ControlForecast) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(forecast.riskLabel)
+                    .font(.blankInter(size: 26, weight: .semibold, relativeTo: .title2))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+
+                Spacer(minLength: 8)
+
+                Text("\(forecast.riskPercent)%")
+                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(forecastColor(forecast.level))
+                    .lineLimit(1)
+            }
+
+            Text(forecast.headline)
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                forecastMiniRow(title: "Best window", value: forecast.windowText)
+                forecastMiniRow(title: "Do this", value: forecast.actionText)
+            }
+
+            if sessionStore.isBlankActive {
+                Text("Protection is already active.")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            } else {
+                Button {
+                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                } label: {
+                    Text("Start \(forecast.durationMinutes) min protection")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background {
+                            Capsule()
+                                .fill(Color.white.opacity(0.24))
+                        }
+                        .overlay {
+                            Capsule()
+                                .stroke(reportPrimary.opacity(0.08), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(forecastColor(forecast.level).opacity(0.12))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(forecastColor(forecast.level).opacity(0.22), lineWidth: 1)
+        }
+    }
+
+    private func forecastMiniRow(title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .frame(width: 78, alignment: .leading)
+            Text(value)
+                .font(.blankInter(size: 13, relativeTo: .footnote))
+                .foregroundStyle(reportPrimary.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func forecastColor(_ level: ControlForecast.Level) -> Color {
+        switch level {
+        case .low:
+            return Color.green
+        case .medium:
+            return Color.orange
+        case .high:
+            return Color.red
+        }
     }
 
     private func dailySummaryRow(title: String, value: String) -> some View {
@@ -1086,6 +1183,136 @@ struct ReportView: View {
         return "Repeat your strongest window one more day before changing the plan."
     }
 
+    private func healthControlForecast(
+        context: HealthRecoveryContext,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        diagnosis: DigitalWellnessDiagnosis
+    ) -> ControlForecast {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let recentEvents = events.filter {
+            $0.occurredAt >= weekAgo
+        }
+        let recentBreaks = recentEvents.filter {
+            $0.kind == .blockBroken || $0.endedReason == .emergency
+        }.count
+        let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
+        let minutesToWeakWindow = minutesUntilNextHour(weakHour, now: now)
+
+        var risk = 28
+        var reasons: [String] = []
+        var plan: [String] = []
+
+        if let score = context.recoveryScore {
+            if score < 45 {
+                risk += 24
+                reasons.append("Recovery looks light, so the next block should be easier to complete.")
+            } else if score >= 75 {
+                risk -= 10
+                reasons.append("Recovery looks strong enough for a more ambitious protection window.")
+            }
+        } else {
+            risk += 8
+            reasons.append("Blanked needs more Health samples to separate low-energy days from normal days.")
+        }
+
+        if let sleep = context.averageSleepMinutes {
+            if sleep < 6 * 60 {
+                risk += 18
+                reasons.append("Recent sleep is short, which often makes automatic scrolling harder to resist.")
+            } else if sleep >= 7 * 60 + 15 {
+                risk -= 6
+            }
+        }
+
+        if let drift = context.bedtimeDriftMinutes, drift >= 75 {
+            risk += 12
+            reasons.append("Sleep timing is drifting, so late-phone protection matters more tonight.")
+        }
+
+        if let steps = context.averageSteps, steps < 3500 {
+            risk += 8
+            reasons.append("Activity is low, so Blanked should lower friction instead of demanding a long block.")
+        } else if let workout = context.averageWorkoutMinutes, workout >= 25 {
+            risk -= 5
+        }
+
+        if recentBreaks > 0 {
+            risk += min(22, recentBreaks * 8)
+            reasons.append("Recent emergency or broken blocks make this window more sensitive.")
+        }
+
+        if minutesToWeakWindow <= 90 {
+            risk += 14
+            reasons.append("\(DigitalWellnessAI.hourRangeText(weakHour)) is close to your current high-risk window.")
+        }
+
+        let riskPercent = min(92, max(12, risk))
+        let level: ControlForecast.Level
+        let riskLabel: String
+        if riskPercent >= 70 {
+            level = .high
+            riskLabel = "High risk"
+        } else if riskPercent >= 45 {
+            level = .medium
+            riskLabel = "Medium risk"
+        } else {
+            level = .low
+            riskLabel = "Low risk"
+        }
+
+        let duration: Int
+        switch level {
+        case .high:
+            duration = 25
+            plan.append("Start before the weak window and keep the block short enough to finish.")
+            plan.append("Block only the apps that usually trigger the loop today.")
+        case .medium:
+            duration = max(30, min(45, diagnosis.initialBlockMinutes))
+            plan.append("Repeat the same window so Blanked can learn what works.")
+            plan.append("Use a moderate block; do not increase difficulty yet.")
+        case .low:
+            duration = max(45, diagnosis.initialBlockMinutes)
+            plan.append("Use your strongest window for a longer protection block.")
+            plan.append("Keep the same app set if yesterday's block worked.")
+        }
+
+        let actionText: String
+        if minutesToWeakWindow <= 90 {
+            actionText = "Start \(duration) min protection at \(activationTimeText(before: weakHour))."
+        } else {
+            actionText = "Schedule a \(duration) min block for \(DigitalWellnessAI.hourRangeText(weakHour))."
+        }
+
+        let headline: String
+        switch level {
+        case .high:
+            headline = "Tonight may be harder than usual. Blanked should protect you before the urge arrives."
+        case .medium:
+            headline = "Risk is manageable. The best move is consistency, not a bigger challenge."
+        case .low:
+            headline = "This looks like a strong control day. Use it to reinforce your best window."
+        }
+
+        if reasons.isEmpty {
+            reasons.append("Blanked is combining Health context with your block history to find your control pattern.")
+        }
+
+        return ControlForecast(
+            level: level,
+            riskPercent: riskPercent,
+            riskLabel: riskLabel,
+            headline: headline,
+            windowText: DigitalWellnessAI.hourRangeText(weakHour),
+            actionText: actionText,
+            durationMinutes: duration,
+            reasons: Array(reasons.prefix(3)),
+            plan: Array(plan.prefix(2))
+        )
+    }
+
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {
         guard let day = riskiestDay(activityDays: activityDays) else {
             return "No pattern"
@@ -1549,6 +1776,17 @@ struct ReportView: View {
         String(format: "%02d:50", (hour + 23) % 24)
     }
 
+    private func minutesUntilNextHour(_ hour: Int, now: Date) -> Int {
+        let calendar = Calendar.current
+        let currentHour = calendar.component(.hour, from: now)
+        let currentMinute = calendar.component(.minute, from: now)
+        if currentHour == hour {
+            return 0
+        }
+        let hoursUntil = (hour - currentHour + 24) % 24
+        return max(0, hoursUntil * 60 - currentMinute)
+    }
+
     private func mostCommonValue<T: Hashable>(_ values: [T]) -> T? {
         let counts = values.reduce(into: [T: Int]()) { counts, value in
             counts[value, default: 0] += 1
@@ -1652,6 +1890,24 @@ private struct HealthRecoveryContext {
     let bedtimeDriftMinutes: Int?
     let wakeDriftMinutes: Int?
     let recoveryScore: Int?
+}
+
+private struct ControlForecast {
+    enum Level {
+        case low
+        case medium
+        case high
+    }
+
+    let level: Level
+    let riskPercent: Int
+    let riskLabel: String
+    let headline: String
+    let windowText: String
+    let actionText: String
+    let durationMinutes: Int
+    let reasons: [String]
+    let plan: [String]
 }
 
 private struct ReportLiquidBackground: View {

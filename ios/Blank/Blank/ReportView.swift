@@ -12,6 +12,10 @@ struct ReportView: View {
 
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var accentBlue: Color { Color(red: 0.25, green: 0.55, blue: 0.95) }
+    private var recoveryGreen: Color { Color(red: 0.18, green: 0.78, blue: 0.38) }
+    private var sleepBlue: Color { Color(red: 0.18, green: 0.48, blue: 0.95) }
+    private var activityOrange: Color { Color(red: 0.92, green: 0.50, blue: 0.16) }
 
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
@@ -150,23 +154,23 @@ struct ReportView: View {
         totalFocusTime: TimeInterval,
         context: HealthRecoveryContext
     ) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 16) {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack(alignment: .center, spacing: 18) {
                 controlRiskRing(forecast: forecast)
 
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("Control today")
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Control today", systemImage: "sparkle.magnifyingglass")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportSecondary)
 
                     Text(forecast.riskLabel)
-                        .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                        .font(.blankInter(size: 34, weight: .semibold, relativeTo: .title))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
 
                     Text(forecast.windowText)
-                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
-                        .foregroundStyle(reportPrimary.opacity(0.88))
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(accentBlue.opacity(0.95))
                         .lineLimit(1)
                 }
             }
@@ -182,33 +186,40 @@ struct ReportView: View {
             todayMoveCard(forecast: forecast)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .liquidGlass(cornerRadius: 30)
+        .padding(20)
+        .liquidGlass(cornerRadius: 28)
     }
 
     private func controlRiskRing(forecast: ControlForecast) -> some View {
         ZStack {
             Circle()
-                .stroke(reportPrimary.opacity(0.10), lineWidth: 10)
+                .stroke(reportPrimary.opacity(0.08), lineWidth: 11)
 
             Circle()
                 .trim(from: 0, to: CGFloat(forecast.riskPercent) / 100)
                 .stroke(
-                    forecastColor(forecast.level),
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                    AngularGradient(
+                        colors: [
+                            forecastColor(forecast.level).opacity(0.40),
+                            forecastColor(forecast.level),
+                            forecastColor(forecast.level).opacity(0.72)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 0) {
                 Text("\(forecast.riskPercent)")
-                    .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title3))
+                    .font(.blankInter(size: 29, weight: .semibold, relativeTo: .title3))
                     .lineLimit(1)
                 Text("%")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(reportSecondary)
             }
         }
-        .frame(width: 106, height: 106)
+        .frame(width: 112, height: 112)
         .accessibilityLabel("Control risk \(forecast.riskPercent) percent")
     }
 
@@ -218,31 +229,40 @@ struct ReportView: View {
         forecast: ControlForecast
     ) -> some View {
         HStack(spacing: 10) {
-            keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: reportPrimary)
-            keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: reportPrimary)
-            keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level))
+            keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: recoveryGreen, symbol: "arrow.counterclockwise")
+            keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: accentBlue, symbol: "shield.fill")
+            keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level), symbol: "waveform.path.ecg")
         }
     }
 
-    private func keyMetricTile(title: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(reportSecondary)
-                .lineLimit(1)
+    private func keyMetricTile(title: String, value: String, tint: Color, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(tint)
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+                    .lineLimit(1)
+            }
 
             Text(value)
-                .font(.blankInter(size: 19, weight: .semibold, relativeTo: .body))
+                .font(.blankInter(size: 20, weight: .semibold, relativeTo: .body))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
         }
-        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.16))
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tint.opacity(0.10))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(tint.opacity(0.16), lineWidth: 1)
         }
     }
 
@@ -252,10 +272,10 @@ struct ReportView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
 
-            driverBar(title: "Phone control", value: max(0, 100 - forecast.riskPercent), tint: forecastColor(forecast.level))
-            driverBar(title: "Recovery", value: context.recoveryScore ?? 50, tint: Color.green)
-            driverBar(title: "Sleep", value: sleepDriverScore(context.averageSleepMinutes), tint: Color.blue)
-            driverBar(title: "Activity", value: activityDriverScore(context.averageSteps), tint: Color.orange)
+            driverBar(title: "Phone control", value: max(0, 100 - forecast.riskPercent), tint: accentBlue)
+            driverBar(title: "Recovery", value: context.recoveryScore ?? 50, tint: recoveryGreen)
+            driverBar(title: "Sleep", value: sleepDriverScore(context.averageSleepMinutes), tint: sleepBlue)
+            driverBar(title: "Activity", value: activityDriverScore(context.averageSteps), tint: activityOrange)
         }
     }
 
@@ -274,9 +294,9 @@ struct ReportView: View {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(reportPrimary.opacity(0.09))
+                        .fill(reportPrimary.opacity(0.08))
                     Capsule()
-                        .fill(tint.opacity(0.72))
+                        .fill(tint.opacity(0.82))
                         .frame(width: proxy.size.width * CGFloat(max(0, min(100, value))) / 100)
                 }
             }
@@ -286,7 +306,7 @@ struct ReportView: View {
 
     private func todayMoveCard(forecast: ControlForecast) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Today's move")
+            Label("Next best block", systemImage: "arrow.forward.circle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
 
@@ -330,15 +350,19 @@ struct ReportView: View {
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(forecastColor(forecast.level).opacity(0.12))
+                .fill(forecastColor(forecast.level).opacity(0.10))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(forecastColor(forecast.level).opacity(0.18), lineWidth: 1)
         }
     }
 
     private func healthAccessCapsule() -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 13) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Health context")
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Health context", systemImage: "heart.text.square.fill")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                     Text(healthSignalsSubtitle)
                         .font(.caption)
@@ -395,7 +419,7 @@ struct ReportView: View {
             .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
+        .padding(17)
         .liquidGlass(cornerRadius: 24)
     }
 
@@ -431,9 +455,9 @@ struct ReportView: View {
                 Text("This week")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("\(weekly.completedSessionCount) starts")
+                Label("\(weekly.completedSessionCount) starts", systemImage: "bolt.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(reportSecondary)
+                    .foregroundStyle(accentBlue)
             }
 
             HStack(alignment: .bottom, spacing: 8) {
@@ -454,7 +478,7 @@ struct ReportView: View {
         return VStack(spacing: 7) {
             Spacer(minLength: 0)
             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                .fill(day.totalFocusTime > 0 ? reportPrimary.opacity(0.78) : reportPrimary.opacity(0.12))
+                .fill(day.totalFocusTime > 0 ? accentBlue.opacity(0.88) : reportPrimary.opacity(0.12))
                 .frame(height: CGFloat(ratio) * 82)
 
             Text(shortWeekdayName(for: day.date))
@@ -474,30 +498,30 @@ struct ReportView: View {
         emergencyUnlocksRemaining: Int
     ) -> some View {
         DisclosureGroup {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 12) {
                 dailySummaryRow(title: "Today", value: summary.today)
                 dailySummaryRow(title: "Signal", value: summary.signal)
                 dailySummaryRow(title: "Next", value: summary.nextAction)
 
                 subtleDivider()
 
-                aiReportSection(title: "Why", items: forecast.reasons)
-                aiReportSection(title: "Plan", items: forecast.plan)
-                aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 })
-                aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 })
+                aiReportSection(title: "Why", items: forecast.reasons, tint: accentBlue)
+                aiReportSection(title: "Plan", items: forecast.plan, tint: recoveryGreen)
+                aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 }, tint: sleepBlue)
+                aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 }, tint: activityOrange)
 
                 subtleDivider()
 
-                metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
-                subtleDivider()
-                metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
-                subtleDivider()
-                metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                VStack(spacing: 10) {
+                    metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                    metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
+                    metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                }
             }
             .padding(.top, 10)
         } label: {
             HStack {
-                Text("Details")
+                Label("Details", systemImage: "slider.horizontal.3")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
                 Text("Signals and plan")
@@ -878,23 +902,46 @@ struct ReportView: View {
     private func forecastColor(_ level: ControlForecast.Level) -> Color {
         switch level {
         case .low:
-            return Color.green
+            return recoveryGreen
         case .medium:
-            return Color.orange
+            return activityOrange
         case .high:
-            return Color.red
+            return Color(red: 0.95, green: 0.22, blue: 0.22)
         }
     }
 
     private func dailySummaryRow(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
+        VStack(alignment: .leading, spacing: 5) {
+            Label(title, systemImage: dailySummarySymbol(title))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)
             Text(value)
-                .font(.blankInter(size: 13, relativeTo: .footnote))
-                .foregroundStyle(reportPrimary.opacity(0.88))
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .footnote))
+                .foregroundStyle(reportPrimary.opacity(0.90))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(reportPrimary.opacity(0.055))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(reportPrimary.opacity(0.07), lineWidth: 1)
+        }
+    }
+
+    private func dailySummarySymbol(_ title: String) -> String {
+        switch title {
+        case "Today":
+            return "calendar"
+        case "Signal":
+            return "waveform"
+        case "Next":
+            return "arrow.forward.circle"
+        default:
+            return "circle"
         }
     }
 
@@ -1022,7 +1069,9 @@ struct ReportView: View {
             }
     }
 
-    private func aiReportSection(title: String, items: [String]) -> some View {
+    private func aiReportSection(title: String, items: [String], tint: Color? = nil) -> some View {
+        let sectionTint = tint ?? reportPrimary.opacity(0.72)
+
         VStack(alignment: .leading, spacing: 7) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -1032,7 +1081,7 @@ struct ReportView: View {
                 ForEach(items, id: \.self) { item in
                     HStack(alignment: .top, spacing: 8) {
                         Circle()
-                            .fill(reportPrimary.opacity(0.72))
+                            .fill(sectionTint)
                             .frame(width: 4, height: 4)
                             .padding(.top, 7)
                         Text(item)
@@ -1042,6 +1091,16 @@ struct ReportView: View {
                     }
                 }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(13)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(sectionTint.opacity(0.08))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(sectionTint.opacity(0.14), lineWidth: 1)
         }
     }
 
@@ -1179,7 +1238,7 @@ struct ReportView: View {
         HStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.body.weight(.medium))
+                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
 
                 Text(caption)
                     .font(.caption)
@@ -1189,11 +1248,20 @@ struct ReportView: View {
             Spacer(minLength: 12)
 
             Text(value)
-                .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
+                .font(.blankInter(size: 19, weight: .semibold, relativeTo: .headline))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
-        .padding(.vertical, 14)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(reportPrimary.opacity(0.05))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(reportPrimary.opacity(0.065), lineWidth: 1)
+        }
     }
 
     private func modesSection(_ activities: [BlankModeActivity]) -> some View {
@@ -1238,7 +1306,7 @@ struct ReportView: View {
 
     private func subtleDivider() -> some View {
         Rectangle()
-            .fill(reportPrimary.opacity(0.07))
+            .fill(reportPrimary.opacity(0.055))
             .frame(height: 1)
     }
 
@@ -2405,17 +2473,18 @@ private extension View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.28))
+                        .fill(Color.white.opacity(0.18))
                     BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .opacity(0.58)
                 }
                 .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 1)
+                    .stroke(BlankColors.glassBorder, lineWidth: 0.8)
             }
-            .shadow(color: BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
+            .shadow(color: BlankColors.ink.opacity(0.038), radius: 18, x: 0, y: 10)
     }
 }
 

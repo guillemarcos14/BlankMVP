@@ -1072,7 +1072,7 @@ struct ReportView: View {
     private func aiReportSection(title: String, items: [String], tint: Color? = nil) -> some View {
         let sectionTint = tint ?? reportPrimary.opacity(0.72)
 
-        VStack(alignment: .leading, spacing: 7) {
+        return VStack(alignment: .leading, spacing: 7) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(reportSecondary)

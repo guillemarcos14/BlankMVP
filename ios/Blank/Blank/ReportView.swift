@@ -33,11 +33,6 @@ struct ReportView: View {
             sessions: sessionStore.sessions,
             selectionCount: sessionStore.selectionCount
         )
-        let recommendation = DigitalWellnessAI.smartBlockRecommendation(
-            events: sessionStore.usageEvents,
-            sessions: sessionStore.sessions,
-            selectionCount: sessionStore.selectionCount
-        )
         let healthContext = healthRecoveryContext(summaries: healthKitStore.summaries)
         let healthInsights = healthDigitalWellnessInsights(
             summaries: healthKitStore.summaries,
@@ -56,41 +51,38 @@ struct ReportView: View {
             VStack(alignment: .center, spacing: 22) {
                     reportHeader()
 
-                    minimalHero(savedTime: savedTime)
-
-                    digitalWellnessDiagnosisCapsule(
-                        diagnosis: diagnosis,
-                        recommendation: recommendation
+                    controlDashboardCapsule(
+                        forecast: controlForecast,
+                        savedTime: savedTime,
+                        totalFocusTime: totalFocusTime,
+                        context: healthContext
                     )
 
-                    healthSignalsCapsule(insights: healthInsights, context: healthContext, forecast: controlForecast)
+                    healthAccessCapsule()
 
                     if hasProgress {
-                        periodSummaryCapsule(sessions: sessionStore.sessions)
-
-                        graphCapsule(activityDays: progress.recentActivity)
-
-                        behaviorCapsule(
-                            weekly: weekly,
-                            progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                        weeklyVisualCapsule(
+                            activityDays: progress.recentActivity,
+                            weekly: weekly
                         )
 
-                        dailyAISummaryCapsule(
+                        statsDetailsCapsule(
                             summary: dailyAISummary(
                                 events: sessionStore.usageEvents,
                                 sessions: sessionStore.sessions,
                                 progress: progress
-                            )
-                        )
-
-                        weeklyAIReportCapsule(
+                            ),
                             report: weeklyAIReport(
                                 events: sessionStore.usageEvents,
                                 sessions: sessionStore.sessions,
                                 progress: progress,
                                 healthContext: healthContext
-                            )
+                            ),
+                            forecast: controlForecast,
+                            healthInsights: healthInsights,
+                            weekly: weekly,
+                            progress: progress,
+                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
                     } else {
                         emptyState()
@@ -100,15 +92,11 @@ struct ReportView: View {
                     aiDemoDataButton()
                     #endif
 
-                    Text(savedTimeExplanation(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount))
+                    Text("For digital wellness only. Blanked does not provide medical diagnosis.")
                         .font(.caption2)
                         .foregroundStyle(reportSecondary.opacity(0.62))
                         .multilineTextAlignment(.center)
-                        .lineSpacing(1)
                         .padding(.horizontal, 24)
-                        .frame(maxWidth: 340)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 2)
             }
             .padding(.horizontal, 22)
             .padding(.top, 24)
@@ -154,6 +142,381 @@ struct ReportView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 28)
         .liquidGlass(cornerRadius: 30)
+    }
+
+    private func controlDashboardCapsule(
+        forecast: ControlForecast,
+        savedTime: TimeInterval,
+        totalFocusTime: TimeInterval,
+        context: HealthRecoveryContext
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
+                controlRiskRing(forecast: forecast)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("Control today")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+
+                    Text(forecast.riskLabel)
+                        .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                    Text(forecast.windowText)
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                        .foregroundStyle(reportPrimary.opacity(0.88))
+                        .lineLimit(1)
+                }
+            }
+
+            keyMetricStrip(
+                savedTime: savedTime,
+                totalFocusTime: totalFocusTime,
+                forecast: forecast
+            )
+
+            controlDriverBars(forecast: forecast, context: context)
+
+            todayMoveCard(forecast: forecast)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .liquidGlass(cornerRadius: 30)
+    }
+
+    private func controlRiskRing(forecast: ControlForecast) -> some View {
+        ZStack {
+            Circle()
+                .stroke(reportPrimary.opacity(0.10), lineWidth: 10)
+
+            Circle()
+                .trim(from: 0, to: CGFloat(forecast.riskPercent) / 100)
+                .stroke(
+                    forecastColor(forecast.level),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 0) {
+                Text("\(forecast.riskPercent)")
+                    .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title3))
+                    .lineLimit(1)
+                Text("%")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            }
+        }
+        .frame(width: 106, height: 106)
+        .accessibilityLabel("Control risk \(forecast.riskPercent) percent")
+    }
+
+    private func keyMetricStrip(
+        savedTime: TimeInterval,
+        totalFocusTime: TimeInterval,
+        forecast: ControlForecast
+    ) -> some View {
+        HStack(spacing: 10) {
+            keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: reportPrimary)
+            keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: reportPrimary)
+            keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level))
+        }
+    }
+
+    private func keyMetricTile(title: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .lineLimit(1)
+
+            Text(value)
+                .font(.blankInter(size: 19, weight: .semibold, relativeTo: .body))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+        }
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.16))
+        }
+    }
+
+    private func controlDriverBars(forecast: ControlForecast, context: HealthRecoveryContext) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Main drivers")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+
+            driverBar(title: "Phone control", value: max(0, 100 - forecast.riskPercent), tint: forecastColor(forecast.level))
+            driverBar(title: "Recovery", value: context.recoveryScore ?? 50, tint: Color.green)
+            driverBar(title: "Sleep", value: sleepDriverScore(context.averageSleepMinutes), tint: Color.blue)
+            driverBar(title: "Activity", value: activityDriverScore(context.averageSteps), tint: Color.orange)
+        }
+    }
+
+    private func driverBar(title: String, value: Int, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportPrimary.opacity(0.82))
+                Spacer()
+                Text("\(value)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(reportPrimary.opacity(0.09))
+                    Capsule()
+                        .fill(tint.opacity(0.72))
+                        .frame(width: proxy.size.width * CGFloat(max(0, min(100, value))) / 100)
+                }
+            }
+            .frame(height: 7)
+        }
+    }
+
+    private func todayMoveCard(forecast: ControlForecast) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Today's move")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+
+            Text(forecast.actionText)
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if sessionStore.isBlankActive {
+                Text("Blanked is active")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background { Capsule().fill(Color.white.opacity(0.16)) }
+            } else {
+                Button {
+                    sessionStore.activateBlank()
+                } label: {
+                    Text("Activate Blanked")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(Color.white.opacity(0.24)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                } label: {
+                    Text("Try \(forecast.durationMinutes) min block")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(forecastColor(forecast.level).opacity(0.12))
+        }
+    }
+
+    private func healthAccessCapsule() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Health context")
+                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                    Text(healthSignalsSubtitle)
+                        .font(.caption)
+                        .foregroundStyle(reportSecondary)
+                }
+
+                Spacer()
+
+                healthStatePill()
+            }
+
+            if case .notRequested = healthKitStore.state {
+                Button {
+                    healthKitStore.requestAccess()
+                } label: {
+                    Text("Connect Apple Health")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                }
+                .buttonStyle(.plain)
+            } else if case .failed(_) = healthKitStore.state {
+                Button {
+                    healthKitStore.requestAccess()
+                } label: {
+                    Text("Retry Apple Health")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                }
+                .buttonStyle(.plain)
+            } else if case .connected = healthKitStore.state {
+                Button {
+                    healthKitStore.disconnect()
+                } label: {
+                    Text("Stop using Apple Health")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                healthKitStore.loadSyntheticAppleWatchData()
+            } label: {
+                Text("Load Apple Watch demo data")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .liquidGlass(cornerRadius: 24)
+    }
+
+    private func healthStatePill() -> some View {
+        let text: String
+        switch healthKitStore.state {
+        case .connected:
+            text = healthKitStore.summaries.isEmpty ? "No data" : "On"
+        case .requesting:
+            text = "Opening"
+        case .unavailable:
+            text = "Off"
+        case .notRequested:
+            text = "Optional"
+        case .failed(_):
+            text = "Retry"
+        }
+
+        return Text(text)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(reportPrimary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background { Capsule().fill(Color.white.opacity(0.16)) }
+    }
+
+    private func weeklyVisualCapsule(activityDays: [BlankActivityDay], weekly: BlankWeeklyReport) -> some View {
+        let days = Array(activityDays.suffix(7))
+        let maxValue = max(days.map(\.totalFocusTime).max() ?? 0, 30 * 60)
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("This week")
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
+                Spacer()
+                Text("\(weekly.completedSessionCount) starts")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            }
+
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(days) { day in
+                    weekBar(day: day, maxValue: maxValue)
+                }
+            }
+            .frame(height: 122)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func weekBar(day: BlankActivityDay, maxValue: TimeInterval) -> some View {
+        let ratio = max(0.06, min(1, day.totalFocusTime / maxValue))
+
+        return VStack(spacing: 7) {
+            Spacer(minLength: 0)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(day.totalFocusTime > 0 ? reportPrimary.opacity(0.78) : reportPrimary.opacity(0.12))
+                .frame(height: CGFloat(ratio) * 82)
+
+            Text(shortWeekdayName(for: day.date))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func statsDetailsCapsule(
+        summary: DailyAISummary,
+        report: WeeklyAIReport,
+        forecast: ControlForecast,
+        healthInsights: [String],
+        weekly: BlankWeeklyReport,
+        progress: BlankProgressReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 14) {
+                dailySummaryRow(title: "Today", value: summary.today)
+                dailySummaryRow(title: "Signal", value: summary.signal)
+                dailySummaryRow(title: "Next", value: summary.nextAction)
+
+                subtleDivider()
+
+                aiReportSection(title: "Why", items: forecast.reasons)
+                aiReportSection(title: "Plan", items: forecast.plan)
+                aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 })
+                aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 })
+
+                subtleDivider()
+
+                metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                subtleDivider()
+                metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
+                subtleDivider()
+                metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack {
+                Text("Details")
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                Spacer()
+                Text("Signals and plan")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+            }
+        }
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func sleepDriverScore(_ minutes: Int?) -> Int {
+        guard let minutes else { return 50 }
+        return max(0, min(100, Int(Double(minutes) / Double(8 * 60) * 100)))
+    }
+
+    private func activityDriverScore(_ steps: Int?) -> Int {
+        guard let steps else { return 50 }
+        return max(0, min(100, Int(Double(steps) / 8000 * 100)))
     }
 
     private func heroPage(
@@ -1582,6 +1945,13 @@ struct ReportView: View {
         formatter.locale = Locale(identifier: "en_US")
         formatter.dateFormat = "EEEE"
         return formatter.string(from: date).capitalized(with: Locale(identifier: "en_US"))
+    }
+
+    private func shortWeekdayName(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.dateFormat = "E"
+        return formatter.string(from: date)
     }
 
     private func dailyAISummary(

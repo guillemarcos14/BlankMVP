@@ -399,6 +399,8 @@ struct ReportView: View {
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
                     }
                     aiReportSection(title: "Why", items: forecast.reasons)
+                    aiReportSection(title: "Unblank Pattern", items: unblankPatternInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
+                    aiReportSection(title: "Intervention Learning", items: interventionLearningInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
                     aiReportSection(title: "Adaptive Plan", items: forecast.plan)
                     aiReportSection(title: "Wellness insights", items: insights)
 
@@ -456,9 +458,9 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             } else {
                 Button {
-                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                    sessionStore.activateBlank()
                 } label: {
-                    Text("Start \(forecast.durationMinutes) min protection")
+                    Text("Activate Blanked")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
@@ -471,6 +473,17 @@ struct ReportView: View {
                             Capsule()
                                 .stroke(reportPrimary.opacity(0.08), lineWidth: 1)
                         }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                } label: {
+                    Text("Try \(forecast.durationMinutes) min block")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.plain)
             }
@@ -1195,8 +1208,10 @@ struct ReportView: View {
         let recentEvents = events.filter {
             $0.occurredAt >= weekAgo
         }
-        let recentBreaks = recentEvents.filter {
-            $0.kind == .blockBroken || $0.endedReason == .emergency
+        let manualUnblanks = recentEvents.filter { $0.endedReason == .manual }.count
+        let emergencyBreaks = recentEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }.count
+        let shortManualUnblanks = recentEvents.filter { event in
+            event.endedReason == .manual && (event.duration ?? .greatestFiniteMagnitude) < 20 * 60
         }.count
         let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
         let minutesToWeakWindow = minutesUntilNextHour(weakHour, now: now)
@@ -1208,10 +1223,10 @@ struct ReportView: View {
         if let score = context.recoveryScore {
             if score < 45 {
                 risk += 24
-                reasons.append("Recovery looks light, so the next block should be easier to complete.")
+                reasons.append("Recovery looks light, so Blanked should reduce friction before the weak window.")
             } else if score >= 75 {
                 risk -= 10
-                reasons.append("Recovery looks strong enough for a more ambitious protection window.")
+                reasons.append("Recovery looks strong enough to hold protection through a longer window.")
             }
         } else {
             risk += 8
@@ -1234,14 +1249,24 @@ struct ReportView: View {
 
         if let steps = context.averageSteps, steps < 3500 {
             risk += 8
-            reasons.append("Activity is low, so Blanked should lower friction instead of demanding a long block.")
+            reasons.append("Activity is low, so the plan should be simple: activate and stay protected.")
         } else if let workout = context.averageWorkoutMinutes, workout >= 25 {
             risk -= 5
         }
 
-        if recentBreaks > 0 {
-            risk += min(22, recentBreaks * 8)
-            reasons.append("Recent emergency or broken blocks make this window more sensitive.")
+        if manualUnblanks > 0 {
+            risk += min(28, manualUnblanks * 9)
+            reasons.append("Recent hold-to-unblank exits are the main relapse signal Blanked is learning from.")
+        }
+
+        if shortManualUnblanks > 0 {
+            risk += min(12, shortManualUnblanks * 6)
+            reasons.append("Some exits happened early, which suggests the protection started too hard or too late.")
+        }
+
+        if emergencyBreaks > 0 {
+            risk += min(16, emergencyBreaks * 6)
+            reasons.append("Emergency exits add a stronger warning signal on top of manual unblanks.")
         }
 
         if minutesToWeakWindow <= 90 {
@@ -1267,23 +1292,23 @@ struct ReportView: View {
         switch level {
         case .high:
             duration = 25
-            plan.append("Start before the weak window and keep the block short enough to finish.")
-            plan.append("Block only the apps that usually trigger the loop today.")
+            plan.append("Activate Blanked before the weak window and keep it on through that window.")
+            plan.append("Use the \(duration)-min block only if indefinite protection feels too heavy today.")
         case .medium:
             duration = max(30, min(45, diagnosis.initialBlockMinutes))
-            plan.append("Repeat the same window so Blanked can learn what works.")
-            plan.append("Use a moderate block; do not increase difficulty yet.")
+            plan.append("Protect the same window again so Blanked can learn whether it prevents manual unblanking.")
+            plan.append("Optional: test a \(duration)-min block as a lighter version of full Blanked.")
         case .low:
             duration = max(45, diagnosis.initialBlockMinutes)
-            plan.append("Use your strongest window for a longer protection block.")
-            plan.append("Keep the same app set if yesterday's block worked.")
+            plan.append("Use this as a strong control day: activate Blanked during your best window.")
+            plan.append("Optional: try a \(duration)-min block to compare timed protection with indefinite Blanked.")
         }
 
         let actionText: String
         if minutesToWeakWindow <= 90 {
-            actionText = "Start \(duration) min protection at \(activationTimeText(before: weakHour))."
+            actionText = "Activate Blanked at \(activationTimeText(before: weakHour)) and stay protected through the window."
         } else {
-            actionText = "Schedule a \(duration) min block for \(DigitalWellnessAI.hourRangeText(weakHour))."
+            actionText = "Protect \(DigitalWellnessAI.hourRangeText(weakHour)) with Blanked. Timed block: \(duration) min optional."
         }
 
         let headline: String
@@ -1311,6 +1336,77 @@ struct ReportView: View {
             reasons: Array(reasons.prefix(3)),
             plan: Array(plan.prefix(2))
         )
+    }
+
+    private func unblankPatternInsights(events: [BlankUsageEvent], sessions: [BlankSession]) -> [String] {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let manualEvents = events.filter {
+            $0.occurredAt >= weekAgo && $0.endedReason == .manual
+        }
+        let emergencyEvents = events.filter {
+            $0.occurredAt >= weekAgo && ($0.kind == .blockBroken || $0.endedReason == .emergency)
+        }
+
+        guard !manualEvents.isEmpty || !emergencyEvents.isEmpty else {
+            return ["No manual unblank pattern this week. Blanked is learning from completed protection windows."]
+        }
+
+        let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now)
+        let averageProtectedMinutes = average(manualEvents.compactMap { event in
+            event.duration.map { Int($0 / 60) }
+        })
+        var insights: [String] = []
+
+        if let weakHour {
+            let count = manualEvents.filter { $0.localHour == weakHour }.count
+            if count > 0 {
+                insights.append("\(count) hold-to-unblank exit\(count == 1 ? "" : "s") happened around \(DigitalWellnessAI.hourRangeText(weakHour)).")
+            }
+        }
+
+        if let averageProtectedMinutes {
+            insights.append("Average protection before manual exit: \(averageProtectedMinutes) min.")
+        }
+
+        if emergencyEvents.count > 0 {
+            insights.append("Emergency exits are rare but high-signal; manual hold exits are the baseline relapse signal.")
+        }
+
+        return Array(insights.prefix(3))
+    }
+
+    private func interventionLearningInsights(events: [BlankUsageEvent], sessions: [BlankSession]) -> [String] {
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let recentSessions = sessions.filter { session in
+            session.startedAt >= weekAgo && session.startedAt <= now && session.endedAt != nil
+        }
+        let completedIndefinite = recentSessions.filter {
+            $0.plannedDurationMinutes == nil && $0.endedReason != .manual && $0.endedReason != .emergency
+        }.count
+        let manualIndefinite = recentSessions.filter {
+            $0.plannedDurationMinutes == nil && $0.endedReason == .manual
+        }
+        let timedCompleted = recentSessions.filter {
+            $0.plannedDurationMinutes != nil && $0.endedReason != .manual && $0.endedReason != .emergency
+        }.count
+        let timedManual = recentSessions.filter {
+            $0.plannedDurationMinutes != nil && $0.endedReason == .manual
+        }.count
+
+        if completedIndefinite > manualIndefinite.count, completedIndefinite > 0 {
+            return ["Indefinite Blanked is working better than early exits this week. Keep it as the default."]
+        }
+        if timedCompleted > timedManual, timedCompleted > 0 {
+            return ["Timed blocks look easier to complete right now. Use them as a lighter entry into Blanked."]
+        }
+        if let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) {
+            return ["Blanked is still learning the best intervention. For now, activate before \(DigitalWellnessAI.hourRangeText(weakHour))."]
+        }
+        return ["Blanked needs more starts and exits before it can compare indefinite protection with timed blocks."]
     }
 
     private func riskMomentValue(activityDays: [BlankActivityDay]) -> String {

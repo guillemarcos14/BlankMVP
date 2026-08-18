@@ -603,7 +603,7 @@ enum DigitalWellnessAI {
             .filter { event in
                 event.occurredAt >= weekStart &&
                 event.occurredAt <= now &&
-                (event.kind == .blockBroken || event.endedReason == .emergency)
+                (event.kind == .blockBroken || event.endedReason == .emergency || event.endedReason == .manual)
             }
             .map(\.localHour)
         let emergencySessionHours = sessions
@@ -611,7 +611,7 @@ enum DigitalWellnessAI {
                 let sessionEnd = session.endedAt ?? now
                 return session.startedAt <= now &&
                 sessionEnd >= weekStart &&
-                session.endedReason == .emergency
+                (session.endedReason == .emergency || session.endedReason == .manual)
             }
             .compactMap(\.localStartHour)
 

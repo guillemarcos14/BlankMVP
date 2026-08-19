@@ -65,9 +65,14 @@ struct ReportView: View {
                     healthAccessCapsule()
 
                     if hasProgress {
-                        weeklyVisualCapsule(
+                        trendsHistoryCapsule(
                             activityDays: progress.recentActivity,
-                            weekly: weekly
+                            weekly: weekly,
+                            totalFocusTime: totalFocusTime,
+                            totalSessionCount: totalSessionCount,
+                            savedTime: savedTime,
+                            progress: progress,
+                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                         )
 
                         statsDetailsCapsule(
@@ -476,6 +481,101 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func trendsHistoryCapsule(
+        activityDays: [BlankActivityDay],
+        weekly: BlankWeeklyReport,
+        totalFocusTime: TimeInterval,
+        totalSessionCount: Int,
+        savedTime: TimeInterval,
+        progress: BlankProgressReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        let days = Array(activityDays.suffix(7))
+
+        return DisclosureGroup {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("Weekly evolution")
+                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        Spacer()
+                        Text("\(weekly.completedSessionCount) starts")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(accentBlue)
+                    }
+
+                    chartPanel(values: days.map(\.totalFocusTime))
+                        .frame(height: 136)
+                        .accessibilityLabel("Weekly protected time evolution")
+                }
+
+                subtleDivider()
+
+                HStack(alignment: .bottom, spacing: 8) {
+                    ForEach(days) { day in
+                        weekBar(day: day, maxValue: max(days.map(\.totalFocusTime).max() ?? 0, 30 * 60))
+                    }
+                }
+                .frame(height: 104)
+                .accessibilityLabel("Daily protected time bars")
+
+                subtleDivider()
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    compactTrendMetric(title: "Recovered", value: formatDuration(savedTime), caption: "Estimated total")
+                    compactTrendMetric(title: "Blanked", value: formatDuration(totalFocusTime), caption: "Total protected")
+                    compactTrendMetric(title: "Sessions", value: "\(totalSessionCount)", caption: "Since start")
+                    compactTrendMetric(title: "Streak", value: "\(progress.currentStreakDays)d", caption: "Days with Blank")
+                    compactTrendMetric(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                    compactTrendMetric(title: "Rescues", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                }
+            }
+            .padding(.top, 12)
+        } label: {
+            HStack(spacing: 12) {
+                Label("Trends & history", systemImage: "chart.xyaxis.line")
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                Spacer()
+                Text("Graph and progress")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+            }
+        }
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func compactTrendMetric(title: String, value: String, caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .lineLimit(1)
+
+            Text(value)
+                .font(.blankInter(size: 18, weight: .semibold, relativeTo: .body))
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.80))
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+        }
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(reportPrimary.opacity(0.045))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(reportPrimary.opacity(0.06), lineWidth: 1)
+        }
     }
 
     private func weekBar(day: BlankActivityDay, maxValue: TimeInterval) -> some View {

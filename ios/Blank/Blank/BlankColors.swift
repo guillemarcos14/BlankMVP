@@ -55,11 +55,11 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
             .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: 342)
             .frame(minHeight: 50)
-            .foregroundStyle(light ? BlankColors.ink : Color.white)
+            .foregroundStyle(light ? BlankColors.airBlue : Color.white)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(light ? Color.white.opacity(configuration.isPressed ? 0.72 : 0.88) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.66 : 0.54))
+                    Capsule().fill(light ? Color.white.opacity(configuration.isPressed ? 0.82 : 0.96) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.66 : 0.54))
                     BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
                         .clipShape(Capsule())
                     Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
@@ -67,6 +67,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                 .allowsHitTesting(false)
             }
             .contentShape(Capsule())
+            .shadow(color: BlankColors.airBlue.opacity(light && !configuration.isPressed ? 0.18 : 0.00), radius: 14, y: 8)
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.07), radius: 9, y: 5)
             .scaleEffect(configuration.isPressed ? 0.982 : 1)
     }
@@ -78,11 +79,11 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
             .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
-            .foregroundStyle(BlankColors.ink)
+            .foregroundStyle(BlankColors.airBlue)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.54 : 0.42))
+                    Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.64 : 0.52))
                     Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
                 }
                 .allowsHitTesting(false)
@@ -173,7 +174,7 @@ private struct BlankGlassCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(BlankColors.glassBorder, lineWidth: 1)
             )
-            .shadow(color: BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
+            .shadow(color: BlankColors.ink.opacity(0.06), radius: 18, x: 0, y: 10)
     }
 }
 

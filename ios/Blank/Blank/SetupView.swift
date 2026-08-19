@@ -1304,8 +1304,9 @@ private struct OnboardingChoiceButton: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? BlankColors.airBlue.opacity(0.55) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
+                    .stroke(selected ? BlankColors.airBlue.opacity(0.78) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
+            .shadow(color: selected ? BlankColors.airBlue.opacity(0.18) : .clear, radius: 12, y: 7)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1349,10 +1350,10 @@ private struct PlanButton: View {
                         if let badge {
                             Text(badge)
                                 .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
-                                .foregroundStyle(BlankColors.ink.opacity(0.72))
+                                .foregroundStyle(Color.white)
                                 .padding(.horizontal, 7)
                                 .frame(minHeight: 20)
-                                .background(Capsule().fill(BlankColors.airMist.opacity(0.58)))
+                                .background(Capsule().fill(BlankColors.airBlue.opacity(0.92)))
                         }
                     }
 
@@ -1371,7 +1372,7 @@ private struct PlanButton: View {
                         .stroke(selected ? BlankColors.ink.opacity(0.38) : Color.white.opacity(0.26), lineWidth: 1)
                     if selected {
                         Circle()
-                            .fill(BlankColors.ink)
+                            .fill(BlankColors.airBlue)
                             .padding(4)
                     }
                 }
@@ -1391,8 +1392,9 @@ private struct PlanButton: View {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? Color.white.opacity(0.72) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
+                    .stroke(selected ? BlankColors.airBlue.opacity(0.74) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
+            .shadow(color: selected ? BlankColors.airBlue.opacity(0.18) : .clear, radius: 14, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)

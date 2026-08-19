@@ -1262,14 +1262,31 @@ private struct TechnicalSettingsSheetLayout<Content: View>: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        VStack(spacing: 18) {
-            content
-            Spacer()
+        ZStack(alignment: .top) {
+            BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
+
+            VStack(spacing: 16) {
+                Capsule()
+                    .fill((sessionStore.isBlankActive ? Color.white : BlankColors.ink).opacity(0.22))
+                    .frame(width: 38, height: 4)
+                    .padding(.top, 8)
+
+                VStack(spacing: 18) {
+                    content
+                }
+                .padding(.horizontal, 22)
+                .padding(.top, 24)
+                .padding(.bottom, 22)
+                .frame(maxWidth: 360)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: sessionStore.isBlankActive ? 0.24 : 0.58)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 8)
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .foregroundStyle(textColor)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive))
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 }
@@ -1283,7 +1300,7 @@ private struct TechnicalSheetTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+            .font(.blankInter(size: 31, weight: .semibold, relativeTo: .largeTitle))
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.86)
@@ -1302,9 +1319,9 @@ private struct TechnicalSheetDescription: View {
 
     var body: some View {
         Text(text)
-            .font(emphasized ? .footnote.weight(.medium) : .body)
+            .font(emphasized ? .blankInter(size: 15, weight: .semibold, relativeTo: .subheadline) : .blankInter(size: 15, relativeTo: .body))
             .multilineTextAlignment(.center)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(emphasized ? .primary : .secondary)
             .lineSpacing(2)
             .frame(maxWidth: 330)
     }

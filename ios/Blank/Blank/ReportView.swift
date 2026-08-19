@@ -328,10 +328,10 @@ struct ReportView: View {
                 } label: {
                     Text("Activate Blanked")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportPrimary)
+                        .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
-                        .background { Capsule().fill(Color.white.opacity(0.24)) }
+                        .background { Capsule().fill(BlankColors.airBlue.opacity(0.92)) }
                 }
                 .contentShape(Capsule())
                 .buttonStyle(.plain)
@@ -382,10 +382,10 @@ struct ReportView: View {
                 } label: {
                     Text("Connect Apple Health")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportPrimary)
+                        .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
-                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                        .background { Capsule().fill(BlankColors.airBlue.opacity(0.92)) }
                 }
                 .contentShape(Capsule())
                 .buttonStyle(.plain)
@@ -395,10 +395,10 @@ struct ReportView: View {
                 } label: {
                     Text("Retry Apple Health")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportPrimary)
+                        .foregroundStyle(Color.white)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
-                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                        .background { Capsule().fill(BlankColors.airBlue.opacity(0.92)) }
                 }
                 .contentShape(Capsule())
                 .buttonStyle(.plain)
@@ -2479,7 +2479,7 @@ private extension View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.24))
+                        .fill(Color.white.opacity(0.32))
                     BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                         .opacity(0.64)
@@ -2490,6 +2490,7 @@ private extension View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(BlankColors.glassBorder, lineWidth: 1)
             }
+            .shadow(color: BlankColors.airBlue.opacity(0.055), radius: 18, x: 0, y: 10)
             .shadow(color: BlankColors.ink.opacity(0.045), radius: 18, x: 0, y: 10)
     }
 }

@@ -1,27 +1,31 @@
 import SwiftUI
+import UIKit
 
 enum BlankColors {
-    static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
+    static let red = Color(uiColor: .systemRed)
     static let redDark = Color(red: 0.125, green: 0.129, blue: 0.141)
     static let green = Color(red: 0.125, green: 0.129, blue: 0.141)
-    static let background = Color(red: 0.914, green: 0.914, blue: 0.906)
-    static let surface = Color(red: 0.961, green: 0.961, blue: 0.961)
+    static let background = Color(uiColor: .systemGroupedBackground)
+    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let text = Color.white
-    static let secondaryText = Color(red: 0.400, green: 0.408, blue: 0.400)
-    static let warmBackground = Color(red: 0.914, green: 0.914, blue: 0.906)
-    static let warmSurface = Color.white.opacity(0.72)
-    static let ink = Color(red: 0.125, green: 0.129, blue: 0.141)
-    static let mutedInk = Color(red: 0.400, green: 0.408, blue: 0.400)
-    static let line = Color(red: 0.125, green: 0.129, blue: 0.141).opacity(0.10)
-    static let airBlue = Color(red: 0.573, green: 0.690, blue: 0.800)
-    static let airMist = Color(red: 0.784, green: 0.814, blue: 0.846)
-    static let airStone = Color(red: 0.769, green: 0.765, blue: 0.757)
-    static let glassTint = Color(red: 0.722, green: 0.725, blue: 0.733)
+    static let secondaryText = Color(uiColor: .secondaryLabel)
+    static let warmBackground = Color(uiColor: .systemGroupedBackground)
+    static let warmSurface = Color(uiColor: .secondarySystemGroupedBackground).opacity(0.78)
+    static let ink = Color(uiColor: .label)
+    static let mutedInk = Color(uiColor: .secondaryLabel)
+    static let tertiaryInk = Color(uiColor: .tertiaryLabel)
+    static let line = Color(uiColor: .separator).opacity(0.34)
+    static let airBlue = Color(uiColor: .systemBlue)
+    static let airMist = Color(uiColor: .systemTeal)
+    static let airStone = Color(uiColor: .systemGray3)
+    static let glassTint = Color(uiColor: .secondarySystemFill)
+    static let controlFill = Color(uiColor: .systemFill)
+    static let elevatedSurface = Color(uiColor: .tertiarySystemGroupedBackground)
     static let glassBorder = LinearGradient(
         colors: [
             Color.white.opacity(0.48),
-            Color.white.opacity(0.16),
-            Color.white.opacity(0.04),
+            Color.white.opacity(0.18),
+            Color(uiColor: .separator).opacity(0.12),
             Color.white.opacity(0.00)
         ],
         startPoint: .topLeading,
@@ -48,41 +52,43 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: 342)
-            .frame(height: 50)
+            .frame(minHeight: 50)
             .foregroundStyle(light ? BlankColors.ink : Color.white)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
+                    Capsule().fill(light ? Color.white.opacity(configuration.isPressed ? 0.72 : 0.88) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.66 : 0.54))
                     BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
                         .clipShape(Capsule())
                     Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .contentShape(Capsule())
+            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.07), radius: 9, y: 5)
+            .scaleEffect(configuration.isPressed ? 0.982 : 1)
     }
 }
 
 struct BlankSecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
+            .frame(minHeight: 48)
             .foregroundStyle(BlankColors.ink)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.42 : 0.30))
+                    Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.54 : 0.42))
                     Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
+            .contentShape(Capsule())
+            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.01 : 0.045), radius: 7, y: 4)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
@@ -100,11 +106,21 @@ struct BlankAtmosphericBackground: View {
             LinearGradient(
                 colors: [
                     Color.white.opacity(dimmed ? 0.02 : 0.14),
-                    BlankColors.airMist.opacity(dimmed ? 0.10 : 0.20),
-                    BlankColors.airStone.opacity(dimmed ? 0.06 : 0.16)
+                    BlankColors.airBlue.opacity(dimmed ? 0.08 : 0.16),
+                    BlankColors.airStone.opacity(dimmed ? 0.08 : 0.18)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
+            )
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(dimmed ? 0.20 : 0.05),
+                    Color.black.opacity(dimmed ? 0.12 : 0.00),
+                    Color.black.opacity(dimmed ? 0.28 : 0.04)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
         }
         .ignoresSafeArea()
@@ -162,7 +178,7 @@ private struct BlankGlassCardModifier: ViewModifier {
 }
 
 extension View {
-    func blankGlassCard(cornerRadius: CGFloat = 22, tintOpacity: Double = 0.34) -> some View {
+    func blankGlassCard(cornerRadius: CGFloat = 18, tintOpacity: Double = 0.34) -> some View {
         modifier(BlankGlassCardModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity))
     }
 }
@@ -176,14 +192,14 @@ struct TopSheetHeader: View {
     var body: some View {
         VStack(spacing: 10) {
             Text(title)
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 34, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(titleColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.86)
 
             Text(subtitle)
-                .font(.body)
+                .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(subtitleColor)
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)

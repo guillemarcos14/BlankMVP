@@ -136,7 +136,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassTint = Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0).opacity(0.42)
+        let glassTint = BlankColors.glassTint.opacity(0.56)
         let logoReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.22),
@@ -166,7 +166,7 @@ struct HomeView: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.white)
                     .foregroundColor(Color.white)
-                    .frame(width: 47, height: 47)
+                    .frame(width: 48, height: 48)
                     .background {
                         ZStack {
                             Circle().fill(.ultraThinMaterial)
@@ -207,19 +207,19 @@ struct HomeView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .frame(width: 291, height: 47)
+        .frame(width: 291, height: 48)
     }
 
     private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
+                .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
                 .foregroundColor(Color.white)
-                .frame(width: 64, height: 47)
+                .frame(width: 64, height: 48)
                 .contentShape(Rectangle())
         }
-        .frame(width: 64, height: 47)
+        .frame(width: 64, height: 48)
         .contentShape(Rectangle())
         .buttonStyle(.plain)
     }
@@ -269,7 +269,7 @@ struct HomeView: View {
                 .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineSpacing(-2)
+                .lineSpacing(1)
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
@@ -719,11 +719,11 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
         )
 
         configuration.label
-            .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
+            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
             .foregroundStyle(Color.white)
             .foregroundColor(Color.white)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(minHeight: 50)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
@@ -734,6 +734,7 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
                 }
                 .allowsHitTesting(false)
             }
+            .contentShape(Capsule())
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
@@ -787,6 +788,17 @@ private struct AppBackground: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(isActive ? 0.18 : 0.06),
+                    Color.black.opacity(isActive ? 0.04 : 0.00),
+                    Color.black.opacity(isActive ? 0.34 : 0.12)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.75), value: isActive)

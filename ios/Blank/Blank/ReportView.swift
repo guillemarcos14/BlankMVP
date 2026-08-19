@@ -239,10 +239,10 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 5) {
                 Image(systemName: symbol)
-                    .font(.caption2.weight(.bold))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(tint)
                 Text(title)
-                    .font(.caption2.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
                     .lineLimit(1)
             }
@@ -253,7 +253,7 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
         }
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background {
@@ -320,7 +320,7 @@ struct ReportView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
+                    .frame(minHeight: 44)
                     .background { Capsule().fill(Color.white.opacity(0.16)) }
             } else {
                 Button {
@@ -330,9 +330,10 @@ struct ReportView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
+                        .frame(minHeight: 44)
                         .background { Capsule().fill(Color.white.opacity(0.24)) }
                 }
+                .contentShape(Capsule())
                 .buttonStyle(.plain)
 
                 Button {
@@ -342,8 +343,9 @@ struct ReportView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportSecondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .frame(minHeight: 44)
                 }
+                .contentShape(Capsule())
                 .buttonStyle(.plain)
             }
         }
@@ -382,9 +384,10 @@ struct ReportView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
                         .background { Capsule().fill(Color.white.opacity(0.20)) }
                 }
+                .contentShape(Capsule())
                 .buttonStyle(.plain)
             } else if case .failed(_) = healthKitStore.state {
                 Button {
@@ -394,9 +397,10 @@ struct ReportView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
                         .background { Capsule().fill(Color.white.opacity(0.20)) }
                 }
+                .contentShape(Capsule())
                 .buttonStyle(.plain)
             } else if case .connected = healthKitStore.state {
                 Button {
@@ -405,6 +409,7 @@ struct ReportView: View {
                     Text("Stop using Apple Health")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportSecondary)
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
             }
@@ -415,6 +420,7 @@ struct ReportView: View {
                 Text("Load Apple Watch demo data")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportSecondary)
+                    .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
         }
@@ -2473,18 +2479,18 @@ private extension View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.18))
+                        .fill(Color.white.opacity(0.24))
                     BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .opacity(0.58)
+                        .opacity(0.64)
                 }
                 .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 0.8)
+                    .stroke(BlankColors.glassBorder, lineWidth: 1)
             }
-            .shadow(color: BlankColors.ink.opacity(0.038), radius: 18, x: 0, y: 10)
+            .shadow(color: BlankColors.ink.opacity(0.045), radius: 18, x: 0, y: 10)
     }
 }
 

@@ -671,12 +671,14 @@ struct SetupView: View {
                         .frame(width: 18, height: 18)
 
                     Text(onboardingConsentText)
-                        .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption2))
-                        .foregroundStyle(Color.white.opacity(0.58))
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.70))
                         .multilineTextAlignment(.leading)
                         .lineSpacing(2)
                 }
                 .frame(maxWidth: 318, alignment: .leading)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Required onboarding data consent")
@@ -1279,21 +1281,32 @@ private struct OnboardingChoiceButton: View {
                     .frame(width: 22)
 
                 Text(title)
-                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.92))
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(Color.white.opacity(0.94))
 
                 Spacer(minLength: 0)
+
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(BlankColors.airBlue)
+                }
             }
             .padding(.horizontal, 18)
-            .frame(height: 58)
+            .frame(minHeight: 58)
             .background {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(Color.white.opacity(selected ? 0.14 : 0.075))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(selected ? 0.18 : 0.085))
+                }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(selected ? BlankColors.airBlue.opacity(0.30) : Color.white.opacity(0.08), lineWidth: selected ? 1.2 : 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? BlankColors.airBlue.opacity(0.55) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1303,12 +1316,12 @@ private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
             BlankAtmosphericBackground(dimmed: true)
-            Color.black.opacity(0.38).ignoresSafeArea()
+            Color.black.opacity(0.30).ignoresSafeArea()
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.06),
-                    Color.black.opacity(0.18),
-                    Color.black.opacity(0.46)
+                    Color.black.opacity(0.04),
+                    Color.black.opacity(0.14),
+                    Color.black.opacity(0.40)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -1338,7 +1351,7 @@ private struct PlanButton: View {
                                 .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
                                 .foregroundStyle(BlankColors.ink.opacity(0.72))
                                 .padding(.horizontal, 7)
-                                .frame(height: 20)
+                                .frame(minHeight: 20)
                                 .background(Capsule().fill(BlankColors.airMist.opacity(0.58)))
                         }
                     }
@@ -1347,8 +1360,8 @@ private struct PlanButton: View {
                         .font(.blankInter(size: 19, weight: .semibold, relativeTo: .headline))
 
                     Text(detail)
-                        .font(.blankInter(size: 11, relativeTo: .caption2))
-                        .foregroundStyle(selected ? BlankColors.ink.opacity(0.58) : Color.white.opacity(0.46))
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(selected ? BlankColors.ink.opacity(0.66) : Color.white.opacity(0.62))
                 }
 
                 Spacer(minLength: 0)
@@ -1365,17 +1378,22 @@ private struct PlanButton: View {
                 .frame(width: 18, height: 18)
             }
             .foregroundStyle(selected ? BlankColors.ink : Color.white.opacity(0.88))
-            .padding(.horizontal, 15)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.92) : Color.white.opacity(0.095))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(selected ? Color.white.opacity(0.94) : Color.white.opacity(0.11))
+                }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(selected ? Color.white.opacity(0.72) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
             }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }

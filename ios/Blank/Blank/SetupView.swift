@@ -1242,6 +1242,28 @@ private struct ReferenceOnboardingScene: View {
     let accessory: AnyView
     let buttonWidth: (String) -> CGFloat
 
+    init(
+        eyebrow: String?,
+        lines: [ReferenceTextLine],
+        body: String?,
+        primaryTitle: String?,
+        primaryAction: (() -> Void)?,
+        secondaryTitle: String?,
+        secondaryAction: (() -> Void)?,
+        accessory: AnyView,
+        buttonWidth: @escaping (String) -> CGFloat
+    ) {
+        self.eyebrow = eyebrow
+        self.lines = lines
+        self.bodyText = body
+        self.primaryTitle = primaryTitle
+        self.primaryAction = primaryAction
+        self.secondaryTitle = secondaryTitle
+        self.secondaryAction = secondaryAction
+        self.accessory = accessory
+        self.buttonWidth = buttonWidth
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)

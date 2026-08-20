@@ -134,8 +134,8 @@ struct SetupView: View {
                 }
 
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 34)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -224,7 +224,7 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("Your phone is taking"),
-                .accent("more of your life"),
+                .text("more of your life"),
                 .text("than you think", icon: "iphone")
             ],
             body: "Let's calculate it with your own pattern.",
@@ -265,7 +265,7 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("The average person loses"),
-                .accent("\(lifetimeYears) years", icon: "hourglass"),
+                .text("\(lifetimeYears) years", icon: "hourglass"),
                 .text("to their phone screen")
             ],
             body: "Over a lifetime.",
@@ -281,7 +281,7 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("Your feed is engineered"),
-                .accent("to pull you back", icon: "sparkles"),
+                .text("to pull you back", icon: "sparkles"),
                 .text("before you notice")
             ],
             body: "Blanked is built to interrupt that loop before it wins.",
@@ -295,7 +295,7 @@ struct SetupView: View {
             lines: [
                 .text("How much time"),
                 .text("do you spend daily", icon: "iphone"),
-                .accent("\(formattedHours(dailyHours)) / day")
+                .text("\(formattedHours(dailyHours)) / day")
             ],
             body: "Use your real Screen Time average.",
             primaryTitle: "Calculate time lost",
@@ -318,9 +318,9 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("At this pace, your phone costs"),
-                .accent("\(animatedLostDays) days", icon: "calendar"),
+                .text("\(animatedLostDays) days", icon: "calendar"),
                 .text("this year"),
-                .accent("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
+                .text("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
                 .text("over a lifetime")
             ],
             primaryTitle: "See what I can recover",
@@ -340,7 +340,7 @@ struct SetupView: View {
             eyebrow: "Your first plan",
             lines: [
                 .text("Protect"),
-                .accent("\(weakMomentPreview)", icon: "shield.fill"),
+                .text("\(weakMomentPreview)", icon: "shield.fill"),
                 .text("for \(initialBlockMinutesPreview) minutes"),
                 .text("then review the pattern", icon: "chart.line.uptrend.xyaxis")
             ],
@@ -398,9 +398,9 @@ struct SetupView: View {
             eyebrow: "Your diagnosis",
             lines: [
                 .text("You are a"),
-                .accent(onboardingArchetype, icon: diagnosisIconName),
+                .text(onboardingArchetype, icon: diagnosisIconName),
                 .text(riskTitlePreview),
-                .accent("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
+                .text("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
             ],
             body: riskBodyPreview,
             primaryTitle: "Build my plan",
@@ -417,7 +417,7 @@ struct SetupView: View {
             lines: [
                 .text("Let Blanked warn you"),
                 .text("before your weakest moment", icon: "bell.badge.fill"),
-                .accent(weakMomentPreview)
+                .text(weakMomentPreview)
             ],
             body: "Reminders are only used to prevent relapse windows.",
             primaryTitle: "Enable reminders",
@@ -433,7 +433,7 @@ struct SetupView: View {
             lines: [
                 .text("Hold to commit"),
                 .text("to protecting", icon: "hand.raised.fill"),
-                .accent(commitmentFocusText)
+                .text(commitmentFocusText)
             ],
             body: commitmentComplete ? "Done." : "Hold for \(max(0, 3 - commitmentSeconds)) seconds.",
             accessory: AnyView(commitmentHoldControl)
@@ -446,7 +446,7 @@ struct SetupView: View {
                 eyebrow: nil,
                 lines: [
                     .text("Start your"),
-                    .accent(onboardingArchetype, icon: diagnosisIconName),
+                    .text(onboardingArchetype, icon: diagnosisIconName),
                     .text("plan")
                 ],
                 body: "Blocking, risk forecast, weekly plan and relapse protection."
@@ -516,13 +516,13 @@ struct SetupView: View {
             } label: {
                 if purchaseStore.isPurchasing || purchaseStore.isLoading {
                     ProgressView()
-                        .tint(BlankColors.ink)
+                        .tint(Color.white)
                 } else {
                     Text("Start free trial")
                 }
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: 222)
+            .buttonStyle(ReferenceOnboardingButtonStyle())
+            .frame(maxWidth: .infinity)
 
             Button("Restore purchases") {
                 Task {
@@ -534,15 +534,15 @@ struct SetupView: View {
                 }
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.56))
+            .foregroundStyle(Color.white.opacity(0.70))
             .buttonStyle(.plain)
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {
                     continueWithReviewDemoAccess()
                 }
-                .buttonStyle(BlankSecondaryButtonStyle())
-                .frame(width: 236)
+                .buttonStyle(ReferenceOnboardingButtonStyle())
+                .frame(maxWidth: .infinity)
             }
 
             legalDisclosure
@@ -550,11 +550,13 @@ struct SetupView: View {
             if let purchaseMessage = purchaseStore.message {
                 Text(purchaseMessage)
                     .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.74))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 320)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 22)
     }
 
     private var permissionStep: some View {
@@ -562,7 +564,7 @@ struct SetupView: View {
             lines: [
                 .text(screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time"),
                 .text("so Blanked can", icon: "lock.shield.fill"),
-                .accent("block distractions")
+                .text("block distractions")
             ],
             body: screenTimeDescription,
             primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
@@ -576,7 +578,7 @@ struct SetupView: View {
             lines: [
                 .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
                 .text(sessionStore.hasSelectedApps ? "is ready" : "to block", icon: "app.badge.fill"),
-                .accent(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingArchetype)
+                .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingArchetype)
             ],
             body: sessionStore.hasSelectedApps
                 ? "\(initialBlockMinutesPreview) minutes at \(weakMomentPreview)."
@@ -611,11 +613,19 @@ struct SetupView: View {
                         selected: selection == option.title
                     ) {
                         onSelect(option.title)
-                        goForward()
                     }
                 }
             }
             .frame(maxWidth: 342)
+
+            Button("Next") {
+                if selection.isEmpty {
+                    onSelect(options.first?.title ?? "")
+                }
+                goForward()
+            }
+            .buttonStyle(ReferenceOnboardingButtonStyle())
+            .frame(maxWidth: .infinity)
 
         }
         .padding(.bottom, 22)
@@ -640,8 +650,7 @@ struct SetupView: View {
             primaryAction: primaryAction,
             secondaryTitle: secondaryTitle,
             secondaryAction: secondaryAction,
-            accessory: accessory,
-            buttonWidth: { onboardingButtonWidth(for: $0) }
+            accessory: accessory
         )
     }
 
@@ -1227,7 +1236,7 @@ private struct ReferenceTextLine: Identifiable {
     }
 
     static func accent(_ text: String, icon: String? = nil) -> ReferenceTextLine {
-        ReferenceTextLine(text: text, icon: icon, isAccent: true)
+        ReferenceTextLine(text: text, icon: icon, isAccent: false)
     }
 }
 
@@ -1240,7 +1249,6 @@ private struct ReferenceOnboardingScene: View {
     let secondaryTitle: String?
     let secondaryAction: (() -> Void)?
     let accessory: AnyView
-    let buttonWidth: (String) -> CGFloat
 
     init(
         eyebrow: String?,
@@ -1250,8 +1258,7 @@ private struct ReferenceOnboardingScene: View {
         primaryAction: (() -> Void)?,
         secondaryTitle: String?,
         secondaryAction: (() -> Void)?,
-        accessory: AnyView,
-        buttonWidth: @escaping (String) -> CGFloat
+        accessory: AnyView
     ) {
         self.eyebrow = eyebrow
         self.lines = lines
@@ -1261,7 +1268,6 @@ private struct ReferenceOnboardingScene: View {
         self.secondaryTitle = secondaryTitle
         self.secondaryAction = secondaryAction
         self.accessory = accessory
-        self.buttonWidth = buttonWidth
     }
 
     var body: some View {
@@ -1278,14 +1284,14 @@ private struct ReferenceOnboardingScene: View {
                     VStack(alignment: .leading, spacing: 14) {
                         if let primaryTitle, let primaryAction {
                             Button(primaryTitle, action: primaryAction)
-                                .buttonStyle(BlankPrimaryButtonStyle(light: true))
-                                .frame(width: buttonWidth(primaryTitle))
+                                .buttonStyle(ReferenceOnboardingButtonStyle())
+                                .frame(maxWidth: .infinity)
                         }
 
                         if let secondaryTitle, let secondaryAction {
                             Button(secondaryTitle, action: secondaryAction)
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                                .foregroundStyle(Color.white.opacity(0.56))
+                                .foregroundStyle(Color.white.opacity(0.70))
                                 .buttonStyle(.plain)
                                 .padding(.leading, 4)
                         }
@@ -1293,7 +1299,7 @@ private struct ReferenceOnboardingScene: View {
                     .padding(.top, 8)
                 }
             }
-            .frame(maxWidth: 354, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 22)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -1316,7 +1322,7 @@ private struct ReferenceOnboardingText: View {
             if let eyebrow, !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.58))
+                    .foregroundStyle(Color.white.opacity(0.78))
                     .padding(.bottom, 2)
             }
 
@@ -1329,7 +1335,7 @@ private struct ReferenceOnboardingText: View {
             if let bodyText, !bodyText.isEmpty {
                 Text(bodyText)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.64))
+                    .foregroundStyle(Color.white.opacity(0.82))
                     .multilineTextAlignment(.leading)
                     .lineSpacing(3)
                     .frame(maxWidth: 330, alignment: .leading)
@@ -1348,18 +1354,14 @@ private struct ReferenceAnimatedLine: View {
         HStack(alignment: .center, spacing: 10) {
             if let icon = line.icon {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(line.isAccent ? BlankColors.ink : Color.white)
-                    .frame(width: 34, height: 34)
-                    .background {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(line.isAccent ? BlankColors.airMist : Color.white.opacity(0.13))
-                    }
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .frame(width: 30, height: 30)
             }
 
             Text(line.text)
-                .font(.blankInter(size: line.isAccent ? 37 : 33, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(line.isAccent ? BlankColors.airMist : Color.white)
+                .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
+                .foregroundStyle(Color.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.68)
                 .multilineTextAlignment(.leading)
@@ -1374,6 +1376,26 @@ private struct ReferenceAnimatedLine: View {
                 visible = true
             }
         }
+    }
+}
+
+private struct ReferenceOnboardingButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
+            .foregroundStyle(Color.white.opacity(configuration.isPressed ? 0.78 : 0.92))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(Color.black.opacity(configuration.isPressed ? 0.54 : 0.42))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(Color.white.opacity(0.035), lineWidth: 1)
+            }
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
@@ -1538,12 +1560,12 @@ private struct PaywallValueRow: View {
         HStack(spacing: 10) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(BlankColors.airMist)
+                .foregroundStyle(Color.white.opacity(0.86))
                 .frame(width: 20)
 
             Text(text)
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.76))
+                .foregroundStyle(Color.white.opacity(0.82))
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -1562,14 +1584,12 @@ private struct OnboardingChoiceButton: View {
     let selected: Bool
     let action: () -> Void
 
-    private let accent = BlankColors.airMist
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: 15) {
                 Image(systemName: systemName)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(Color.white.opacity(0.88))
                     .frame(width: 22)
 
                 Text(title)
@@ -1581,7 +1601,7 @@ private struct OnboardingChoiceButton: View {
                 if selected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(BlankColors.airBlue)
+                        .foregroundStyle(Color.white.opacity(0.92))
                 }
             }
             .padding(.horizontal, 18)
@@ -1591,14 +1611,14 @@ private struct OnboardingChoiceButton: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(selected ? 0.18 : 0.085))
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? BlankColors.airBlue.opacity(0.78) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
-            .shadow(color: selected ? BlankColors.airBlue.opacity(0.18) : .clear, radius: 12, y: 7)
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1608,19 +1628,47 @@ private struct OnboardingChoiceButton: View {
 private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground(dimmed: true)
-            Color.black.opacity(0.30).ignoresSafeArea()
+            Color.black.ignoresSafeArea()
+            ReferenceBottomGlow()
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.04),
-                    Color.black.opacity(0.14),
-                    Color.black.opacity(0.40)
+                    Color.black.opacity(0.00),
+                    Color.black.opacity(0.10),
+                    Color.black.opacity(0.22)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
         }
+    }
+}
+
+private struct ReferenceBottomGlow: View {
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Ellipse()
+                    .fill(BlankColors.airMist.opacity(0.22))
+                    .frame(width: proxy.size.width * 1.18, height: 210)
+                    .blur(radius: 54)
+                    .offset(x: -proxy.size.width * 0.12, y: proxy.size.height * 0.39)
+
+                Ellipse()
+                    .fill(BlankColors.airBlue.opacity(0.16))
+                    .frame(width: proxy.size.width * 0.86, height: 180)
+                    .blur(radius: 58)
+                    .offset(x: proxy.size.width * 0.22, y: proxy.size.height * 0.43)
+
+                Ellipse()
+                    .fill(Color(red: 1.0, green: 0.38, blue: 0.22).opacity(0.12))
+                    .frame(width: proxy.size.width * 0.92, height: 160)
+                    .blur(radius: 62)
+                    .offset(x: -proxy.size.width * 0.28, y: proxy.size.height * 0.46)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .ignoresSafeArea()
     }
 }
 
@@ -1642,10 +1690,10 @@ private struct PlanButton: View {
                         if let badge {
                             Text(badge)
                                 .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
-                                .foregroundStyle(Color.white)
+                                .foregroundStyle(Color.white.opacity(0.92))
                                 .padding(.horizontal, 7)
                                 .frame(minHeight: 20)
-                                .background(Capsule().fill(BlankColors.airBlue.opacity(0.92)))
+                                .background(Capsule().fill(Color.white.opacity(0.12)))
                         }
                     }
 
@@ -1654,23 +1702,23 @@ private struct PlanButton: View {
 
                     Text(detail)
                         .font(.blankInter(size: 12, relativeTo: .caption))
-                        .foregroundStyle(selected ? BlankColors.ink.opacity(0.66) : Color.white.opacity(0.62))
+                        .foregroundStyle(Color.white.opacity(0.62))
                 }
 
                 Spacer(minLength: 0)
 
                 ZStack {
                     Circle()
-                        .stroke(selected ? BlankColors.ink.opacity(0.38) : Color.white.opacity(0.26), lineWidth: 1)
+                        .stroke(selected ? Color.white.opacity(0.58) : Color.white.opacity(0.26), lineWidth: 1)
                     if selected {
                         Circle()
-                            .fill(BlankColors.airBlue)
+                            .fill(Color.white.opacity(0.90))
                             .padding(4)
                     }
                 }
                 .frame(width: 18, height: 18)
             }
-            .foregroundStyle(selected ? BlankColors.ink : Color.white.opacity(0.88))
+            .foregroundStyle(Color.white.opacity(0.88))
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
@@ -1679,14 +1727,14 @@ private struct PlanButton: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(selected ? Color.white.opacity(0.94) : Color.white.opacity(0.11))
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? BlankColors.airBlue.opacity(0.74) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
-            .shadow(color: selected ? BlankColors.airBlue.opacity(0.18) : .clear, radius: 14, y: 8)
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)

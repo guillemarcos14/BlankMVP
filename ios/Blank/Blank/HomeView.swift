@@ -105,7 +105,8 @@ struct HomeView: View {
             .presentationDetents([.medium, .large])
             .blankTransparentPresentation()
         }
-        .sheet(isPresented: $showingEmergency) {
+        .overlay {
+            if showingEmergency {
             EmergencySheet(
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
             ) {
@@ -119,9 +120,16 @@ struct HomeView: View {
                 }
                 return unlocked
             }
-            .presentationDetents([.height(430)])
-            .blankTransparentPresentation()
+            onCancel: {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                    showingEmergency = false
+                }
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.985)))
+            .zIndex(20)
+            }
         }
+        .animation(.spring(response: 0.34, dampingFraction: 0.88), value: showingEmergency)
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
                 .presentationDetents([.medium])
@@ -1186,10 +1194,10 @@ private struct ForgetBlankConfirmSheet: View {
 
 private struct EmergencySheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.dismiss) private var dismiss
     @State private var confirmingUnlock = false
     let emergencyUnlocksRemaining: Int
     let onUnlock: () -> Bool
+    let onCancel: () -> Void
     private var isActive: Bool { sessionStore.isBlankActive }
     private var textColor: Color { isActive ? Color.white : BlankColors.ink }
 
@@ -1256,7 +1264,7 @@ private struct EmergencySheet: View {
                 .disabled(emergencyUnlocksRemaining <= 0)
 
                 Button("Cancel") {
-                    dismiss()
+                    onCancel()
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -1273,7 +1281,7 @@ private struct EmergencySheet: View {
             TechnicalSheetActions {
                 Button("Unlock now") {
                     if onUnlock() {
-                        dismiss()
+                        onCancel()
                     }
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())

@@ -1226,13 +1226,13 @@ private struct EmergencySheet: View {
         .frame(maxWidth: 360)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(isActive ? Color.white.opacity(0.18) : Color.white.opacity(0.74))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke((isActive ? Color.white : BlankColors.ink).opacity(isActive ? 0.42 : 0.08), lineWidth: 1)
         }
-        .shadow(color: Color.black.opacity(isActive ? 0.11 : 0.07), radius: 24, y: 14)
+        .shadow(color: Color.black.opacity(isActive ? 0.11 : 0.035), radius: isActive ? 24 : 14, y: isActive ? 14 : 7)
         .padding(.horizontal, 22)
         .foregroundStyle(textColor)
         .preferredColorScheme(isActive ? .dark : .light)

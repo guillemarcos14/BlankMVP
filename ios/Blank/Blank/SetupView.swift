@@ -135,7 +135,7 @@ struct SetupView: View {
 
             }
             .padding(.horizontal, 28)
-            .padding(.bottom, 24)
+            .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -613,22 +613,13 @@ struct SetupView: View {
                         selected: selection == option.title
                     ) {
                         onSelect(option.title)
+                        goForward()
                     }
                 }
             }
             .frame(maxWidth: 342)
-
-            Button("Next") {
-                if selection.isEmpty {
-                    onSelect(options.first?.title ?? "")
-                }
-                goForward()
-            }
-            .buttonStyle(ReferenceOnboardingButtonStyle())
-            .frame(maxWidth: .infinity)
-
         }
-        .padding(.bottom, 22)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
@@ -1249,6 +1240,7 @@ private struct ReferenceOnboardingScene: View {
     let secondaryTitle: String?
     let secondaryAction: (() -> Void)?
     let accessory: AnyView
+    @State private var showsDetail = false
 
     init(
         eyebrow: String?,
@@ -1274,35 +1266,58 @@ private struct ReferenceOnboardingScene: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: 18) {
-                ReferenceOnboardingText(eyebrow: eyebrow, lines: lines, body: bodyText)
+            VStack(alignment: .leading, spacing: 14) {
+                ReferenceOnboardingText(
+                    eyebrow: eyebrow,
+                    lines: lines,
+                    body: showsDetail ? bodyText : nil,
+                    dimmed: showsDetail && hasDetail
+                )
 
                 accessory
                     .padding(.top, 4)
-
-                if primaryTitle != nil || secondaryTitle != nil {
-                    VStack(alignment: .leading, spacing: 14) {
-                        if let primaryTitle, let primaryAction {
-                            Button(primaryTitle, action: primaryAction)
-                                .buttonStyle(ReferenceOnboardingButtonStyle())
-                                .frame(maxWidth: .infinity)
-                        }
-
-                        if let secondaryTitle, let secondaryAction {
-                            Button(secondaryTitle, action: secondaryAction)
-                                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                                .foregroundStyle(Color.white.opacity(0.70))
-                                .buttonStyle(.plain)
-                                .padding(.leading, 4)
-                        }
-                    }
-                    .padding(.top, 8)
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 22)
+            .padding(.bottom, 18)
+
+            if primaryTitle != nil || secondaryTitle != nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let primaryTitle {
+                        Button(primaryTitle) {
+                            handlePrimaryTap()
+                        }
+                        .buttonStyle(ReferenceOnboardingButtonStyle())
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    if let secondaryTitle, let secondaryAction {
+                        Button(secondaryTitle, action: secondaryAction)
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                            .foregroundStyle(Color.white.opacity(0.70))
+                            .buttonStyle(.plain)
+                            .padding(.leading, 4)
+                    }
+                }
+                .padding(.bottom, 4)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    }
+
+    private var hasDetail: Bool {
+        guard let bodyText else { return false }
+        return !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func handlePrimaryTap() {
+        if hasDetail && !showsDetail {
+            withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
+                showsDetail = true
+            }
+            return
+        }
+
+        primaryAction?()
     }
 }
 
@@ -1310,15 +1325,17 @@ private struct ReferenceOnboardingText: View {
     let eyebrow: String?
     let lines: [ReferenceTextLine]
     let bodyText: String?
+    let dimmed: Bool
 
-    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?) {
+    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, dimmed: Bool = false) {
         self.eyebrow = eyebrow
         self.lines = lines
         self.bodyText = body
+        self.dimmed = dimmed
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 7) {
             if let eyebrow, !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
@@ -1326,20 +1343,24 @@ private struct ReferenceOnboardingText: View {
                     .padding(.bottom, 2)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
                 ForEach(lines.indices, id: \.self) { index in
-                    ReferenceAnimatedLine(line: lines[index], delay: Double(index) * 0.075)
+                    ReferenceAnimatedLine(line: lines[index], delay: Double(index) * 0.075, iconAfterText: index.isMultiple(of: 2))
                 }
             }
+            .opacity(dimmed ? 0.52 : 1)
+            .offset(y: dimmed ? -18 : 0)
 
             if let bodyText, !bodyText.isEmpty {
                 Text(bodyText)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(Color.white.opacity(0.82))
                     .multilineTextAlignment(.leading)
-                    .lineSpacing(3)
+                    .lineSpacing(1)
+                    .tracking(0)
                     .frame(maxWidth: 330, alignment: .leading)
-                    .padding(.top, 6)
+                    .padding(.top, 2)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
     }
@@ -1348,23 +1369,27 @@ private struct ReferenceOnboardingText: View {
 private struct ReferenceAnimatedLine: View {
     let line: ReferenceTextLine
     let delay: Double
+    let iconAfterText: Bool
     @State private var visible = false
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            if let icon = line.icon {
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(Color.white)
-                    .frame(width: 30, height: 30)
+            if !iconAfterText {
+                iconView
             }
 
             Text(line.text)
-                .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.68)
                 .multilineTextAlignment(.leading)
+                .lineSpacing(0)
+                .tracking(0)
+
+            if iconAfterText {
+                iconView
+            }
         }
         .frame(maxWidth: 354, alignment: .leading)
         .opacity(visible ? 1 : 0)
@@ -1375,6 +1400,16 @@ private struct ReferenceAnimatedLine: View {
             withAnimation(.spring(response: 0.55, dampingFraction: 0.86).delay(delay)) {
                 visible = true
             }
+        }
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        if let icon = line.icon {
+            Image(systemName: icon)
+                .font(.system(size: 25, weight: .bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 28, height: 28)
         }
     }
 }

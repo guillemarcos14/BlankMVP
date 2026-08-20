@@ -14,12 +14,31 @@ private enum OnboardingStep: Int, CaseIterable {
     case profile
     case dailyUse
     case result
+    case diagnosis
     case recovery
     case commitment
     case trial
     case permission
     case notifications
     case apps
+
+    var bottomGlowPalette: BottomGlowPalette {
+        let palettes: [BottomGlowPalette] = [
+            .init(id: 0, primary: Color(red: 0.05, green: 0.64, blue: 1.00), secondary: Color(red: 0.00, green: 0.92, blue: 1.00), accent: Color(red: 0.16, green: 0.42, blue: 1.00)),
+            .init(id: 1, primary: Color(red: 0.02, green: 0.30, blue: 0.92), secondary: Color(red: 0.08, green: 0.56, blue: 1.00), accent: Color(red: 0.00, green: 0.20, blue: 0.70)),
+            .init(id: 2, primary: Color(red: 0.30, green: 0.46, blue: 1.00), secondary: Color(red: 0.00, green: 0.76, blue: 0.96), accent: Color(red: 0.22, green: 0.28, blue: 0.94)),
+            .init(id: 3, primary: Color(red: 0.00, green: 0.44, blue: 0.76), secondary: Color(red: 0.24, green: 0.86, blue: 1.00), accent: Color(red: 0.00, green: 0.64, blue: 0.96)),
+            .init(id: 4, primary: Color(red: 0.12, green: 0.24, blue: 0.88), secondary: Color(red: 0.00, green: 0.52, blue: 1.00), accent: Color(red: 0.38, green: 0.44, blue: 1.00))
+        ]
+        return palettes[rawValue % palettes.count]
+    }
+}
+
+private struct BottomGlowPalette {
+    let id: Int
+    let primary: Color
+    let secondary: Color
+    let accent: Color
 }
 
 private enum OnboardingPlan: String {
@@ -84,7 +103,7 @@ struct SetupView: View {
 
     var body: some View {
         ZStack {
-            BlankOnboardingBackground()
+            BlankOnboardingBackground(palette: currentStep.bottomGlowPalette)
 
             VStack(spacing: 0) {
                 HStack {
@@ -113,7 +132,7 @@ struct SetupView: View {
                             content
                                 .id(currentStep.rawValue)
                                 .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .center)))
-                                .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 96) : nil)
+                                .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 64) : nil)
 
                             if let message {
                                 Text(message)
@@ -132,8 +151,8 @@ struct SetupView: View {
                 }
 
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 34)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -195,6 +214,8 @@ struct SetupView: View {
             dailyUseStep
         case .result:
             resultStep
+        case .diagnosis:
+            diagnosisStep
         case .recovery:
             recoveryStep
         case .commitment:
@@ -217,282 +238,143 @@ struct SetupView: View {
         bodyColor: Color = BlankColors.ink,
         button: String
     ) -> some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 96)
-
-            Text(title)
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-
-            if let body {
-                Text(body)
-                    .font(.blankInter(size: bodySize, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(bodyColor)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.74)
-                    .frame(maxWidth: 342)
-            }
-
-            Spacer(minLength: 28)
-
-            Button(button) {
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: button))
-        }
+        referenceScene(
+            lines: [
+                .text("Your phone is taking"),
+                .text("more of your life"),
+                .text("than you think", icon: "iphone")
+            ],
+            body: "Let's calculate it with your own pattern.",
+            primaryTitle: button,
+            primaryAction: goForward
+        )
     }
 
     private var nameStep: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 116)
-
-            Text("What should we call you?")
-                .font(.blankInter(size: 31, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .lineSpacing(1)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: 342)
-
-            TextField("Your name", text: $name)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .font(.blankInter(size: 18, weight: .medium, relativeTo: .body))
-                .foregroundStyle(BlankColors.ink)
-                .multilineTextAlignment(.leading)
-                .padding(.horizontal, 18)
-                .frame(height: 54)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
-                .frame(maxWidth: 314)
-                .padding(.top, 2)
-
-            Spacer(minLength: 28)
-
-            Button("Continue") {
+        referenceScene(
+            lines: [
+                .text("First, what should"),
+                .text("we call you?", icon: "person.fill")
+            ],
+            primaryTitle: "Continue",
+            primaryAction: {
                 if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     name = "You"
                 }
                 goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Continue"))
-        }
-        .frame(maxHeight: .infinity)
+            },
+            centerContent: true,
+            accessory: AnyView(
+                TextField("Your name", text: $name)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .font(.blankInter(size: 18, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(BlankColors.ink)
+                    .multilineTextAlignment(.leading)
+                    .padding(.horizontal, 18)
+                    .frame(height: 54)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
+                    .frame(maxWidth: 280, alignment: .leading)
+            )
+        )
     }
 
     private var lifetimeStep: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 92)
-
-            Text("The average person loses\nto their phone screen")
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.10), lineWidth: 7)
-
-                Circle()
-                    .trim(from: 0, to: lifetimeRingProgress)
-                    .stroke(
-                        Color.white.opacity(0.72),
-                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-
-                VStack(spacing: 5) {
-                    Text("\(lifetimeYears) years")
-                        .font(.blankInter(size: 35, weight: .semibold, relativeTo: .largeTitle))
-                        .foregroundStyle(Color.white)
-
-                    Text("Over a lifetime")
-                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.54))
-                }
-            }
-            .frame(width: 176, height: 176)
-            .padding(.top, 6)
-            .onAppear {
-                startLifetimeAnimation()
-            }
-
-            Spacer(minLength: 28)
-
-            Button("Continue") {
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Continue"))
+        referenceScene(
+            lines: [
+                .text("The average person loses"),
+                .text("\(lifetimeYears) years", icon: "hourglass"),
+                .text("to their phone screen"),
+                .text("over a lifetime")
+            ],
+            primaryTitle: "Continue",
+            primaryAction: goForward
+        )
+        .onAppear {
+            startLifetimeAnimation()
         }
-        .frame(maxHeight: .infinity)
     }
 
     private var dopamineStep: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 92)
-
-            Text("Your feed is engineered")
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-
-            Text("Studies compare its reward loop to c**aine. You've been drugged by algorithms")
-                .font(.blankInter(size: 19, weight: .semibold, relativeTo: .title3))
-                .foregroundStyle(Color.white.opacity(0.76))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 310)
-
-            Spacer(minLength: 28)
-
-            Button("Continue") {
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Continue"))
-        }
-        .frame(maxHeight: .infinity)
+        referenceScene(
+            lines: [
+                .text("Your feed is engineered"),
+                .text("to pull you back", icon: "sparkles"),
+                .text("before you notice")
+            ],
+            body: "Blanked is built to interrupt that loop before it wins.",
+            primaryTitle: "Continue",
+            primaryAction: goForward
+        )
     }
 
     private var dailyUseStep: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 54)
-
-            OnboardingHeader(
-                eyebrow: "",
-                title: "How much time do you spend on your phone daily?",
-                body: "Use your real daily average"
-            )
-
-            VStack(spacing: 18) {
+        referenceScene(
+            lines: [
+                .text("How much time"),
+                .text("do you spend daily", icon: "iphone"),
+                .text("\(formattedHours(dailyHours)) / day")
+            ],
+            primaryTitle: "Calculate time lost",
+            primaryAction: {
+                storedDailyHours = dailyHours
+                goForward()
+            },
+            accessory: AnyView(
                 Slider(value: $dailyHours, in: 1...9, step: 0.5)
-                    .tint(BlankColors.ink)
+                    .tint(Color.white)
+                    .frame(maxWidth: 330)
                     .onChange(of: dailyHours) { value in
                         storedDailyHours = value
                     }
-
-                Text("\(formattedHours(dailyHours)) / day")
-                    .font(.blankInter(size: 38, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(Color.white)
-            }
-            .frame(maxWidth: 342)
-            .padding(.top, 12)
-
-            Spacer(minLength: 28)
-
-            Button("Calculate time lost") {
-                storedDailyHours = dailyHours
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Calculate time lost"))
-        }
-        .frame(maxHeight: .infinity)
+            )
+        )
     }
 
     private var resultStep: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 54)
-
-            OnboardingHeader(
-                eyebrow: "",
-                title: "This is what your phone could cost you",
-                body: ""
-            )
-
-            VStack(spacing: 26) {
-                ResultMetricView(
-                    value: "\(animatedLostDays)",
-                    unit: "days",
-                    caption: "you won't get back this year"
-                )
-
-                ResultMetricView(
-                    value: "\(animatedLostYears)",
-                    unit: "years",
-                    caption: "over a lifetime"
-                )
-            }
-            .frame(maxWidth: 342)
-            .padding(.top, 10)
-            .onAppear {
-                startResultCountAnimation()
-            }
-
-            Spacer(minLength: 28)
-
-            Button("See what I can recover") {
-                onboardingGoal = "Recover control from distracting apps"
-                weakMoment = "When scrolling takes over"
+        referenceScene(
+            lines: [
+                .text("At this pace, your phone costs"),
+                .text("\(animatedLostDays) days", icon: "calendar"),
+                .text("this year"),
+                .text("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
+                .text("over a lifetime")
+            ],
+            primaryTitle: "See what I can recover",
+            primaryAction: {
+                onboardingGoal = firstTargetText
+                weakMoment = weakMomentPreview
                 goForward()
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "See what I can recover"))
+        )
+        .onAppear {
+            startResultCountAnimation()
         }
-        .frame(maxHeight: .infinity)
     }
 
     private var recoveryStep: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 82)
-
-            Text("Blanked can help you get that time back")
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
-
-            VStack(spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("+\(animatedRecoveredYears)")
-                        .font(.blankInter(size: 50, weight: .semibold, relativeTo: .largeTitle))
-                        .monospacedDigit()
-
-                    Text("years")
-                        .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
-                        .foregroundStyle(BlankColors.airMist.opacity(0.86))
-                }
-                .foregroundStyle(BlankColors.airMist)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-
-                Text("recovered over a lifetime")
-                    .font(.blankInter(size: 15, relativeTo: .subheadline))
-                    .foregroundStyle(Color.white.opacity(0.66))
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: 342)
-            .onAppear {
-                startRecoveryCountAnimation()
-            }
-
-            Spacer(minLength: 28)
-
-            Button("Start recovering") {
-                goForward()
-            }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Start recovering"))
-        }
-        .frame(maxHeight: .infinity)
+        referenceScene(
+            lines: [
+                .text("Protect"),
+                .text("\(weakMomentPreview)", icon: "shield.fill"),
+                .text("for \(initialBlockMinutesPreview) minutes"),
+                .text("then review the pattern", icon: "chart.line.uptrend.xyaxis")
+            ],
+            body: "One repeatable block first. More automation later.",
+            primaryTitle: "Start my first block",
+            primaryAction: goForward
+        )
     }
 
     private var goalStep: some View {
         choiceStep(
             title: "What matters most to you?",
             options: [
-                ("target", "Better focus"),
-                ("moon.fill", "Better sleep"),
-                ("person.2.fill", "Be more present"),
-                ("brain.head.profile", "Improve mental health"),
-                ("ellipsis", "Other")
+                ("moon.fill", "Sleep better"),
+                ("target", "Deep work"),
+                ("person.2.fill", "More presence"),
+                ("app.badge.fill", "Less social media"),
+                ("lock.shield.fill", "Control back")
             ],
             selection: selectedOnboardingGoal
         ) { selectedOnboardingGoal = $0 }
@@ -514,121 +396,75 @@ struct SetupView: View {
 
     private var profileStep: some View {
         choiceStep(
-            title: "What describes you best?",
+            title: "When do you usually lose control?",
             options: [
-                ("laptopcomputer", "Technology"),
-                ("lightbulb.fill", "Entrepreneur"),
-                ("house.fill", "Remote"),
-                ("chart.bar.fill", "Finance"),
-                ("paintbrush.pointed.fill", "Creative"),
-                ("graduationcap.fill", "Student"),
-                ("heart.fill", "Caregiver")
+                ("moon.stars.fill", "Night scrolling"),
+                ("laptopcomputer", "Work distractions"),
+                ("graduationcap.fill", "Study focus"),
+                ("sparkles", "Boredom loop"),
+                ("person.2.fill", "Social relapse"),
+                ("sun.max.fill", "Morning checking")
             ],
             selection: selectedProfile
         ) { selectedProfile = $0 }
     }
 
+    private var diagnosisStep: some View {
+        referenceScene(
+            lines: [
+                .text("You are a"),
+                .text(onboardingArchetype, icon: diagnosisIconName),
+                .text(riskTitlePreview),
+                .text("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
+            ],
+            body: riskBodyPreview,
+            primaryTitle: "Build my plan",
+            primaryAction: {
+                onboardingGoal = firstTargetText
+                weakMoment = weakMomentPreview
+                goForward()
+            }
+        )
+    }
+
     private var notificationsStep: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Blanked")
-                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                        Spacer()
-                        Text("now")
-                            .font(.blankInter(size: 11, relativeTo: .caption2))
-                            .foregroundStyle(BlankColors.mutedInk)
-                    }
-                    Text("Your scroll risk is rising")
-                        .font(.blankInter(size: 12, relativeTo: .caption))
-                        .lineLimit(2)
-                }
-                .foregroundStyle(BlankColors.ink)
-                .padding(13)
-                .frame(width: 276, alignment: .leading)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.86))
-                }
-            }
-
-            Spacer(minLength: 0)
-
-            VStack(spacing: 22) {
-                OnboardingHeader(
-                    eyebrow: "",
-                    title: "Stay ahead of the scroll",
-                    body: "Blanked can remind you before your weakest moments"
-                )
-
-                VStack(spacing: 15) {
-                    Button("Enable reminders") {
-                        requestNotifications()
-                    }
-                    .buttonStyle(BlankPrimaryButtonStyle(light: true))
-                    .frame(width: onboardingButtonWidth(for: "Enable reminders"))
-
-                    Button("Not now") {
-                        goForward()
-                    }
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.56))
-                    .buttonStyle(.plain)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxHeight: .infinity)
+        referenceScene(
+            lines: [
+                .text("Let Blanked warn you"),
+                .text("before your weakest moment", icon: "bell.badge.fill"),
+                .text(weakMomentPreview)
+            ],
+            body: "Reminders are only used to prevent relapse windows.",
+            primaryTitle: "Enable reminders",
+            primaryAction: requestNotifications,
+            secondaryTitle: "Not now",
+            secondaryAction: goForward,
+            accessory: AnyView(notificationPreview)
+        )
     }
 
     private var commitmentStep: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            VStack(spacing: 24) {
-                OnboardingHeader(
-                    eyebrow: "",
-                    title: "I'm ready to take back control",
-                    body: commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s"
-                )
-
-                Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
-                    .font(.system(size: 25, weight: .semibold))
-                    .foregroundStyle(BlankColors.ink)
-                    .frame(width: 74, height: 74)
-                    .background(Circle().fill(Color.white.opacity(isCommitmentPressing ? 0.62 : 0.82)))
-                    .scaleEffect(isCommitmentPressing ? 0.985 : 1)
-                    .onLongPressGesture(
-                        minimumDuration: 3,
-                        maximumDistance: 48,
-                        pressing: { isPressing in
-                            isCommitmentPressing = isPressing
-                            if isPressing {
-                                startCommitmentHold()
-                            } else if !commitmentComplete {
-                                cancelCommitmentHold()
-                            }
-                        },
-                        perform: {
-                            completeCommitmentHold()
-                        }
-                    )
-
-            }
-
-            Spacer(minLength: 0)
-        }
-        .frame(maxHeight: .infinity)
+        referenceScene(
+            lines: [
+                .text("Hold to commit"),
+                .text("to protecting", icon: "hand.raised.fill"),
+                .text(commitmentFocusText)
+            ],
+            body: commitmentComplete ? "Done." : "Hold for \(max(0, 3 - commitmentSeconds)) seconds.",
+            accessory: AnyView(commitmentHoldControl)
+        )
     }
 
     private var trialStep: some View {
         VStack(spacing: 15) {
-            OnboardingHeader(
-                eyebrow: "",
-                title: "Start taking back your time",
-                body: "Block the apps that steal your focus. Try Blanked free for 3 days"
+            ReferenceOnboardingText(
+                eyebrow: nil,
+                lines: [
+                    .text("Start your"),
+                    .text(onboardingArchetype, icon: diagnosisIconName),
+                    .text("plan")
+                ],
+                body: "App blocking, risk forecast and relapse protection."
             )
 
             VStack(spacing: 9) {
@@ -667,12 +503,14 @@ struct SetupView: View {
                         .frame(width: 18, height: 18)
 
                     Text(onboardingConsentText)
-                        .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption2))
-                        .foregroundStyle(Color.white.opacity(0.58))
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.70))
                         .multilineTextAlignment(.leading)
                         .lineSpacing(2)
                 }
                 .frame(maxWidth: 318, alignment: .leading)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Required onboarding data consent")
@@ -682,13 +520,13 @@ struct SetupView: View {
             } label: {
                 if purchaseStore.isPurchasing || purchaseStore.isLoading {
                     ProgressView()
-                        .tint(BlankColors.ink)
+                        .tint(Color.white)
                 } else {
                     Text("Start free trial")
                 }
             }
-            .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: 222)
+            .buttonStyle(ReferenceOnboardingButtonStyle())
+            .frame(maxWidth: .infinity)
 
             Button("Restore purchases") {
                 Task {
@@ -700,15 +538,16 @@ struct SetupView: View {
                 }
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.56))
+            .foregroundStyle(Color.white.opacity(0.70))
             .buttonStyle(.plain)
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     continueWithReviewDemoAccess()
                 }
-                .buttonStyle(BlankSecondaryButtonStyle())
-                .frame(width: 236)
+                .buttonStyle(ReferenceOnboardingButtonStyle())
+                .frame(maxWidth: .infinity)
             }
 
             legalDisclosure
@@ -716,76 +555,44 @@ struct SetupView: View {
             if let purchaseMessage = purchaseStore.message {
                 Text(purchaseMessage)
                     .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.mutedInk)
+                    .foregroundStyle(Color.white.opacity(0.74))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 320)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.bottom, 22)
     }
 
     private var permissionStep: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            VStack(spacing: 20) {
-                OnboardingHeader(
-                    eyebrow: "",
-                    title: screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time",
-                    body: screenTimeDescription
-                )
-
-                if screenTimeBlocker.authorizationStatus == .approved {
-                    StatusPill(text: "Screen Time ready")
-                }
-            }
-
-            Button(screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time", action: authorizeScreenTime)
-                .buttonStyle(BlankPrimaryButtonStyle(light: true))
-                .frame(width: onboardingButtonWidth(for: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time"))
-                .padding(.top, 42)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.bottom, 22)
+        referenceScene(
+            lines: [
+                .text(screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time"),
+                .text("so Blanked can", icon: "lock.shield.fill"),
+                .text("block distractions")
+            ],
+            body: screenTimeDescription,
+            primaryTitle: screenTimeBlocker.authorizationStatus == .approved ? "Continue" : "Allow Screen Time",
+            primaryAction: authorizeScreenTime,
+            accessory: screenTimeBlocker.authorizationStatus == .approved ? AnyView(StatusPill(text: "Screen Time ready")) : AnyView(EmptyView())
+        )
     }
 
     private var appsStep: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 0)
-
-            VStack(spacing: 20) {
-                OnboardingHeader(
-                    eyebrow: "",
-                    title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
-                    body: sessionStore.hasSelectedApps
-                        ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)"
-                        : "Pick the apps, categories, or websites that usually steal your time"
-                )
-
-                if sessionStore.hasSelectedApps {
-                    StatusPill(text: "\(sessionStore.selectionCount) selected")
-                }
-            }
-
-            VStack(spacing: 15) {
-                Button(sessionStore.hasSelectedApps ? "Continue" : "Select apps", action: selectAppsOrContinue)
-                    .buttonStyle(BlankPrimaryButtonStyle(light: true))
-                    .frame(width: onboardingButtonWidth(for: sessionStore.hasSelectedApps ? "Continue" : "Select apps"))
-
-                if sessionStore.hasSelectedApps {
-                    Button("Edit selection") {
-                        showingPicker = true
-                    }
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.56))
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 42)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.bottom, 22)
+        referenceScene(
+            lines: [
+                .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
+                .text(sessionStore.hasSelectedApps ? "is ready" : "to block", icon: "app.badge.fill"),
+                .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingArchetype)
+            ],
+            body: sessionStore.hasSelectedApps
+                ? "\(initialBlockMinutesPreview) minutes at \(weakMomentPreview)."
+                : "Pick the apps, categories or websites that trigger this pattern.",
+            primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
+            primaryAction: selectAppsOrContinue,
+            secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
+            secondaryAction: sessionStore.hasSelectedApps ? { showingPicker = true } : nil
+        )
     }
 
     private func choiceStep(
@@ -795,33 +602,52 @@ struct SetupView: View {
         onSelect: @escaping (String) -> Void
     ) -> some View {
         VStack(spacing: 22) {
-            Spacer(minLength: 74)
-
-            Text(title)
-                .font(.blankInter(size: 30, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: 342)
+            ReferenceOnboardingText(
+                eyebrow: nil,
+                lines: choiceSceneLines(for: title),
+                body: nil
+            )
 
             VStack(spacing: 11) {
                 ForEach(options, id: \.title) { option in
                     OnboardingChoiceButton(
                         systemName: option.icon,
                         title: option.title,
-                        selected: selection == option.title
+                        selected: false
                     ) {
                         onSelect(option.title)
                         goForward()
                     }
                 }
             }
+            .padding(.top, 8)
             .frame(maxWidth: 342)
-
-            Spacer(minLength: 28)
         }
-        .frame(maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private func referenceScene(
+        eyebrow: String? = nil,
+        lines: [ReferenceTextLine],
+        body: String? = nil,
+        primaryTitle: String? = nil,
+        primaryAction: (() -> Void)? = nil,
+        secondaryTitle: String? = nil,
+        secondaryAction: (() -> Void)? = nil,
+        centerContent: Bool = false,
+        accessory: AnyView = AnyView(EmptyView())
+    ) -> some View {
+        ReferenceOnboardingScene(
+            eyebrow: eyebrow,
+            lines: lines,
+            body: body,
+            primaryTitle: primaryTitle,
+            primaryAction: primaryAction,
+            secondaryTitle: secondaryTitle,
+            secondaryAction: secondaryAction,
+            centerContent: centerContent,
+            accessory: accessory
+        )
     }
 
     private func stepContent(
@@ -858,6 +684,53 @@ struct SetupView: View {
         .frame(maxHeight: .infinity)
     }
 
+    private var notificationPreview: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Blanked")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                Spacer()
+                Text("now")
+                    .font(.blankInter(size: 11, relativeTo: .caption2))
+                    .foregroundStyle(BlankColors.mutedInk)
+            }
+            Text("Your scroll risk is rising")
+                .font(.blankInter(size: 12, relativeTo: .caption))
+                .lineLimit(2)
+        }
+        .foregroundStyle(BlankColors.ink)
+        .padding(13)
+        .frame(width: 276, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.86))
+        }
+    }
+
+    private var commitmentHoldControl: some View {
+        Image(systemName: commitmentComplete ? "checkmark" : "arrow.right")
+            .font(.system(size: 25, weight: .semibold))
+            .foregroundStyle(BlankColors.ink)
+            .frame(width: 74, height: 74)
+            .background(Circle().fill(Color.white.opacity(isCommitmentPressing ? 0.62 : 0.82)))
+            .scaleEffect(isCommitmentPressing ? 0.985 : 1)
+            .onLongPressGesture(
+                minimumDuration: 3,
+                maximumDistance: 48,
+                pressing: { isPressing in
+                    isCommitmentPressing = isPressing
+                    if isPressing {
+                        startCommitmentHold()
+                    } else if !commitmentComplete {
+                        cancelCommitmentHold()
+                    }
+                },
+                perform: {
+                    completeCommitmentHold()
+                }
+            )
+    }
+
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
             return "Blanked can now shield the apps you choose"
@@ -875,17 +748,19 @@ struct SetupView: View {
     }
 
     private var legalDisclosure: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 16) {
-                legalButton("Terms of Use", document: .termsOfUse)
-                legalButton("Privacy Policy", document: .privacyPolicy)
-            }
-
+        VStack(spacing: 3) {
             Text("Full access today. \(selectedPlanRenewalDisclosure)")
                 .multilineTextAlignment(.center)
-                .font(.blankInter(size: 10, relativeTo: .caption2))
-                .foregroundStyle(Color.white.opacity(0.42))
+
+            HStack(spacing: 3) {
+                legalButton("Terms of Use", document: .termsOfUse)
+                Text("and")
+                legalButton("Privacy Policy", document: .privacyPolicy)
+                Text("apply")
+            }
         }
+        .font(.blankInter(size: 11, relativeTo: .caption2))
+        .foregroundStyle(Color.white.opacity(0.40))
         .lineSpacing(2)
         .frame(maxWidth: 320)
     }
@@ -894,16 +769,9 @@ struct SetupView: View {
         Button(title) {
             presentedLegalDocument = document
         }
-        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-        .foregroundStyle(Color.white.opacity(0.96))
-        .padding(.horizontal, 10)
-        .frame(height: 28)
-        .background(Capsule().fill(Color.white.opacity(0.10)))
-        .overlay {
-            Capsule().stroke(Color.white.opacity(0.28), lineWidth: 1)
-        }
+        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+        .foregroundStyle(Color.white.opacity(0.72))
         .buttonStyle(.plain)
-        .accessibilityHint("Opens \(title) in the app")
     }
 
     private var onboardingConsentText: String {
@@ -922,10 +790,47 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
             return true
         case .trial:
             return false
+        }
+    }
+
+    private var diagnosisIconName: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "moon.stars.fill"
+        case "Dopamine Loop":
+            return "sparkles"
+        case "Presence Drifter":
+            return "person.2.fill"
+        case "Focus Breaker":
+            return "target"
+        default:
+            return "arrow.triangle.2.circlepath"
+        }
+    }
+
+    private func choiceSceneLines(for title: String) -> [ReferenceTextLine] {
+        switch title {
+        case "What matters most to you?":
+            return [
+                .text("What do you want"),
+                .text("to protect first?", icon: "shield.fill")
+            ]
+        case "How old are you?":
+            return [
+                .text("Where are you"),
+                .text("in your routine?", icon: "person.fill")
+            ]
+        case "When do you usually lose control?":
+            return [
+                .text("Where do you"),
+                .text("lose control?", icon: "clock.fill")
+            ]
+        default:
+            return [.text(title)]
         }
     }
 
@@ -952,6 +857,128 @@ struct SetupView: View {
 
     private var recoveredYears: Int {
         max(1, Int((dailyHours * 0.30 * 84.1 / 24.0).rounded()))
+    }
+
+    private var recoveredWeeklyHours: Double {
+        max(0.5, dailyHours * 7.0 * 0.30)
+    }
+
+    private var recoveredWeeklyHoursText: String {
+        if recoveredWeeklyHours.rounded() == recoveredWeeklyHours {
+            return "\(Int(recoveredWeeklyHours))h"
+        }
+        return String(format: "%.1fh", recoveredWeeklyHours)
+    }
+
+    private var onboardingArchetype: String {
+        let goal = selectedOnboardingGoal.lowercased()
+        let profile = selectedProfile.lowercased()
+
+        if goal.contains("sleep") || profile.contains("night") {
+            return "Night Scroller"
+        }
+        if goal.contains("social") || profile.contains("social") || profile.contains("boredom") {
+            return "Dopamine Loop"
+        }
+        if goal.contains("presence") {
+            return "Presence Drifter"
+        }
+        if goal.contains("work") || profile.contains("work") || profile.contains("study") {
+            return "Focus Breaker"
+        }
+        return "Habit Rebuilder"
+    }
+
+    private var recommendedHourPreview: Int {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return 22
+        case "Dopamine Loop":
+            return 20
+        case "Presence Drifter":
+            return 18
+        case "Focus Breaker":
+            return selectedProfile.lowercased().contains("study") ? 16 : 9
+        default:
+            return selectedProfile.lowercased().contains("morning") ? 8 : Calendar.current.component(.hour, from: Date())
+        }
+    }
+
+    private var weakMomentPreview: String {
+        DigitalWellnessAI.hourRangeText(recommendedHourPreview)
+    }
+
+    private var initialBlockMinutesPreview: Int {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return 45
+        case "Focus Breaker":
+            return 45
+        case "Presence Drifter":
+            return 25
+        default:
+            return dailyHours >= 6.5 ? 35 : 30
+        }
+    }
+
+    private var riskTitlePreview: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Late-night scroll risk"
+        case "Dopamine Loop":
+            return "High stimulation risk"
+        case "Presence Drifter":
+            return "Attention leak risk"
+        case "Focus Breaker":
+            return "Deep-work interruption risk"
+        default:
+            return "Automatic checking risk"
+        }
+    }
+
+    private var riskBodyPreview: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Your highest leverage habit is protecting the final hour before sleep."
+        case "Dopamine Loop":
+            return "Your phone is likely filling low-energy moments before you notice."
+        case "Presence Drifter":
+            return "The first win is protecting short windows where you want to be present."
+        case "Focus Breaker":
+            return "Your biggest gain is starting a block before the first distraction."
+        default:
+            return "Your plan should make the first block easy and repeatable."
+        }
+    }
+
+    private var firstTargetText: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Reduce late scrolling by 30%"
+        case "Dopamine Loop":
+            return "Break the boredom scroll loop"
+        case "Presence Drifter":
+            return "Protect one present window daily"
+        case "Focus Breaker":
+            return "Protect your first deep-work block"
+        default:
+            return "Build one repeatable block"
+        }
+    }
+
+    private var commitmentFocusText: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "my sleep"
+        case "Dopamine Loop":
+            return "my attention"
+        case "Presence Drifter":
+            return "my presence"
+        case "Focus Breaker":
+            return "my focus"
+        default:
+            return "my time"
+        }
     }
 
     private func formattedHours(_ value: Double) -> String {
@@ -1128,6 +1155,12 @@ struct SetupView: View {
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+            DigitalWellnessAI.saveInitialDiagnosis(
+                goal: selectedOnboardingGoal,
+                profile: selectedProfile,
+                dailyHours: storedDailyHours,
+                selectionCount: sessionStore.selectionCount
+            )
             sessionStore.finishSetup()
         } else {
             showingPicker = true
@@ -1153,6 +1186,261 @@ struct SetupView: View {
     private func onboardingButtonWidth(for title: String) -> CGFloat {
         let estimated = CGFloat(title.count) * 8.2 + 66
         return min(max(estimated, 184), 316)
+    }
+}
+
+private struct ReferenceTextLine: Identifiable {
+    let id = UUID()
+    let text: String
+    let icon: String?
+    let isAccent: Bool
+
+    static func text(_ text: String, icon: String? = nil) -> ReferenceTextLine {
+        ReferenceTextLine(text: text, icon: icon, isAccent: false)
+    }
+
+    static func accent(_ text: String, icon: String? = nil) -> ReferenceTextLine {
+        ReferenceTextLine(text: text, icon: icon, isAccent: false)
+    }
+}
+
+private struct ReferenceOnboardingScene: View {
+    let eyebrow: String?
+    let lines: [ReferenceTextLine]
+    let bodyText: String?
+    let primaryTitle: String?
+    let primaryAction: (() -> Void)?
+    let secondaryTitle: String?
+    let secondaryAction: (() -> Void)?
+    let centerContent: Bool
+    let accessory: AnyView
+    @State private var showsDetail = false
+
+    init(
+        eyebrow: String?,
+        lines: [ReferenceTextLine],
+        body: String?,
+        primaryTitle: String?,
+        primaryAction: (() -> Void)?,
+        secondaryTitle: String?,
+        secondaryAction: (() -> Void)?,
+        centerContent: Bool,
+        accessory: AnyView
+    ) {
+        self.eyebrow = eyebrow
+        self.lines = lines
+        self.bodyText = body
+        self.primaryTitle = primaryTitle
+        self.primaryAction = primaryAction
+        self.secondaryTitle = secondaryTitle
+        self.secondaryAction = secondaryAction
+        self.centerContent = centerContent
+        self.accessory = accessory
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: 14) {
+                ReferenceOnboardingText(
+                    eyebrow: eyebrow,
+                    lines: lines,
+                    body: showsDetail ? bodyText : nil,
+                    detailStartIndex: lines.count,
+                    titleOpacity: showsDetail ? 0.38 : 1
+                )
+
+                accessory
+                    .padding(.top, 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 18)
+
+            if centerContent {
+                Spacer(minLength: 0)
+            }
+
+            if primaryTitle != nil || secondaryTitle != nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let primaryTitle {
+                        Button(primaryTitle) {
+                            handlePrimaryTap()
+                        }
+                        .buttonStyle(ReferenceOnboardingButtonStyle())
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    if let secondaryTitle, let secondaryAction {
+                        Button(secondaryTitle, action: secondaryAction)
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                            .foregroundStyle(Color.white.opacity(0.70))
+                            .buttonStyle(.plain)
+                            .padding(.leading, 4)
+                    }
+                }
+                .padding(.bottom, 0)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    }
+
+    private var hasDetail: Bool {
+        guard let bodyText else { return false }
+        return !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func handlePrimaryTap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        if hasDetail && !showsDetail {
+            withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
+                showsDetail = true
+            }
+            return
+        }
+
+        primaryAction?()
+    }
+}
+
+private struct ReferenceOnboardingText: View {
+    let eyebrow: String?
+    let lines: [ReferenceTextLine]
+    let bodyText: String?
+    let detailStartIndex: Int
+    let titleOpacity: Double
+
+    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, detailStartIndex: Int = 0, titleOpacity: Double = 1) {
+        self.eyebrow = eyebrow
+        self.lines = lines
+        self.bodyText = body
+        self.detailStartIndex = detailStartIndex
+        self.titleOpacity = titleOpacity
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if let eyebrow, !eyebrow.isEmpty {
+                Text(eyebrow.uppercased())
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.78))
+                    .padding(.bottom, 2)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(lines.indices, id: \.self) { index in
+                    ReferenceAnimatedLine(line: lines[index], delay: Double(index) * 0.075, iconAfterText: index.isMultiple(of: 2))
+                }
+            }
+            .opacity(titleOpacity)
+            .animation(.easeInOut(duration: 0.26), value: titleOpacity)
+
+            if let bodyText, !bodyText.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(detailLines(from: bodyText).indices, id: \.self) { index in
+                        let lineIndex = detailStartIndex + index
+                        ReferenceAnimatedLine(
+                            line: .text(detailLines(from: bodyText)[index]),
+                            delay: Double(lineIndex) * 0.075,
+                            iconAfterText: lineIndex.isMultiple(of: 2)
+                        )
+                    }
+                }
+                .padding(.top, 2)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+
+    private func detailLines(from text: String) -> [String] {
+        let words = text.split(separator: " ").map(String.init)
+        var lines: [String] = []
+        var current = ""
+
+        for word in words {
+            let candidate = current.isEmpty ? word : "\(current) \(word)"
+            if candidate.count > 24, !current.isEmpty {
+                lines.append(current)
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+
+        if !current.isEmpty {
+            lines.append(current)
+        }
+
+        return lines
+    }
+}
+
+private struct ReferenceAnimatedLine: View {
+    let line: ReferenceTextLine
+    let delay: Double
+    let iconAfterText: Bool
+    @State private var visible = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            if !iconAfterText {
+                iconView
+            }
+
+            Text(line.text)
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                .foregroundStyle(Color.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.68)
+                .multilineTextAlignment(.leading)
+                .lineSpacing(0)
+                .tracking(0)
+
+            if iconAfterText {
+                iconView
+            }
+        }
+        .frame(maxWidth: 354, alignment: .leading)
+        .opacity(visible ? 1 : 0)
+        .offset(y: visible ? 0 : 28)
+        .blur(radius: visible ? 0 : 5)
+        .onAppear {
+            visible = false
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.86).delay(delay)) {
+                visible = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var iconView: some View {
+        if let icon = line.icon {
+            Image(systemName: icon)
+                .font(.system(size: 25, weight: .bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 28, height: 28)
+        }
+    }
+}
+
+private struct ReferenceOnboardingButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
+            .foregroundStyle(Color.white.opacity(configuration.isPressed ? 0.78 : 0.92))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(Color.black.opacity(configuration.isPressed ? 0.54 : 0.42))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(Color.white.opacity(0.035), lineWidth: 1)
+            }
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
@@ -1225,59 +1513,244 @@ private struct ResultMetricView: View {
     }
 }
 
+private struct OnboardingInsightCard: View {
+    let systemName: String
+    let title: String
+    let value: String
+    let caption: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(BlankColors.airMist)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.white.opacity(0.10)))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.56))
+
+                Text(value)
+                    .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white.opacity(0.94))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+
+                Text(caption)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.56))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+}
+
+private struct OnboardingPlanPreviewRow: View {
+    let number: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(number)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(BlankColors.ink)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.white.opacity(0.86)))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white.opacity(0.94))
+
+                Text(detail)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .lineSpacing(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+}
+
+private struct PaywallValueRow: View {
+    let systemName: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.86))
+                .frame(width: 20)
+
+            Text(text)
+                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.82))
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 34)
+        .background {
+            Capsule().fill(Color.white.opacity(0.075))
+        }
+    }
+}
+
 private struct OnboardingChoiceButton: View {
     let systemName: String
     let title: String
     let selected: Bool
     let action: () -> Void
 
-    private let accent = BlankColors.airMist
-
     var body: some View {
         Button(action: action) {
             HStack(spacing: 15) {
                 Image(systemName: systemName)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(Color.white.opacity(0.88))
                     .frame(width: 22)
 
                 Text(title)
-                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.92))
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(Color.white.opacity(0.94))
 
                 Spacer(minLength: 0)
+
+                if selected {
+                    EmptyView()
+                }
             }
             .padding(.horizontal, 18)
-            .frame(height: 58)
+            .frame(minHeight: 58)
             .background {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .fill(Color.white.opacity(selected ? 0.14 : 0.075))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(selected ? BlankColors.airBlue.opacity(0.30) : Color.white.opacity(0.08), lineWidth: selected ? 1.2 : 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }
 }
 
 private struct BlankOnboardingBackground: View {
+    let palette: BottomGlowPalette
+
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground(dimmed: true)
-            Color.black.opacity(0.38).ignoresSafeArea()
+            Color.black.ignoresSafeArea()
+            ReferenceBottomGlow(palette: palette)
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.06),
-                    Color.black.opacity(0.18),
-                    Color.black.opacity(0.46)
+                    Color.black.opacity(0.00),
+                    Color.black.opacity(0.10),
+                    Color.black.opacity(0.22)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
         }
+        .animation(.easeInOut(duration: 0.42), value: palette.id)
+    }
+}
+
+private struct ReferenceBottomGlow: View {
+    let palette: BottomGlowPalette
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                Ellipse()
+                    .fill(palette.primary.opacity(0.34))
+                    .frame(width: proxy.size.width * 1.55, height: 250)
+                    .blur(radius: 50)
+                    .position(x: proxy.size.width * 0.50, y: proxy.size.height + 34)
+
+                Ellipse()
+                    .fill(palette.secondary.opacity(0.30))
+                    .frame(width: proxy.size.width * 1.18, height: 190)
+                    .blur(radius: 48)
+                    .position(x: proxy.size.width * 0.48, y: proxy.size.height + 18)
+
+                Ellipse()
+                    .fill(palette.secondary.opacity(0.36))
+                    .frame(width: proxy.size.width * 0.92, height: 360)
+                    .blur(radius: 58)
+                    .position(x: proxy.size.width * 0.95, y: proxy.size.height - 52)
+                    .mask(rightSideRiseMask(proxy: proxy))
+
+                Ellipse()
+                    .fill(palette.accent.opacity(0.25))
+                    .frame(width: proxy.size.width * 0.70, height: 300)
+                    .blur(radius: 64)
+                    .position(x: proxy.size.width * 0.86, y: proxy.size.height - 18)
+                    .mask(rightSideRiseMask(proxy: proxy))
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.00),
+                        Color.white.opacity(0.08),
+                        Color.white.opacity(0.16)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 240)
+                .position(x: proxy.size.width / 2, y: proxy.size.height - 70)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .ignoresSafeArea()
+    }
+
+    private func rightSideRiseMask(proxy: GeometryProxy) -> some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0.00),
+                .init(color: .clear, location: 0.44),
+                .init(color: .white.opacity(0.20), location: 0.62),
+                .init(color: .white, location: 1.00)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .frame(width: proxy.size.width, height: proxy.size.height)
     }
 }
 
@@ -1299,10 +1772,10 @@ private struct PlanButton: View {
                         if let badge {
                             Text(badge)
                                 .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
-                                .foregroundStyle(BlankColors.ink.opacity(0.72))
+                                .foregroundStyle(Color.white.opacity(0.92))
                                 .padding(.horizontal, 7)
-                                .frame(height: 20)
-                                .background(Capsule().fill(BlankColors.airMist.opacity(0.58)))
+                                .frame(minHeight: 20)
+                                .background(Capsule().fill(Color.white.opacity(0.12)))
                         }
                     }
 
@@ -1310,35 +1783,41 @@ private struct PlanButton: View {
                         .font(.blankInter(size: 19, weight: .semibold, relativeTo: .headline))
 
                     Text(detail)
-                        .font(.blankInter(size: 11, relativeTo: .caption2))
-                        .foregroundStyle(selected ? BlankColors.ink.opacity(0.58) : Color.white.opacity(0.46))
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.62))
                 }
 
                 Spacer(minLength: 0)
 
                 ZStack {
                     Circle()
-                        .stroke(selected ? BlankColors.ink.opacity(0.38) : Color.white.opacity(0.26), lineWidth: 1)
+                        .stroke(selected ? Color.white.opacity(0.58) : Color.white.opacity(0.26), lineWidth: 1)
                     if selected {
                         Circle()
-                            .fill(BlankColors.ink)
+                            .fill(Color.white.opacity(0.90))
                             .padding(4)
                     }
                 }
                 .frame(width: 18, height: 18)
             }
-            .foregroundStyle(selected ? BlankColors.ink : Color.white.opacity(0.88))
-            .padding(.horizontal, 15)
-            .padding(.vertical, 12)
+            .foregroundStyle(Color.white.opacity(0.88))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(selected ? Color.white.opacity(0.92) : Color.white.opacity(0.095))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? Color.white.opacity(0.72) : Color.white.opacity(0.12), lineWidth: selected ? 1.2 : 1)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1416,7 +1895,7 @@ private struct LegalDocumentView: View {
             return [
                 (
                     "Overview",
-                    "Blanked is a digital wellness app that helps you block distracting apps and websites. In this version, Blanked does not collect personal data through its own backend."
+                    "Blanked is a digital wellness app that helps you block distracting apps and websites. We collect only the data needed to provide the app, process subscriptions, and personalize the onboarding experience on your device."
                 ),
                 (
                     "Data Stored On Device",
@@ -1436,7 +1915,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Your Choices",
-                    "You can revoke Screen Time permissions in iOS Settings, cancel your subscription in App Store settings, or contact hola@blankeate.com for privacy requests."
+                    "You can revoke permissions in iOS Settings, cancel your subscription in App Store settings, or contact hola@blankeate.com for privacy requests."
                 )
             ]
         }

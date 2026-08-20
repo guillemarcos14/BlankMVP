@@ -1185,14 +1185,17 @@ private struct ForgetBlankConfirmSheet: View {
 }
 
 private struct EmergencySheet: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmingUnlock = false
     let emergencyUnlocksRemaining: Int
     let onUnlock: () -> Bool
+    private var isActive: Bool { sessionStore.isBlankActive }
+    private var textColor: Color { isActive ? Color.white : BlankColors.ink }
 
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground(dimmed: true)
+            BlankAtmosphericBackground(dimmed: isActive)
 
             VStack {
                 Spacer(minLength: 0)
@@ -1225,9 +1228,9 @@ private struct EmergencySheet: View {
                 }
                 .overlay {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(Color.white.opacity(0.42), lineWidth: 1)
+                        .stroke((isActive ? Color.white : BlankColors.ink).opacity(isActive ? 0.42 : 0.08), lineWidth: 1)
                 }
-                .shadow(color: Color.black.opacity(0.11), radius: 24, y: 14)
+                .shadow(color: Color.black.opacity(isActive ? 0.11 : 0.07), radius: 24, y: 14)
 
                 Spacer(minLength: 0)
             }
@@ -1235,8 +1238,8 @@ private struct EmergencySheet: View {
             .padding(.vertical, 34)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(BlankColors.ink)
-        .preferredColorScheme(.light)
+        .foregroundStyle(textColor)
+        .preferredColorScheme(isActive ? .dark : .light)
     }
 
     private var firstStepContent: some View {
@@ -1294,6 +1297,7 @@ private struct EmergencySheet: View {
     private func emergencyHeader(_ text: String) -> some View {
         Text(text)
             .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
+            .foregroundStyle(textColor)
             .multilineTextAlignment(.center)
             .lineLimit(1)
             .minimumScaleFactor(0.88)

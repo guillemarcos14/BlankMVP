@@ -107,26 +107,31 @@ struct HomeView: View {
         }
         .overlay {
             if showingEmergency {
-            EmergencySheet(
-                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
-            ) {
-                let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.deactivateForEmergency()
+                ZStack {
+                    AppBackground(isActive: sessionStore.isBlankActive)
+                        .ignoresSafeArea()
+
+                    EmergencySheet(
+                        emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                    ) {
+                        let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
+                            sessionStore.deactivateForEmergency()
+                        }
+                        if unlocked {
+                            screenTimeBlocker.clear()
+                            message = nil
+                            messageAction = nil
+                        }
+                        return unlocked
+                    }
+                    onCancel: {
+                        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+                            showingEmergency = false
+                        }
+                    }
                 }
-                if unlocked {
-                    screenTimeBlocker.clear()
-                    message = nil
-                    messageAction = nil
-                }
-                return unlocked
-            }
-            onCancel: {
-                withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
-                    showingEmergency = false
-                }
-            }
-            .transition(.opacity.combined(with: .scale(scale: 0.985)))
-            .zIndex(20)
+                .transition(.opacity.combined(with: .scale(scale: 0.985)))
+                .zIndex(20)
             }
         }
         .animation(.spring(response: 0.34, dampingFraction: 0.88), value: showingEmergency)
@@ -1226,7 +1231,7 @@ private struct EmergencySheet: View {
         .frame(maxWidth: 360)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(isActive ? Color.white.opacity(0.18) : Color.white.opacity(0.74))
+                .fill(isActive ? Color.white.opacity(0.18) : Color.white.opacity(0.92))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)

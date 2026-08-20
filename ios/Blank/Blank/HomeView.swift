@@ -1202,50 +1202,38 @@ private struct EmergencySheet: View {
     private var textColor: Color { isActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        ZStack {
-            Color.clear
-
-            VStack {
-                Spacer(minLength: 0)
-
-                VStack(spacing: 0) {
-                    Group {
-                        if confirmingUnlock {
-                            confirmUnlockContent
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .move(edge: .trailing)),
-                                    removal: .opacity.combined(with: .move(edge: .leading))
-                                ))
-                        } else {
-                            firstStepContent
-                                .transition(.asymmetric(
-                                    insertion: .opacity.combined(with: .move(edge: .leading)),
-                                    removal: .opacity.combined(with: .move(edge: .trailing))
-                                ))
-                        }
-                    }
-                    .animation(.spring(response: 0.36, dampingFraction: 0.90), value: confirmingUnlock)
+        VStack(spacing: 0) {
+            Group {
+                if confirmingUnlock {
+                    confirmUnlockContent
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .move(edge: .leading))
+                        ))
+                } else {
+                    firstStepContent
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .leading)),
+                            removal: .opacity.combined(with: .move(edge: .trailing))
+                        ))
                 }
-                .padding(.horizontal, 22)
-                .padding(.top, 28)
-                .padding(.bottom, 24)
-                .frame(maxWidth: 360)
-                .background {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke((isActive ? Color.white : BlankColors.ink).opacity(isActive ? 0.42 : 0.08), lineWidth: 1)
-                }
-                .shadow(color: Color.black.opacity(isActive ? 0.11 : 0.07), radius: 24, y: 14)
-
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 34)
+            .animation(.spring(response: 0.36, dampingFraction: 0.90), value: confirmingUnlock)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 22)
+        .padding(.top, 28)
+        .padding(.bottom, 24)
+        .frame(maxWidth: 360)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke((isActive ? Color.white : BlankColors.ink).opacity(isActive ? 0.42 : 0.08), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(isActive ? 0.11 : 0.07), radius: 24, y: 14)
+        .padding(.horizontal, 22)
         .foregroundStyle(textColor)
         .preferredColorScheme(isActive ? .dark : .light)
     }

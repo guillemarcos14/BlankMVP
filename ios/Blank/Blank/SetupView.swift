@@ -24,11 +24,11 @@ private enum OnboardingStep: Int, CaseIterable {
 
     var bottomGlowPalette: BottomGlowPalette {
         let palettes: [BottomGlowPalette] = [
-            .init(id: 0, primary: Color(red: 0.16, green: 0.62, blue: 1.00), secondary: Color(red: 0.12, green: 0.86, blue: 0.96), accent: Color(red: 0.30, green: 0.45, blue: 1.00)),
-            .init(id: 1, primary: Color(red: 0.08, green: 0.48, blue: 1.00), secondary: Color(red: 0.22, green: 0.70, blue: 1.00), accent: Color(red: 0.06, green: 0.32, blue: 0.86)),
-            .init(id: 2, primary: Color(red: 0.24, green: 0.58, blue: 1.00), secondary: Color(red: 0.10, green: 0.78, blue: 0.92), accent: Color(red: 0.18, green: 0.40, blue: 1.00)),
-            .init(id: 3, primary: Color(red: 0.10, green: 0.40, blue: 0.98), secondary: Color(red: 0.34, green: 0.74, blue: 1.00), accent: Color(red: 0.08, green: 0.58, blue: 0.96)),
-            .init(id: 4, primary: Color(red: 0.20, green: 0.50, blue: 1.00), secondary: Color(red: 0.10, green: 0.66, blue: 0.92), accent: Color(red: 0.32, green: 0.52, blue: 1.00))
+            .init(id: 0, primary: Color(red: 0.05, green: 0.64, blue: 1.00), secondary: Color(red: 0.00, green: 0.92, blue: 1.00), accent: Color(red: 0.16, green: 0.42, blue: 1.00)),
+            .init(id: 1, primary: Color(red: 0.02, green: 0.30, blue: 0.92), secondary: Color(red: 0.08, green: 0.56, blue: 1.00), accent: Color(red: 0.00, green: 0.20, blue: 0.70)),
+            .init(id: 2, primary: Color(red: 0.30, green: 0.46, blue: 1.00), secondary: Color(red: 0.00, green: 0.76, blue: 0.96), accent: Color(red: 0.22, green: 0.28, blue: 0.94)),
+            .init(id: 3, primary: Color(red: 0.00, green: 0.44, blue: 0.76), secondary: Color(red: 0.24, green: 0.86, blue: 1.00), accent: Color(red: 0.00, green: 0.64, blue: 0.96)),
+            .init(id: 4, primary: Color(red: 0.12, green: 0.24, blue: 0.88), secondary: Color(red: 0.00, green: 0.52, blue: 1.00), accent: Color(red: 0.38, green: 0.44, blue: 1.00))
         ]
         return palettes[rawValue % palettes.count]
     }

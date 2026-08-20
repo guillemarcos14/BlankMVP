@@ -454,6 +454,269 @@ struct BlankProgressReport: Equatable {
     var longestStreakDays: Int
 }
 
+struct DigitalWellnessPlanItem: Codable, Equatable, Identifiable {
+    var id: Int
+    var title: String
+    var action: String
+}
+
+struct DigitalWellnessDiagnosis: Codable, Equatable {
+    var archetype: String
+    var riskTitle: String
+    var riskBody: String
+    var primaryGoal: String
+    var weakMoment: String
+    var dailyHours: Double
+    var initialBlockMinutes: Int
+    var recommendedHour: Int
+    var plan: [DigitalWellnessPlanItem]
+    var createdAt: Date
+}
+
+struct SmartBlockRecommendation: Equatable {
+    var title: String
+    var detail: String
+    var durationMinutes: Int
+}
+
+struct RelapseIntervention: Equatable {
+    var headline: String
+    var cost: String
+    var alternative: String
+}
+
+enum DigitalWellnessAI {
+    private static let diagnosisKey = "blankDigitalWellnessDiagnosis"
+
+    static func saveInitialDiagnosis(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        goal: String,
+        profile: String,
+        dailyHours: Double,
+        selectionCount: Int,
+        now: Date = Date()
+    ) {
+        let diagnosis = initialDiagnosis(
+            goal: goal,
+            profile: profile,
+            dailyHours: dailyHours,
+            selectionCount: selectionCount,
+            now: now
+        )
+        guard let data = try? JSONEncoder().encode(diagnosis) else { return }
+        defaults.set(data, forKey: diagnosisKey)
+    }
+
+    static func loadDiagnosis(defaults: UserDefaults = BlankSharedState.defaults) -> DigitalWellnessDiagnosis? {
+        guard let data = defaults.data(forKey: diagnosisKey) else { return nil }
+        return try? JSONDecoder().decode(DigitalWellnessDiagnosis.self, from: data)
+    }
+
+    static func currentDiagnosis(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        selectionCount: Int,
+        now: Date = Date()
+    ) -> DigitalWellnessDiagnosis {
+        let stored = loadDiagnosis(defaults: defaults)
+        let goal = defaults.string(forKey: "blankOnboardingGoal") ?? stored?.primaryGoal ?? ""
+        let profile = defaults.string(forKey: "blankOnboardingProfile") ?? ""
+        let dailyHours = defaults.object(forKey: "blankOnboardingDailyHours") == nil
+            ? stored?.dailyHours ?? 4.5
+            : defaults.double(forKey: "blankOnboardingDailyHours")
+        var diagnosis = stored ?? initialDiagnosis(
+            goal: goal,
+            profile: profile,
+            dailyHours: dailyHours,
+            selectionCount: selectionCount,
+            now: now
+        )
+
+        if let weakHour = weakHour(events: events, sessions: sessions, now: now) {
+            diagnosis.recommendedHour = weakHour
+            diagnosis.weakMoment = hourRangeText(weakHour)
+        }
+        return diagnosis
+    }
+
+    static func smartBlockRecommendation(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        selectionCount: Int,
+        now: Date = Date()
+    ) -> SmartBlockRecommendation {
+        let diagnosis = currentDiagnosis(
+            defaults: defaults,
+            events: events,
+            sessions: sessions,
+            selectionCount: selectionCount,
+            now: now
+        )
+
+        if let weakHour = weakHour(events: events, sessions: sessions, now: now) {
+            let minutes = minutesUntilNextHour(weakHour, now: now)
+            if minutes <= 90 {
+                return SmartBlockRecommendation(
+                    title: "Protect your weak window",
+                    detail: "\(hourRangeText(weakHour)) is your highest-risk window. Start a \(diagnosis.initialBlockMinutes)-min block.",
+                    durationMinutes: diagnosis.initialBlockMinutes
+                )
+            }
+        }
+
+        return SmartBlockRecommendation(
+            title: "Start your \(diagnosis.archetype) plan",
+            detail: "Day 1: protect \(hourRangeText(diagnosis.recommendedHour)) with a \(diagnosis.initialBlockMinutes)-min block.",
+            durationMinutes: diagnosis.initialBlockMinutes
+        )
+    }
+
+    static func relapseIntervention(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        selectionCount: Int,
+        now: Date = Date()
+    ) -> RelapseIntervention {
+        let diagnosis = currentDiagnosis(
+            defaults: defaults,
+            events: events,
+            sessions: sessions,
+            selectionCount: selectionCount,
+            now: now
+        )
+        let weakHour = weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
+        let isWeakWindow = Calendar.current.component(.hour, from: now) == weakHour
+        return RelapseIntervention(
+            headline: isWeakWindow ? "This is your risk window." : "This break trains the loop.",
+            cost: "Breaking now weakens your \(diagnosis.archetype.lowercased()) plan.",
+            alternative: "Try 5 more minutes, then decide again."
+        )
+    }
+
+    static func weakHour(events: [BlankUsageEvent], sessions: [BlankSession], now: Date = Date()) -> Int? {
+        let calendar = Calendar.current
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let brokenEventHours = events
+            .filter { event in
+                event.occurredAt >= weekStart &&
+                event.occurredAt <= now &&
+                (event.kind == .blockBroken || event.endedReason == .emergency || event.endedReason == .manual)
+            }
+            .map(\.localHour)
+        let emergencySessionHours = sessions
+            .filter { session in
+                let sessionEnd = session.endedAt ?? now
+                return session.startedAt <= now &&
+                sessionEnd >= weekStart &&
+                (session.endedReason == .emergency || session.endedReason == .manual)
+            }
+            .compactMap(\.localStartHour)
+
+        return mostCommonValue(brokenEventHours + emergencySessionHours)
+    }
+
+    static func hourRangeText(_ hour: Int) -> String {
+        "\(String(format: "%02d:00", hour))-\(String(format: "%02d:00", (hour + 1) % 24))"
+    }
+
+    private static func initialDiagnosis(
+        goal: String,
+        profile: String,
+        dailyHours: Double,
+        selectionCount: Int,
+        now: Date
+    ) -> DigitalWellnessDiagnosis {
+        let goalText = goal.isEmpty ? "Build healthier screen habits" : goal
+        let normalizedGoal = goal.lowercased()
+        let normalizedProfile = profile.lowercased()
+
+        let archetype: String
+        let riskTitle: String
+        let riskBody: String
+        let recommendedHour: Int
+        let blockMinutes: Int
+
+        if normalizedGoal.contains("sleep") || normalizedProfile.contains("night") {
+            archetype = "Night Scroller"
+            riskTitle = "Late-night scroll risk"
+            riskBody = "Your highest leverage habit is protecting the final hour before sleep."
+            recommendedHour = 22
+            blockMinutes = 45
+        } else if normalizedGoal.contains("social") || normalizedProfile.contains("social") || normalizedProfile.contains("boredom") || dailyHours >= 6.5 {
+            archetype = "Dopamine Loop"
+            riskTitle = "High stimulation risk"
+            riskBody = "Your phone is likely filling low-energy moments before you notice."
+            recommendedHour = 20
+            blockMinutes = 30
+        } else if normalizedGoal.contains("present") || normalizedProfile.contains("caregiver") {
+            archetype = "Presence Drifter"
+            riskTitle = "Attention leak risk"
+            riskBody = "The main win is protecting short windows where you want to be more present."
+            recommendedHour = 18
+            blockMinutes = 25
+        } else if normalizedProfile.contains("study") || normalizedProfile.contains("work") || normalizedGoal.contains("work") || normalizedGoal.contains("focus") || normalizedProfile.contains("technology") {
+            archetype = "Focus Breaker"
+            riskTitle = "Deep-work interruption risk"
+            riskBody = "Your biggest gain is starting blocks before the first distraction."
+            recommendedHour = normalizedProfile.contains("study") ? 16 : 9
+            blockMinutes = 45
+        } else {
+            archetype = "Habit Rebuilder"
+            riskTitle = "Automatic checking risk"
+            riskBody = "Your plan should make the first block easy and repeatable."
+            recommendedHour = normalizedProfile.contains("morning") ? 8 : Calendar.current.component(.hour, from: now)
+            blockMinutes = selectionCount < 3 ? 25 : 35
+        }
+
+        let weakMoment = hourRangeText(recommendedHour)
+        return DigitalWellnessDiagnosis(
+            archetype: archetype,
+            riskTitle: riskTitle,
+            riskBody: riskBody,
+            primaryGoal: goalText,
+            weakMoment: weakMoment,
+            dailyHours: dailyHours,
+            initialBlockMinutes: blockMinutes,
+            recommendedHour: recommendedHour,
+            plan: sevenDayPlan(archetype: archetype, weakMoment: weakMoment, blockMinutes: blockMinutes),
+            createdAt: now
+        )
+    }
+
+    private static func sevenDayPlan(archetype: String, weakMoment: String, blockMinutes: Int) -> [DigitalWellnessPlanItem] {
+        [
+            DigitalWellnessPlanItem(id: 1, title: "Day 1", action: "\(blockMinutes) min during \(weakMoment)."),
+            DigitalWellnessPlanItem(id: 2, title: "Day 2", action: "Repeat the same window with the same apps."),
+            DigitalWellnessPlanItem(id: 3, title: "Day 3", action: "Add 10 min if there was no emergency."),
+            DigitalWellnessPlanItem(id: 4, title: "Day 4", action: "Start 10 min before the urge usually appears."),
+            DigitalWellnessPlanItem(id: 5, title: "Day 5", action: "Keep one strict block and one short reset."),
+            DigitalWellnessPlanItem(id: 6, title: "Day 6", action: "Review which app pulled hardest."),
+            DigitalWellnessPlanItem(id: 7, title: "Day 7", action: "Repeat your best \(archetype.lowercased()) block.")
+        ]
+    }
+
+    private static func minutesUntilNextHour(_ hour: Int, now: Date) -> Int {
+        let calendar = Calendar.current
+        let currentHour = calendar.component(.hour, from: now)
+        let currentMinute = calendar.component(.minute, from: now)
+        if currentHour == hour {
+            return 0
+        }
+        let hoursUntil = (hour - currentHour + 24) % 24
+        return max(0, hoursUntil * 60 - currentMinute)
+    }
+
+    private static func mostCommonValue<T: Hashable>(_ values: [T]) -> T? {
+        let counts = values.reduce(into: [T: Int]()) { counts, value in
+            counts[value, default: 0] += 1
+        }
+        return counts.max { lhs, rhs in lhs.value < rhs.value }?.key
+    }
+}
+
 enum BlankProgressAggregator {
     static func aggregate(
         sessions: [BlankSession],

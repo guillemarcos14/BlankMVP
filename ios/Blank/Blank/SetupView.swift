@@ -283,7 +283,7 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("The average person loses"),
-                .text("\(lifetimeYears) years", icon: "hourglass"),
+                .accent("\(lifetimeYears) years", icon: "hourglass"),
                 .text("to their phone screen"),
                 .text("over a lifetime")
             ],
@@ -313,7 +313,7 @@ struct SetupView: View {
             lines: [
                 .text("How much time"),
                 .text("do you spend daily", icon: "iphone"),
-                .text("\(formattedHours(dailyHours)) / day")
+                .accent("\(formattedHours(dailyHours)) / day")
             ],
             primaryTitle: "Calculate time lost",
             primaryAction: {
@@ -335,9 +335,9 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("At this pace, your phone costs"),
-                .text("\(animatedLostDays) days", icon: "calendar"),
+                .accent("\(animatedLostDays) days", icon: "calendar"),
                 .text("this year"),
-                .text("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
+                .accent("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
                 .text("over a lifetime")
             ],
             primaryTitle: "See what I can recover",
@@ -415,7 +415,7 @@ struct SetupView: View {
                 .text("You are a"),
                 .text(onboardingArchetype, icon: diagnosisIconName),
                 .text(riskTitlePreview),
-                .text("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
+                .accent("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
             ],
             body: riskBodyPreview,
             primaryTitle: "Build my plan",
@@ -1200,7 +1200,7 @@ private struct ReferenceTextLine: Identifiable {
     }
 
     static func accent(_ text: String, icon: String? = nil) -> ReferenceTextLine {
-        ReferenceTextLine(text: text, icon: icon, isAccent: false)
+        ReferenceTextLine(text: text, icon: icon, isAccent: true)
     }
 }
 
@@ -1255,7 +1255,7 @@ private struct ReferenceOnboardingScene: View {
                     .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 18)
+            .padding(.bottom, 42)
 
             if centerContent {
                 Spacer(minLength: 0)
@@ -1390,12 +1390,14 @@ private struct ReferenceAnimatedLine: View {
 
             Text(line.text)
                 .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
                 .lineLimit(2)
                 .minimumScaleFactor(0.68)
                 .multilineTextAlignment(.leading)
                 .lineSpacing(0)
                 .tracking(0)
+                .shadow(color: line.isAccent ? Color.white.opacity(0.42) : .clear, radius: 11, x: 0, y: 0)
+                .shadow(color: line.isAccent ? Color(red: 0.58, green: 0.82, blue: 1).opacity(0.30) : .clear, radius: 18, x: 0, y: 0)
 
             if iconAfterText {
                 iconView
@@ -1418,8 +1420,9 @@ private struct ReferenceAnimatedLine: View {
         if let icon = line.icon {
             Image(systemName: icon)
                 .font(.system(size: 25, weight: .bold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
                 .frame(width: 28, height: 28)
+                .shadow(color: line.isAccent ? Color.white.opacity(0.36) : .clear, radius: 9, x: 0, y: 0)
         }
     }
 }

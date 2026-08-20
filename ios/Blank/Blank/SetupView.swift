@@ -275,7 +275,7 @@ struct SetupView: View {
                     .padding(.horizontal, 18)
                     .frame(height: 54)
                     .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
-                    .frame(maxWidth: 314, alignment: .leading)
+                    .frame(maxWidth: 280, alignment: .leading)
             )
         )
     }
@@ -825,8 +825,8 @@ struct SetupView: View {
             ]
         case "How old are you?":
             return [
-                .text("How old"),
-                .text("are you?", icon: "person.fill")
+                .text("Where are you"),
+                .text("in your routine?", icon: "person.fill")
             ]
         case "When do you usually lose control?":
             return [

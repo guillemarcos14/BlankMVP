@@ -1195,7 +1195,7 @@ private struct EmergencySheet: View {
 
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground(dimmed: isActive)
+            Color.clear
 
             VStack {
                 Spacer(minLength: 0)

@@ -597,8 +597,6 @@ struct SetupView: View {
         onSelect: @escaping (String) -> Void
     ) -> some View {
         VStack(spacing: 22) {
-            Spacer(minLength: 0)
-
             ReferenceOnboardingText(
                 eyebrow: nil,
                 lines: choiceSceneLines(for: title),
@@ -619,8 +617,7 @@ struct SetupView: View {
             }
             .frame(maxWidth: 342)
         }
-        .padding(.bottom, 10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private func referenceScene(
@@ -1684,22 +1681,34 @@ private struct ReferenceBottomGlow: View {
         GeometryReader { proxy in
             ZStack {
                 Ellipse()
-                    .fill(BlankColors.airMist.opacity(0.22))
-                    .frame(width: proxy.size.width * 1.18, height: 210)
-                    .blur(radius: 54)
-                    .offset(x: -proxy.size.width * 0.12, y: proxy.size.height * 0.39)
+                    .fill(BlankColors.airMist.opacity(0.42))
+                    .frame(width: proxy.size.width * 1.45, height: 260)
+                    .blur(radius: 48)
+                    .position(x: proxy.size.width * 0.38, y: proxy.size.height + 10)
 
                 Ellipse()
-                    .fill(BlankColors.airBlue.opacity(0.16))
-                    .frame(width: proxy.size.width * 0.86, height: 180)
-                    .blur(radius: 58)
-                    .offset(x: proxy.size.width * 0.22, y: proxy.size.height * 0.43)
+                    .fill(BlankColors.airBlue.opacity(0.34))
+                    .frame(width: proxy.size.width * 1.10, height: 230)
+                    .blur(radius: 52)
+                    .position(x: proxy.size.width * 0.72, y: proxy.size.height + 4)
 
                 Ellipse()
-                    .fill(Color(red: 1.0, green: 0.38, blue: 0.22).opacity(0.12))
-                    .frame(width: proxy.size.width * 0.92, height: 160)
-                    .blur(radius: 62)
-                    .offset(x: -proxy.size.width * 0.28, y: proxy.size.height * 0.46)
+                    .fill(Color(red: 1.0, green: 0.38, blue: 0.22).opacity(0.24))
+                    .frame(width: proxy.size.width * 1.08, height: 210)
+                    .blur(radius: 56)
+                    .position(x: proxy.size.width * 0.12, y: proxy.size.height + 18)
+
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.00),
+                        Color.white.opacity(0.08),
+                        Color.white.opacity(0.16)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 240)
+                .position(x: proxy.size.width / 2, y: proxy.size.height - 70)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

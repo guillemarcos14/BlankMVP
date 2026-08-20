@@ -1190,7 +1190,7 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        TechnicalSettingsSheetLayout {
+        TechnicalSettingsSheetLayout(topInset: 76) {
             Group {
                 if confirmingUnlock {
                     confirmUnlockContent
@@ -1305,6 +1305,7 @@ private struct RelinkSheet: View {
 
 private struct TechnicalSettingsSheetLayout<Content: View>: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    var topInset: CGFloat = 8
     @ViewBuilder var content: Content
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -1330,7 +1331,7 @@ private struct TechnicalSettingsSheetLayout<Content: View>: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 18)
-            .padding(.top, 8)
+            .padding(.top, topInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .foregroundStyle(textColor)

@@ -608,7 +608,7 @@ struct SetupView: View {
                     OnboardingChoiceButton(
                         systemName: option.icon,
                         title: option.title,
-                        selected: selection == option.title
+                        selected: false
                     ) {
                         onSelect(option.title)
                         goForward()
@@ -1268,7 +1268,7 @@ private struct ReferenceOnboardingScene: View {
                     eyebrow: eyebrow,
                     lines: lines,
                     body: showsDetail ? bodyText : nil,
-                    dimmed: showsDetail && hasDetail
+                    detailStartIndex: lines.count
                 )
 
                 accessory
@@ -1322,13 +1322,13 @@ private struct ReferenceOnboardingText: View {
     let eyebrow: String?
     let lines: [ReferenceTextLine]
     let bodyText: String?
-    let dimmed: Bool
+    let detailStartIndex: Int
 
-    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, dimmed: Bool = false) {
+    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, detailStartIndex: Int = 0) {
         self.eyebrow = eyebrow
         self.lines = lines
         self.bodyText = body
-        self.dimmed = dimmed
+        self.detailStartIndex = detailStartIndex
     }
 
     var body: some View {
@@ -1345,21 +1345,44 @@ private struct ReferenceOnboardingText: View {
                     ReferenceAnimatedLine(line: lines[index], delay: Double(index) * 0.075, iconAfterText: index.isMultiple(of: 2))
                 }
             }
-            .opacity(dimmed ? 0.52 : 1)
-            .offset(y: dimmed ? -18 : 0)
 
             if let bodyText, !bodyText.isEmpty {
-                Text(bodyText)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.82))
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(1)
-                    .tracking(0)
-                    .frame(maxWidth: 330, alignment: .leading)
-                    .padding(.top, 2)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(detailLines(from: bodyText).indices, id: \.self) { index in
+                        let lineIndex = detailStartIndex + index
+                        ReferenceAnimatedLine(
+                            line: .text(detailLines(from: bodyText)[index]),
+                            delay: Double(lineIndex) * 0.075,
+                            iconAfterText: lineIndex.isMultiple(of: 2)
+                        )
+                    }
+                }
+                .padding(.top, 2)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+    }
+
+    private func detailLines(from text: String) -> [String] {
+        let words = text.split(separator: " ").map(String.init)
+        var lines: [String] = []
+        var current = ""
+
+        for word in words {
+            let candidate = current.isEmpty ? word : "\(current) \(word)"
+            if candidate.count > 24, !current.isEmpty {
+                lines.append(current)
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+
+        if !current.isEmpty {
+            lines.append(current)
+        }
+
+        return lines
     }
 }
 
@@ -1631,9 +1654,7 @@ private struct OnboardingChoiceButton: View {
                 Spacer(minLength: 0)
 
                 if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.92))
+                    EmptyView()
                 }
             }
             .padding(.horizontal, 18)

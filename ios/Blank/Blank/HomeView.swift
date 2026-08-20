@@ -119,7 +119,8 @@ struct HomeView: View {
                 }
                 return unlocked
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.height(430)])
+            .blankTransparentPresentation()
         }
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
@@ -1190,24 +1191,52 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        TechnicalSettingsSheetLayout(topInset: 84) {
-            Group {
-                if confirmingUnlock {
-                    confirmUnlockContent
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .trailing)),
-                            removal: .opacity.combined(with: .move(edge: .leading))
-                        ))
-                } else {
-                    firstStepContent
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .leading)),
-                            removal: .opacity.combined(with: .move(edge: .trailing))
-                        ))
+        ZStack {
+            BlankAtmosphericBackground(dimmed: true)
+
+            VStack {
+                Spacer(minLength: 0)
+
+                VStack(spacing: 0) {
+                    Group {
+                        if confirmingUnlock {
+                            confirmUnlockContent
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .move(edge: .trailing)),
+                                    removal: .opacity.combined(with: .move(edge: .leading))
+                                ))
+                        } else {
+                            firstStepContent
+                                .transition(.asymmetric(
+                                    insertion: .opacity.combined(with: .move(edge: .leading)),
+                                    removal: .opacity.combined(with: .move(edge: .trailing))
+                                ))
+                        }
+                    }
+                    .animation(.spring(response: 0.36, dampingFraction: 0.90), value: confirmingUnlock)
                 }
+                .padding(.horizontal, 22)
+                .padding(.top, 28)
+                .padding(.bottom, 24)
+                .frame(maxWidth: 360)
+                .background {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(Color.white.opacity(0.42), lineWidth: 1)
+                }
+                .shadow(color: Color.black.opacity(0.11), radius: 24, y: 14)
+
+                Spacer(minLength: 0)
             }
-            .animation(.spring(response: 0.36, dampingFraction: 0.90), value: confirmingUnlock)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 34)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(BlankColors.ink)
+        .preferredColorScheme(.light)
     }
 
     private var firstStepContent: some View {

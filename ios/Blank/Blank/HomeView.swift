@@ -1190,7 +1190,7 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        TechnicalSettingsSheetLayout(topInset: 76) {
+        TechnicalSettingsSheetLayout(topInset: 84) {
             Group {
                 if confirmingUnlock {
                     confirmUnlockContent
@@ -1211,8 +1211,8 @@ private struct EmergencySheet: View {
     }
 
     private var firstStepContent: some View {
-        VStack(spacing: 16) {
-            TechnicalSheetTitle("Emergency")
+        VStack(spacing: 13) {
+            emergencyHeader("Emergency")
             TechnicalSheetDescription("Try 5 more minutes first.", emphasized: true)
             TechnicalSheetDescription("Unlock only if you need access now.")
             TechnicalSheetDescription(unlocksText, emphasized: true)
@@ -1233,8 +1233,8 @@ private struct EmergencySheet: View {
     }
 
     private var confirmUnlockContent: some View {
-        VStack(spacing: 16) {
-            TechnicalSheetTitle("Confirm unlock")
+        VStack(spacing: 13) {
+            emergencyHeader("Confirm unlock")
             TechnicalSheetDescription("This will turn Blank off and unlock protected apps.", emphasized: true)
             TechnicalSheetDescription("It uses 1 emergency unlock.")
             TechnicalSheetDescription(unlocksText, emphasized: true)
@@ -1260,6 +1260,15 @@ private struct EmergencySheet: View {
         return emergencyUnlocksRemaining > 0
             ? "\(emergencyUnlocksRemaining) unlocks left this week."
             : "No unlocks left this week."
+    }
+
+    private func emergencyHeader(_ text: String) -> some View {
+        Text(text)
+            .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .minimumScaleFactor(0.88)
+            .frame(maxWidth: 320)
     }
 }
 

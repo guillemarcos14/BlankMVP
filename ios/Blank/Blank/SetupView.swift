@@ -234,19 +234,17 @@ struct SetupView: View {
     }
 
     private var nameStep: some View {
-        referenceScene(
-            lines: [
-                .text("First, what should"),
-                .text("Blanked call you?", icon: "person.fill")
-            ],
-            primaryTitle: "Continue",
-            primaryAction: {
-                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    name = "You"
-                }
-                goForward()
-            },
-            accessory: AnyView(
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 18) {
+                ReferenceOnboardingText(
+                    eyebrow: nil,
+                    lines: [
+                        .text("First, what should"),
+                        .text("we call you?", icon: "person.fill")
+                    ],
+                    body: nil
+                )
+
                 TextField("Your name", text: $name)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -257,8 +255,19 @@ struct SetupView: View {
                     .frame(height: 54)
                     .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
                     .frame(maxWidth: 314, alignment: .leading)
-            )
-        )
+            }
+
+            Button("Continue") {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    name = "You"
+                }
+                goForward()
+            }
+            .buttonStyle(ReferenceOnboardingButtonStyle())
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
     private var lifetimeStep: some View {
@@ -266,9 +275,9 @@ struct SetupView: View {
             lines: [
                 .text("The average person loses"),
                 .text("\(lifetimeYears) years", icon: "hourglass"),
-                .text("to their phone screen")
+                .text("to their phone screen"),
+                .text("over a lifetime")
             ],
-            body: "Over a lifetime.",
             primaryTitle: "Continue",
             primaryAction: goForward
         )
@@ -297,7 +306,6 @@ struct SetupView: View {
                 .text("do you spend daily", icon: "iphone"),
                 .text("\(formattedHours(dailyHours)) / day")
             ],
-            body: "Use your real Screen Time average.",
             primaryTitle: "Calculate time lost",
             primaryAction: {
                 storedDailyHours = dailyHours
@@ -337,7 +345,6 @@ struct SetupView: View {
 
     private var recoveryStep: some View {
         referenceScene(
-            eyebrow: "Your first plan",
             lines: [
                 .text("Protect"),
                 .text("\(weakMomentPreview)", icon: "shield.fill"),
@@ -395,7 +402,6 @@ struct SetupView: View {
 
     private var diagnosisStep: some View {
         referenceScene(
-            eyebrow: "Your diagnosis",
             lines: [
                 .text("You are a"),
                 .text(onboardingArchetype, icon: diagnosisIconName),
@@ -449,16 +455,8 @@ struct SetupView: View {
                     .text(onboardingArchetype, icon: diagnosisIconName),
                     .text("plan")
                 ],
-                body: "Blocking, risk forecast, weekly plan and relapse protection."
+                body: "App blocking, risk forecast and relapse protection."
             )
-
-            VStack(spacing: 8) {
-                PaywallValueRow(systemName: "shield.fill", text: "Block your selected distractions")
-                PaywallValueRow(systemName: "waveform.path.ecg", text: "Forecast your next risk window")
-                PaywallValueRow(systemName: "calendar", text: "Follow a 7-day recovery plan")
-                PaywallValueRow(systemName: "lock.rotation", text: "Slow down emergency unlocks")
-            }
-            .frame(maxWidth: 342)
 
             VStack(spacing: 9) {
                 PlanButton(
@@ -616,6 +614,7 @@ struct SetupView: View {
                     }
                 }
             }
+            .padding(.top, 8)
             .frame(maxWidth: 342)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -814,13 +813,13 @@ struct SetupView: View {
             ]
         case "How old are you?":
             return [
-                .text("Personalize your"),
-                .text("digital wellness plan", icon: "person.fill")
+                .text("How old"),
+                .text("are you?", icon: "person.fill")
             ]
         case "When do you usually lose control?":
             return [
-                .text("When does your"),
-                .text("scroll loop start?", icon: "clock.fill")
+                .text("Where do you"),
+                .text("lose control?", icon: "clock.fill")
             ]
         default:
             return [.text(title)]
@@ -1277,7 +1276,7 @@ private struct ReferenceOnboardingScene: View {
                     .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 10)
+            .padding(.bottom, 18)
 
             if primaryTitle != nil || secondaryTitle != nil {
                 VStack(alignment: .leading, spacing: 10) {

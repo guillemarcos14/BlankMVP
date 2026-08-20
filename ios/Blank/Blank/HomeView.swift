@@ -107,8 +107,7 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet(
-                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-                intervention: relapseIntervention
+                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
             ) {
                 let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
                     sessionStore.deactivateForEmergency()
@@ -1186,26 +1185,44 @@ private struct ForgetBlankConfirmSheet: View {
 
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmingUnlock = false
     let emergencyUnlocksRemaining: Int
-    let intervention: RelapseIntervention
     let onUnlock: () -> Bool
 
     var body: some View {
         TechnicalSettingsSheetLayout {
+            Group {
+                if confirmingUnlock {
+                    confirmUnlockContent
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .move(edge: .leading))
+                        ))
+                } else {
+                    firstStepContent
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .leading)),
+                            removal: .opacity.combined(with: .move(edge: .trailing))
+                        ))
+                }
+            }
+            .animation(.spring(response: 0.36, dampingFraction: 0.90), value: confirmingUnlock)
+        }
+    }
+
+    private var firstStepContent: some View {
+        VStack(spacing: 16) {
             TechnicalSheetTitle("Emergency")
-            TechnicalSheetDescription(intervention.headline, emphasized: true)
-            TechnicalSheetDescription(intervention.cost)
-            TechnicalSheetDescription(intervention.alternative, emphasized: true)
-            TechnicalSheetDescription("This turns Blank off without using your Blank and unlocks protected apps. Use it only if you need access now.")
-            TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "You have \(emergencyUnlocksRemaining) unlocks left this week." : "You have used your 3 unlocks this week.", emphasized: true)
+            TechnicalSheetDescription("Try 5 more minutes first.", emphasized: true)
+            TechnicalSheetDescription("Unlock only if you need access now.")
+            TechnicalSheetDescription(unlocksText, emphasized: true)
             TechnicalSheetActions {
-                Button("Unlock") {
-                    if onUnlock() {
-                        dismiss()
-                    }
+                Button("Continue") {
+                    confirmingUnlock = true
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())
                 .disabled(emergencyUnlocksRemaining <= 0)
+
                 Button("Cancel") {
                     dismiss()
                 }
@@ -1213,6 +1230,36 @@ private struct EmergencySheet: View {
                 .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private var confirmUnlockContent: some View {
+        VStack(spacing: 16) {
+            TechnicalSheetTitle("Confirm unlock")
+            TechnicalSheetDescription("This will turn Blank off and unlock protected apps.", emphasized: true)
+            TechnicalSheetDescription("It uses 1 emergency unlock.")
+            TechnicalSheetDescription(unlocksText, emphasized: true)
+            TechnicalSheetActions {
+                Button("Unlock now") {
+                    if onUnlock() {
+                        dismiss()
+                    }
+                }
+                .buttonStyle(BlankPrimaryButtonStyle())
+                .disabled(emergencyUnlocksRemaining <= 0)
+
+                Button("Back") {
+                    confirmingUnlock = false
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var unlocksText: String {
+        return emergencyUnlocksRemaining > 0
+            ? "\(emergencyUnlocksRemaining) unlocks left this week."
+            : "No unlocks left this week."
     }
 }
 

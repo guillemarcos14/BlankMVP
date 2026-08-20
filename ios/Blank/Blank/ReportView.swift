@@ -5,6 +5,8 @@ struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
+    @State private var trendsExpanded = false
+    @State private var detailsExpanded = false
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
     @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
     @AppStorage("blankWeeklyAIPlanSecond", store: BlankSharedState.defaults) private var storedPlanSecond = ""
@@ -72,7 +74,8 @@ struct ReportView: View {
                             totalSessionCount: totalSessionCount,
                             savedTime: savedTime,
                             progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
+                            isExpanded: $trendsExpanded
                         )
 
                         statsDetailsCapsule(
@@ -91,7 +94,8 @@ struct ReportView: View {
                             healthInsights: healthInsights,
                             weekly: weekly,
                             progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
+                            isExpanded: $detailsExpanded
                         )
                     } else {
                         emptyState()
@@ -490,61 +494,64 @@ struct ReportView: View {
         totalSessionCount: Int,
         savedTime: TimeInterval,
         progress: BlankProgressReport,
-        emergencyUnlocksRemaining: Int
+        emergencyUnlocksRemaining: Int,
+        isExpanded: Binding<Bool>
     ) -> some View {
         let days = Array(activityDays.suffix(7))
 
-        return DisclosureGroup {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text("Weekly evolution")
-                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                        Spacer()
-                        Text("\(weekly.completedSessionCount) starts")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(accentBlue)
+        return VStack(alignment: .leading, spacing: 0) {
+            animatedDisclosureHeader(
+                title: "Trends & history",
+                subtitle: "Graph and progress",
+                systemImage: "chart.xyaxis.line",
+                isExpanded: isExpanded
+            )
+
+            if isExpanded.wrappedValue {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Weekly evolution")
+                                .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                            Spacer()
+                            Text("\(weekly.completedSessionCount) starts")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(accentBlue)
+                        }
+
+                        chartPanel(values: days.map(\.totalFocusTime))
+                            .frame(height: 136)
+                            .accessibilityLabel("Weekly protected time evolution")
                     }
 
-                    chartPanel(values: days.map(\.totalFocusTime))
-                        .frame(height: 136)
-                        .accessibilityLabel("Weekly protected time evolution")
-                }
+                    subtleDivider()
 
-                subtleDivider()
+                    HStack(alignment: .bottom, spacing: 8) {
+                        ForEach(days) { day in
+                            weekBar(day: day, maxValue: max(days.map(\.totalFocusTime).max() ?? 0, 30 * 60))
+                        }
+                    }
+                    .frame(height: 104)
+                    .accessibilityLabel("Daily protected time bars")
 
-                HStack(alignment: .bottom, spacing: 8) {
-                    ForEach(days) { day in
-                        weekBar(day: day, maxValue: max(days.map(\.totalFocusTime).max() ?? 0, 30 * 60))
+                    subtleDivider()
+
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        compactTrendMetric(title: "Recovered", value: formatDuration(savedTime), caption: "Estimated total")
+                        compactTrendMetric(title: "Blanked", value: formatDuration(totalFocusTime), caption: "Total protected")
+                        compactTrendMetric(title: "Sessions", value: "\(totalSessionCount)", caption: "Since start")
+                        compactTrendMetric(title: "Streak", value: "\(progress.currentStreakDays)d", caption: "Days with Blank")
+                        compactTrendMetric(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                        compactTrendMetric(title: "Rescues", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
                     }
                 }
-                .frame(height: 104)
-                .accessibilityLabel("Daily protected time bars")
-
-                subtleDivider()
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    compactTrendMetric(title: "Recovered", value: formatDuration(savedTime), caption: "Estimated total")
-                    compactTrendMetric(title: "Blanked", value: formatDuration(totalFocusTime), caption: "Total protected")
-                    compactTrendMetric(title: "Sessions", value: "\(totalSessionCount)", caption: "Since start")
-                    compactTrendMetric(title: "Streak", value: "\(progress.currentStreakDays)d", caption: "Days with Blank")
-                    compactTrendMetric(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
-                    compactTrendMetric(title: "Rescues", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
-                }
-            }
-            .padding(.top, 12)
-        } label: {
-            HStack(spacing: 12) {
-                Label("Trends & history", systemImage: "chart.xyaxis.line")
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-                Spacer()
-                Text("Graph and progress")
-                    .font(.caption)
-                    .foregroundStyle(reportSecondary)
+                .padding(.top, 14)
+                .transition(disclosureContentTransition)
             }
         }
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+        .animation(disclosureAnimation, value: isExpanded.wrappedValue)
     }
 
     private func compactTrendMetric(title: String, value: String, caption: String) -> some View {
@@ -601,42 +608,95 @@ struct ReportView: View {
         healthInsights: [String],
         weekly: BlankWeeklyReport,
         progress: BlankProgressReport,
-        emergencyUnlocksRemaining: Int
+        emergencyUnlocksRemaining: Int,
+        isExpanded: Binding<Bool>
     ) -> some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 12) {
-                dailySummaryRow(title: "Today", value: summary.today)
-                dailySummaryRow(title: "Signal", value: summary.signal)
-                dailySummaryRow(title: "Next", value: summary.nextAction)
+        VStack(alignment: .leading, spacing: 0) {
+            animatedDisclosureHeader(
+                title: "Details",
+                subtitle: "Signals and plan",
+                systemImage: "slider.horizontal.3",
+                isExpanded: isExpanded
+            )
 
-                subtleDivider()
+            if isExpanded.wrappedValue {
+                VStack(alignment: .leading, spacing: 12) {
+                    dailySummaryRow(title: "Today", value: summary.today)
+                    dailySummaryRow(title: "Signal", value: summary.signal)
+                    dailySummaryRow(title: "Next", value: summary.nextAction)
 
-                aiReportSection(title: "Why", items: forecast.reasons, tint: accentBlue)
-                aiReportSection(title: "Plan", items: forecast.plan, tint: recoveryGreen)
-                aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 }, tint: sleepBlue)
-                aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 }, tint: activityOrange)
+                    subtleDivider()
 
-                subtleDivider()
+                    aiReportSection(title: "Why", items: forecast.reasons, tint: accentBlue)
+                    aiReportSection(title: "Plan", items: forecast.plan, tint: recoveryGreen)
+                    aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 }, tint: sleepBlue)
+                    aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 }, tint: activityOrange)
 
-                VStack(spacing: 10) {
-                    metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
-                    metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
-                    metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                    subtleDivider()
+
+                    VStack(spacing: 10) {
+                        metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+                        metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
+                        metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                    }
                 }
-            }
-            .padding(.top, 10)
-        } label: {
-            HStack {
-                Label("Details", systemImage: "slider.horizontal.3")
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-                Spacer()
-                Text("Signals and plan")
-                    .font(.caption)
-                    .foregroundStyle(reportSecondary)
+                .padding(.top, 14)
+                .transition(disclosureContentTransition)
             }
         }
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+        .animation(disclosureAnimation, value: isExpanded.wrappedValue)
+    }
+
+    private var disclosureAnimation: Animation {
+        .spring(response: 0.42, dampingFraction: 0.88, blendDuration: 0.12)
+    }
+
+    private var disclosureContentTransition: AnyTransition {
+        .asymmetric(
+            insertion: .opacity
+                .combined(with: .move(edge: .top))
+                .combined(with: .scale(scale: 0.985, anchor: .top)),
+            removal: .opacity
+                .combined(with: .move(edge: .top))
+        )
+    }
+
+    private func animatedDisclosureHeader(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        Button {
+            withAnimation(disclosureAnimation) {
+                isExpanded.wrappedValue.toggle()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Label(title, systemImage: systemImage)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                    .labelStyle(.titleAndIcon)
+
+                Spacer(minLength: 12)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(reportSecondary)
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 180 : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(isExpanded.wrappedValue ? "Expanded" : "Collapsed")
     }
 
     private func sleepDriverScore(_ minutes: Int?) -> Int {

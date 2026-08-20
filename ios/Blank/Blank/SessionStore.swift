@@ -89,6 +89,14 @@ final class SessionStore: ObservableObject {
     init(defaults: UserDefaults = BlankSharedState.defaults) {
         self.defaults = defaults
         Self.migrateLegacyDefaultsIfNeeded(to: defaults)
+        #if DEBUG
+        #if targetEnvironment(simulator)
+        if defaults.object(forKey: Keys.setupComplete) == nil {
+            defaults.set(true, forKey: Keys.setupComplete)
+            defaults.set("simulator-nfc-tag", forKey: Keys.nfcTagUid)
+        }
+        #endif
+        #endif
         isBlankActive = defaults.bool(forKey: Keys.isBlankActive)
         if let timestamp = defaults.object(forKey: Keys.blankActiveSince) as? TimeInterval, timestamp > 0 {
             blankActiveSince = Date(timeIntervalSince1970: timestamp)

@@ -115,7 +115,7 @@ struct SetupView: View {
                             content
                                 .id(currentStep.rawValue)
                                 .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .center)))
-                                .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 96) : nil)
+                                .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 64) : nil)
 
                             if let message {
                                 Text(message)
@@ -135,7 +135,7 @@ struct SetupView: View {
 
             }
             .padding(.horizontal, 28)
-            .padding(.bottom, 10)
+            .padding(.bottom, 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -539,6 +539,7 @@ struct SetupView: View {
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     continueWithReviewDemoAccess()
                 }
                 .buttonStyle(ReferenceOnboardingButtonStyle())
@@ -1268,14 +1269,15 @@ private struct ReferenceOnboardingScene: View {
                     eyebrow: eyebrow,
                     lines: lines,
                     body: showsDetail ? bodyText : nil,
-                    detailStartIndex: lines.count
+                    detailStartIndex: lines.count,
+                    titleOpacity: showsDetail ? 0.38 : 1
                 )
 
                 accessory
                     .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 18)
+            .padding(.bottom, 10)
 
             if primaryTitle != nil || secondaryTitle != nil {
                 VStack(alignment: .leading, spacing: 10) {
@@ -1295,7 +1297,7 @@ private struct ReferenceOnboardingScene: View {
                             .padding(.leading, 4)
                     }
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 0)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
@@ -1307,6 +1309,8 @@ private struct ReferenceOnboardingScene: View {
     }
 
     private func handlePrimaryTap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
         if hasDetail && !showsDetail {
             withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
                 showsDetail = true
@@ -1323,12 +1327,14 @@ private struct ReferenceOnboardingText: View {
     let lines: [ReferenceTextLine]
     let bodyText: String?
     let detailStartIndex: Int
+    let titleOpacity: Double
 
-    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, detailStartIndex: Int = 0) {
+    init(eyebrow: String?, lines: [ReferenceTextLine], body: String?, detailStartIndex: Int = 0, titleOpacity: Double = 1) {
         self.eyebrow = eyebrow
         self.lines = lines
         self.bodyText = body
         self.detailStartIndex = detailStartIndex
+        self.titleOpacity = titleOpacity
     }
 
     var body: some View {
@@ -1345,6 +1351,8 @@ private struct ReferenceOnboardingText: View {
                     ReferenceAnimatedLine(line: lines[index], delay: Double(index) * 0.075, iconAfterText: index.isMultiple(of: 2))
                 }
             }
+            .opacity(titleOpacity)
+            .animation(.easeInOut(duration: 0.26), value: titleOpacity)
 
             if let bodyText, !bodyText.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {

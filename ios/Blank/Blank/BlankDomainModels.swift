@@ -639,13 +639,13 @@ enum DigitalWellnessAI {
         let recommendedHour: Int
         let blockMinutes: Int
 
-        if normalizedGoal.contains("sleep") {
+        if normalizedGoal.contains("sleep") || normalizedProfile.contains("night") {
             archetype = "Night Scroller"
             riskTitle = "Late-night scroll risk"
             riskBody = "Your highest leverage habit is protecting the final hour before sleep."
             recommendedHour = 22
             blockMinutes = 45
-        } else if normalizedGoal.contains("mental") || dailyHours >= 6.5 {
+        } else if normalizedGoal.contains("social") || normalizedProfile.contains("social") || normalizedProfile.contains("boredom") || dailyHours >= 6.5 {
             archetype = "Dopamine Loop"
             riskTitle = "High stimulation risk"
             riskBody = "Your phone is likely filling low-energy moments before you notice."
@@ -657,17 +657,17 @@ enum DigitalWellnessAI {
             riskBody = "The main win is protecting short windows where you want to be more present."
             recommendedHour = 18
             blockMinutes = 25
-        } else if normalizedProfile.contains("student") || normalizedGoal.contains("focus") || normalizedProfile.contains("technology") {
+        } else if normalizedProfile.contains("study") || normalizedProfile.contains("work") || normalizedGoal.contains("work") || normalizedGoal.contains("focus") || normalizedProfile.contains("technology") {
             archetype = "Focus Breaker"
             riskTitle = "Deep-work interruption risk"
             riskBody = "Your biggest gain is starting blocks before the first distraction."
-            recommendedHour = 9
+            recommendedHour = normalizedProfile.contains("study") ? 16 : 9
             blockMinutes = 45
         } else {
             archetype = "Habit Rebuilder"
             riskTitle = "Automatic checking risk"
             riskBody = "Your plan should make the first block easy and repeatable."
-            recommendedHour = Calendar.current.component(.hour, from: now)
+            recommendedHour = normalizedProfile.contains("morning") ? 8 : Calendar.current.component(.hour, from: now)
             blockMinutes = selectionCount < 3 ? 25 : 35
         }
 

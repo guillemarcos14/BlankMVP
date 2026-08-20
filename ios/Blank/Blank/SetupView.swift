@@ -14,6 +14,7 @@ private enum OnboardingStep: Int, CaseIterable {
     case profile
     case dailyUse
     case result
+    case diagnosis
     case recovery
     case commitment
     case trial
@@ -196,6 +197,8 @@ struct SetupView: View {
             dailyUseStep
         case .result:
             resultStep
+        case .diagnosis:
+            diagnosisStep
         case .recovery:
             recoveryStep
         case .commitment:
@@ -430,8 +433,8 @@ struct SetupView: View {
             Spacer(minLength: 28)
 
             Button("See what I can recover") {
-                onboardingGoal = "Recover control from distracting apps"
-                weakMoment = "When scrolling takes over"
+                onboardingGoal = firstTargetText
+                weakMoment = weakMomentPreview
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
@@ -442,45 +445,42 @@ struct SetupView: View {
 
     private var recoveryStep: some View {
         VStack(spacing: 24) {
-            Spacer(minLength: 82)
+            Spacer(minLength: 48)
 
-            Text("Blanked can help you get that time back")
-                .font(.blankInter(size: 27, weight: .semibold, relativeTo: .title))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-                .frame(maxWidth: 342)
+            OnboardingHeader(
+                eyebrow: "Your first plan",
+                title: "Start with one protected window",
+                body: "Blanked will use this plan to guide your first block, reminders and progress insights."
+            )
 
-            VStack(spacing: 7) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("+\(animatedRecoveredYears)")
-                        .font(.blankInter(size: 50, weight: .semibold, relativeTo: .largeTitle))
-                        .monospacedDigit()
+            VStack(spacing: 10) {
+                OnboardingPlanPreviewRow(
+                    number: "1",
+                    title: "Block \(weakMomentPreview)",
+                    detail: "\(initialBlockMinutesPreview) minutes for your highest-risk window"
+                )
 
-                    Text("years")
-                        .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
-                        .foregroundStyle(BlankColors.airMist.opacity(0.86))
-                }
-                .foregroundStyle(BlankColors.airMist)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
+                OnboardingPlanPreviewRow(
+                    number: "2",
+                    title: "Choose the apps",
+                    detail: "Pick only the apps, categories or websites that pull you back"
+                )
 
-                Text("recovered over a lifetime")
-                    .font(.blankInter(size: 15, relativeTo: .subheadline))
-                    .foregroundStyle(Color.white.opacity(0.66))
-                    .multilineTextAlignment(.center)
+                OnboardingPlanPreviewRow(
+                    number: "3",
+                    title: "Review the pattern",
+                    detail: "Blanked turns blocks and unlocks into a weekly plan"
+                )
             }
             .frame(maxWidth: 342)
-            .onAppear {
-                startRecoveryCountAnimation()
-            }
 
             Spacer(minLength: 28)
 
-            Button("Start recovering") {
+            Button("Start my first block") {
                 goForward()
             }
             .buttonStyle(BlankPrimaryButtonStyle(light: true))
-            .frame(width: onboardingButtonWidth(for: "Start recovering"))
+            .frame(width: onboardingButtonWidth(for: "Start my first block"))
         }
         .frame(maxHeight: .infinity)
     }
@@ -489,11 +489,11 @@ struct SetupView: View {
         choiceStep(
             title: "What matters most to you?",
             options: [
-                ("target", "Better focus"),
-                ("moon.fill", "Better sleep"),
-                ("person.2.fill", "Be more present"),
-                ("brain.head.profile", "Improve mental health"),
-                ("ellipsis", "Other")
+                ("moon.fill", "Sleep better"),
+                ("target", "Deep work"),
+                ("person.2.fill", "More presence"),
+                ("app.badge.fill", "Less social media"),
+                ("lock.shield.fill", "Control back")
             ],
             selection: selectedOnboardingGoal
         ) { selectedOnboardingGoal = $0 }
@@ -515,18 +515,64 @@ struct SetupView: View {
 
     private var profileStep: some View {
         choiceStep(
-            title: "What describes you best?",
+            title: "When do you usually lose control?",
             options: [
-                ("laptopcomputer", "Technology"),
-                ("lightbulb.fill", "Entrepreneur"),
-                ("house.fill", "Remote"),
-                ("chart.bar.fill", "Finance"),
-                ("paintbrush.pointed.fill", "Creative"),
-                ("graduationcap.fill", "Student"),
-                ("heart.fill", "Caregiver")
+                ("moon.stars.fill", "Night scrolling"),
+                ("laptopcomputer", "Work distractions"),
+                ("graduationcap.fill", "Study focus"),
+                ("sparkles", "Boredom loop"),
+                ("person.2.fill", "Social relapse"),
+                ("sun.max.fill", "Morning checking")
             ],
             selection: selectedProfile
         ) { selectedProfile = $0 }
+    }
+
+    private var diagnosisStep: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 46)
+
+            OnboardingHeader(
+                eyebrow: "Your diagnosis",
+                title: onboardingArchetype,
+                body: riskBodyPreview
+            )
+
+            VStack(spacing: 11) {
+                OnboardingInsightCard(
+                    systemName: "exclamationmark.triangle.fill",
+                    title: riskTitlePreview,
+                    value: weakMomentPreview,
+                    caption: "Your first risk window"
+                )
+
+                OnboardingInsightCard(
+                    systemName: "clock.arrow.circlepath",
+                    title: "Recoverable time",
+                    value: "\(recoveredWeeklyHoursText)/week",
+                    caption: "Based on a 30% reduction"
+                )
+
+                OnboardingInsightCard(
+                    systemName: "scope",
+                    title: "First target",
+                    value: firstTargetText,
+                    caption: "Your starting point"
+                )
+            }
+            .frame(maxWidth: 342)
+
+            Spacer(minLength: 24)
+
+            Button("Build my plan") {
+                onboardingGoal = firstTargetText
+                weakMoment = weakMomentPreview
+                goForward()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle(light: true))
+            .frame(width: onboardingButtonWidth(for: "Build my plan"))
+        }
+        .frame(maxHeight: .infinity)
     }
 
     private var notificationsStep: some View {
@@ -591,7 +637,7 @@ struct SetupView: View {
             VStack(spacing: 24) {
                 OnboardingHeader(
                     eyebrow: "",
-                    title: "I'm ready to take back control",
+                    title: "I'm ready to protect \(commitmentFocusText)",
                     body: commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds))s"
                 )
 
@@ -628,9 +674,17 @@ struct SetupView: View {
         VStack(spacing: 15) {
             OnboardingHeader(
                 eyebrow: "",
-                title: "Start taking back your time",
-                body: "Block the apps that steal your focus. Try Blanked free for 3 days"
+                title: "Start your \(onboardingArchetype) plan",
+                body: "Your trial includes blocking, risk forecast, weekly plan, progress insights and relapse protection"
             )
+
+            VStack(spacing: 8) {
+                PaywallValueRow(systemName: "shield.fill", text: "Block your selected distractions")
+                PaywallValueRow(systemName: "waveform.path.ecg", text: "Forecast your next risk window")
+                PaywallValueRow(systemName: "calendar", text: "Follow a 7-day recovery plan")
+                PaywallValueRow(systemName: "lock.rotation", text: "Slow down emergency unlocks")
+            }
+            .frame(maxWidth: 342)
 
             VStack(spacing: 9) {
                 PlanButton(
@@ -762,10 +816,10 @@ struct SetupView: View {
             VStack(spacing: 20) {
                 OnboardingHeader(
                     eyebrow: "",
-                    title: sessionStore.hasSelectedApps ? "Your apps are protected" : "Choose what to block",
+                    title: sessionStore.hasSelectedApps ? "Your first block is ready" : "Choose what to block",
                     body: sessionStore.hasSelectedApps
-                        ? "\(sessionStore.selectionCount) apps, categories, or websites are ready in \(sessionStore.currentMode.name)"
-                        : "Pick the apps, categories, or websites that usually steal your time"
+                        ? "\(sessionStore.selectionCount) selections are ready for your \(initialBlockMinutesPreview)-min block at \(weakMomentPreview)"
+                        : "Pick the apps, categories, or websites that usually trigger your \(onboardingArchetype.lowercased()) pattern"
                 )
 
                 if sessionStore.hasSelectedApps {
@@ -923,7 +977,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
             return true
         case .trial:
             return false
@@ -953,6 +1007,128 @@ struct SetupView: View {
 
     private var recoveredYears: Int {
         max(1, Int((dailyHours * 0.30 * 84.1 / 24.0).rounded()))
+    }
+
+    private var recoveredWeeklyHours: Double {
+        max(0.5, dailyHours * 7.0 * 0.30)
+    }
+
+    private var recoveredWeeklyHoursText: String {
+        if recoveredWeeklyHours.rounded() == recoveredWeeklyHours {
+            return "\(Int(recoveredWeeklyHours))h"
+        }
+        return String(format: "%.1fh", recoveredWeeklyHours)
+    }
+
+    private var onboardingArchetype: String {
+        let goal = selectedOnboardingGoal.lowercased()
+        let profile = selectedProfile.lowercased()
+
+        if goal.contains("sleep") || profile.contains("night") {
+            return "Night Scroller"
+        }
+        if goal.contains("social") || profile.contains("social") || profile.contains("boredom") {
+            return "Dopamine Loop"
+        }
+        if goal.contains("presence") {
+            return "Presence Drifter"
+        }
+        if goal.contains("work") || profile.contains("work") || profile.contains("study") {
+            return "Focus Breaker"
+        }
+        return "Habit Rebuilder"
+    }
+
+    private var recommendedHourPreview: Int {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return 22
+        case "Dopamine Loop":
+            return 20
+        case "Presence Drifter":
+            return 18
+        case "Focus Breaker":
+            return selectedProfile.lowercased().contains("study") ? 16 : 9
+        default:
+            return selectedProfile.lowercased().contains("morning") ? 8 : Calendar.current.component(.hour, from: Date())
+        }
+    }
+
+    private var weakMomentPreview: String {
+        DigitalWellnessAI.hourRangeText(recommendedHourPreview)
+    }
+
+    private var initialBlockMinutesPreview: Int {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return 45
+        case "Focus Breaker":
+            return 45
+        case "Presence Drifter":
+            return 25
+        default:
+            return dailyHours >= 6.5 ? 35 : 30
+        }
+    }
+
+    private var riskTitlePreview: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Late-night scroll risk"
+        case "Dopamine Loop":
+            return "High stimulation risk"
+        case "Presence Drifter":
+            return "Attention leak risk"
+        case "Focus Breaker":
+            return "Deep-work interruption risk"
+        default:
+            return "Automatic checking risk"
+        }
+    }
+
+    private var riskBodyPreview: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Your highest leverage habit is protecting the final hour before sleep."
+        case "Dopamine Loop":
+            return "Your phone is likely filling low-energy moments before you notice."
+        case "Presence Drifter":
+            return "The first win is protecting short windows where you want to be present."
+        case "Focus Breaker":
+            return "Your biggest gain is starting a block before the first distraction."
+        default:
+            return "Your plan should make the first block easy and repeatable."
+        }
+    }
+
+    private var firstTargetText: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "Reduce late scrolling by 30%"
+        case "Dopamine Loop":
+            return "Break the boredom scroll loop"
+        case "Presence Drifter":
+            return "Protect one present window daily"
+        case "Focus Breaker":
+            return "Protect your first deep-work block"
+        default:
+            return "Build one repeatable block"
+        }
+    }
+
+    private var commitmentFocusText: String {
+        switch onboardingArchetype {
+        case "Night Scroller":
+            return "my sleep"
+        case "Dopamine Loop":
+            return "my attention"
+        case "Presence Drifter":
+            return "my presence"
+        case "Focus Breaker":
+            return "my focus"
+        default:
+            return "my time"
+        }
     }
 
     private func formattedHours(_ value: Double) -> String {
@@ -1260,6 +1436,116 @@ private struct ResultMetricView: View {
                 .foregroundStyle(Color.white.opacity(0.66))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
+        }
+    }
+}
+
+private struct OnboardingInsightCard: View {
+    let systemName: String
+    let title: String
+    let value: String
+    let caption: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: systemName)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(BlankColors.airMist)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.white.opacity(0.10)))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.56))
+
+                Text(value)
+                    .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white.opacity(0.94))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+
+                Text(caption)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.56))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+}
+
+private struct OnboardingPlanPreviewRow: View {
+    let number: String
+    let title: String
+    let detail: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Text(number)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(BlankColors.ink)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.white.opacity(0.86)))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(Color.white.opacity(0.94))
+
+                Text(detail)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .lineSpacing(2)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
+    }
+}
+
+private struct PaywallValueRow: View {
+    let systemName: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(BlankColors.airMist)
+                .frame(width: 20)
+
+            Text(text)
+                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.76))
+                .lineLimit(2)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 34)
+        .background {
+            Capsule().fill(Color.white.opacity(0.075))
         }
     }
 }

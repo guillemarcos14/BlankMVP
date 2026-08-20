@@ -1732,22 +1732,30 @@ private struct ReferenceBottomGlow: View {
         GeometryReader { proxy in
             ZStack {
                 Ellipse()
-                    .fill(palette.secondary.opacity(0.40))
-                    .frame(width: proxy.size.width * 1.45, height: 260)
-                    .blur(radius: 48)
-                    .position(x: proxy.size.width * 0.38, y: proxy.size.height + 10)
-
-                Ellipse()
                     .fill(palette.primary.opacity(0.34))
-                    .frame(width: proxy.size.width * 1.10, height: 230)
-                    .blur(radius: 52)
-                    .position(x: proxy.size.width * 0.72, y: proxy.size.height + 4)
+                    .frame(width: proxy.size.width * 1.55, height: 250)
+                    .blur(radius: 50)
+                    .position(x: proxy.size.width * 0.50, y: proxy.size.height + 34)
 
                 Ellipse()
-                    .fill(palette.accent.opacity(0.26))
-                    .frame(width: proxy.size.width * 1.08, height: 210)
-                    .blur(radius: 56)
-                    .position(x: proxy.size.width * 0.12, y: proxy.size.height + 18)
+                    .fill(palette.secondary.opacity(0.30))
+                    .frame(width: proxy.size.width * 1.18, height: 190)
+                    .blur(radius: 48)
+                    .position(x: proxy.size.width * 0.48, y: proxy.size.height + 18)
+
+                Ellipse()
+                    .fill(palette.secondary.opacity(0.36))
+                    .frame(width: proxy.size.width * 0.92, height: 360)
+                    .blur(radius: 58)
+                    .position(x: proxy.size.width * 0.95, y: proxy.size.height - 52)
+                    .mask(rightSideRiseMask(proxy: proxy))
+
+                Ellipse()
+                    .fill(palette.accent.opacity(0.25))
+                    .frame(width: proxy.size.width * 0.70, height: 300)
+                    .blur(radius: 64)
+                    .position(x: proxy.size.width * 0.86, y: proxy.size.height - 18)
+                    .mask(rightSideRiseMask(proxy: proxy))
 
                 LinearGradient(
                     colors: [
@@ -1764,6 +1772,20 @@ private struct ReferenceBottomGlow: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .ignoresSafeArea()
+    }
+
+    private func rightSideRiseMask(proxy: GeometryProxy) -> some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0.00),
+                .init(color: .clear, location: 0.44),
+                .init(color: .white.opacity(0.20), location: 0.62),
+                .init(color: .white, location: 1.00)
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+        .frame(width: proxy.size.width, height: proxy.size.height)
     }
 }
 

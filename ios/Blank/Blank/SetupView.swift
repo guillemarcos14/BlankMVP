@@ -252,17 +252,20 @@ struct SetupView: View {
     }
 
     private var nameStep: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 18) {
-                ReferenceOnboardingText(
-                    eyebrow: nil,
-                    lines: [
-                        .text("First, what should"),
-                        .text("we call you?", icon: "person.fill")
-                    ],
-                    body: nil
-                )
-
+        referenceScene(
+            lines: [
+                .text("First, what should"),
+                .text("we call you?", icon: "person.fill")
+            ],
+            primaryTitle: "Continue",
+            primaryAction: {
+                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    name = "You"
+                }
+                goForward()
+            },
+            centerContent: true,
+            accessory: AnyView(
                 TextField("Your name", text: $name)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -273,19 +276,8 @@ struct SetupView: View {
                     .frame(height: 54)
                     .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
                     .frame(maxWidth: 314, alignment: .leading)
-            }
-
-            Button("Continue") {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    name = "You"
-                }
-                goForward()
-            }
-            .buttonStyle(ReferenceOnboardingButtonStyle())
-            .frame(maxWidth: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            )
+        )
     }
 
     private var lifetimeStep: some View {
@@ -646,6 +638,7 @@ struct SetupView: View {
         primaryAction: (() -> Void)? = nil,
         secondaryTitle: String? = nil,
         secondaryAction: (() -> Void)? = nil,
+        centerContent: Bool = false,
         accessory: AnyView = AnyView(EmptyView())
     ) -> some View {
         ReferenceOnboardingScene(
@@ -656,6 +649,7 @@ struct SetupView: View {
             primaryAction: primaryAction,
             secondaryTitle: secondaryTitle,
             secondaryAction: secondaryAction,
+            centerContent: centerContent,
             accessory: accessory
         )
     }
@@ -1254,6 +1248,7 @@ private struct ReferenceOnboardingScene: View {
     let primaryAction: (() -> Void)?
     let secondaryTitle: String?
     let secondaryAction: (() -> Void)?
+    let centerContent: Bool
     let accessory: AnyView
     @State private var showsDetail = false
 
@@ -1265,6 +1260,7 @@ private struct ReferenceOnboardingScene: View {
         primaryAction: (() -> Void)?,
         secondaryTitle: String?,
         secondaryAction: (() -> Void)?,
+        centerContent: Bool,
         accessory: AnyView
     ) {
         self.eyebrow = eyebrow
@@ -1274,6 +1270,7 @@ private struct ReferenceOnboardingScene: View {
         self.primaryAction = primaryAction
         self.secondaryTitle = secondaryTitle
         self.secondaryAction = secondaryAction
+        self.centerContent = centerContent
         self.accessory = accessory
     }
 
@@ -1295,6 +1292,10 @@ private struct ReferenceOnboardingScene: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 18)
+
+            if centerContent {
+                Spacer(minLength: 0)
+            }
 
             if primaryTitle != nil || secondaryTitle != nil {
                 VStack(alignment: .leading, spacing: 10) {

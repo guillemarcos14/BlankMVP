@@ -21,6 +21,24 @@ private enum OnboardingStep: Int, CaseIterable {
     case permission
     case notifications
     case apps
+
+    var bottomGlowPalette: BottomGlowPalette {
+        let palettes: [BottomGlowPalette] = [
+            .init(id: 0, primary: Color(red: 0.16, green: 0.62, blue: 1.00), secondary: Color(red: 0.12, green: 0.86, blue: 0.96), accent: Color(red: 0.30, green: 0.45, blue: 1.00)),
+            .init(id: 1, primary: Color(red: 0.08, green: 0.48, blue: 1.00), secondary: Color(red: 0.22, green: 0.70, blue: 1.00), accent: Color(red: 0.06, green: 0.32, blue: 0.86)),
+            .init(id: 2, primary: Color(red: 0.24, green: 0.58, blue: 1.00), secondary: Color(red: 0.10, green: 0.78, blue: 0.92), accent: Color(red: 0.18, green: 0.40, blue: 1.00)),
+            .init(id: 3, primary: Color(red: 0.10, green: 0.40, blue: 0.98), secondary: Color(red: 0.34, green: 0.74, blue: 1.00), accent: Color(red: 0.08, green: 0.58, blue: 0.96)),
+            .init(id: 4, primary: Color(red: 0.20, green: 0.50, blue: 1.00), secondary: Color(red: 0.10, green: 0.66, blue: 0.92), accent: Color(red: 0.32, green: 0.52, blue: 1.00))
+        ]
+        return palettes[rawValue % palettes.count]
+    }
+}
+
+private struct BottomGlowPalette {
+    let id: Int
+    let primary: Color
+    let secondary: Color
+    let accent: Color
 }
 
 private enum OnboardingPlan: String {
@@ -86,7 +104,7 @@ struct SetupView: View {
 
     var body: some View {
         ZStack {
-            BlankOnboardingBackground()
+            BlankOnboardingBackground(palette: currentStep.bottomGlowPalette)
 
             VStack(spacing: 0) {
                 HStack {
@@ -1686,10 +1704,12 @@ private struct OnboardingChoiceButton: View {
 }
 
 private struct BlankOnboardingBackground: View {
+    let palette: BottomGlowPalette
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            ReferenceBottomGlow()
+            ReferenceBottomGlow(palette: palette)
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.00),
@@ -1701,27 +1721,30 @@ private struct BlankOnboardingBackground: View {
             )
             .ignoresSafeArea()
         }
+        .animation(.easeInOut(duration: 0.42), value: palette.id)
     }
 }
 
 private struct ReferenceBottomGlow: View {
+    let palette: BottomGlowPalette
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 Ellipse()
-                    .fill(BlankColors.airMist.opacity(0.42))
+                    .fill(palette.secondary.opacity(0.40))
                     .frame(width: proxy.size.width * 1.45, height: 260)
                     .blur(radius: 48)
                     .position(x: proxy.size.width * 0.38, y: proxy.size.height + 10)
 
                 Ellipse()
-                    .fill(BlankColors.airBlue.opacity(0.34))
+                    .fill(palette.primary.opacity(0.34))
                     .frame(width: proxy.size.width * 1.10, height: 230)
                     .blur(radius: 52)
                     .position(x: proxy.size.width * 0.72, y: proxy.size.height + 4)
 
                 Ellipse()
-                    .fill(Color(red: 1.0, green: 0.38, blue: 0.22).opacity(0.24))
+                    .fill(palette.accent.opacity(0.26))
                     .frame(width: proxy.size.width * 1.08, height: 210)
                     .blur(radius: 56)
                     .position(x: proxy.size.width * 0.12, y: proxy.size.height + 18)

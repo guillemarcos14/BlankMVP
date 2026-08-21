@@ -24,11 +24,11 @@ private enum OnboardingStep: Int, CaseIterable {
 
     var bottomGlowPalette: BottomGlowPalette {
         let palettes: [BottomGlowPalette] = [
-            .init(id: 0, primary: Color(red: 0.05, green: 0.64, blue: 1.00), secondary: Color(red: 0.00, green: 0.92, blue: 1.00), accent: Color(red: 0.16, green: 0.42, blue: 1.00)),
-            .init(id: 1, primary: Color(red: 0.02, green: 0.30, blue: 0.92), secondary: Color(red: 0.08, green: 0.56, blue: 1.00), accent: Color(red: 0.00, green: 0.20, blue: 0.70)),
-            .init(id: 2, primary: Color(red: 0.30, green: 0.46, blue: 1.00), secondary: Color(red: 0.00, green: 0.76, blue: 0.96), accent: Color(red: 0.22, green: 0.28, blue: 0.94)),
-            .init(id: 3, primary: Color(red: 0.00, green: 0.44, blue: 0.76), secondary: Color(red: 0.24, green: 0.86, blue: 1.00), accent: Color(red: 0.00, green: 0.64, blue: 0.96)),
-            .init(id: 4, primary: Color(red: 0.12, green: 0.24, blue: 0.88), secondary: Color(red: 0.00, green: 0.52, blue: 1.00), accent: Color(red: 0.38, green: 0.44, blue: 1.00))
+            .init(id: 0, primary: BlankColors.airBlue, secondary: BlankColors.airMist, accent: Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0)),
+            .init(id: 1, primary: Color(red: 0.48, green: 0.57, blue: 0.67), secondary: BlankColors.airBlue, accent: BlankColors.glassTint),
+            .init(id: 2, primary: Color(red: 0.40, green: 0.50, blue: 0.62), secondary: Color(red: 0.66, green: 0.74, blue: 0.82), accent: BlankColors.airMist),
+            .init(id: 3, primary: Color(red: 0.36, green: 0.47, blue: 0.58), secondary: BlankColors.airBlue, accent: Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0)),
+            .init(id: 4, primary: Color(red: 0.44, green: 0.53, blue: 0.64), secondary: BlankColors.airMist, accent: Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0))
         ]
         return palettes[rawValue % palettes.count]
     }
@@ -244,7 +244,7 @@ struct SetupView: View {
                 .text("more of your life"),
                 .text("than you think", icon: "iphone")
             ],
-            body: "Let's calculate it with your own pattern.",
+            body: "Let's calculate it",
             primaryTitle: button,
             primaryAction: goForward
         )
@@ -298,7 +298,7 @@ struct SetupView: View {
     private var dopamineStep: some View {
         referenceScene(
             lines: [
-                .text("Your feed is engineered"),
+                .text("Algorithms are built"),
                 .text("to pull you back", icon: "sparkles"),
                 .text("before you notice")
             ],
@@ -311,8 +311,8 @@ struct SetupView: View {
     private var dailyUseStep: some View {
         referenceScene(
             lines: [
-                .text("How much time"),
-                .text("do you spend daily", icon: "iphone"),
+                .text("What's your average"),
+                .text("daily screen time?", icon: "iphone"),
                 .accent("\(formattedHours(dailyHours)) / day")
             ],
             primaryTitle: "Calculate time lost",
@@ -334,13 +334,13 @@ struct SetupView: View {
     private var resultStep: some View {
         referenceScene(
             lines: [
-                .text("At this pace, your phone costs"),
+                .text("At this pace, your phone costs you"),
                 .accent("\(animatedLostDays) days", icon: "calendar"),
                 .text("this year"),
                 .accent("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
                 .text("over a lifetime")
             ],
-            primaryTitle: "See what I can recover",
+            primaryTitle: "See how I can recover",
             primaryAction: {
                 onboardingGoal = firstTargetText
                 weakMoment = weakMomentPreview
@@ -362,7 +362,10 @@ struct SetupView: View {
             ],
             body: "One repeatable block first. More automation later.",
             primaryTitle: "Start my first block",
-            primaryAction: goForward
+            primaryAction: {
+                sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
+                goForward()
+            }
         )
     }
 
@@ -412,8 +415,8 @@ struct SetupView: View {
     private var diagnosisStep: some View {
         referenceScene(
             lines: [
-                .text("You are a"),
-                .text(onboardingArchetype, icon: diagnosisIconName),
+                .text("Your first win is"),
+                .text(weakMomentPreview, icon: diagnosisIconName),
                 .text(riskTitlePreview),
                 .accent("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
             ],
@@ -422,6 +425,7 @@ struct SetupView: View {
             primaryAction: {
                 onboardingGoal = firstTargetText
                 weakMoment = weakMomentPreview
+                sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
                 goForward()
             }
         )
@@ -430,16 +434,15 @@ struct SetupView: View {
     private var notificationsStep: some View {
         referenceScene(
             lines: [
-                .text("Let Blanked warn you"),
-                .text("before your weakest moment", icon: "bell.badge.fill"),
-                .text(weakMomentPreview)
+                .text("Let us warn you"),
+                .text("before your weakest moment", icon: "bell.badge.fill")
             ],
-            body: "Reminders are only used to prevent relapse windows.",
             primaryTitle: "Enable reminders",
             primaryAction: requestNotifications,
             secondaryTitle: "Not now",
             secondaryAction: goForward,
-            accessory: AnyView(notificationPreview)
+            accessory: AnyView(notificationPreview),
+            accessoryAboveText: true
         )
     }
 
@@ -460,11 +463,11 @@ struct SetupView: View {
             ReferenceOnboardingText(
                 eyebrow: nil,
                 lines: [
-                    .text("Start your"),
-                    .text(onboardingArchetype, icon: diagnosisIconName),
-                    .text("plan")
+                    .text("Don't lose another"),
+                    .text("\(recoveredWeeklyHoursText) next week", icon: "clock.arrow.circlepath"),
+                    .text("to automatic scrolling")
                 ],
-                body: "App blocking, risk forecast and relapse protection."
+                body: "Start with 3 days free. Block the moments that steal your time, sleep better tonight, and feel back in control tomorrow."
             )
 
             VStack(spacing: 9) {
@@ -522,7 +525,7 @@ struct SetupView: View {
                     ProgressView()
                         .tint(Color.white)
                 } else {
-                    Text("Start free trial")
+                    Text("Start 3 days free")
                 }
             }
             .buttonStyle(ReferenceOnboardingButtonStyle())
@@ -583,7 +586,7 @@ struct SetupView: View {
             lines: [
                 .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
                 .text(sessionStore.hasSelectedApps ? "is ready" : "to block", icon: "app.badge.fill"),
-                .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingArchetype)
+                .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingNameText)
             ],
             body: sessionStore.hasSelectedApps
                 ? "\(initialBlockMinutesPreview) minutes at \(weakMomentPreview)."
@@ -635,7 +638,8 @@ struct SetupView: View {
         secondaryTitle: String? = nil,
         secondaryAction: (() -> Void)? = nil,
         centerContent: Bool = false,
-        accessory: AnyView = AnyView(EmptyView())
+        accessory: AnyView = AnyView(EmptyView()),
+        accessoryAboveText: Bool = false
     ) -> some View {
         ReferenceOnboardingScene(
             eyebrow: eyebrow,
@@ -646,7 +650,8 @@ struct SetupView: View {
             secondaryTitle: secondaryTitle,
             secondaryAction: secondaryAction,
             centerContent: centerContent,
-            accessory: accessory
+            accessory: accessory,
+            accessoryAboveText: accessoryAboveText
         )
     }
 
@@ -822,7 +827,7 @@ struct SetupView: View {
         case "How old are you?":
             return [
                 .text("Where are you"),
-                .text("in your routine?", icon: "person.fill")
+                .text("in life right now?", icon: "person.fill")
             ]
         case "When do you usually lose control?":
             return [
@@ -979,6 +984,11 @@ struct SetupView: View {
         default:
             return "my time"
         }
+    }
+
+    private var onboardingNameText: String {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedName.isEmpty ? "Your plan" : trimmedName
     }
 
     private func formattedHours(_ value: Double) -> String {
@@ -1214,6 +1224,7 @@ private struct ReferenceOnboardingScene: View {
     let secondaryAction: (() -> Void)?
     let centerContent: Bool
     let accessory: AnyView
+    let accessoryAboveText: Bool
     @State private var showsDetail = false
 
     init(
@@ -1225,7 +1236,8 @@ private struct ReferenceOnboardingScene: View {
         secondaryTitle: String?,
         secondaryAction: (() -> Void)?,
         centerContent: Bool,
-        accessory: AnyView
+        accessory: AnyView,
+        accessoryAboveText: Bool
     ) {
         self.eyebrow = eyebrow
         self.lines = lines
@@ -1236,6 +1248,7 @@ private struct ReferenceOnboardingScene: View {
         self.secondaryAction = secondaryAction
         self.centerContent = centerContent
         self.accessory = accessory
+        self.accessoryAboveText = accessoryAboveText
     }
 
     var body: some View {
@@ -1243,6 +1256,11 @@ private struct ReferenceOnboardingScene: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: 14) {
+                if accessoryAboveText {
+                    accessory
+                        .padding(.bottom, 8)
+                }
+
                 ReferenceOnboardingText(
                     eyebrow: eyebrow,
                     lines: lines,
@@ -1251,8 +1269,10 @@ private struct ReferenceOnboardingScene: View {
                     titleOpacity: showsDetail ? 0.38 : 1
                 )
 
-                accessory
-                    .padding(.top, 4)
+                if !accessoryAboveText {
+                    accessory
+                        .padding(.top, 4)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 42)
@@ -1276,7 +1296,7 @@ private struct ReferenceOnboardingScene: View {
                             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
                             .foregroundStyle(Color.white.opacity(0.70))
                             .buttonStyle(.plain)
-                            .padding(.leading, 4)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
                 .padding(.bottom, 0)
@@ -1396,8 +1416,9 @@ private struct ReferenceAnimatedLine: View {
                 .multilineTextAlignment(.leading)
                 .lineSpacing(0)
                 .tracking(0)
-                .shadow(color: line.isAccent ? Color.white.opacity(0.42) : .clear, radius: 11, x: 0, y: 0)
-                .shadow(color: line.isAccent ? Color(red: 0.58, green: 0.82, blue: 1).opacity(0.30) : .clear, radius: 18, x: 0, y: 0)
+                .shadow(color: line.isAccent ? Color.white.opacity(0.68) : .clear, radius: 10, x: 0, y: 0)
+                .shadow(color: line.isAccent ? BlankColors.airMist.opacity(0.52) : .clear, radius: 22, x: 0, y: 0)
+                .shadow(color: line.isAccent ? BlankColors.airBlue.opacity(0.34) : .clear, radius: 34, x: 0, y: 0)
 
             if iconAfterText {
                 iconView
@@ -1422,7 +1443,8 @@ private struct ReferenceAnimatedLine: View {
                 .font(.system(size: 25, weight: .bold))
                 .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
                 .frame(width: 28, height: 28)
-                .shadow(color: line.isAccent ? Color.white.opacity(0.36) : .clear, radius: 9, x: 0, y: 0)
+                .shadow(color: line.isAccent ? Color.white.opacity(0.62) : .clear, radius: 10, x: 0, y: 0)
+                .shadow(color: line.isAccent ? BlankColors.airMist.opacity(0.38) : .clear, radius: 18, x: 0, y: 0)
         }
     }
 }
@@ -1506,6 +1528,8 @@ private struct ResultMetricView: View {
             .foregroundStyle(Color.white)
             .lineLimit(1)
             .minimumScaleFactor(0.74)
+            .shadow(color: Color.white.opacity(0.46), radius: 10, x: 0, y: 0)
+            .shadow(color: BlankColors.airMist.opacity(0.38), radius: 24, x: 0, y: 0)
 
             Text(caption)
                 .font(.blankInter(size: 15, relativeTo: .subheadline))

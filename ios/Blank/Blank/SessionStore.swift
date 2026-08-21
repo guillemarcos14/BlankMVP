@@ -372,6 +372,27 @@ final class SessionStore: ObservableObject {
         selectMode(mode.id)
     }
 
+    func applyOnboardingPlan(modeName: String, startHour: Int) {
+        let cleanName = modeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let planModeName = cleanName.isEmpty ? "My Plan" : cleanName
+
+        if let existingMode = focusModes.first(where: { $0.name == planModeName }) {
+            currentModeId = existingMode.id
+        } else {
+            let mode = BlankFocusMode(name: planModeName, selectionData: Self.encodedSelection(selection))
+            focusModes.append(mode)
+            currentModeId = mode.id
+        }
+
+        let startMinute = min(max(startHour, 0), 23) * 60
+        schedule = BlankFocusSchedule(
+            enabled: true,
+            startMinute: startMinute,
+            endMinute: (startMinute + 60) % (24 * 60)
+        )
+        schedulePausedUntil = nil
+    }
+
     func renameMode(_ modeId: UUID, name: String) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return }

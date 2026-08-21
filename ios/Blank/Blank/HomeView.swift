@@ -35,7 +35,7 @@ struct HomeView: View {
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
-    private let unblankHoldDuration: TimeInterval = 20
+    private let unblankHoldDuration: TimeInterval = 24
 
     var body: some View {
         GeometryReader { proxy in
@@ -49,7 +49,7 @@ struct HomeView: View {
                     .zIndex(2)
 
                 configCard
-                    .padding(.horizontal, layout.horizontalPadding)
+                    .frame(width: layout.configCardWidth)
                     .padding(.top, layout.configTopPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
@@ -619,6 +619,7 @@ private struct HomeLayoutMetrics {
     let topPadding: CGFloat
     let configTopPadding: CGFloat
     let bottomPadding: CGFloat
+    let configCardWidth: CGFloat
     let messageMaxWidth: CGFloat
     let actionWidth: CGFloat
     let centerX: CGFloat
@@ -633,6 +634,7 @@ private struct HomeLayoutMetrics {
         topPadding = topSafeArea + 26
         configTopPadding = topPadding + 47 + 14
         bottomPadding = max(safeAreaInsets.bottom + 18, 34)
+        configCardWidth = min(max(width - horizontalPadding * 2, 260), 320)
         messageMaxWidth = min(max(width - horizontalPadding * 2, 280), 350)
         actionWidth = min(max(width - horizontalPadding * 2, 260), 342)
         centerX = width / 2
@@ -712,17 +714,31 @@ private struct UnblankBreathingPrompt: View {
             return BreathingStep(title: "Stay with it", secondsRemaining: 0, visualProgress: 0.20)
         }
 
-        let cycleElapsed = elapsed.truncatingRemainder(dividingBy: 10)
-        if cycleElapsed < 4 {
-            let progress = 0.20 + (cycleElapsed / 4) * 0.80
-            let secondsRemaining = max(1, Int(ceil(4 - cycleElapsed)))
-            return BreathingStep(title: "Inhale", secondsRemaining: secondsRemaining, visualProgress: progress)
+        let cycleElapsed = elapsed.truncatingRemainder(dividingBy: 12)
+        if cycleElapsed < 1 {
+            return BreathingStep(title: "Stay here", secondsRemaining: max(1, Int(ceil(1 - cycleElapsed))), visualProgress: 0.20)
         }
 
-        let exhaleElapsed = cycleElapsed - 4
-        let progress = 1.0 - (exhaleElapsed / 6) * 0.80
-        let secondsRemaining = max(1, Int(ceil(6 - exhaleElapsed)))
-        return BreathingStep(title: "Exhale", secondsRemaining: secondsRemaining, visualProgress: progress)
+        if cycleElapsed < 6 {
+            let phaseElapsed = cycleElapsed - 1
+            let progress = 0.20 + smoothBreathProgress(phaseElapsed / 5) * 0.80
+            let secondsRemaining = max(1, Int(ceil(6 - cycleElapsed)))
+            return BreathingStep(title: "Breathe in", secondsRemaining: secondsRemaining, visualProgress: progress)
+        }
+
+        if cycleElapsed < 11 {
+            let phaseElapsed = cycleElapsed - 6
+            let progress = 1.0 - smoothBreathProgress(phaseElapsed / 5) * 0.80
+            let secondsRemaining = max(1, Int(ceil(11 - cycleElapsed)))
+            return BreathingStep(title: "Breathe out", secondsRemaining: secondsRemaining, visualProgress: progress)
+        }
+
+        return BreathingStep(title: "Stay here", secondsRemaining: max(1, Int(ceil(12 - cycleElapsed))), visualProgress: 0.20)
+    }
+
+    private func smoothBreathProgress(_ rawProgress: TimeInterval) -> TimeInterval {
+        let x = min(max(rawProgress, 0), 1)
+        return x * x * (3 - 2 * x)
     }
 }
 
@@ -736,7 +752,7 @@ private struct BreathingCountdownText: View {
     let secondsRemaining: Int
 
     var body: some View {
-        Text(secondsRemaining > 0 ? "\(secondsRemaining) seconds" : "You're back in control")
+        Text(secondsRemaining > 0 ? "\(secondsRemaining) second\(secondsRemaining == 1 ? "" : "s")" : "You're back in control")
             .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
             .foregroundStyle(Color.white.opacity(0.62))
             .multilineTextAlignment(.center)
@@ -777,7 +793,7 @@ private struct BreathProgressLine: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(width: 188, height: 12)
-        .animation(.easeInOut(duration: 1.15), value: progress)
+        .animation(.easeInOut(duration: 1.35), value: progress)
     }
 }
 

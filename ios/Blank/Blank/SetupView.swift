@@ -353,8 +353,9 @@ struct SetupView: View {
     private var recoveryStep: some View {
         referenceScene(
             lines: [
-                .text("Let's protect"),
-                .text("\(weakMomentPreview)", icon: "shield.fill")
+                .text(riskBodyPreview),
+                .text("Let's protect", icon: "shield.fill"),
+                .text(weakMomentPreview)
             ],
             body: "Then review the pattern",
             primaryTitle: "Start my first block",
@@ -412,10 +413,9 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("Your first win is"),
-                .text(weakMomentPreview, icon: diagnosisIconName),
-                .accent("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
+                .text(weakMomentPreview, icon: diagnosisIconName)
             ],
-            body: riskBodyPreview,
+            body: "You can recover\n\(recoveredWeeklyHoursText)/week",
             primaryTitle: "Build my plan",
             primaryAction: {
                 onboardingGoal = firstTargetText
@@ -458,11 +458,10 @@ struct SetupView: View {
             ReferenceOnboardingText(
                 eyebrow: nil,
                 lines: [
-                    .text("Don't lose another"),
-                    .text("\(recoveredWeeklyHoursText) next week", icon: "clock.arrow.circlepath"),
-                    .text("to automatic scrolling")
+                    .text("Don't lose \(lostLifetimeYears) years"),
+                    .text("Start with 3 days free")
                 ],
-                body: "Start with 3 days free. Block the moments that steal your time, sleep better tonight, and feel back in control tomorrow."
+                body: nil
             )
 
             VStack(spacing: 9) {
@@ -580,11 +579,11 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
-                .text(sessionStore.hasSelectedApps ? "is ready" : "to block", icon: "app.badge.fill"),
+                .text(sessionStore.hasSelectedApps ? "is ready with" : "to block", icon: "app.badge.fill"),
                 .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingNameText)
             ],
             body: sessionStore.hasSelectedApps
-                ? "\(initialBlockMinutesPreview) minutes at \(weakMomentPreview)."
+                ? "1 hour at \(weakMomentPreview)"
                 : "Pick the apps, categories or websites that trigger this pattern.",
             primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
             primaryAction: selectAppsOrContinue,
@@ -1369,22 +1368,25 @@ private struct ReferenceOnboardingText: View {
     }
 
     private func detailLines(from text: String) -> [String] {
-        let words = text.split(separator: " ").map(String.init)
         var lines: [String] = []
-        var current = ""
 
-        for word in words {
-            let candidate = current.isEmpty ? word : "\(current) \(word)"
-            if candidate.count > 24, !current.isEmpty {
-                lines.append(current)
-                current = word
-            } else {
-                current = candidate
+        for paragraph in text.components(separatedBy: .newlines) {
+            let words = paragraph.split(separator: " ").map(String.init)
+            var current = ""
+
+            for word in words {
+                let candidate = current.isEmpty ? word : "\(current) \(word)"
+                if candidate.count > 24, !current.isEmpty {
+                    lines.append(current)
+                    current = word
+                } else {
+                    current = candidate
+                }
             }
-        }
 
-        if !current.isEmpty {
-            lines.append(current)
+            if !current.isEmpty {
+                lines.append(current)
+            }
         }
 
         return lines
@@ -1406,8 +1408,8 @@ private struct ReferenceAnimatedLine: View {
             Text(line.text)
                 .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
-                .lineLimit(2)
-                .minimumScaleFactor(0.68)
+                .lineLimit(line.icon == nil ? 2 : 1)
+                .minimumScaleFactor(line.icon == nil ? 0.68 : 0.46)
                 .multilineTextAlignment(.leading)
                 .lineSpacing(0)
                 .tracking(0)

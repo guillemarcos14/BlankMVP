@@ -687,115 +687,79 @@ private struct UnblankBreathingPrompt: View {
             let elapsed = min(max(0, context.date.timeIntervalSince(startedAt)), totalDuration)
             let step = breathingStep(for: elapsed)
 
-            VStack(spacing: 15) {
-                VStack(spacing: 5) {
-                    Text(step.title)
-                        .id(step.title)
-                        .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                        .foregroundStyle(Color.white)
-                        .opacity(step.titleOpacity)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                        .transition(.opacity)
-
-                    BreathingCountdownText(secondsRemaining: step.secondsRemaining, isVisible: step.showsCountdown)
-                }
+            VStack(spacing: 18) {
+                Text(step.title)
+                    .id(step.title)
+                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                    .foregroundStyle(Color.white)
+                    .opacity(step.titleOpacity)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .transition(.opacity)
+                    .frame(height: 42)
 
                 BreathProgressLine(progress: step.visualProgress)
             }
-            .animation(.easeInOut(duration: 0.85), value: step.title)
-            .animation(.easeInOut(duration: 0.65), value: step.titleOpacity)
-            .animation(.easeInOut(duration: 0.42), value: step.secondsRemaining)
+            .animation(.easeInOut(duration: 0.95), value: step.title)
+            .animation(.easeInOut(duration: 0.82), value: step.titleOpacity)
         }
         .frame(width: 260, height: 122)
     }
 
     private func breathingStep(for elapsed: TimeInterval) -> BreathingStep {
         if elapsed >= totalDuration {
-            return BreathingStep(title: "Breathe out", secondsRemaining: 0, visualProgress: 0.20, titleOpacity: 0, showsCountdown: false)
+            return BreathingStep(title: "Breathe out", visualProgress: 0.20, titleOpacity: 0)
         }
 
         if elapsed < 5 {
             let progress = 0.20 + smoothBreathProgress(elapsed / 5) * 0.80
-            return BreathingStep(title: "Breathe in", secondsRemaining: secondsLeft(in: 5, elapsed: elapsed), visualProgress: progress)
+            return BreathingStep(title: "Breathe in", visualProgress: progress)
         }
 
         if elapsed < 6 {
-            return BreathingStep(title: "Breathe in", secondsRemaining: 0, visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 5), showsCountdown: false)
+            return BreathingStep(title: "Breathe in", visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 5))
         }
 
         if elapsed < 11 {
             let phaseElapsed = elapsed - 6
             let progress = 1.0 - smoothBreathProgress(phaseElapsed / 5) * 0.80
-            return BreathingStep(title: "Breathe out", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
+            return BreathingStep(title: "Breathe out", visualProgress: progress)
         }
 
         if elapsed < 12 {
-            return BreathingStep(title: "Breathe out", secondsRemaining: 0, visualProgress: 0.20, titleOpacity: fadeOutOpacity(elapsed - 11), showsCountdown: false)
+            return BreathingStep(title: "Breathe out", visualProgress: 0.20, titleOpacity: fadeOutOpacity(elapsed - 11))
         }
 
         if elapsed < 17 {
             let phaseElapsed = elapsed - 12
             let progress = 0.20 + smoothBreathProgress(phaseElapsed / 5) * 0.80
-            return BreathingStep(title: "Breathe in", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
+            return BreathingStep(title: "Breathe in", visualProgress: progress)
         }
 
         if elapsed < 18 {
-            return BreathingStep(title: "Breathe in", secondsRemaining: 0, visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 17), showsCountdown: false)
+            return BreathingStep(title: "Breathe in", visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 17))
         }
 
         let phaseElapsed = elapsed - 18
         let progress = 1.0 - smoothBreathProgress(phaseElapsed / 5) * 0.80
-        return BreathingStep(title: "Breathe out", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
+        return BreathingStep(title: "Breathe out", visualProgress: progress)
     }
 
     private func smoothBreathProgress(_ rawProgress: TimeInterval) -> TimeInterval {
         let x = min(max(rawProgress, 0), 1)
-        return x * x * (3 - 2 * x)
+        return 0.5 - cos(Double.pi * x) / 2
     }
 
     private func fadeOutOpacity(_ elapsed: TimeInterval) -> Double {
         1 - smoothBreathProgress(elapsed)
     }
-
-    private func secondsLeft(in duration: TimeInterval, elapsed: TimeInterval) -> Int {
-        max(1, Int(ceil(duration - elapsed)))
-    }
 }
 
 private struct BreathingStep: Equatable {
     let title: String
-    let secondsRemaining: Int
     let visualProgress: Double
     var titleOpacity: Double = 1
-    var showsCountdown: Bool = true
-}
-
-private struct BreathingCountdownText: View {
-    let secondsRemaining: Int
-    let isVisible: Bool
-
-    var body: some View {
-        Text(secondsRemaining > 0 ? "\(secondsRemaining) second\(secondsRemaining == 1 ? "" : "s")" : "You're back in control")
-            .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.62))
-            .opacity(isVisible ? 1 : 0)
-            .multilineTextAlignment(.center)
-            .lineLimit(1)
-            .monospacedDigit()
-            .modifier(NumericTextTransition())
-    }
-}
-
-private struct NumericTextTransition: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 17.0, *) {
-            content.contentTransition(.numericText())
-        } else {
-            content.transition(.opacity)
-        }
-    }
 }
 
 private struct BreathProgressLine: View {
@@ -808,18 +772,18 @@ private struct BreathProgressLine: View {
 
             ZStack(alignment: .center) {
                 Capsule()
-                    .fill(Color.white.opacity(0.12))
-                    .frame(height: 2)
+                    .fill(Color.white.opacity(0.10))
+                    .frame(height: 1)
 
                 Capsule()
-                    .fill(Color.white.opacity(0.58))
-                    .frame(width: width, height: 2)
-                    .shadow(color: Color.white.opacity(0.22), radius: 8)
+                    .fill(Color.white.opacity(0.54))
+                    .frame(width: width, height: 1.5)
+                    .shadow(color: Color.white.opacity(0.14), radius: 6)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .frame(width: 188, height: 12)
-        .animation(.easeInOut(duration: 1.35), value: progress)
+        .animation(.easeInOut(duration: 1.45), value: progress)
     }
 }
 

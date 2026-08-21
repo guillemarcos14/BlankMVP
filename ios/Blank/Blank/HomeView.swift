@@ -372,7 +372,7 @@ struct HomeView: View {
                 }
             }
             .simultaneousGesture(
-                LongPressGesture(minimumDuration: unblankHoldDuration)
+                LongPressGesture(minimumDuration: unblankHoldDuration, maximumDistance: 80)
                     .onEnded { _ in
                         guard sessionStore.isBlankActive else { return }
                         let result = withAnimation(.easeInOut(duration: 0.65)) {

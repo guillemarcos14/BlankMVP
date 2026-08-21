@@ -178,6 +178,9 @@ struct SetupView: View {
             if step == .recovery {
                 recoveryRevealStep = 0
             }
+            if step == .commitment {
+                resetCommitmentHold()
+            }
         }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
@@ -359,7 +362,7 @@ struct SetupView: View {
             lines: recoverySceneLines,
             primaryTitle: "Start my first block",
             primaryAction: {
-                if recoveryRevealStep < 2 {
+                if recoveryRevealStep < 1 {
                     withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
                         recoveryRevealStep += 1
                     }
@@ -901,13 +904,8 @@ struct SetupView: View {
 
         guard recoveryRevealStep >= 1 else { return lines }
 
-        let planOpacity = recoveryRevealStep >= 2 ? 0.42 : 1.0
-        lines.append(.text("Let's protect", icon: "shield.fill", opacity: planOpacity))
-        lines.append(.text(weakMomentPreview, opacity: planOpacity))
-
-        if recoveryRevealStep >= 2 {
-            lines.append(.text("Then review the pattern"))
-        }
+        lines.append(.text("Let's protect", icon: "shield.fill"))
+        lines.append(.text(weakMomentPreview))
         return lines
     }
 
@@ -1176,6 +1174,11 @@ struct SetupView: View {
         commitmentSeconds = 0
     }
 
+    private func resetCommitmentHold() {
+        cancelCommitmentHold()
+        commitmentComplete = false
+    }
+
     private func completeCommitmentHold() {
         isCommitmentPressing = false
         commitmentTimer?.invalidate()
@@ -1244,6 +1247,9 @@ struct SetupView: View {
 
     private func goBack() {
         guard let previous = OnboardingStep(rawValue: max(currentStep.rawValue - 1, 0)) else { return }
+        if currentStep == .commitment {
+            resetCommitmentHold()
+        }
         withAnimation(.easeInOut(duration: 0.38)) {
             currentStep = previous
         }

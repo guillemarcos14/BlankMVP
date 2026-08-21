@@ -1,10 +1,20 @@
 import FamilyControls
 import SwiftUI
 
-private enum SettingsRoute: Hashable {
+private enum HomeSheet: Identifiable {
     case modes
     case schedule
     case report
+    case emergency
+
+    var id: String {
+        switch self {
+        case .modes: return "modes"
+        case .schedule: return "schedule"
+        case .report: return "report"
+        case .emergency: return "emergency"
+        }
+    }
 }
 
 struct HomeView: View {
@@ -16,11 +26,7 @@ struct HomeView: View {
     @State private var message: String?
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
-    @State private var showingSettings = false
-    @State private var settingsRoute: SettingsRoute?
-    @State private var showingEmergency = false
-    @State private var showingRelink = false
-    @State private var showingForgetConfirm = false
+    @State private var activeSheet: HomeSheet?
     @State private var nfcReader = NFCReader()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
@@ -80,53 +86,16 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
-            openSettings(.modes)
+            activeSheet = .modes
             sessionStore.shouldOpenBlockConfiguration = false
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
             guard shouldScan else { return }
             openWidgetScanIfNeeded()
         }
-        .sheet(isPresented: $showingSettings, onDismiss: {
-            settingsRoute = nil
-        }) {
-            SettingsSheet(
-                initialRoute: $settingsRoute,
-                showingPicker: $showingPicker,
-                showingEmergency: $showingEmergency,
-                showingRelink: $showingRelink,
-                showingForgetConfirm: $showingForgetConfirm
-            )
-            .presentationDetents([.medium, .large])
-            .blankTransparentPresentation()
-        }
-        .sheet(isPresented: $showingEmergency) {
-            EmergencySheet(
-                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-                coachMessage: emergencyCoachMessage
-            ) {
-                let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.deactivateForEmergency()
-                }
-                if unlocked {
-                    screenTimeBlocker.clear()
-                    message = nil
-                    messageAction = nil
-                }
-                return unlocked
-            }
-            .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingRelink) {
-            RelinkSheet(message: $message, messageAction: $messageAction)
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingForgetConfirm) {
-            ForgetBlankConfirmSheet {
-                sessionStore.forgetNfcTag()
-                screenTimeBlocker.clear()
-            }
-            .presentationDetents([.medium])
+        .sheet(item: $activeSheet) { sheet in
+            homeSheetContent(sheet)
+                .blankTransparentPresentation()
         }
     }
 
@@ -155,7 +124,7 @@ struct HomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                showingEmergency = true
+                activeSheet = .emergency
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
@@ -178,13 +147,13 @@ struct HomeView: View {
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
-                    openSettings(.report)
+                    activeSheet = .report
                 }
                 topNavButton("Mode") {
-                    openSettings(.modes)
+                    activeSheet = .modes
                 }
                 topNavButton("Habits") {
-                    openSettings(.schedule)
+                    activeSheet = .schedule
                 }
             }
             .padding(.horizontal, 22)
@@ -217,11 +186,6 @@ struct HomeView: View {
         .frame(width: 64, height: 47)
         .contentShape(Rectangle())
         .buttonStyle(.plain)
-    }
-
-    private func openSettings(_ route: SettingsRoute? = nil) {
-        settingsRoute = route
-        showingSettings = true
     }
 
     @ViewBuilder
@@ -510,10 +474,41 @@ struct HomeView: View {
                 message = approved ? "Screen Time authorized." : "Screen Time is still pending."
                 messageAction = approved ? nil : .screenTime
             }
-        case .relinkNfc:
-            showingRelink = true
         case .selectApps:
             showingPicker = true
+        }
+    }
+
+    @ViewBuilder
+    private func homeSheetContent(_ sheet: HomeSheet) -> some View {
+        switch sheet {
+        case .modes:
+            ModesList(showingPicker: $showingPicker) {
+                activeSheet = nil
+            }
+            .presentationDetents([.medium, .large])
+        case .schedule:
+            ScheduleEditorContent()
+                .presentationDetents([.medium, .large])
+        case .report:
+            ReportView()
+                .presentationDetents([.medium, .large])
+        case .emergency:
+            EmergencySheet(
+                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
+                coachMessage: emergencyCoachMessage
+            ) {
+                let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
+                    sessionStore.deactivateForEmergency()
+                }
+                if unlocked {
+                    screenTimeBlocker.clear()
+                    message = nil
+                    messageAction = nil
+                }
+                return unlocked
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -676,7 +671,6 @@ private struct GlassCornerHighlight: View {
 private struct ConfigIssue: Identifiable {
     enum Action {
         case screenTime
-        case relinkNfc
         case selectApps
     }
 
@@ -830,93 +824,6 @@ private struct ModesList: View {
     }
 }
 
-private struct SettingsSheet: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
-    @Binding var initialRoute: SettingsRoute?
-    @Binding var showingPicker: Bool
-    @Binding var showingEmergency: Bool
-    @Binding var showingRelink: Bool
-    @Binding var showingForgetConfirm: Bool
-    @Environment(\.dismiss) private var dismiss
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-
-    var body: some View {
-        Group {
-            if initialRoute == nil {
-                NavigationStack {
-                    settingsContent
-                }
-            } else {
-                routeContent
-            }
-        }
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-    }
-
-    @ViewBuilder
-    private var routeContent: some View {
-        switch initialRoute {
-        case .modes:
-            ModesList(showingPicker: $showingPicker) {
-                dismiss()
-            }
-        case .schedule:
-            ScheduleEditorContent()
-        case .report:
-            ReportView()
-        case nil:
-            EmptyView()
-        }
-    }
-
-    private var settingsContent: some View {
-        List {
-            Text("Settings")
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
-            settingsButton("Link new Blank") {
-                showingRelink = true
-                dismiss()
-            }
-            settingsButton("I forgot my Blank") {
-                showingForgetConfirm = true
-                dismiss()
-            }
-            settingsButton("Emergency", role: .destructive) {
-                showingEmergency = true
-                dismiss()
-            }
-        }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .tint(textColor)
-    }
-
-    private func settingsButton(
-        _ label: String,
-        role: ButtonRole? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role, action: action) {
-            HStack {
-                Text(label)
-                Spacer()
-            }
-        }
-        .foregroundStyle(role == .destructive ? Color.red : textColor)
-        .listRowBackground(Color.clear)
-    }
-}
-
 private extension View {
     @ViewBuilder
     func blankTransparentPresentation() -> some View {
@@ -1055,32 +962,6 @@ private struct TimeMenuRow: View {
     }
 }
 
-private struct ForgetBlankConfirmSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let onConfirm: () -> Void
-
-    var body: some View {
-        TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("I forgot my Blank")
-            TechnicalSheetDescription("This turns Blank off, removes the linked item, and returns to onboarding so you can register a new one.")
-            TechnicalSheetDescription("Your modes and selected apps stay saved.", emphasized: true)
-            TechnicalSheetActions {
-                Button("I forgot my Blank") {
-                    onConfirm()
-                    dismiss()
-                }
-                .buttonStyle(BlankPrimaryButtonStyle())
-
-                Button("Cancel") {
-                    dismiss()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
 private struct EmergencySheet: View {
     @Environment(\.dismiss) private var dismiss
     let emergencyUnlocksRemaining: Int
@@ -1088,7 +969,7 @@ private struct EmergencySheet: View {
     let onUnlock: () -> Bool
 
     var body: some View {
-        TechnicalSettingsSheetLayout {
+        TechnicalSheetLayout {
             TechnicalSheetTitle("Emergency")
             TechnicalSheetDescription(coachMessage, emphasized: true)
             TechnicalSheetDescription("This turns Blank off without using your Blank and unlocks protected apps. Use it only if you need access now.")
@@ -1111,47 +992,7 @@ private struct EmergencySheet: View {
     }
 }
 
-private struct RelinkSheet: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.dismiss) private var dismiss
-    @Binding var message: String?
-    @Binding var messageAction: ConfigIssue.Action?
-    @State private var nfcReader = NFCReader()
-
-    var body: some View {
-        TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("New Blank")
-            TechnicalSheetDescription("Scan the new Blank to replace the one you linked. Your modes and protected apps stay saved.")
-            TechnicalSheetActions {
-                Button("Scan new Blank") {
-                    nfcReader.scan { result in
-                        Task { @MainActor in
-                            switch result {
-                            case .success(let uid):
-                                sessionStore.nfcTagUid = uid
-                                message = "New Blank linked."
-                                messageAction = nil
-                                dismiss()
-                            case .failure(let error):
-                                message = error.localizedDescription
-                                messageAction = nil
-                            }
-                        }
-                    }
-                }
-                .buttonStyle(BlankPrimaryButtonStyle())
-
-                Button("Cancel") {
-                    dismiss()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
-private struct TechnicalSettingsSheetLayout<Content: View>: View {
+private struct TechnicalSheetLayout<Content: View>: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @ViewBuilder var content: Content
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }

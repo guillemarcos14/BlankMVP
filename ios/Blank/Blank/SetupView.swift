@@ -418,7 +418,8 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text("Your first win is"),
-                .text(weakMomentPreview, icon: diagnosisIconName)
+                .text("blocking your", icon: diagnosisIconName),
+                .text("weakest hour")
             ],
             body: "You can recover\n\(recoveredWeeklyHoursNumberText) hours a week\n\(recoveredYearlyDaysText) days a year",
             primaryTitle: "Build my plan",
@@ -1002,7 +1003,7 @@ struct SetupView: View {
         case "Night Scroller":
             return "Your highest leverage habit is protecting the final hour before sleep."
         case "Dopamine Loop":
-            return "Your phone is likely filling low-energy moments before you notice."
+            return "You usually scroll when your energy is lowest"
         case "Presence Drifter":
             return "The first win is protecting short windows where you want to be present."
         case "Focus Breaker":

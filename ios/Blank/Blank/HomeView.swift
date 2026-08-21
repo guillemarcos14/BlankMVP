@@ -696,45 +696,64 @@ private struct UnblankBreathingPrompt: View {
                         .minimumScaleFactor(0.82)
                         .transition(.opacity)
 
-                    Text(step.subtitle)
-                        .id(step.subtitle)
-                        .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.62))
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .transition(.opacity)
+                    BreathingCountdownText(secondsRemaining: step.secondsRemaining)
                 }
 
                 BreathProgressLine(progress: step.visualProgress)
             }
             .animation(.easeInOut(duration: 0.85), value: step.title)
+            .animation(.easeInOut(duration: 0.42), value: step.secondsRemaining)
         }
         .frame(width: 260, height: 122)
     }
 
     private func breathingStep(for elapsed: TimeInterval) -> BreathingStep {
-        if elapsed < 4 {
-            let progress = 0.20 + (elapsed / 4) * 0.80
-            return BreathingStep(title: "Inhale", subtitle: "4 seconds", visualProgress: progress)
+        if elapsed >= totalDuration {
+            return BreathingStep(title: "Stay with it", secondsRemaining: 0, visualProgress: 0.20)
         }
 
-        if elapsed < 11 {
-            return BreathingStep(title: "Hold", subtitle: "7 seconds", visualProgress: 1.0)
+        let cycleElapsed = elapsed.truncatingRemainder(dividingBy: 10)
+        if cycleElapsed < 4 {
+            let progress = 0.20 + (cycleElapsed / 4) * 0.80
+            let secondsRemaining = max(1, Int(ceil(4 - cycleElapsed)))
+            return BreathingStep(title: "Inhale", secondsRemaining: secondsRemaining, visualProgress: progress)
         }
 
-        if elapsed < 19 {
-            let progress = 1.0 - ((elapsed - 11) / 8) * 0.80
-            return BreathingStep(title: "Exhale", subtitle: "8 seconds", visualProgress: progress)
-        }
-
-        return BreathingStep(title: "Stay with it", subtitle: "You're back in control", visualProgress: 0.20)
+        let exhaleElapsed = cycleElapsed - 4
+        let progress = 1.0 - (exhaleElapsed / 6) * 0.80
+        let secondsRemaining = max(1, Int(ceil(6 - exhaleElapsed)))
+        return BreathingStep(title: "Exhale", secondsRemaining: secondsRemaining, visualProgress: progress)
     }
 }
 
 private struct BreathingStep: Equatable {
     let title: String
-    let subtitle: String
+    let secondsRemaining: Int
     let visualProgress: Double
+}
+
+private struct BreathingCountdownText: View {
+    let secondsRemaining: Int
+
+    var body: some View {
+        Text(secondsRemaining > 0 ? "\(secondsRemaining) seconds" : "You're back in control")
+            .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.62))
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .monospacedDigit()
+            .modifier(NumericTextTransition())
+    }
+}
+
+private struct NumericTextTransition: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.contentTransition(.numericText())
+        } else {
+            content.transition(.opacity)
+        }
+    }
 }
 
 private struct BreathProgressLine: View {

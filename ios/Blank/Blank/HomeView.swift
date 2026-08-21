@@ -35,7 +35,7 @@ struct HomeView: View {
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
-    private let unblankHoldDuration: TimeInterval = 24
+    private let unblankHoldDuration: TimeInterval = 23
 
     var body: some View {
         GeometryReader { proxy in
@@ -693,17 +693,19 @@ private struct UnblankBreathingPrompt: View {
                         .id(step.title)
                         .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                         .foregroundStyle(Color.white)
+                        .opacity(step.titleOpacity)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                         .transition(.opacity)
 
-                    BreathingCountdownText(secondsRemaining: step.secondsRemaining)
+                    BreathingCountdownText(secondsRemaining: step.secondsRemaining, isVisible: step.showsCountdown)
                 }
 
                 BreathProgressLine(progress: step.visualProgress)
             }
             .animation(.easeInOut(duration: 0.85), value: step.title)
+            .animation(.easeInOut(duration: 0.65), value: step.titleOpacity)
             .animation(.easeInOut(duration: 0.42), value: step.secondsRemaining)
         }
         .frame(width: 260, height: 122)
@@ -711,34 +713,54 @@ private struct UnblankBreathingPrompt: View {
 
     private func breathingStep(for elapsed: TimeInterval) -> BreathingStep {
         if elapsed >= totalDuration {
-            return BreathingStep(title: "Stay with it", secondsRemaining: 0, visualProgress: 0.20)
+            return BreathingStep(title: "Breathe out", secondsRemaining: 0, visualProgress: 0.20, titleOpacity: 0, showsCountdown: false)
         }
 
-        let cycleElapsed = elapsed.truncatingRemainder(dividingBy: 12)
-        if cycleElapsed < 1 {
-            return BreathingStep(title: "Stay here", secondsRemaining: max(1, Int(ceil(1 - cycleElapsed))), visualProgress: 0.20)
+        if elapsed < 5 {
+            let progress = 0.20 + smoothBreathProgress(elapsed / 5) * 0.80
+            return BreathingStep(title: "Breathe in", secondsRemaining: secondsLeft(in: 5, elapsed: elapsed), visualProgress: progress)
         }
 
-        if cycleElapsed < 6 {
-            let phaseElapsed = cycleElapsed - 1
-            let progress = 0.20 + smoothBreathProgress(phaseElapsed / 5) * 0.80
-            let secondsRemaining = max(1, Int(ceil(6 - cycleElapsed)))
-            return BreathingStep(title: "Breathe in", secondsRemaining: secondsRemaining, visualProgress: progress)
+        if elapsed < 6 {
+            return BreathingStep(title: "Breathe in", secondsRemaining: 0, visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 5), showsCountdown: false)
         }
 
-        if cycleElapsed < 11 {
-            let phaseElapsed = cycleElapsed - 6
+        if elapsed < 11 {
+            let phaseElapsed = elapsed - 6
             let progress = 1.0 - smoothBreathProgress(phaseElapsed / 5) * 0.80
-            let secondsRemaining = max(1, Int(ceil(11 - cycleElapsed)))
-            return BreathingStep(title: "Breathe out", secondsRemaining: secondsRemaining, visualProgress: progress)
+            return BreathingStep(title: "Breathe out", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
         }
 
-        return BreathingStep(title: "Stay here", secondsRemaining: max(1, Int(ceil(12 - cycleElapsed))), visualProgress: 0.20)
+        if elapsed < 12 {
+            return BreathingStep(title: "Breathe out", secondsRemaining: 0, visualProgress: 0.20, titleOpacity: fadeOutOpacity(elapsed - 11), showsCountdown: false)
+        }
+
+        if elapsed < 17 {
+            let phaseElapsed = elapsed - 12
+            let progress = 0.20 + smoothBreathProgress(phaseElapsed / 5) * 0.80
+            return BreathingStep(title: "Breathe in", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
+        }
+
+        if elapsed < 18 {
+            return BreathingStep(title: "Breathe in", secondsRemaining: 0, visualProgress: 1.0, titleOpacity: fadeOutOpacity(elapsed - 17), showsCountdown: false)
+        }
+
+        let phaseElapsed = elapsed - 18
+        let progress = 1.0 - smoothBreathProgress(phaseElapsed / 5) * 0.80
+        return BreathingStep(title: "Breathe out", secondsRemaining: secondsLeft(in: 5, elapsed: phaseElapsed), visualProgress: progress)
     }
 
     private func smoothBreathProgress(_ rawProgress: TimeInterval) -> TimeInterval {
         let x = min(max(rawProgress, 0), 1)
         return x * x * (3 - 2 * x)
+    }
+
+    private func fadeOutOpacity(_ elapsed: TimeInterval) -> Double {
+        1 - smoothBreathProgress(elapsed)
+    }
+
+    private func secondsLeft(in duration: TimeInterval, elapsed: TimeInterval) -> Int {
+        max(1, Int(ceil(duration - elapsed)))
     }
 }
 
@@ -746,15 +768,19 @@ private struct BreathingStep: Equatable {
     let title: String
     let secondsRemaining: Int
     let visualProgress: Double
+    var titleOpacity: Double = 1
+    var showsCountdown: Bool = true
 }
 
 private struct BreathingCountdownText: View {
     let secondsRemaining: Int
+    let isVisible: Bool
 
     var body: some View {
         Text(secondsRemaining > 0 ? "\(secondsRemaining) second\(secondsRemaining == 1 ? "" : "s")" : "You're back in control")
             .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
             .foregroundStyle(Color.white.opacity(0.62))
+            .opacity(isVisible ? 1 : 0)
             .multilineTextAlignment(.center)
             .lineLimit(1)
             .monospacedDigit()

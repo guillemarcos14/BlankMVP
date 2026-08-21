@@ -30,6 +30,7 @@ struct HomeView: View {
     @State private var nfcReader = NFCReader()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
+    @State private var unblankHoldStartedAt: Date?
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -224,13 +225,23 @@ struct HomeView: View {
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 22) {
-            Text(homeTagline)
-                .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
-                .foregroundStyle(Color.white)
-                .multilineTextAlignment(.center)
-                .lineSpacing(-2)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
+            Group {
+                if sessionStore.isBlankActive, let unblankHoldStartedAt {
+                    UnblankBreathingPrompt(startedAt: unblankHoldStartedAt)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                } else {
+                    Text(homeTagline)
+                        .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(-2)
+                        .lineLimit(3)
+                        .minimumScaleFactor(0.78)
+                        .transition(.opacity.combined(with: .scale(scale: 1.02)))
+                }
+            }
+            .frame(height: 122)
+            .animation(.easeInOut(duration: 0.42), value: unblankHoldStartedAt != nil)
 
             bottomAction(width: actionWidth)
 
@@ -351,6 +362,7 @@ struct HomeView: View {
                         screenTimeBlocker.clear()
                         unblankHoldProgress = 0
                         isAnimatingUnblankHold = false
+                        unblankHoldStartedAt = nil
                         setMessage(for: result)
                     }
             )
@@ -359,6 +371,7 @@ struct HomeView: View {
                     .onChanged { _ in
                         guard sessionStore.isBlankActive, !isAnimatingUnblankHold else { return }
                         isAnimatingUnblankHold = true
+                        unblankHoldStartedAt = Date()
                         unblankHoldProgress = 0
                         withAnimation(.linear(duration: 20)) {
                             unblankHoldProgress = 1
@@ -366,6 +379,7 @@ struct HomeView: View {
                     }
                     .onEnded { _ in
                         isAnimatingUnblankHold = false
+                        unblankHoldStartedAt = nil
                         withAnimation(.easeOut(duration: 0.18)) {
                             unblankHoldProgress = 0
                         }
@@ -640,6 +654,78 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
+    }
+}
+
+private struct UnblankBreathingPrompt: View {
+    let startedAt: Date
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            let phase = breathingPhase(at: context.date)
+            let scale = breathingScale(for: phase)
+            let prompt = breathingPrompt(for: phase)
+
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        Circle()
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    }
+                    .frame(width: 104, height: 104)
+                    .scaleEffect(scale)
+                    .opacity(0.42)
+                    .shadow(color: Color.white.opacity(0.10), radius: 18)
+
+                VStack(spacing: 6) {
+                    Text(prompt)
+                        .id(prompt)
+                        .font(.blankInter(size: 32, weight: .medium, relativeTo: .largeTitle))
+                        .foregroundStyle(Color.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+
+                    Text("Let the urge pass")
+                        .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.62))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .animation(.easeInOut(duration: 0.36), value: prompt)
+        }
+        .frame(width: 260, height: 122)
+    }
+
+    private func breathingPhase(at date: Date) -> Double {
+        let elapsed = max(0, date.timeIntervalSince(startedAt))
+        return elapsed.truncatingRemainder(dividingBy: 6) / 6
+    }
+
+    private func breathingScale(for phase: Double) -> Double {
+        if phase < 0.45 {
+            return 0.88 + (phase / 0.45) * 0.18
+        }
+
+        if phase < 0.88 {
+            return 1.06 - ((phase - 0.45) / 0.43) * 0.18
+        }
+
+        return 0.88
+    }
+
+    private func breathingPrompt(for phase: Double) -> String {
+        if phase < 0.45 {
+            return "Breathe in"
+        }
+
+        if phase < 0.88 {
+            return "Breathe out"
+        }
+
+        return "Stay here"
     }
 }
 

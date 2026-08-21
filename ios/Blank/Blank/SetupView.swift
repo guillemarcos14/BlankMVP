@@ -258,14 +258,11 @@ struct SetupView: View {
             ],
             primaryTitle: "Continue",
             primaryAction: {
-                if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    name = "You"
-                }
                 goForward()
             },
             centerContent: true,
             accessory: AnyView(
-                TextField("Your name", text: $name)
+                TextField("You", text: $name)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .font(.blankInter(size: 18, weight: .medium, relativeTo: .body))
@@ -302,7 +299,7 @@ struct SetupView: View {
                 .text("to pull you back", icon: "sparkles"),
                 .text("before you notice")
             ],
-            body: "Blanked is built to interrupt that loop before it wins.",
+            body: "Blanked is built to interrupt that loop before it wins",
             primaryTitle: "Continue",
             primaryAction: goForward
         )
@@ -340,6 +337,7 @@ struct SetupView: View {
                 .accent("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
                 .text("over a lifetime")
             ],
+            body: "That's too much time",
             primaryTitle: "See how I can recover",
             primaryAction: {
                 onboardingGoal = firstTargetText
@@ -355,12 +353,10 @@ struct SetupView: View {
     private var recoveryStep: some View {
         referenceScene(
             lines: [
-                .text("Protect"),
-                .text("\(weakMomentPreview)", icon: "shield.fill"),
-                .text("for \(initialBlockMinutesPreview) minutes"),
-                .text("then review the pattern", icon: "chart.line.uptrend.xyaxis")
+                .text("Let's protect"),
+                .text("\(weakMomentPreview)", icon: "shield.fill")
             ],
-            body: "One repeatable block first. More automation later.",
+            body: "Then review the pattern",
             primaryTitle: "Start my first block",
             primaryAction: {
                 sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
@@ -417,7 +413,6 @@ struct SetupView: View {
             lines: [
                 .text("Your first win is"),
                 .text(weakMomentPreview, icon: diagnosisIconName),
-                .text(riskTitlePreview),
                 .accent("\(recoveredWeeklyHoursText)/week recoverable", icon: "clock.arrow.circlepath")
             ],
             body: riskBodyPreview,

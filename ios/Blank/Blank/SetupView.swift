@@ -469,6 +469,13 @@ struct SetupView: View {
                 body: nil
             )
 
+            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
+                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.50))
+                .multilineTextAlignment(.leading)
+                .lineSpacing(3)
+                .frame(maxWidth: 330, alignment: .leading)
+
             VStack(spacing: 9) {
                 PlanButton(
                     title: "Annual",
@@ -888,17 +895,39 @@ struct SetupView: View {
     }
 
     private var recoverySceneLines: [ReferenceTextLine] {
-        if recoveryRevealStep == 0 {
-            return [.text(riskBodyPreview)]
-        }
-        var lines: [ReferenceTextLine] = [
-            .text(riskBodyPreview),
-            .text("Let's protect", icon: "shield.fill"),
-            .text(weakMomentPreview)
-        ]
+        let openingOpacity = recoveryRevealStep == 0 ? 1.0 : 0.34
+        var lines = onboardingTextLines(from: riskBodyPreview, opacity: openingOpacity)
+
+        guard recoveryRevealStep >= 1 else { return lines }
+
+        let planOpacity = recoveryRevealStep >= 2 ? 0.42 : 1.0
+        lines.append(.text("Let's protect", icon: "shield.fill", opacity: planOpacity))
+        lines.append(.text(weakMomentPreview, opacity: planOpacity))
+
         if recoveryRevealStep >= 2 {
             lines.append(.text("Then review the pattern"))
         }
+        return lines
+    }
+
+    private func onboardingTextLines(from text: String, opacity: Double = 1) -> [ReferenceTextLine] {
+        var lines: [ReferenceTextLine] = []
+        var current = ""
+
+        for word in text.split(separator: " ").map(String.init) {
+            let candidate = current.isEmpty ? word : "\(current) \(word)"
+            if candidate.count > 24, !current.isEmpty {
+                lines.append(.text(current, opacity: opacity))
+                current = word
+            } else {
+                current = candidate
+            }
+        }
+
+        if !current.isEmpty {
+            lines.append(.text(current, opacity: opacity))
+        }
+
         return lines
     }
 
@@ -1231,13 +1260,14 @@ private struct ReferenceTextLine: Identifiable {
     let text: String
     let icon: String?
     let isAccent: Bool
+    let opacity: Double
 
-    static func text(_ text: String, icon: String? = nil) -> ReferenceTextLine {
-        ReferenceTextLine(text: text, icon: icon, isAccent: false)
+    static func text(_ text: String, icon: String? = nil, opacity: Double = 1) -> ReferenceTextLine {
+        ReferenceTextLine(text: text, icon: icon, isAccent: false, opacity: opacity)
     }
 
-    static func accent(_ text: String, icon: String? = nil) -> ReferenceTextLine {
-        ReferenceTextLine(text: text, icon: icon, isAccent: true)
+    static func accent(_ text: String, icon: String? = nil, opacity: Double = 1) -> ReferenceTextLine {
+        ReferenceTextLine(text: text, icon: icon, isAccent: true, opacity: opacity)
     }
 }
 
@@ -1455,7 +1485,8 @@ private struct ReferenceAnimatedLine: View {
             }
         }
         .frame(maxWidth: 354, alignment: .leading)
-        .opacity(visible ? 1 : 0)
+        .opacity(visible ? line.opacity : 0)
+        .animation(.easeInOut(duration: 0.26), value: line.opacity)
         .offset(y: visible ? 0 : 28)
         .blur(radius: visible ? 0 : 5)
         .onAppear {

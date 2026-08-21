@@ -35,6 +35,7 @@ struct HomeView: View {
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Shaping what we\ncreate with the\npower of time."
+    private let unblankHoldDuration: TimeInterval = 20
 
     var body: some View {
         GeometryReader { proxy in
@@ -193,33 +194,51 @@ struct HomeView: View {
     private var configCard: some View {
         let issues = configIssues
         if !issues.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(spacing: 8) {
                 ForEach(issues) { issue in
                     Button {
                         resolve(issue.action)
                     } label: {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: "exclamationmark.circle")
-                            VStack(alignment: .leading, spacing: 4) {
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(BlankColors.ink.opacity(0.76))
+                                .frame(width: 22, height: 22)
+                                .background(Circle().fill(Color.white.opacity(0.54)))
+
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(issue.title)
                                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                                    .foregroundStyle(BlankColors.ink)
+                                    .lineLimit(1)
+
                                 Text(issue.body)
                                     .font(.blankInter(size: 13, relativeTo: .footnote))
                                     .foregroundStyle(BlankColors.mutedInk)
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
-                            Spacer(minLength: 8)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(BlankColors.mutedInk)
+                            .layoutPriority(1)
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .fill(.ultraThinMaterial)
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .fill(Color.white.opacity(0.68))
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(Color.white.opacity(0.42), lineWidth: 1)
+                            }
+                        }
+                        .shadow(color: Color.black.opacity(0.05), radius: 12, y: 6)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.78))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -227,7 +246,7 @@ struct HomeView: View {
         VStack(spacing: 22) {
             Group {
                 if sessionStore.isBlankActive, let unblankHoldStartedAt {
-                    UnblankBreathingPrompt(startedAt: unblankHoldStartedAt)
+                    UnblankBreathingPrompt(startedAt: unblankHoldStartedAt, totalDuration: unblankHoldDuration)
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 } else {
                     Text(homeTagline)
@@ -353,7 +372,7 @@ struct HomeView: View {
                 }
             }
             .simultaneousGesture(
-                LongPressGesture(minimumDuration: 20)
+                LongPressGesture(minimumDuration: unblankHoldDuration)
                     .onEnded { _ in
                         guard sessionStore.isBlankActive else { return }
                         let result = withAnimation(.easeInOut(duration: 0.65)) {
@@ -373,7 +392,7 @@ struct HomeView: View {
                         isAnimatingUnblankHold = true
                         unblankHoldStartedAt = Date()
                         unblankHoldProgress = 0
-                        withAnimation(.linear(duration: 20)) {
+                        withAnimation(.linear(duration: unblankHoldDuration)) {
                             unblankHoldProgress = 1
                         }
                     }
@@ -659,73 +678,87 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
 
 private struct UnblankBreathingPrompt: View {
     let startedAt: Date
+    let totalDuration: TimeInterval
 
     var body: some View {
         TimelineView(.animation) { context in
-            let phase = breathingPhase(at: context.date)
-            let scale = breathingScale(for: phase)
-            let prompt = breathingPrompt(for: phase)
+            let elapsed = min(max(0, context.date.timeIntervalSince(startedAt)), totalDuration)
+            let step = breathingStep(for: elapsed)
 
-            ZStack {
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Circle()
-                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                    }
-                    .frame(width: 104, height: 104)
-                    .scaleEffect(scale)
-                    .opacity(0.42)
-                    .shadow(color: Color.white.opacity(0.10), radius: 18)
-
-                VStack(spacing: 6) {
-                    Text(prompt)
-                        .id(prompt)
-                        .font(.blankInter(size: 32, weight: .medium, relativeTo: .largeTitle))
+            VStack(spacing: 15) {
+                VStack(spacing: 5) {
+                    Text(step.title)
+                        .id(step.title)
+                        .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                         .foregroundStyle(Color.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
-                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        .transition(.opacity)
 
-                    Text("Let the urge pass")
+                    Text(step.subtitle)
+                        .id(step.subtitle)
                         .font(.blankInter(size: 13, weight: .regular, relativeTo: .footnote))
                         .foregroundStyle(Color.white.opacity(0.62))
                         .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .transition(.opacity)
                 }
+
+                BreathProgressLine(progress: step.visualProgress)
             }
-            .animation(.easeInOut(duration: 0.36), value: prompt)
+            .animation(.easeInOut(duration: 0.85), value: step.title)
         }
         .frame(width: 260, height: 122)
     }
 
-    private func breathingPhase(at date: Date) -> Double {
-        let elapsed = max(0, date.timeIntervalSince(startedAt))
-        return elapsed.truncatingRemainder(dividingBy: 6) / 6
+    private func breathingStep(for elapsed: TimeInterval) -> BreathingStep {
+        if elapsed < 4 {
+            let progress = 0.20 + (elapsed / 4) * 0.80
+            return BreathingStep(title: "Inhale", subtitle: "4 seconds", visualProgress: progress)
+        }
+
+        if elapsed < 11 {
+            return BreathingStep(title: "Hold", subtitle: "7 seconds", visualProgress: 1.0)
+        }
+
+        if elapsed < 19 {
+            let progress = 1.0 - ((elapsed - 11) / 8) * 0.80
+            return BreathingStep(title: "Exhale", subtitle: "8 seconds", visualProgress: progress)
+        }
+
+        return BreathingStep(title: "Stay with it", subtitle: "You're back in control", visualProgress: 0.20)
     }
+}
 
-    private func breathingScale(for phase: Double) -> Double {
-        if phase < 0.45 {
-            return 0.88 + (phase / 0.45) * 0.18
+private struct BreathingStep: Equatable {
+    let title: String
+    let subtitle: String
+    let visualProgress: Double
+}
+
+private struct BreathProgressLine: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            let clamped = min(max(progress, 0.16), 1)
+            let width = proxy.size.width * CGFloat(clamped)
+
+            ZStack(alignment: .center) {
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(height: 2)
+
+                Capsule()
+                    .fill(Color.white.opacity(0.58))
+                    .frame(width: width, height: 2)
+                    .shadow(color: Color.white.opacity(0.22), radius: 8)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
-
-        if phase < 0.88 {
-            return 1.06 - ((phase - 0.45) / 0.43) * 0.18
-        }
-
-        return 0.88
-    }
-
-    private func breathingPrompt(for phase: Double) -> String {
-        if phase < 0.45 {
-            return "Breathe in"
-        }
-
-        if phase < 0.88 {
-            return "Breathe out"
-        }
-
-        return "Stay here"
+        .frame(width: 188, height: 12)
+        .animation(.easeInOut(duration: 1.15), value: progress)
     }
 }
 

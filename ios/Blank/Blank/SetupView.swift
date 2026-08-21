@@ -91,6 +91,7 @@ struct SetupView: View {
     @State private var animatedRecoveredYears = 0
     @State private var onboardingDataConsent = false
     @State private var presentedLegalDocument: BlankLegalDocument?
+    @State private var recoveryRevealStep = 0
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
@@ -173,6 +174,9 @@ struct SetupView: View {
         .onChange(of: currentStep) { step in
             if step == .lifetime {
                 startLifetimeAnimation()
+            }
+            if step == .recovery {
+                recoveryRevealStep = 0
             }
         }
         .onChange(of: sessionStore.selection) { newSelection in
@@ -352,16 +356,17 @@ struct SetupView: View {
 
     private var recoveryStep: some View {
         referenceScene(
-            lines: [
-                .text(riskBodyPreview),
-                .text("Let's protect", icon: "shield.fill"),
-                .text(weakMomentPreview)
-            ],
-            body: "Then review the pattern",
+            lines: recoverySceneLines,
             primaryTitle: "Start my first block",
             primaryAction: {
-                sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
-                goForward()
+                if recoveryRevealStep < 2 {
+                    withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
+                        recoveryRevealStep += 1
+                    }
+                } else {
+                    sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
+                    goForward()
+                }
             }
         )
     }
@@ -415,7 +420,7 @@ struct SetupView: View {
                 .text("Your first win is"),
                 .text(weakMomentPreview, icon: diagnosisIconName)
             ],
-            body: "You can recover\n\(recoveredWeeklyHoursText)/week",
+            body: "You can recover\n\(recoveredWeeklyHoursNumberText) hours a week\n\(recoveredYearlyDaysText) days a year",
             primaryTitle: "Build my plan",
             primaryAction: {
                 onboardingGoal = firstTargetText
@@ -458,8 +463,8 @@ struct SetupView: View {
             ReferenceOnboardingText(
                 eyebrow: nil,
                 lines: [
-                    .text("Don't lose \(lostLifetimeYears) years"),
-                    .text("Start with 3 days free")
+                    .text("Don't lose \(lostLifetimeYears) years."),
+                    .text("Start with 3 days free.")
                 ],
                 body: nil
             )
@@ -557,8 +562,9 @@ struct SetupView: View {
                     .frame(maxWidth: 320)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 22)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .padding(.top, 34)
+        .padding(.bottom, 34)
     }
 
     private var permissionStep: some View {
@@ -583,7 +589,7 @@ struct SetupView: View {
                 .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingNameText)
             ],
             body: sessionStore.hasSelectedApps
-                ? "1 hour at \(weakMomentPreview)"
+                ? weakMomentPreview
                 : "Pick the apps, categories or websites that trigger this pattern.",
             primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
             primaryAction: selectAppsOrContinue,
@@ -867,6 +873,33 @@ struct SetupView: View {
             return "\(Int(recoveredWeeklyHours))h"
         }
         return String(format: "%.1fh", recoveredWeeklyHours)
+    }
+
+    private var recoveredWeeklyHoursNumberText: String {
+        if recoveredWeeklyHours.rounded() == recoveredWeeklyHours {
+            return "\(Int(recoveredWeeklyHours))"
+        }
+        return String(format: "%.1f", recoveredWeeklyHours)
+    }
+
+    private var recoveredYearlyDaysText: String {
+        let days = max(1, Int(((recoveredWeeklyHours * 52.0) / 24.0).rounded()))
+        return "\(days)"
+    }
+
+    private var recoverySceneLines: [ReferenceTextLine] {
+        if recoveryRevealStep == 0 {
+            return [.text(riskBodyPreview)]
+        }
+        var lines: [ReferenceTextLine] = [
+            .text(riskBodyPreview),
+            .text("Let's protect", icon: "shield.fill"),
+            .text(weakMomentPreview)
+        ]
+        if recoveryRevealStep >= 2 {
+            lines.append(.text("Then review the pattern"))
+        }
+        return lines
     }
 
     private var onboardingArchetype: String {

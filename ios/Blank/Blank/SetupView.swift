@@ -1791,13 +1791,12 @@ private struct OnboardingEdgeHalo: View {
     let palette: BottomGlowPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let duration = 6.6
-    private let segmentLength = 0.24
+    private let duration = 8.8
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { context in
             GeometryReader { proxy in
-                let inset: CGFloat = 2
+                let inset: CGFloat = 5
                 let cornerRadius = min(max(proxy.safeAreaInsets.top + 18, 42), 60)
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 let phase = reduceMotion ? 0.62 : normalizedPhase(from: context.date)
@@ -1807,14 +1806,17 @@ private struct OnboardingEdgeHalo: View {
                         .inset(by: 3)
                         .stroke(palette.secondary.opacity(0.07), lineWidth: 1)
 
-                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 48, opacity: 0.24)
+                    edgeSegment(shape: shape, inset: inset + 44, phase: wrappedPhase(phase - 0.14), length: 0.34, lineWidth: 78, opacity: 0.055)
+                        .blur(radius: 46)
+
+                    edgeSegment(shape: shape, inset: inset + 28, phase: wrappedPhase(phase - 0.08), length: 0.36, lineWidth: 60, opacity: 0.10)
+                        .blur(radius: 38)
+
+                    edgeSegment(shape: shape, inset: inset + 12, phase: wrappedPhase(phase - 0.035), length: 0.36, lineWidth: 42, opacity: 0.18)
                         .blur(radius: 30)
 
-                    edgeSegment(shape: shape, inset: inset + 18, phase: phase, lineWidth: 34, opacity: 0.28)
-                        .blur(radius: 24)
-
-                    edgeSegment(shape: shape, inset: inset + 34, phase: phase, lineWidth: 22, opacity: 0.20)
-                        .blur(radius: 18)
+                    edgeSegment(shape: shape, inset: inset, phase: phase, length: 0.30, lineWidth: 28, opacity: 0.28)
+                        .blur(radius: 22)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .allowsHitTesting(false)
@@ -1829,25 +1831,32 @@ private struct OnboardingEdgeHalo: View {
         return progress < 0 ? progress + 1 : progress
     }
 
+    private func wrappedPhase(_ phase: Double) -> Double {
+        let wrapped = phase.truncatingRemainder(dividingBy: 1)
+        return wrapped < 0 ? wrapped + 1 : wrapped
+    }
+
     @ViewBuilder
     private func edgeSegment(
         shape: RoundedRectangle,
         inset: CGFloat,
         phase: Double,
+        length: Double,
         lineWidth: CGFloat,
         opacity: Double
     ) -> some View {
         let start = phase
-        let end = start + segmentLength
+        let end = start + length
         let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
         let gradient = LinearGradient(
             colors: [
                 .clear,
-                palette.primary.opacity(opacity * 0.30),
-                BlankColors.airBlue.opacity(opacity * 0.66),
-                BlankColors.airMist.opacity(opacity),
-                Color.white.opacity(opacity * 0.72),
-                palette.secondary.opacity(opacity * 0.52),
+                palette.primary.opacity(opacity * 0.12),
+                BlankColors.airBlue.opacity(opacity * 0.34),
+                BlankColors.airMist.opacity(opacity * 0.72),
+                Color.white.opacity(opacity),
+                BlankColors.airMist.opacity(opacity * 0.48),
+                palette.secondary.opacity(opacity * 0.20),
                 .clear
             ],
             startPoint: .leading,

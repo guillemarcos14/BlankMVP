@@ -154,6 +154,7 @@ struct SetupView: View {
     @State private var isSubmittingOnboardingResponse = false
     @State private var presentedLegalDocument: BlankLegalDocument?
     @State private var recoveryRevealStep = 0
+    @State private var personalizationShowsDetail = false
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var onboardingAnonymousUserId = ""
@@ -539,35 +540,38 @@ struct SetupView: View {
                             .text("Let's personalize"),
                             .text("the plan", icon: "sparkles")
                         ],
-                        body: "We use the answers to personalize your plan\nand improve the recommendations.",
-                        detailStartIndex: 2
+                        body: personalizationShowsDetail ? "We use the answers to personalize your plan\nand improve the recommendations." : nil,
+                        detailStartIndex: 2,
+                        titleOpacity: personalizationShowsDetail ? 0.38 : 1
                     )
-
-                    Text("We do not share the app list or Screen Time data.")
-                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.52))
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(2)
-                        .frame(maxWidth: 318, alignment: .leading)
-                        .padding(.top, 2)
                 }
                 .frame(maxWidth: 318, alignment: .leading)
                 .position(x: proxy.size.width / 2, y: proxy.size.height * 0.46)
 
-                Button {
-                    submitOnboardingPersonalization()
-                } label: {
-                    if isSubmittingOnboardingResponse {
-                        ProgressView()
-                            .tint(Color.white)
-                    } else {
-                        Text("Personalize my plan")
+                VStack(spacing: 9) {
+                    Button {
+                        handlePersonalizationTap()
+                    } label: {
+                        if isSubmittingOnboardingResponse {
+                            ProgressView()
+                                .tint(Color.white)
+                        } else {
+                            Text("Personalize my plan")
+                        }
                     }
+                    .buttonStyle(ReferenceOnboardingButtonStyle())
+                    .frame(maxWidth: 318)
+                    .disabled(isSubmittingOnboardingResponse)
+
+                    Text("We do not share the app list or Screen Time data.")
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(2)
+                        .frame(maxWidth: 318)
                 }
-                .buttonStyle(ReferenceOnboardingButtonStyle())
                 .frame(maxWidth: 318)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .disabled(isSubmittingOnboardingResponse)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1233,6 +1237,19 @@ struct SetupView: View {
         }
     }
 
+    private func handlePersonalizationTap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+
+        guard personalizationShowsDetail else {
+            withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
+                personalizationShowsDetail = true
+            }
+            return
+        }
+
+        submitOnboardingPersonalization()
+    }
+
     private func currentOnboardingAnonymousUserId() -> String {
         if !onboardingAnonymousUserId.isEmpty {
             return onboardingAnonymousUserId
@@ -1372,6 +1389,9 @@ struct SetupView: View {
         guard let previous = OnboardingStep(rawValue: max(currentStep.rawValue - 1, 0)) else { return }
         if currentStep == .commitment {
             resetCommitmentHold()
+        }
+        if currentStep == .personalization || previous == .personalization {
+            personalizationShowsDetail = false
         }
         withAnimation(.easeInOut(duration: 0.38)) {
             currentStep = previous

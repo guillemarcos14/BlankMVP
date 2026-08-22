@@ -670,13 +670,13 @@ struct SetupView: View {
                     .padding(.top, 10)
             }
 
-            Spacer(minLength: 16)
+            Spacer(minLength: 24)
 
             legalDisclosure
         }
         .frame(maxWidth: 318, maxHeight: .infinity, alignment: .center)
         .padding(.top, 10)
-        .padding(.bottom, 10)
+        .padding(.bottom, 4)
     }
 
     private var permissionStep: some View {
@@ -865,16 +865,16 @@ struct SetupView: View {
     }
 
     private var legalDisclosure: some View {
-        VStack(spacing: 3) {
-            Text("Full access today. \(selectedPlanRenewalDisclosure)")
-                .multilineTextAlignment(.center)
-
+        VStack(spacing: 4) {
             HStack(spacing: 3) {
                 legalButton("Terms of Use", document: .termsOfUse)
                 Text("and")
                 legalButton("Privacy Policy", document: .privacyPolicy)
                 Text("apply")
             }
+
+            Text("Full access today. \(selectedPlanRenewalDisclosure)")
+                .multilineTextAlignment(.center)
         }
         .font(.blankInter(size: 11, relativeTo: .caption2))
         .foregroundStyle(Color.white.opacity(0.40))
@@ -2130,9 +2130,9 @@ private struct PlanButton: View {
                 .frame(width: 18, height: 18)
             }
             .foregroundStyle(Color.white.opacity(0.88))
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 17)
+            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             .background {
                 ZStack {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)

@@ -540,7 +540,7 @@ struct SetupView: View {
                             .text("Let's personalize"),
                             .text("the plan", icon: "sparkles")
                         ],
-                        body: personalizationShowsDetail ? "We use the answers to personalize your plan\nand improve the recommendations." : nil,
+                        body: personalizationShowsDetail ? "Use the answers to personalize my plan\nand improve the recommendations." : nil,
                         detailStartIndex: 2,
                         titleOpacity: personalizationShowsDetail ? 0.38 : 1
                     )
@@ -563,7 +563,7 @@ struct SetupView: View {
                     .frame(maxWidth: 318)
                     .disabled(isSubmittingOnboardingResponse)
 
-                    Text("We do not share the app list or Screen Time data.")
+                    Text("We do not share the app list or screen time data.")
                         .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                         .foregroundStyle(Color.white.opacity(0.52))
                         .multilineTextAlignment(.center)
@@ -2202,7 +2202,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Onboarding Data",
-                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan and improve recommendations. Blanked does not share your app list or Screen Time data."
+                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan and improve recommendations. Blanked does not share your app list or screen time data."
                 ),
                 (
                     "Purchases",

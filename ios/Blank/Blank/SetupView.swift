@@ -578,105 +578,105 @@ struct SetupView: View {
     }
 
     private var trialStep: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .bottom) {
-                VStack(spacing: 0) {
-                    ReferenceOnboardingText(
-                        eyebrow: nil,
-                        lines: [
-                            .text("Don't lose \(lostLifetimeYears) years."),
-                            .text("Start with 3 days free.")
-                        ],
-                        body: nil
-                    )
+        VStack(spacing: 0) {
+            Spacer(minLength: 20)
 
-                    Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
-                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.50))
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(3)
-                        .frame(maxWidth: 318, alignment: .leading)
-                        .padding(.top, 15)
+            ReferenceOnboardingText(
+                eyebrow: nil,
+                lines: [
+                    .text("Don't lose \(lostLifetimeYears) years."),
+                    .text("Start with 3 days free.")
+                ],
+                body: nil
+            )
 
-                    VStack(spacing: 9) {
-                        PlanButton(
-                            title: "Annual",
-                            price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
-                            detail: "3 days free, then billed yearly",
-                            badge: "Best value",
-                            selected: selectedPlan == .annual
-                        ) {
-                            selectedPlan = .annual
-                        }
+            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
+                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.50))
+                .multilineTextAlignment(.leading)
+                .lineSpacing(3)
+                .frame(maxWidth: 318, alignment: .leading)
+                .padding(.top, 15)
 
-                        PlanButton(
-                            title: "Monthly",
-                            price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "€2.99"),
-                            detail: "3 days free, then billed monthly",
-                            badge: nil,
-                            selected: selectedPlan == .monthly
-                        ) {
-                            selectedPlan = .monthly
-                        }
-                    }
-                    .frame(maxWidth: 318)
-                    .padding(.top, 25)
+            VStack(spacing: 9) {
+                PlanButton(
+                    title: "Annual",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
+                    detail: "3 days free, then billed yearly",
+                    badge: "Best value",
+                    selected: selectedPlan == .annual
+                ) {
+                    selectedPlan = .annual
+                }
 
-                    Button {
-                        purchaseSelectedPlan()
-                    } label: {
-                        if purchaseStore.isPurchasing || purchaseStore.isLoading {
-                            ProgressView()
-                                .tint(Color.black)
-                        } else {
-                            Text("Start Free")
-                        }
-                    }
-                    .buttonStyle(PaywallPrimaryButtonStyle())
-                    .frame(maxWidth: 318)
-                    .padding(.top, 22)
+                PlanButton(
+                    title: "Monthly",
+                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "€2.99"),
+                    detail: "3 days free, then billed monthly",
+                    badge: nil,
+                    selected: selectedPlan == .monthly
+                ) {
+                    selectedPlan = .monthly
+                }
+            }
+            .frame(maxWidth: 318)
+            .padding(.top, 25)
 
-                    Button("Restore purchases") {
-                        Task {
-                            await purchaseStore.restorePurchases()
-                            if purchaseStore.hasEntitlement {
-                                trialStarted = true
-                                goForward()
-                            }
-                        }
-                    }
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.70))
-                    .buttonStyle(.plain)
-                    .padding(.top, 17)
+            Button {
+                purchaseSelectedPlan()
+            } label: {
+                if purchaseStore.isPurchasing || purchaseStore.isLoading {
+                    ProgressView()
+                        .tint(Color.black)
+                } else {
+                    Text("Start Free")
+                }
+            }
+            .buttonStyle(PaywallPrimaryButtonStyle())
+            .frame(maxWidth: 318)
+            .padding(.top, 22)
 
-                    if isReviewDemoAccessAvailable {
-                        Button("Continue in demo mode") {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            continueWithReviewDemoAccess()
-                        }
-                        .buttonStyle(ReferenceOnboardingButtonStyle())
-                        .frame(maxWidth: 318)
-                        .padding(.top, 17)
-                    }
-
-                    if let purchaseMessage = purchaseStore.message {
-                        Text(purchaseMessage)
-                            .font(.blankInter(size: 12, relativeTo: .caption))
-                            .foregroundStyle(Color.white.opacity(0.74))
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: 318)
-                            .padding(.top, 12)
+            Button("Restore purchases") {
+                Task {
+                    await purchaseStore.restorePurchases()
+                    if purchaseStore.hasEntitlement {
+                        trialStarted = true
+                        goForward()
                     }
                 }
-                .frame(maxWidth: 318)
-                .position(x: proxy.size.width / 2, y: proxy.size.height * 0.47)
-
-                legalDisclosure
-                    .padding(.bottom, 7)
             }
+            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.70))
+            .buttonStyle(.plain)
+            .padding(.top, 13)
+
+            if isReviewDemoAccessAvailable {
+                Button("Continue in demo mode") {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    continueWithReviewDemoAccess()
+                }
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.82))
+                .buttonStyle(.plain)
+                .padding(.top, 13)
+            }
+
+            if let purchaseMessage = purchaseStore.message {
+                Text(purchaseMessage)
+                    .font(.blankInter(size: 12, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.74))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 318)
+                    .padding(.top, 10)
+            }
+
+            Spacer(minLength: 16)
+
+            legalDisclosure
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: 318, maxHeight: .infinity, alignment: .center)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
     }
 
     private var permissionStep: some View {
@@ -903,10 +903,8 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .personalization, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .personalization, .trial, .notifications, .permission, .apps:
             return true
-        case .trial:
-            return false
         }
     }
 

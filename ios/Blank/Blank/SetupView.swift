@@ -154,6 +154,8 @@ struct SetupView: View {
             }
             .padding(.horizontal, 28)
             .padding(.bottom, 0)
+
+            OnboardingEdgeHalo(palette: currentStep.bottomGlowPalette)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -1770,7 +1772,6 @@ private struct BlankOnboardingBackground: View {
         ZStack {
             Color.black.ignoresSafeArea()
             ReferenceBottomGlow(palette: palette)
-            OnboardingEdgeHalo(palette: palette)
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.00),
@@ -1789,59 +1790,61 @@ private struct BlankOnboardingBackground: View {
 private struct OnboardingEdgeHalo: View {
     let palette: BottomGlowPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var phase = 0.0
 
-    private let segmentLength = 0.22
+    private let duration = 3.8
+    private let segmentLength = 0.18
 
     var body: some View {
-        GeometryReader { proxy in
-            let inset: CGFloat = 5
-            let cornerRadius = min(max(proxy.safeAreaInsets.top + 16, 40), 58)
-            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { context in
+            GeometryReader { proxy in
+                let inset: CGFloat = 8
+                let cornerRadius = min(max(proxy.safeAreaInsets.top + 18, 42), 60)
+                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                let phase = reduceMotion ? 0.62 : normalizedPhase(from: context.date)
 
-            ZStack {
-                shape
-                    .inset(by: inset)
-                    .stroke(palette.secondary.opacity(0.10), lineWidth: 1)
+                ZStack {
+                    shape
+                        .inset(by: inset)
+                        .stroke(palette.secondary.opacity(0.18), lineWidth: 1)
 
-                edgeSegment(shape: shape, inset: inset, lineWidth: 10, opacity: 0.28)
-                    .blur(radius: 12)
+                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 14, opacity: 0.34)
+                        .blur(radius: 14)
 
-                edgeSegment(shape: shape, inset: inset, lineWidth: 3, opacity: 0.74)
-                    .blur(radius: 1.2)
+                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 4, opacity: 0.86)
+                        .blur(radius: 1.6)
 
-                edgeSegment(shape: shape, inset: inset, lineWidth: 1.15, opacity: 0.92)
+                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 1.4, opacity: 1.0)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .allowsHitTesting(false)
             }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-            .allowsHitTesting(false)
         }
         .ignoresSafeArea()
-        .onAppear {
-            guard !reduceMotion else { return }
-            phase = 0
-            withAnimation(.linear(duration: 4.8).repeatForever(autoreverses: false)) {
-                phase = 1
-            }
-        }
+    }
+
+    private func normalizedPhase(from date: Date) -> Double {
+        let progress = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: duration) / duration
+        return progress < 0 ? progress + 1 : progress
     }
 
     @ViewBuilder
     private func edgeSegment(
         shape: RoundedRectangle,
         inset: CGFloat,
+        phase: Double,
         lineWidth: CGFloat,
         opacity: Double
     ) -> some View {
-        let start = reduceMotion ? 0.64 : phase
+        let start = phase
         let end = start + segmentLength
         let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
         let gradient = LinearGradient(
             colors: [
                 .clear,
-                palette.primary.opacity(opacity * 0.42),
+                palette.primary.opacity(opacity * 0.58),
                 BlankColors.airMist.opacity(opacity),
                 Color.white.opacity(opacity),
-                palette.secondary.opacity(opacity * 0.62),
+                palette.secondary.opacity(opacity * 0.72),
                 .clear
             ],
             startPoint: .leading,

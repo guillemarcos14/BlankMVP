@@ -17,6 +17,7 @@ private enum OnboardingStep: Int, CaseIterable {
     case diagnosis
     case recovery
     case commitment
+    case personalization
     case trial
     case permission
     case notifications
@@ -68,6 +69,67 @@ private enum BlankLegalDocument: Identifiable {
     }
 }
 
+private struct OnboardingResponsePayload: Encodable {
+    let anonymous_user_id: String
+    let name: String
+    let age_range: String
+    let goal: String
+    let profile: String
+    let daily_hours: Double
+    let ai_goal: String
+    let weak_moment: String
+    let selected_plan: String
+    let locale: String
+    let app_version: String
+    let build_number: String
+    let data_consent: Bool
+    let consent_text: String
+}
+
+private struct OnboardingResponsesClient {
+    private let baseURL: URL?
+    private let session: URLSession
+
+    init(baseURL: URL? = Self.configuredBaseURL(), session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func submit(_ payload: OnboardingResponsePayload) async throws {
+        #if DEBUG
+        if baseURL == nil {
+            return
+        }
+        #endif
+
+        guard let baseURL else {
+            throw URLError(.badURL)
+        }
+
+        let url = baseURL.appendingPathComponent("onboarding-responses")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(payload)
+
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+    }
+
+    private static func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+}
+
 struct SetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
@@ -89,11 +151,12 @@ struct SetupView: View {
     @State private var animatedLostDays = 0
     @State private var animatedLostYears = 0
     @State private var animatedRecoveredYears = 0
-    @State private var onboardingDataConsent = false
+    @State private var isSubmittingOnboardingResponse = false
     @State private var presentedLegalDocument: BlankLegalDocument?
     @State private var recoveryRevealStep = 0
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
+    @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var onboardingAnonymousUserId = ""
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var onboardingGoal = ""
     @AppStorage("blankOnboardingWeakMoment", store: BlankSharedState.defaults) private var weakMoment = ""
     @AppStorage("blankOnboardingGoal", store: BlankSharedState.defaults) private var selectedOnboardingGoal = ""
@@ -229,6 +292,8 @@ struct SetupView: View {
             recoveryStep
         case .commitment:
             commitmentStep
+        case .personalization:
+            personalizationStep
         case .trial:
             trialStep
         case .permission:
@@ -464,6 +529,50 @@ struct SetupView: View {
         )
     }
 
+    private var personalizationStep: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 14) {
+                    ReferenceOnboardingText(
+                        eyebrow: nil,
+                        lines: [
+                            .text("Let's personalize"),
+                            .text("the plan", icon: "sparkles")
+                        ],
+                        body: "We use the answers to personalize your plan\nand improve the recommendations.",
+                        detailStartIndex: 2
+                    )
+
+                    Text("We do not share the app list or Screen Time data.")
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(2)
+                        .frame(maxWidth: 318, alignment: .leading)
+                        .padding(.top, 2)
+                }
+                .frame(maxWidth: 318, alignment: .leading)
+                .position(x: proxy.size.width / 2, y: proxy.size.height * 0.46)
+
+                Button {
+                    submitOnboardingPersonalization()
+                } label: {
+                    if isSubmittingOnboardingResponse {
+                        ProgressView()
+                            .tint(Color.white)
+                    } else {
+                        Text("Personalize my plan")
+                    }
+                }
+                .buttonStyle(ReferenceOnboardingButtonStyle())
+                .frame(maxWidth: 318)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .disabled(isSubmittingOnboardingResponse)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     private var trialStep: some View {
         VStack(spacing: 15) {
             ReferenceOnboardingText(
@@ -504,31 +613,6 @@ struct SetupView: View {
                 }
             }
             .frame(maxWidth: 318)
-
-            Button {
-                onboardingDataConsent.toggle()
-                if onboardingDataConsent {
-                    message = nil
-                }
-            } label: {
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: onboardingDataConsent ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(onboardingDataConsent ? 0.88 : 0.52))
-                        .frame(width: 18, height: 18)
-
-                    Text(onboardingConsentText)
-                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.70))
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(2)
-                }
-                .frame(maxWidth: 318, alignment: .leading)
-                .padding(.vertical, 6)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Required onboarding data consent")
 
             Button {
                 purchaseSelectedPlan()
@@ -792,10 +876,6 @@ struct SetupView: View {
         .buttonStyle(.plain)
     }
 
-    private var onboardingConsentText: String {
-        "I agree to the Privacy Policy and Terms"
-    }
-
     private var isReviewDemoAccessAvailable: Bool {
         #if DEBUG
         #if targetEnvironment(simulator)
@@ -808,7 +888,7 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .personalization, .notifications, .permission, .apps:
             return true
         case .trial:
             return false
@@ -1104,11 +1184,6 @@ struct SetupView: View {
     }
 
     private func purchaseSelectedPlan() {
-        guard onboardingDataConsent else {
-            message = "Please agree to the Privacy Policy and Terms to continue"
-            return
-        }
-
         let productId = selectedPlan == .annual
             ? StoreKitPurchaseStore.annualProductId
             : StoreKitPurchaseStore.monthlyProductId
@@ -1119,6 +1194,52 @@ struct SetupView: View {
                 goForward()
             }
         }
+    }
+
+    private func submitOnboardingPersonalization() {
+        guard !isSubmittingOnboardingResponse else { return }
+        isSubmittingOnboardingResponse = true
+        message = nil
+        let payload = OnboardingResponsePayload(
+            anonymous_user_id: currentOnboardingAnonymousUserId(),
+            name: onboardingNameText,
+            age_range: selectedAgeRange,
+            goal: selectedOnboardingGoal,
+            profile: selectedProfile,
+            daily_hours: storedDailyHours,
+            ai_goal: firstTargetText,
+            weak_moment: weakMomentPreview,
+            selected_plan: selectedPlan.rawValue,
+            locale: Locale.current.identifier,
+            app_version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            build_number: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+            data_consent: true,
+            consent_text: "Personalize my plan"
+        )
+
+        Task {
+            do {
+                try await OnboardingResponsesClient().submit(payload)
+                await MainActor.run {
+                    isSubmittingOnboardingResponse = false
+                    goForward()
+                }
+            } catch {
+                await MainActor.run {
+                    isSubmittingOnboardingResponse = false
+                    message = "We could not personalize your plan. Please try again."
+                }
+            }
+        }
+    }
+
+    private func currentOnboardingAnonymousUserId() -> String {
+        if !onboardingAnonymousUserId.isEmpty {
+            return onboardingAnonymousUserId
+        }
+        let created = UUID().uuidString
+        onboardingAnonymousUserId = created
+        return created
     }
 
     private func continueWithReviewDemoAccess() {
@@ -1361,7 +1482,7 @@ private struct ReferenceOnboardingScene: View {
                         }
                     }
                     .frame(maxWidth: 318, alignment: .leading)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
             }
         }
@@ -2061,7 +2182,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Onboarding Data",
-                    "Your onboarding answers are used inside the app to personalize the experience and are stored locally on your device. Blanked does not send onboarding answers to its own backend in this version."
+                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan and improve recommendations. Blanked does not share your app list or Screen Time data."
                 ),
                 (
                     "Purchases",

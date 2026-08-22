@@ -132,12 +132,7 @@ struct SetupView: View {
                         VStack(spacing: 22) {
                             content
                                 .id(currentStep.rawValue)
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    )
-                                )
+                                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .center)))
                                 .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 64) : nil)
 
                             if let message {
@@ -563,7 +558,7 @@ struct SetupView: View {
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {
-                    BlankHaptics.lightTap()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     continueWithReviewDemoAccess()
                 }
                 .buttonStyle(ReferenceOnboardingButtonStyle())
@@ -634,7 +629,7 @@ struct SetupView: View {
                     OnboardingChoiceButton(
                         systemName: option.icon,
                         title: option.title,
-                        selected: selection == option.title
+                        selected: false
                     ) {
                         onSelect(option.title)
                         goForward()
@@ -1196,7 +1191,7 @@ struct SetupView: View {
     }
 
     private func playCommitmentHaptic() {
-        BlankHaptics.lightTap()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func authorizeScreenTime() {
@@ -1330,7 +1325,6 @@ private struct ReferenceOnboardingScene: View {
                 if accessoryAboveText {
                     accessory
                         .padding(.bottom, 8)
-                        .premiumEntrance(delay: 0.05)
                 }
 
                 ReferenceOnboardingText(
@@ -1344,7 +1338,6 @@ private struct ReferenceOnboardingScene: View {
                 if !accessoryAboveText {
                     accessory
                         .padding(.top, 4)
-                        .premiumEntrance(delay: 0.12)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1362,21 +1355,14 @@ private struct ReferenceOnboardingScene: View {
                         }
                         .buttonStyle(ReferenceOnboardingButtonStyle())
                         .frame(maxWidth: .infinity)
-                        .premiumEntrance(delay: 0.18)
                     }
 
                     if let secondaryTitle, let secondaryAction {
-                        Button {
-                            BlankHaptics.selection()
-                            secondaryAction()
-                        } label: {
-                            Text(secondaryTitle)
-                        }
+                        Button(secondaryTitle, action: secondaryAction)
                             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
                             .foregroundStyle(Color.white.opacity(0.70))
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .premiumEntrance(delay: 0.24)
                     }
                 }
                 .padding(.bottom, 0)
@@ -1391,7 +1377,7 @@ private struct ReferenceOnboardingScene: View {
     }
 
     private func handlePrimaryTap() {
-        BlankHaptics.lightTap()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         if hasDetail && !showsDetail {
             withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
@@ -1548,7 +1534,8 @@ private struct ReferenceOnboardingButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(Color.white.opacity(0.035), lineWidth: 1)
             }
-            .premiumPressEffect(isPressed: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
@@ -1740,10 +1727,7 @@ private struct OnboardingChoiceButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button {
-            BlankHaptics.selection()
-            action()
-        } label: {
+        Button(action: action) {
             HStack(spacing: 15) {
                 Image(systemName: systemName)
                     .font(.system(size: 16, weight: .semibold))
@@ -1757,12 +1741,7 @@ private struct OnboardingChoiceButton: View {
                 Spacer(minLength: 0)
 
                 if selected {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(BlankColors.ink)
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.white.opacity(0.88)))
-                        .transition(.scale(scale: 0.72).combined(with: .opacity))
+                    EmptyView()
                 }
             }
             .padding(.horizontal, 18)
@@ -1780,11 +1759,9 @@ private struct OnboardingChoiceButton: View {
                     .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
             .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
-            .scaleEffect(selected ? 1.012 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: selected)
     }
 }
 
@@ -1938,10 +1915,7 @@ private struct PlanButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button {
-            BlankHaptics.selection()
-            action()
-        } label: {
+        Button(action: action) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -1971,12 +1945,9 @@ private struct PlanButton: View {
                     Circle()
                         .stroke(selected ? Color.white.opacity(0.58) : Color.white.opacity(0.26), lineWidth: 1)
                     if selected {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(BlankColors.ink)
-                            .frame(width: 14, height: 14)
-                            .background(Circle().fill(Color.white.opacity(0.90)))
-                            .transition(.scale(scale: 0.62).combined(with: .opacity))
+                        Circle()
+                            .fill(Color.white.opacity(0.90))
+                            .padding(4)
                     }
                 }
                 .frame(width: 18, height: 18)
@@ -1998,11 +1969,9 @@ private struct PlanButton: View {
                     .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
             .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
-            .scaleEffect(selected ? 1.01 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: selected)
     }
 }
 

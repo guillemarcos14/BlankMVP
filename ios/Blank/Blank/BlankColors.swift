@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 enum BlankColors {
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
@@ -64,7 +63,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                 .allowsHitTesting(false)
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
-            .premiumPressEffect(isPressed: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
@@ -84,17 +83,7 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
                 .allowsHitTesting(false)
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
-            .premiumPressEffect(isPressed: configuration.isPressed)
-    }
-}
-
-enum BlankHaptics {
-    static func lightTap() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.72)
-    }
-
-    static func selection() {
-        UISelectionFeedbackGenerator().selectionChanged()
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
@@ -175,40 +164,6 @@ private struct BlankGlassCardModifier: ViewModifier {
 extension View {
     func blankGlassCard(cornerRadius: CGFloat = 22, tintOpacity: Double = 0.34) -> some View {
         modifier(BlankGlassCardModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity))
-    }
-
-    func premiumPressEffect(isPressed: Bool) -> some View {
-        scaleEffect(isPressed ? 0.972 : 1)
-            .brightness(isPressed ? 0.035 : 0)
-            .animation(.spring(response: 0.24, dampingFraction: 0.78), value: isPressed)
-    }
-
-    func premiumEntrance(delay: Double = 0) -> some View {
-        modifier(BlankPremiumEntranceModifier(delay: delay))
-    }
-}
-
-private struct BlankPremiumEntranceModifier: ViewModifier {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var visible = false
-    let delay: Double
-
-    func body(content: Content) -> some View {
-        content
-            .opacity(visible ? 1 : 0)
-            .offset(y: reduceMotion ? 0 : (visible ? 0 : 12))
-            .blur(radius: reduceMotion || visible ? 0 : 5)
-            .task {
-                guard !visible else { return }
-                if delay > 0 {
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                }
-                await MainActor.run {
-                    withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .spring(response: 0.46, dampingFraction: 0.86)) {
-                        visible = true
-                    }
-                }
-            }
     }
 }
 

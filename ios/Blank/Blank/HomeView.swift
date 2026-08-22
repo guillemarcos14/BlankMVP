@@ -350,7 +350,6 @@ struct HomeView: View {
                 if sessionStore.isBlankActive {
                     return
                 } else {
-                    BlankHaptics.lightTap()
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
                         sessionStore.activateBlank()
                     }
@@ -376,7 +375,6 @@ struct HomeView: View {
                 LongPressGesture(minimumDuration: unblankHoldDuration, maximumDistance: 80)
                     .onEnded { _ in
                         guard sessionStore.isBlankActive else { return }
-                        BlankHaptics.lightTap()
                         let result = withAnimation(.easeInOut(duration: 0.65)) {
                             sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
                         }
@@ -391,7 +389,6 @@ struct HomeView: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
                         guard sessionStore.isBlankActive, !isAnimatingUnblankHold else { return }
-                        BlankHaptics.selection()
                         isAnimatingUnblankHold = true
                         unblankHoldStartedAt = Date()
                         unblankHoldProgress = 0
@@ -677,7 +674,7 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
                 .allowsHitTesting(false)
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
-            .premiumPressEffect(isPressed: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
@@ -830,36 +827,13 @@ private struct ConfigIssue: Identifiable {
 
 private struct AppBackground: View {
     let isActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !isActive)) { context in
-            let phase = reduceMotion || !isActive ? 0 : context.date.timeIntervalSinceReferenceDate
-            let breath = (sin(phase * 0.58) + 1) / 2
-
-            ZStack {
-                Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
-                    .resizable()
-                    .scaledToFill()
-                    .scaleEffect(isActive && !reduceMotion ? 1.012 + breath * 0.006 : 1)
-                    .opacity(isActive ? 0.98 : 1)
-                    .ignoresSafeArea()
-
-                if isActive {
-                    RadialGradient(
-                        colors: [
-                            BlankColors.airMist.opacity(0.10 + breath * 0.055),
-                            BlankColors.airBlue.opacity(0.035 + breath * 0.035),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: 24,
-                        endRadius: 420
-                    )
-                    .blendMode(.screen)
-                    .ignoresSafeArea()
-                }
-            }
+        ZStack {
+            Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
+                .resizable()
+                .scaledToFill()
+                .ignoresSafeArea()
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.75), value: isActive)
@@ -964,7 +938,6 @@ private struct ModesList: View {
         let isSelected = mode.id == sessionStore.currentModeId
 
         return Button {
-            BlankHaptics.selection()
             sessionStore.selectMode(mode.id)
             onFinish()
         } label: {

@@ -1791,32 +1791,34 @@ private struct OnboardingEdgeHalo: View {
     let palette: BottomGlowPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let duration = 3.8
-    private let segmentLength = 0.18
+    private let duration = 6.6
+    private let segmentLength = 0.24
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { context in
             GeometryReader { proxy in
-                let inset: CGFloat = 8
+                let inset: CGFloat = 2
                 let cornerRadius = min(max(proxy.safeAreaInsets.top + 18, 42), 60)
                 let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 let phase = reduceMotion ? 0.62 : normalizedPhase(from: context.date)
 
                 ZStack {
                     shape
-                        .inset(by: inset)
-                        .stroke(palette.secondary.opacity(0.18), lineWidth: 1)
+                        .inset(by: 3)
+                        .stroke(palette.secondary.opacity(0.07), lineWidth: 1)
 
-                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 14, opacity: 0.34)
-                        .blur(radius: 14)
+                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 48, opacity: 0.24)
+                        .blur(radius: 30)
 
-                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 4, opacity: 0.86)
-                        .blur(radius: 1.6)
+                    edgeSegment(shape: shape, inset: inset + 18, phase: phase, lineWidth: 34, opacity: 0.28)
+                        .blur(radius: 24)
 
-                    edgeSegment(shape: shape, inset: inset, phase: phase, lineWidth: 1.4, opacity: 1.0)
+                    edgeSegment(shape: shape, inset: inset + 34, phase: phase, lineWidth: 22, opacity: 0.20)
+                        .blur(radius: 18)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .allowsHitTesting(false)
+                .blendMode(.screen)
             }
         }
         .ignoresSafeArea()
@@ -1841,10 +1843,11 @@ private struct OnboardingEdgeHalo: View {
         let gradient = LinearGradient(
             colors: [
                 .clear,
-                palette.primary.opacity(opacity * 0.58),
+                palette.primary.opacity(opacity * 0.30),
+                BlankColors.airBlue.opacity(opacity * 0.66),
                 BlankColors.airMist.opacity(opacity),
-                Color.white.opacity(opacity),
-                palette.secondary.opacity(opacity * 0.72),
+                Color.white.opacity(opacity * 0.72),
+                palette.secondary.opacity(opacity * 0.52),
                 .clear
             ],
             startPoint: .leading,

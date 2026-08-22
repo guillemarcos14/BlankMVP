@@ -1770,6 +1770,7 @@ private struct BlankOnboardingBackground: View {
         ZStack {
             Color.black.ignoresSafeArea()
             ReferenceBottomGlow(palette: palette)
+            OnboardingEdgeHalo(palette: palette)
             LinearGradient(
                 colors: [
                     Color.black.opacity(0.00),
@@ -1782,6 +1783,87 @@ private struct BlankOnboardingBackground: View {
             .ignoresSafeArea()
         }
         .animation(.easeInOut(duration: 0.42), value: palette.id)
+    }
+}
+
+private struct OnboardingEdgeHalo: View {
+    let palette: BottomGlowPalette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase = 0.0
+
+    private let segmentLength = 0.22
+
+    var body: some View {
+        GeometryReader { proxy in
+            let inset: CGFloat = 5
+            let cornerRadius = min(max(proxy.safeAreaInsets.top + 16, 40), 58)
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+            ZStack {
+                shape
+                    .inset(by: inset)
+                    .stroke(palette.secondary.opacity(0.10), lineWidth: 1)
+
+                edgeSegment(shape: shape, inset: inset, lineWidth: 10, opacity: 0.28)
+                    .blur(radius: 12)
+
+                edgeSegment(shape: shape, inset: inset, lineWidth: 3, opacity: 0.74)
+                    .blur(radius: 1.2)
+
+                edgeSegment(shape: shape, inset: inset, lineWidth: 1.15, opacity: 0.92)
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .allowsHitTesting(false)
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            guard !reduceMotion else { return }
+            phase = 0
+            withAnimation(.linear(duration: 4.8).repeatForever(autoreverses: false)) {
+                phase = 1
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func edgeSegment(
+        shape: RoundedRectangle,
+        inset: CGFloat,
+        lineWidth: CGFloat,
+        opacity: Double
+    ) -> some View {
+        let start = reduceMotion ? 0.64 : phase
+        let end = start + segmentLength
+        let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        let gradient = LinearGradient(
+            colors: [
+                .clear,
+                palette.primary.opacity(opacity * 0.42),
+                BlankColors.airMist.opacity(opacity),
+                Color.white.opacity(opacity),
+                palette.secondary.opacity(opacity * 0.62),
+                .clear
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+
+        if end <= 1 {
+            shape
+                .inset(by: inset)
+                .trim(from: start, to: end)
+                .stroke(gradient, style: style)
+        } else {
+            shape
+                .inset(by: inset)
+                .trim(from: start, to: 1)
+                .stroke(gradient, style: style)
+
+            shape
+                .inset(by: inset)
+                .trim(from: 0, to: end - 1)
+                .stroke(gradient, style: style)
+        }
     }
 }
 

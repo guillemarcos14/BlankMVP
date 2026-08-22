@@ -24,11 +24,11 @@ private enum OnboardingStep: Int, CaseIterable {
 
     var bottomGlowPalette: BottomGlowPalette {
         let palettes: [BottomGlowPalette] = [
-            .init(id: 0, primary: BlankColors.airBlue, secondary: BlankColors.airMist, accent: Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0)),
-            .init(id: 1, primary: Color(red: 0.48, green: 0.57, blue: 0.67), secondary: BlankColors.airBlue, accent: BlankColors.glassTint),
-            .init(id: 2, primary: Color(red: 0.40, green: 0.50, blue: 0.62), secondary: Color(red: 0.66, green: 0.74, blue: 0.82), accent: BlankColors.airMist),
-            .init(id: 3, primary: Color(red: 0.36, green: 0.47, blue: 0.58), secondary: BlankColors.airBlue, accent: Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0)),
-            .init(id: 4, primary: Color(red: 0.44, green: 0.53, blue: 0.64), secondary: BlankColors.airMist, accent: Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0))
+            .init(id: 0, primary: Color(red: 0.48, green: 0.66, blue: 0.84), secondary: Color(red: 0.62, green: 0.76, blue: 0.90), accent: Color(red: 0.34, green: 0.52, blue: 0.72)),
+            .init(id: 1, primary: Color(red: 0.42, green: 0.61, blue: 0.82), secondary: Color(red: 0.55, green: 0.72, blue: 0.88), accent: Color(red: 0.30, green: 0.48, blue: 0.68)),
+            .init(id: 2, primary: Color(red: 0.38, green: 0.58, blue: 0.80), secondary: Color(red: 0.58, green: 0.74, blue: 0.90), accent: Color(red: 0.28, green: 0.46, blue: 0.66)),
+            .init(id: 3, primary: Color(red: 0.36, green: 0.56, blue: 0.78), secondary: Color(red: 0.52, green: 0.70, blue: 0.88), accent: Color(red: 0.32, green: 0.50, blue: 0.70)),
+            .init(id: 4, primary: Color(red: 0.44, green: 0.64, blue: 0.84), secondary: Color(red: 0.60, green: 0.76, blue: 0.91), accent: Color(red: 0.31, green: 0.50, blue: 0.71))
         ]
         return palettes[rawValue % palettes.count]
     }
@@ -132,7 +132,12 @@ struct SetupView: View {
                         VStack(spacing: 22) {
                             content
                                 .id(currentStep.rawValue)
-                                .transition(.opacity.combined(with: .scale(scale: 0.985, anchor: .center)))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                                        removal: .move(edge: .leading).combined(with: .opacity)
+                                    )
+                                )
                                 .frame(height: usesAnchoredPrimaryAction ? max(0, proxy.size.height - 64) : nil)
 
                             if let message {
@@ -155,7 +160,7 @@ struct SetupView: View {
             .padding(.horizontal, 28)
             .padding(.bottom, 0)
 
-            OnboardingEdgeHalo(palette: currentStep.bottomGlowPalette)
+            OnboardingTopBreathingLight(palette: currentStep.bottomGlowPalette)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(Color.white)
@@ -558,7 +563,7 @@ struct SetupView: View {
 
             if isReviewDemoAccessAvailable {
                 Button("Continue in demo mode") {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    BlankHaptics.lightTap()
                     continueWithReviewDemoAccess()
                 }
                 .buttonStyle(ReferenceOnboardingButtonStyle())
@@ -629,7 +634,7 @@ struct SetupView: View {
                     OnboardingChoiceButton(
                         systemName: option.icon,
                         title: option.title,
-                        selected: false
+                        selected: selection == option.title
                     ) {
                         onSelect(option.title)
                         goForward()
@@ -1191,7 +1196,7 @@ struct SetupView: View {
     }
 
     private func playCommitmentHaptic() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        BlankHaptics.lightTap()
     }
 
     private func authorizeScreenTime() {
@@ -1325,6 +1330,7 @@ private struct ReferenceOnboardingScene: View {
                 if accessoryAboveText {
                     accessory
                         .padding(.bottom, 8)
+                        .premiumEntrance(delay: 0.05)
                 }
 
                 ReferenceOnboardingText(
@@ -1338,6 +1344,7 @@ private struct ReferenceOnboardingScene: View {
                 if !accessoryAboveText {
                     accessory
                         .padding(.top, 4)
+                        .premiumEntrance(delay: 0.12)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1355,14 +1362,21 @@ private struct ReferenceOnboardingScene: View {
                         }
                         .buttonStyle(ReferenceOnboardingButtonStyle())
                         .frame(maxWidth: .infinity)
+                        .premiumEntrance(delay: 0.18)
                     }
 
                     if let secondaryTitle, let secondaryAction {
-                        Button(secondaryTitle, action: secondaryAction)
+                        Button {
+                            BlankHaptics.selection()
+                            secondaryAction()
+                        } label: {
+                            Text(secondaryTitle)
+                        }
                             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
                             .foregroundStyle(Color.white.opacity(0.70))
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, alignment: .center)
+                            .premiumEntrance(delay: 0.24)
                     }
                 }
                 .padding(.bottom, 0)
@@ -1377,7 +1391,7 @@ private struct ReferenceOnboardingScene: View {
     }
 
     private func handlePrimaryTap() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        BlankHaptics.lightTap()
 
         if hasDetail && !showsDetail {
             withAnimation(.spring(response: 0.48, dampingFraction: 0.88)) {
@@ -1534,8 +1548,7 @@ private struct ReferenceOnboardingButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(Color.white.opacity(0.035), lineWidth: 1)
             }
-            .scaleEffect(configuration.isPressed ? 0.99 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .premiumPressEffect(isPressed: configuration.isPressed)
     }
 }
 
@@ -1727,7 +1740,10 @@ private struct OnboardingChoiceButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            BlankHaptics.selection()
+            action()
+        } label: {
             HStack(spacing: 15) {
                 Image(systemName: systemName)
                     .font(.system(size: 16, weight: .semibold))
@@ -1741,7 +1757,12 @@ private struct OnboardingChoiceButton: View {
                 Spacer(minLength: 0)
 
                 if selected {
-                    EmptyView()
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(BlankColors.ink)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(Color.white.opacity(0.88)))
+                        .transition(.scale(scale: 0.72).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 18)
@@ -1759,9 +1780,11 @@ private struct OnboardingChoiceButton: View {
                     .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
             .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
+            .scaleEffect(selected ? 1.012 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: selected)
     }
 }
 
@@ -1787,36 +1810,45 @@ private struct BlankOnboardingBackground: View {
     }
 }
 
-private struct OnboardingEdgeHalo: View {
+private struct OnboardingTopBreathingLight: View {
     let palette: BottomGlowPalette
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let duration = 8.8
+    private let duration = 7.4
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
             GeometryReader { proxy in
-                let inset: CGFloat = 5
-                let cornerRadius = min(max(proxy.safeAreaInsets.top + 18, 42), 60)
-                let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                let phase = reduceMotion ? 0.62 : normalizedPhase(from: context.date)
+                let progress = reduceMotion ? 0.52 : breathingProgress(from: context.date)
+                let scale = CGFloat(progress)
+                let width = proxy.size.width * (1.16 + scale * 0.28)
+                let height: CGFloat = 210 + scale * 74
+                let topY = -46 + proxy.safeAreaInsets.top * 0.18
 
                 ZStack {
-                    shape
-                        .inset(by: 3)
-                        .stroke(palette.secondary.opacity(0.07), lineWidth: 1)
+                    Ellipse()
+                        .fill(palette.secondary.opacity(0.15 + progress * 0.08))
+                        .frame(width: width, height: height)
+                        .blur(radius: 58)
+                        .position(x: proxy.size.width / 2, y: topY)
 
-                    edgeSegment(shape: shape, inset: inset + 44, phase: wrappedPhase(phase - 0.14), length: 0.34, lineWidth: 78, opacity: 0.055)
-                        .blur(radius: 46)
+                    Ellipse()
+                        .fill(palette.primary.opacity(0.12 + progress * 0.07))
+                        .frame(width: width * 0.72, height: height * 0.64)
+                        .blur(radius: 42)
+                        .position(x: proxy.size.width / 2, y: topY + 8)
 
-                    edgeSegment(shape: shape, inset: inset + 28, phase: wrappedPhase(phase - 0.08), length: 0.36, lineWidth: 60, opacity: 0.10)
-                        .blur(radius: 38)
-
-                    edgeSegment(shape: shape, inset: inset + 12, phase: wrappedPhase(phase - 0.035), length: 0.36, lineWidth: 42, opacity: 0.18)
-                        .blur(radius: 30)
-
-                    edgeSegment(shape: shape, inset: inset, phase: phase, length: 0.30, lineWidth: 28, opacity: 0.28)
-                        .blur(radius: 22)
+                    LinearGradient(
+                        colors: [
+                            palette.secondary.opacity(0.12 + progress * 0.06),
+                            palette.primary.opacity(0.06 + progress * 0.03),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 230 + scale * 42)
+                    .position(x: proxy.size.width / 2, y: 88)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .allowsHitTesting(false)
@@ -1826,59 +1858,10 @@ private struct OnboardingEdgeHalo: View {
         .ignoresSafeArea()
     }
 
-    private func normalizedPhase(from date: Date) -> Double {
+    private func breathingProgress(from date: Date) -> Double {
         let progress = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: duration) / duration
-        return progress < 0 ? progress + 1 : progress
-    }
-
-    private func wrappedPhase(_ phase: Double) -> Double {
-        let wrapped = phase.truncatingRemainder(dividingBy: 1)
-        return wrapped < 0 ? wrapped + 1 : wrapped
-    }
-
-    @ViewBuilder
-    private func edgeSegment(
-        shape: RoundedRectangle,
-        inset: CGFloat,
-        phase: Double,
-        length: Double,
-        lineWidth: CGFloat,
-        opacity: Double
-    ) -> some View {
-        let start = phase
-        let end = start + length
-        let style = StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
-        let gradient = LinearGradient(
-            colors: [
-                .clear,
-                palette.primary.opacity(opacity * 0.12),
-                BlankColors.airBlue.opacity(opacity * 0.34),
-                BlankColors.airMist.opacity(opacity * 0.72),
-                Color.white.opacity(opacity),
-                BlankColors.airMist.opacity(opacity * 0.48),
-                palette.secondary.opacity(opacity * 0.20),
-                .clear
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-
-        if end <= 1 {
-            shape
-                .inset(by: inset)
-                .trim(from: start, to: end)
-                .stroke(gradient, style: style)
-        } else {
-            shape
-                .inset(by: inset)
-                .trim(from: start, to: 1)
-                .stroke(gradient, style: style)
-
-            shape
-                .inset(by: inset)
-                .trim(from: 0, to: end - 1)
-                .stroke(gradient, style: style)
-        }
+        let normalized = progress < 0 ? progress + 1 : progress
+        return (1 - cos(normalized * 2 * Double.pi)) / 2
     }
 }
 
@@ -1889,26 +1872,26 @@ private struct ReferenceBottomGlow: View {
         GeometryReader { proxy in
             ZStack {
                 Ellipse()
-                    .fill(palette.primary.opacity(0.34))
+                    .fill(palette.primary.opacity(0.42))
                     .frame(width: proxy.size.width * 1.55, height: 250)
                     .blur(radius: 50)
                     .position(x: proxy.size.width * 0.50, y: proxy.size.height + 34)
 
                 Ellipse()
-                    .fill(palette.secondary.opacity(0.30))
+                    .fill(palette.secondary.opacity(0.36))
                     .frame(width: proxy.size.width * 1.18, height: 190)
                     .blur(radius: 48)
                     .position(x: proxy.size.width * 0.48, y: proxy.size.height + 18)
 
                 Ellipse()
-                    .fill(palette.secondary.opacity(0.36))
+                    .fill(palette.secondary.opacity(0.42))
                     .frame(width: proxy.size.width * 0.92, height: 360)
                     .blur(radius: 58)
                     .position(x: proxy.size.width * 0.95, y: proxy.size.height - 52)
                     .mask(rightSideRiseMask(proxy: proxy))
 
                 Ellipse()
-                    .fill(palette.accent.opacity(0.25))
+                    .fill(palette.accent.opacity(0.32))
                     .frame(width: proxy.size.width * 0.70, height: 300)
                     .blur(radius: 64)
                     .position(x: proxy.size.width * 0.86, y: proxy.size.height - 18)
@@ -1917,8 +1900,8 @@ private struct ReferenceBottomGlow: View {
                 LinearGradient(
                     colors: [
                         Color.white.opacity(0.00),
-                        Color.white.opacity(0.08),
-                        Color.white.opacity(0.16)
+                        palette.secondary.opacity(0.10),
+                        palette.primary.opacity(0.18)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
@@ -1955,7 +1938,10 @@ private struct PlanButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            BlankHaptics.selection()
+            action()
+        } label: {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
@@ -1985,9 +1971,12 @@ private struct PlanButton: View {
                     Circle()
                         .stroke(selected ? Color.white.opacity(0.58) : Color.white.opacity(0.26), lineWidth: 1)
                     if selected {
-                        Circle()
-                            .fill(Color.white.opacity(0.90))
-                            .padding(4)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(BlankColors.ink)
+                            .frame(width: 14, height: 14)
+                            .background(Circle().fill(Color.white.opacity(0.90)))
+                            .transition(.scale(scale: 0.62).combined(with: .opacity))
                     }
                 }
                 .frame(width: 18, height: 18)
@@ -2009,9 +1998,11 @@ private struct PlanButton: View {
                     .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
             .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
+            .scaleEffect(selected ? 1.01 : 1)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
+        .animation(.spring(response: 0.32, dampingFraction: 0.82), value: selected)
     }
 }
 

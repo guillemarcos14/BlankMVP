@@ -578,94 +578,105 @@ struct SetupView: View {
     }
 
     private var trialStep: some View {
-        VStack(spacing: 15) {
-            ReferenceOnboardingText(
-                eyebrow: nil,
-                lines: [
-                    .text("Don't lose \(lostLifetimeYears) years."),
-                    .text("Start with 3 days free.")
-                ],
-                body: nil
-            )
+        GeometryReader { proxy in
+            ZStack(alignment: .bottom) {
+                VStack(spacing: 0) {
+                    ReferenceOnboardingText(
+                        eyebrow: nil,
+                        lines: [
+                            .text("Don't lose \(lostLifetimeYears) years."),
+                            .text("Start with 3 days free.")
+                        ],
+                        body: nil
+                    )
 
-            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
-                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.50))
-                .multilineTextAlignment(.leading)
-                .lineSpacing(3)
-                .frame(maxWidth: 318, alignment: .leading)
+                    Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
+                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.50))
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(3)
+                        .frame(maxWidth: 318, alignment: .leading)
+                        .padding(.top, 15)
 
-            VStack(spacing: 9) {
-                PlanButton(
-                    title: "Annual",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
-                    detail: "3 days free, then billed yearly",
-                    badge: "Best value",
-                    selected: selectedPlan == .annual
-                ) {
-                    selectedPlan = .annual
-                }
+                    VStack(spacing: 9) {
+                        PlanButton(
+                            title: "Annual",
+                            price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
+                            detail: "3 days free, then billed yearly",
+                            badge: "Best value",
+                            selected: selectedPlan == .annual
+                        ) {
+                            selectedPlan = .annual
+                        }
 
-                PlanButton(
-                    title: "Monthly",
-                    price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "€2.99"),
-                    detail: "3 days free, then billed monthly",
-                    badge: nil,
-                    selected: selectedPlan == .monthly
-                ) {
-                    selectedPlan = .monthly
-                }
-            }
-            .frame(maxWidth: 318)
+                        PlanButton(
+                            title: "Monthly",
+                            price: purchaseStore.priceText(for: StoreKitPurchaseStore.monthlyProductId, fallback: "€2.99"),
+                            detail: "3 days free, then billed monthly",
+                            badge: nil,
+                            selected: selectedPlan == .monthly
+                        ) {
+                            selectedPlan = .monthly
+                        }
+                    }
+                    .frame(maxWidth: 318)
+                    .padding(.top, 25)
 
-            Button {
-                purchaseSelectedPlan()
-            } label: {
-                if purchaseStore.isPurchasing || purchaseStore.isLoading {
-                    ProgressView()
-                        .tint(Color.white)
-                } else {
-                    Text("Start 3 days free")
-                }
-            }
-            .buttonStyle(ReferenceOnboardingButtonStyle())
-            .frame(maxWidth: 318)
+                    Button {
+                        purchaseSelectedPlan()
+                    } label: {
+                        if purchaseStore.isPurchasing || purchaseStore.isLoading {
+                            ProgressView()
+                                .tint(Color.black)
+                        } else {
+                            Text("Start Free")
+                        }
+                    }
+                    .buttonStyle(PaywallPrimaryButtonStyle())
+                    .frame(maxWidth: 318)
+                    .padding(.top, 22)
 
-            Button("Restore purchases") {
-                Task {
-                    await purchaseStore.restorePurchases()
-                    if purchaseStore.hasEntitlement {
-                        trialStarted = true
-                        goForward()
+                    Button("Restore purchases") {
+                        Task {
+                            await purchaseStore.restorePurchases()
+                            if purchaseStore.hasEntitlement {
+                                trialStarted = true
+                                goForward()
+                            }
+                        }
+                    }
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Color.white.opacity(0.70))
+                    .buttonStyle(.plain)
+                    .padding(.top, 17)
+
+                    if isReviewDemoAccessAvailable {
+                        Button("Continue in demo mode") {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            continueWithReviewDemoAccess()
+                        }
+                        .buttonStyle(ReferenceOnboardingButtonStyle())
+                        .frame(maxWidth: 318)
+                        .padding(.top, 17)
+                    }
+
+                    if let purchaseMessage = purchaseStore.message {
+                        Text(purchaseMessage)
+                            .font(.blankInter(size: 12, relativeTo: .caption))
+                            .foregroundStyle(Color.white.opacity(0.74))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 318)
+                            .padding(.top, 12)
                     }
                 }
-            }
-            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.70))
-            .buttonStyle(.plain)
-
-            if isReviewDemoAccessAvailable {
-                Button("Continue in demo mode") {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    continueWithReviewDemoAccess()
-                }
-                .buttonStyle(ReferenceOnboardingButtonStyle())
                 .frame(maxWidth: 318)
-            }
+                .position(x: proxy.size.width / 2, y: proxy.size.height * 0.47)
 
-            legalDisclosure
-
-            if let purchaseMessage = purchaseStore.message {
-                Text(purchaseMessage)
-                    .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.74))
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 318)
+                legalDisclosure
+                    .padding(.bottom, 7)
             }
         }
-        .frame(maxWidth: 318, maxHeight: .infinity, alignment: .center)
-        .padding(.top, 34)
-        .padding(.bottom, 34)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var permissionStep: some View {
@@ -1672,6 +1683,27 @@ private struct ReferenceOnboardingButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .stroke(Color.white.opacity(0.035), lineWidth: 1)
             }
+            .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+    }
+}
+
+private struct PaywallPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
+            .foregroundStyle(Color.black.opacity(configuration.isPressed ? 0.68 : 0.92))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.78 : 0.94))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
+            }
+            .shadow(color: Color.white.opacity(configuration.isPressed ? 0.10 : 0.20), radius: 18, x: 0, y: 0)
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }

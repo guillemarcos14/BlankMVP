@@ -152,7 +152,7 @@ struct SetupView: View {
                 }
 
             }
-            .padding(.horizontal, 28)
+            .padding(.horizontal, 32)
             .padding(.bottom, 0)
 
             OnboardingTopBreathingLight(palette: currentStep.bottomGlowPalette)
@@ -480,7 +480,7 @@ struct SetupView: View {
                 .foregroundStyle(Color.white.opacity(0.50))
                 .multilineTextAlignment(.leading)
                 .lineSpacing(3)
-                .frame(maxWidth: 330, alignment: .leading)
+                .frame(maxWidth: 318, alignment: .leading)
 
             VStack(spacing: 9) {
                 PlanButton(
@@ -503,7 +503,7 @@ struct SetupView: View {
                     selectedPlan = .monthly
                 }
             }
-            .frame(maxWidth: 342)
+            .frame(maxWidth: 318)
 
             Button {
                 onboardingDataConsent.toggle()
@@ -541,7 +541,7 @@ struct SetupView: View {
                 }
             }
             .buttonStyle(ReferenceOnboardingButtonStyle())
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 318)
 
             Button("Restore purchases") {
                 Task {
@@ -562,7 +562,7 @@ struct SetupView: View {
                     continueWithReviewDemoAccess()
                 }
                 .buttonStyle(ReferenceOnboardingButtonStyle())
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: 318)
             }
 
             legalDisclosure
@@ -572,10 +572,10 @@ struct SetupView: View {
                     .font(.blankInter(size: 12, relativeTo: .caption))
                     .foregroundStyle(Color.white.opacity(0.74))
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 320)
+                    .frame(maxWidth: 318)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: 318, maxHeight: .infinity, alignment: .center)
         .padding(.top, 34)
         .padding(.bottom, 34)
     }
@@ -637,9 +637,9 @@ struct SetupView: View {
                 }
             }
             .padding(.top, 8)
-            .frame(maxWidth: 342)
+            .frame(maxWidth: 318)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: 318, maxHeight: .infinity, alignment: .center)
     }
 
     private func referenceScene(
@@ -780,7 +780,7 @@ struct SetupView: View {
         .font(.blankInter(size: 11, relativeTo: .caption2))
         .foregroundStyle(Color.white.opacity(0.40))
         .lineSpacing(2)
-        .frame(maxWidth: 320)
+        .frame(maxWidth: 318)
     }
 
     private func legalButton(_ title: String, document: BlankLegalDocument) -> some View {
@@ -1339,7 +1339,7 @@ private struct ReferenceOnboardingScene: View {
                             .padding(.top, 4)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: 318, alignment: .leading)
                 .position(x: proxy.size.width / 2, y: proxy.size.height * 0.46)
 
                 if primaryTitle != nil || secondaryTitle != nil {
@@ -1360,7 +1360,7 @@ private struct ReferenceOnboardingScene: View {
                                 .frame(maxWidth: .infinity, alignment: .center)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: 318, alignment: .leading)
                     .frame(maxHeight: .infinity, alignment: .bottom)
                 }
             }
@@ -1490,7 +1490,7 @@ private struct ReferenceAnimatedLine: View {
                 iconView
             }
         }
-        .frame(maxWidth: 354, alignment: .leading)
+        .frame(maxWidth: 318, alignment: .leading)
         .opacity(visible ? line.opacity : 0)
         .animation(.easeInOut(duration: 0.26), value: line.opacity)
         .offset(y: visible ? 0 : 28)
@@ -1569,7 +1569,7 @@ private struct OnboardingHeader: View {
                     .foregroundStyle(Color.white.opacity(0.68))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
-                    .frame(maxWidth: 342)
+                    .frame(maxWidth: 318)
                     .padding(.top, 2)
             }
         }
@@ -1804,34 +1804,34 @@ private struct OnboardingTopBreathingLight: View {
             GeometryReader { proxy in
                 let progress = reduceMotion ? 0.52 : breathingProgress(from: context.date)
                 let scale = CGFloat(progress)
-                let width = proxy.size.width * (1.16 + scale * 0.28)
-                let height: CGFloat = 210 + scale * 74
-                let topY = -46 + proxy.safeAreaInsets.top * 0.18
+                let width = proxy.size.width * (0.82 + scale * 0.18)
+                let height: CGFloat = 138 + scale * 46
+                let topY = -38 + proxy.safeAreaInsets.top * 0.14
 
                 ZStack {
                     Ellipse()
-                        .fill(palette.secondary.opacity(0.15 + progress * 0.08))
+                        .fill(palette.secondary.opacity(0.12 + progress * 0.06))
                         .frame(width: width, height: height)
-                        .blur(radius: 58)
+                        .blur(radius: 46)
                         .position(x: proxy.size.width / 2, y: topY)
 
                     Ellipse()
-                        .fill(palette.primary.opacity(0.12 + progress * 0.07))
-                        .frame(width: width * 0.72, height: height * 0.64)
-                        .blur(radius: 42)
-                        .position(x: proxy.size.width / 2, y: topY + 8)
+                        .fill(palette.primary.opacity(0.10 + progress * 0.05))
+                        .frame(width: width * 0.66, height: height * 0.58)
+                        .blur(radius: 34)
+                        .position(x: proxy.size.width / 2, y: topY + 5)
 
                     LinearGradient(
                         colors: [
-                            palette.secondary.opacity(0.12 + progress * 0.06),
-                            palette.primary.opacity(0.06 + progress * 0.03),
+                            palette.secondary.opacity(0.08 + progress * 0.04),
+                            palette.primary.opacity(0.04 + progress * 0.02),
                             Color.clear
                         ],
                         startPoint: .top,
                         endPoint: .bottom
                     )
-                    .frame(height: 230 + scale * 42)
-                    .position(x: proxy.size.width / 2, y: 88)
+                    .frame(height: 150 + scale * 28)
+                    .position(x: proxy.size.width / 2, y: 58)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .allowsHitTesting(false)

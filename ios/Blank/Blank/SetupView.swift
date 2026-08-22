@@ -1768,12 +1768,21 @@ private struct BlankOnboardingBackground: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+
+            Image("blank_home_background_active")
+                .resizable()
+                .scaledToFill()
+                .opacity(0.14)
+                .blur(radius: 3)
+                .overlay(Color.black.opacity(0.74))
+                .ignoresSafeArea()
+
             ReferenceBottomGlow(palette: palette)
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.00),
-                    Color.black.opacity(0.10),
-                    Color.black.opacity(0.22)
+                    Color.black.opacity(0.08),
+                    Color.black.opacity(0.22),
+                    Color.black.opacity(0.36)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

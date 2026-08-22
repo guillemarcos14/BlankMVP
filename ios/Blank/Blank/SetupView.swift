@@ -1318,57 +1318,54 @@ private struct ReferenceOnboardingScene: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .leading, spacing: 14) {
+                    if accessoryAboveText {
+                        accessory
+                            .padding(.bottom, 8)
+                    }
 
-            VStack(alignment: .leading, spacing: 14) {
-                if accessoryAboveText {
-                    accessory
-                        .padding(.bottom, 8)
+                    ReferenceOnboardingText(
+                        eyebrow: eyebrow,
+                        lines: lines,
+                        body: showsDetail ? bodyText : nil,
+                        detailStartIndex: lines.count,
+                        titleOpacity: showsDetail ? 0.38 : 1
+                    )
+
+                    if !accessoryAboveText {
+                        accessory
+                            .padding(.top, 4)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .position(x: proxy.size.width / 2, y: proxy.size.height * 0.46)
 
-                ReferenceOnboardingText(
-                    eyebrow: eyebrow,
-                    lines: lines,
-                    body: showsDetail ? bodyText : nil,
-                    detailStartIndex: lines.count,
-                    titleOpacity: showsDetail ? 0.38 : 1
-                )
-
-                if !accessoryAboveText {
-                    accessory
-                        .padding(.top, 4)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, 42)
-
-            if centerContent {
-                Spacer(minLength: 0)
-            }
-
-            if primaryTitle != nil || secondaryTitle != nil {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let primaryTitle {
-                        Button(primaryTitle) {
-                            handlePrimaryTap()
+                if primaryTitle != nil || secondaryTitle != nil {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let primaryTitle {
+                            Button(primaryTitle) {
+                                handlePrimaryTap()
+                            }
+                            .buttonStyle(ReferenceOnboardingButtonStyle())
+                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(ReferenceOnboardingButtonStyle())
-                        .frame(maxWidth: .infinity)
-                    }
 
-                    if let secondaryTitle, let secondaryAction {
-                        Button(secondaryTitle, action: secondaryAction)
-                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                            .foregroundStyle(Color.white.opacity(0.70))
-                            .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                        if let secondaryTitle, let secondaryAction {
+                            Button(secondaryTitle, action: secondaryAction)
+                                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                                .foregroundStyle(Color.white.opacity(0.70))
+                                .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
                 }
-                .padding(.bottom, 0)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var hasDetail: Bool {

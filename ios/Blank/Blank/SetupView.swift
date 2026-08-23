@@ -831,6 +831,13 @@ struct SetupView: View {
             .frame(width: 74, height: 74)
             .background(Circle().fill(Color.white.opacity(isCommitmentPressing ? 0.62 : 0.82)))
             .scaleEffect(isCommitmentPressing ? 0.985 : 1)
+            #if DEBUG
+            .onTapGesture {
+                #if targetEnvironment(simulator)
+                completeCommitmentHold()
+                #endif
+            }
+            #endif
             .onLongPressGesture(
                 minimumDuration: 3,
                 maximumDistance: 48,

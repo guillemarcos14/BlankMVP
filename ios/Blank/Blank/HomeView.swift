@@ -34,8 +34,12 @@ struct HomeView: View {
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "Shaping what we\ncreate with the\npower of time."
+    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     private let unblankHoldDuration: TimeInterval = 23
+
+    private var aiSystem: DigitalWellnessV3System {
+        sessionStore.digitalWellnessV3
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -262,6 +266,12 @@ struct HomeView: View {
             .frame(height: 122)
             .animation(.easeInOut(duration: 0.42), value: unblankHoldStartedAt != nil)
 
+            if !sessionStore.isBlankActive, configIssues.isEmpty {
+                ControlForecastCard(system: aiSystem)
+                    .frame(maxWidth: min(maxWidth, 330))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
             bottomAction(width: actionWidth)
 
             centerStatus
@@ -351,7 +361,7 @@ struct HomeView: View {
                     return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank()
+                        sessionStore.activateBlank(durationMinutes: aiSystem.plan.recommendedDurationMinutes)
                     }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
@@ -411,12 +421,11 @@ struct HomeView: View {
         guard !sessionStore.isBlankActive,
               message == nil,
               configIssues.isEmpty,
-              let weakHour = weakHourThisWeek(),
-              minutesUntilNextHour(weakHour) <= 30 else {
+              aiSystem.forecast.minutesUntilRisk <= 30 else {
             return nil
         }
 
-        return "Your weak window is coming. Start Blank."
+        return "\(aiSystem.forecast.riskWindow) is a high-risk window. Start the plan."
     }
 
     private var emergencyCoachMessage: String {
@@ -424,20 +433,8 @@ struct HomeView: View {
             return "You are breaking your weekly goal."
         }
 
-        guard let weakHour = weakHourThisWeek() else {
-            return "Pause for 10 seconds before deciding."
-        }
-
-        let currentHour = Calendar.current.component(.hour, from: now)
-        if weakHour == currentHour {
-            return "You are in your weak window. Try 5 more minutes."
-        }
-
-        if minutesUntilNextHour(weakHour) <= 30 {
-            return "Your weak window is close. Avoid breaking now."
-        }
-
-        return "Breaking now counts as a weekly emergency."
+        let relapse = aiSystem.relapseIntervention
+        return "\(relapse.headline) \(relapse.cost) \(relapse.alternative)"
     }
 
     private func weakHourThisWeek() -> Int? {
@@ -784,6 +781,65 @@ private struct BreathProgressLine: View {
         }
         .frame(width: 188, height: 12)
         .animation(.easeInOut(duration: 1.45), value: progress)
+    }
+}
+
+private struct ControlForecastCard: View {
+    let system: DigitalWellnessV3System
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(system.forecast.title)
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    Text(system.plan.title)
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.66))
+                }
+
+                Spacer()
+
+                Text("\(system.forecast.riskScore)")
+                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
+                    .monospacedDigit()
+            }
+
+            Text(system.forecast.reason)
+                .font(.blankInter(size: 13, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                forecastPill(system.forecast.riskWindow)
+                forecastPill("\(system.plan.recommendedDurationMinutes) min")
+                forecastPill(system.plan.difficulty)
+            }
+        }
+        .foregroundStyle(Color.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.black.opacity(0.13))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.10), radius: 16, y: 9)
+    }
+
+    private func forecastPill(_ text: String) -> some View {
+        Text(text)
+            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 9)
+            .frame(height: 25)
+            .background {
+                Capsule().fill(Color.white.opacity(0.14))
+            }
     }
 }
 

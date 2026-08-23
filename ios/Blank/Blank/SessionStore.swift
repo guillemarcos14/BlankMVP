@@ -175,6 +175,16 @@ final class SessionStore: ObservableObject {
         return BlankWeeklySessionAggregator.aggregate(sessions: sessions, weekStart: weekStart)
     }
 
+    var digitalWellnessV3: DigitalWellnessV3System {
+        DigitalWellnessAI.v3System(
+            events: usageEvents,
+            sessions: sessions,
+            selectionCount: selectionCount,
+            modeName: currentMode.name,
+            emergencyUnlocksRemaining: emergencyUnlocksRemaining
+        )
+    }
+
     var emergencyUnlocksRemaining: Int {
         if defaults.string(forKey: Keys.emergencyUnlockWeekKey) != Self.currentWeekKey() {
             return Self.maxEmergencyUnlocksPerWeek

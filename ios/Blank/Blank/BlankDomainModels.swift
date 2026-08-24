@@ -723,8 +723,8 @@ enum DigitalWellnessFeatureBuilder {
             bedtime = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.bedtimeMinute))
             wake = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.wakeMinute))
             restingHR = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.restingHeartRate))
-            hrv = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.hrvSDNN))
-            steps = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.steps))
+            hrv = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.hrvSDNN })
+            steps = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.steps })
         }
     }
 

@@ -192,6 +192,21 @@ final class SessionStore: ObservableObject {
         )
     }
 
+    func digitalWellnessFeaturePayload(
+        healthSummaries: [HealthDaySummary],
+        now: Date = Date()
+    ) -> DigitalWellnessFeaturePayload {
+        DigitalWellnessFeatureBuilder.makePayload(
+            defaults: defaults,
+            healthSummaries: healthSummaries,
+            sessions: sessions,
+            events: usageEvents,
+            selectionCount: selectionCount,
+            selectionSnapshot: currentSelectionSnapshot,
+            now: now
+        )
+    }
+
     func handleNfcTag(uid: String) -> NfcResult {
         guard let savedUid = nfcTagUid else {
             nfcTagUid = uid

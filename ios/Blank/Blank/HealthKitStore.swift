@@ -7,6 +7,10 @@ struct HealthDaySummary: Identifiable, Equatable {
     var date: Date
     var inBedMinutes: Int?
     var sleepMinutes: Int?
+    var deepSleepMinutes: Int?
+    var remSleepMinutes: Int?
+    var coreSleepMinutes: Int?
+    var awakeMinutes: Int?
     var bedtimeMinute: Int?
     var wakeMinute: Int?
     var steps: Int?
@@ -22,6 +26,10 @@ struct HealthDaySummary: Identifiable, Equatable {
     var hasSignals: Bool {
         inBedMinutes != nil ||
         sleepMinutes != nil ||
+        deepSleepMinutes != nil ||
+        remSleepMinutes != nil ||
+        coreSleepMinutes != nil ||
+        awakeMinutes != nil ||
         bedtimeMinute != nil ||
         wakeMinute != nil ||
         steps != nil ||
@@ -39,6 +47,10 @@ struct HealthDaySummary: Identifiable, Equatable {
 private struct HealthSleepSummary {
     var inBedMinutes: Int?
     var sleepMinutes: Int?
+    var deepSleepMinutes: Int?
+    var remSleepMinutes: Int?
+    var coreSleepMinutes: Int?
+    var awakeMinutes: Int?
     var bedtimeMinute: Int?
     var wakeMinute: Int?
 }
@@ -125,6 +137,10 @@ final class HealthKitStore: ObservableObject {
                 date: date,
                 inBedMinutes: sleepMinutes + 34,
                 sleepMinutes: sleepMinutes,
+                deepSleepMinutes: max(24, Int(Double(sleepMinutes) * (shortSleepDay ? 0.11 : 0.16))),
+                remSleepMinutes: max(38, Int(Double(sleepMinutes) * (shortSleepDay ? 0.18 : 0.22))),
+                coreSleepMinutes: max(90, Int(Double(sleepMinutes) * 0.56)),
+                awakeMinutes: shortSleepDay ? 46 + dayIndex % 8 : 22 + dayIndex % 10,
                 bedtimeMinute: bedtimeMinute % (24 * 60),
                 wakeMinute: wakeMinute,
                 steps: steps,
@@ -252,6 +268,10 @@ final class HealthKitStore: ObservableObject {
                     date: day,
                     inBedMinutes: sleepByDay[day]?.inBedMinutes,
                     sleepMinutes: sleepByDay[day]?.sleepMinutes,
+                    deepSleepMinutes: sleepByDay[day]?.deepSleepMinutes,
+                    remSleepMinutes: sleepByDay[day]?.remSleepMinutes,
+                    coreSleepMinutes: sleepByDay[day]?.coreSleepMinutes,
+                    awakeMinutes: sleepByDay[day]?.awakeMinutes,
                     bedtimeMinute: sleepByDay[day]?.bedtimeMinute,
                     wakeMinute: sleepByDay[day]?.wakeMinute,
                     steps: stepsByDay[day],
@@ -305,15 +325,32 @@ final class HealthKitStore: ObservableObject {
         let query = HKSampleQuery(sampleType: type, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, _ in
             var asleepTotals: [Date: TimeInterval] = [:]
             var inBedTotals: [Date: TimeInterval] = [:]
+            var deepSleepTotals: [Date: TimeInterval] = [:]
+            var remSleepTotals: [Date: TimeInterval] = [:]
+            var coreSleepTotals: [Date: TimeInterval] = [:]
+            var awakeTotals: [Date: TimeInterval] = [:]
             var bedtimeByDay: [Date: Int] = [:]
             var wakeByDay: [Date: Int] = [:]
             for sample in samples as? [HKCategorySample] ?? [] {
                 let day = calendar.startOfDay(for: sample.startDate)
+                let duration = sample.endDate.timeIntervalSince(sample.startDate)
                 if sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue {
-                    inBedTotals[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+                    inBedTotals[day, default: 0] += duration
+                }
+                if sample.value == HKCategoryValueSleepAnalysis.awake.rawValue {
+                    awakeTotals[day, default: 0] += duration
+                }
+                if sample.value == HKCategoryValueSleepAnalysis.asleepDeep.rawValue {
+                    deepSleepTotals[day, default: 0] += duration
+                }
+                if sample.value == HKCategoryValueSleepAnalysis.asleepREM.rawValue {
+                    remSleepTotals[day, default: 0] += duration
+                }
+                if sample.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue {
+                    coreSleepTotals[day, default: 0] += duration
                 }
                 guard Self.isAsleepValue(sample.value) else { continue }
-                asleepTotals[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+                asleepTotals[day, default: 0] += duration
                 let startMinute = Self.minuteOfDay(sample.startDate, calendar: calendar)
                 let endMinute = Self.minuteOfDay(sample.endDate, calendar: calendar)
                 bedtimeByDay[day] = Self.earlierSleepStart(current: bedtimeByDay[day], candidate: startMinute)
@@ -321,17 +358,25 @@ final class HealthKitStore: ObservableObject {
             }
             let days = Set(asleepTotals.keys)
                 .union(inBedTotals.keys)
+                .union(deepSleepTotals.keys)
+                .union(remSleepTotals.keys)
+                .union(coreSleepTotals.keys)
+                .union(awakeTotals.keys)
                 .union(bedtimeByDay.keys)
                 .union(wakeByDay.keys)
             let summaries = Dictionary(uniqueKeysWithValues: days.map { day in
                 (
-                    day,
-                    HealthSleepSummary(
-                        inBedMinutes: inBedTotals[day].map { Int(($0 / 60).rounded()) },
-                        sleepMinutes: asleepTotals[day].map { Int(($0 / 60).rounded()) },
-                        bedtimeMinute: bedtimeByDay[day],
-                        wakeMinute: wakeByDay[day]
-                    )
+                        day,
+                        HealthSleepSummary(
+                            inBedMinutes: inBedTotals[day].map { Int(($0 / 60).rounded()) },
+                            sleepMinutes: asleepTotals[day].map { Int(($0 / 60).rounded()) },
+                            deepSleepMinutes: deepSleepTotals[day].map { Int(($0 / 60).rounded()) },
+                            remSleepMinutes: remSleepTotals[day].map { Int(($0 / 60).rounded()) },
+                            coreSleepMinutes: coreSleepTotals[day].map { Int(($0 / 60).rounded()) },
+                            awakeMinutes: awakeTotals[day].map { Int(($0 / 60).rounded()) },
+                            bedtimeMinute: bedtimeByDay[day],
+                            wakeMinute: wakeByDay[day]
+                        )
                 )
             })
             completion(summaries)

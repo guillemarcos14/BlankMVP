@@ -479,6 +479,596 @@ struct SmartBlockRecommendation: Equatable {
     var durationMinutes: Int
 }
 
+struct DigitalWellnessDataManifest: Equatable {
+    struct Section: Identifiable, Equatable {
+        var id: String { area }
+        var area: String
+        var rawLocalData: [String]
+        var backendFeatures: [String]
+        var sendsRawData: Bool
+    }
+
+    static let sections: [Section] = [
+        Section(
+            area: "Onboarding",
+            rawLocalData: ["name", "age range", "goal", "profile", "declared daily usage", "declared weak moment"],
+            backendFeatures: ["goal", "profile", "age_range", "declared_daily_usage_hours", "weak_moment", "motivation_cluster"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Blocking",
+            rawLocalData: ["exact session starts and ends", "entry mode", "duration", "result"],
+            backendFeatures: ["blocks_started", "blocks_completed", "blocked_minutes", "avg_block_duration_minutes", "plan_adherence_percent"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Relapse",
+            rawLocalData: ["break attempts", "emergency unlocks", "local hour", "duration"],
+            backendFeatures: ["relapses_count", "relapse_rate", "weakest_hour", "worst_window", "unlock_pressure_score"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Apps",
+            rawLocalData: ["exact selected apps", "categories", "web domains"],
+            backendFeatures: ["selection_count", "category_mix", "distraction_cluster"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Sleep",
+            rawLocalData: ["sleep stage intervals", "in bed intervals", "awake intervals", "bedtime and wake timestamps"],
+            backendFeatures: ["sleep_total_minutes", "deep_sleep_minutes", "rem_sleep_minutes", "core_sleep_minutes", "awake_minutes", "sleep_efficiency", "bedtime_local", "wake_time_local", "sleep_debt_minutes"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Heart",
+            rawLocalData: ["heart rate samples", "resting heart rate samples", "HRV samples"],
+            backendFeatures: ["resting_hr", "avg_daily_hr", "resting_hr_delta", "hrv_avg", "hrv_vs_baseline_percent", "recovery_score"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Activity",
+            rawLocalData: ["steps", "distance", "active energy", "basal energy", "exercise minutes"],
+            backendFeatures: ["steps_total", "active_energy_kcal", "exercise_minutes", "activity_vs_baseline_percent", "sedentary_day_flag", "high_activity_day_flag"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Workouts",
+            rawLocalData: ["workout samples", "workout timestamps", "workout heart data"],
+            backendFeatures: ["workout_total_minutes", "workout_intensity_score", "training_load_proxy", "late_workout_flag"],
+            sendsRawData: false
+        ),
+        Section(
+            area: "Mindfulness",
+            rawLocalData: ["mindful session intervals"],
+            backendFeatures: ["mindful_minutes", "mindfulness_streak", "mindfulness_before_sleep_flag"],
+            sendsRawData: false
+        )
+    ]
+}
+
+struct DigitalWellnessFeaturePayload: Codable, Equatable {
+    var schema_version: Int
+    var generated_at: Date
+    var period_start: Date
+    var period_end: Date
+    var profile: DigitalWellnessProfileFeatures
+    var daily: [DigitalWellnessDailyFeatures]
+    var weekly: DigitalWellnessWeeklyFeatures
+    var correlations: DigitalWellnessCorrelationFeatures
+    var privacy: DigitalWellnessPrivacyFeatures
+}
+
+struct DigitalWellnessProfileFeatures: Codable, Equatable {
+    var age_range: String?
+    var goal: String?
+    var profile: String?
+    var declared_daily_usage_hours: Double?
+    var weak_moment: String?
+    var motivation_cluster: String
+}
+
+struct DigitalWellnessDailyFeatures: Codable, Identifiable, Equatable {
+    var id: Date { date }
+    var date: Date
+    var day_of_week: Int
+    var sleep_total_minutes: Int?
+    var deep_sleep_minutes: Int?
+    var rem_sleep_minutes: Int?
+    var core_sleep_minutes: Int?
+    var awake_minutes: Int?
+    var sleep_efficiency: Double?
+    var bedtime_local: String?
+    var wake_time_local: String?
+    var sleep_debt_minutes: Int?
+    var bedtime_variability_minutes: Int?
+    var wake_time_variability_minutes: Int?
+    var resting_hr: Int?
+    var avg_daily_hr: Int?
+    var resting_hr_delta: Int?
+    var hrv_avg: Int?
+    var hrv_vs_baseline_percent: Int?
+    var recovery_score: Int?
+    var steps_total: Int?
+    var active_energy_kcal: Int?
+    var exercise_minutes: Int?
+    var workout_total_minutes: Int?
+    var workout_intensity_score: Int?
+    var training_load_proxy: String?
+    var mindful_minutes: Int?
+    var blocks_started: Int
+    var blocks_completed: Int
+    var relapses_count: Int
+    var blocked_minutes: Int
+    var avg_block_duration_minutes: Int?
+    var plan_adherence_percent: Int
+    var weakest_hour: Int?
+    var risk_windows: [String]
+    var first_phone_risk_after_wake: String?
+    var night_scroll_risk: String
+    var sedentary_day_flag: Bool?
+    var high_activity_day_flag: Bool?
+    var low_recovery_flag: Bool?
+    var late_bedtime_flag: Bool?
+    var short_sleep_flag: Bool?
+}
+
+struct DigitalWellnessWeeklyFeatures: Codable, Equatable {
+    var days_count: Int
+    var active_days_7d: Int
+    var selection_count: Int
+    var category_mix: String
+    var distraction_cluster: String
+    var avg_sleep_minutes: Int?
+    var avg_deep_sleep_minutes: Int?
+    var avg_rem_sleep_minutes: Int?
+    var avg_awake_minutes: Int?
+    var sleep_consistency_score: Int?
+    var bedtime_variability_minutes: Int?
+    var wake_time_variability_minutes: Int?
+    var avg_resting_hr: Int?
+    var avg_hrv: Int?
+    var recovery_trend_14d: String
+    var avg_steps: Int?
+    var avg_exercise_minutes: Int?
+    var blocks_started: Int
+    var blocks_completed: Int
+    var relapses_count: Int
+    var relapse_rate: Double
+    var unlock_pressure_score: Int
+    var blocked_minutes: Int
+    var plan_adherence_percent: Int
+    var weakest_hour: Int?
+    var best_focus_window: String?
+    var worst_focus_window: String?
+    var habit_volatility_score: Int
+    var recommended_plan_difficulty: String
+}
+
+struct DigitalWellnessCorrelationFeatures: Codable, Equatable {
+    var relapses_after_short_sleep: Int
+    var relapses_after_low_hrv: Int
+    var night_scroll_after_late_bedtime: Bool
+    var morning_scroll_after_poor_sleep: Bool
+    var focus_success_after_workout: Bool
+    var screen_risk_after_workout: String
+    var screen_risk_after_bad_sleep: String
+}
+
+struct DigitalWellnessPrivacyFeatures: Codable, Equatable {
+    var raw_health_samples_sent: Bool
+    var raw_sleep_stage_timestamps_sent: Bool
+    var exact_app_selection_sent: Bool
+    var exact_location_sent: Bool
+    var health_processing_location: String
+    var backend_payload_type: String
+}
+
+enum DigitalWellnessFeatureBuilder {
+    static func makePayload(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        healthSummaries: [HealthDaySummary],
+        sessions: [BlankSession],
+        events: [BlankUsageEvent],
+        selectionCount: Int,
+        selectionSnapshot: BlankSelectionSnapshot = BlankSelectionSnapshot(),
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> DigitalWellnessFeaturePayload {
+        let periodEnd = calendar.startOfDay(for: now)
+        let periodStart = calendar.date(byAdding: .day, value: -13, to: periodEnd) ?? periodEnd
+        let healthByDay = Dictionary(uniqueKeysWithValues: healthSummaries.map { (calendar.startOfDay(for: $0.date), $0) })
+        let days = (0..<14).compactMap { calendar.date(byAdding: .day, value: $0, to: periodStart) }
+        let baselines = HealthBaselines(summaries: healthSummaries)
+        let daily = days.map { day in
+            makeDailyFeatures(
+                day: day,
+                health: healthByDay[calendar.startOfDay(for: day)],
+                baselines: baselines,
+                sessions: sessionsForDay(day, sessions: sessions, now: now, calendar: calendar),
+                events: eventsForDay(day, events: events, calendar: calendar),
+                calendar: calendar
+            )
+        }
+
+        return DigitalWellnessFeaturePayload(
+            schema_version: 1,
+            generated_at: now,
+            period_start: periodStart,
+            period_end: periodEnd,
+            profile: makeProfile(defaults: defaults),
+            daily: daily,
+            weekly: makeWeeklyFeatures(daily: daily, selectionCount: selectionCount, selectionSnapshot: selectionSnapshot),
+            correlations: makeCorrelations(daily: daily),
+            privacy: DigitalWellnessPrivacyFeatures(
+                raw_health_samples_sent: false,
+                raw_sleep_stage_timestamps_sent: false,
+                exact_app_selection_sent: false,
+                exact_location_sent: false,
+                health_processing_location: "on_device",
+                backend_payload_type: "daily_and_weekly_features"
+            )
+        )
+    }
+
+    private struct HealthBaselines {
+        var sleep: Int?
+        var bedtime: Int?
+        var wake: Int?
+        var restingHR: Int?
+        var hrv: Int?
+        var steps: Int?
+
+        init(summaries: [HealthDaySummary]) {
+            sleep = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.sleepMinutes))
+            bedtime = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.bedtimeMinute))
+            wake = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.wakeMinute))
+            restingHR = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.restingHeartRate))
+            hrv = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.hrvSDNN))
+            steps = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.steps))
+        }
+    }
+
+    private static func makeProfile(defaults: UserDefaults) -> DigitalWellnessProfileFeatures {
+        let goal = clean(defaults.string(forKey: "blankOnboardingGoal"))
+        let profile = clean(defaults.string(forKey: "blankOnboardingProfile"))
+        let weakMoment = clean(defaults.string(forKey: "blankOnboardingWeakMoment"))
+        let dailyUsage = defaults.object(forKey: "blankOnboardingDailyHours") == nil
+            ? nil
+            : defaults.double(forKey: "blankOnboardingDailyHours")
+
+        return DigitalWellnessProfileFeatures(
+            age_range: clean(defaults.string(forKey: "blankOnboardingAgeRange")),
+            goal: goal,
+            profile: profile,
+            declared_daily_usage_hours: dailyUsage,
+            weak_moment: weakMoment,
+            motivation_cluster: motivationCluster(goal: goal, profile: profile, weakMoment: weakMoment)
+        )
+    }
+
+    private static func makeDailyFeatures(
+        day: Date,
+        health: HealthDaySummary?,
+        baselines: HealthBaselines,
+        sessions: [BlankSession],
+        events: [BlankUsageEvent],
+        calendar: Calendar
+    ) -> DigitalWellnessDailyFeatures {
+        let completed = sessions.filter { $0.endedAt != nil }
+        let blockedMinutes = Int(sessions.reduce(TimeInterval.zero) { $0 + $1.duration } / 60)
+        let relapseEvents = events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency || $0.endedReason == .manual }
+        let started = events.filter { $0.kind == .blockStarted }.count
+        let weakHour = mostCommon(relapseEvents.map(\.localHour) + sessions.compactMap(\.localStartHour))
+        let hrvDelta = percentDelta(value: health?.hrvSDNN, baseline: baselines.hrv)
+        let restingDelta = delta(value: health?.restingHeartRate, baseline: baselines.restingHR)
+        let recovery = recoveryScore(
+            sleepMinutes: health?.sleepMinutes,
+            hrvDelta: hrvDelta,
+            restingHRDelta: restingDelta,
+            steps: health?.steps,
+            stepsBaseline: baselines.steps
+        )
+        let shortSleep = health?.sleepMinutes.map { $0 < 6 * 60 }
+        let lowRecovery = recovery.map { $0 < 45 }
+
+        return DigitalWellnessDailyFeatures(
+            date: day,
+            day_of_week: calendar.component(.weekday, from: day),
+            sleep_total_minutes: health?.sleepMinutes,
+            deep_sleep_minutes: health?.deepSleepMinutes,
+            rem_sleep_minutes: health?.remSleepMinutes,
+            core_sleep_minutes: health?.coreSleepMinutes,
+            awake_minutes: health?.awakeMinutes,
+            sleep_efficiency: sleepEfficiency(sleep: health?.sleepMinutes, inBed: health?.inBedMinutes, awake: health?.awakeMinutes),
+            bedtime_local: health?.bedtimeMinute.map(timeText),
+            wake_time_local: health?.wakeMinute.map(timeText),
+            sleep_debt_minutes: sleepDebt(sleep: health?.sleepMinutes, baseline: baselines.sleep),
+            bedtime_variability_minutes: minuteDistance(health?.bedtimeMinute, baselines.bedtime),
+            wake_time_variability_minutes: minuteDistance(health?.wakeMinute, baselines.wake),
+            resting_hr: health?.restingHeartRate,
+            avg_daily_hr: health?.averageHeartRate,
+            resting_hr_delta: restingDelta,
+            hrv_avg: health?.hrvSDNN,
+            hrv_vs_baseline_percent: hrvDelta,
+            recovery_score: recovery,
+            steps_total: health?.steps,
+            active_energy_kcal: health?.activeEnergyKcal,
+            exercise_minutes: health?.workoutMinutes,
+            workout_total_minutes: health?.workoutMinutes,
+            workout_intensity_score: workoutIntensityScore(workoutMinutes: health?.workoutMinutes, activeEnergy: health?.activeEnergyKcal, averageHeartRate: health?.averageHeartRate),
+            training_load_proxy: trainingLoadProxy(workoutIntensityScore(workoutMinutes: health?.workoutMinutes, activeEnergy: health?.activeEnergyKcal, averageHeartRate: health?.averageHeartRate)),
+            mindful_minutes: health?.mindfulMinutes,
+            blocks_started: started,
+            blocks_completed: completed.count,
+            relapses_count: relapseEvents.count,
+            blocked_minutes: blockedMinutes,
+            avg_block_duration_minutes: completed.isEmpty ? nil : blockedMinutes / max(1, completed.count),
+            plan_adherence_percent: started == 0 ? 0 : Int(Double(completed.count) / Double(started) * 100),
+            weakest_hour: weakHour,
+            risk_windows: riskWindowsFrom(hours: relapseEvents.map(\.localHour) + sessions.compactMap(\.localStartHour)),
+            first_phone_risk_after_wake: firstPhoneRiskAfterWake(wakeMinute: health?.wakeMinute, events: relapseEvents),
+            night_scroll_risk: nightRisk(events: relapseEvents, sessions: sessions, shortSleep: shortSleep ?? false, lowRecovery: lowRecovery ?? false),
+            sedentary_day_flag: health?.steps.map { $0 < 3500 },
+            high_activity_day_flag: health?.steps.map { $0 >= 9000 },
+            low_recovery_flag: lowRecovery,
+            late_bedtime_flag: health?.bedtimeMinute.map { $0 >= 23 * 60 || $0 < 2 * 60 },
+            short_sleep_flag: shortSleep
+        )
+    }
+
+    private static func makeWeeklyFeatures(
+        daily: [DigitalWellnessDailyFeatures],
+        selectionCount: Int,
+        selectionSnapshot: BlankSelectionSnapshot
+    ) -> DigitalWellnessWeeklyFeatures {
+        let recent = Array(daily.suffix(7))
+        let started = recent.reduce(0) { $0 + $1.blocks_started }
+        let completed = recent.reduce(0) { $0 + $1.blocks_completed }
+        let relapses = recent.reduce(0) { $0 + $1.relapses_count }
+        let attempts = max(1, completed + relapses)
+        let adherence = started == 0 ? 0 : Int(Double(completed) / Double(started) * 100)
+        let bedtimeDrift = average(recent.compactMap(\.bedtime_variability_minutes))
+        let weakHour = mostCommon(recent.compactMap(\.weakest_hour))
+        let volatility = min(100, relapses * 16 + max(0, 100 - adherence) / 2 + (bedtimeDrift ?? 0) / 3)
+
+        return DigitalWellnessWeeklyFeatures(
+            days_count: recent.count,
+            active_days_7d: recent.filter { $0.blocks_started > 0 || $0.blocked_minutes > 0 }.count,
+            selection_count: selectionCount,
+            category_mix: categoryMix(selectionSnapshot),
+            distraction_cluster: distractionCluster(selectionSnapshot),
+            avg_sleep_minutes: average(recent.compactMap(\.sleep_total_minutes)),
+            avg_deep_sleep_minutes: average(recent.compactMap(\.deep_sleep_minutes)),
+            avg_rem_sleep_minutes: average(recent.compactMap(\.rem_sleep_minutes)),
+            avg_awake_minutes: average(recent.compactMap(\.awake_minutes)),
+            sleep_consistency_score: bedtimeDrift.map { max(0, 100 - min(100, $0)) },
+            bedtime_variability_minutes: bedtimeDrift,
+            wake_time_variability_minutes: average(recent.compactMap(\.wake_time_variability_minutes)),
+            avg_resting_hr: average(recent.compactMap(\.resting_hr)),
+            avg_hrv: average(recent.compactMap(\.hrv_avg)),
+            recovery_trend_14d: recoveryTrend(daily),
+            avg_steps: average(recent.compactMap(\.steps_total)),
+            avg_exercise_minutes: average(recent.compactMap(\.exercise_minutes)),
+            blocks_started: started,
+            blocks_completed: completed,
+            relapses_count: relapses,
+            relapse_rate: Double(relapses) / Double(attempts),
+            unlock_pressure_score: min(100, relapses * 22 + max(0, 70 - adherence) / 2),
+            blocked_minutes: recent.reduce(0) { $0 + $1.blocked_minutes },
+            plan_adherence_percent: adherence,
+            weakest_hour: weakHour,
+            best_focus_window: bestFocusWindow(recent),
+            worst_focus_window: weakHour.map(DigitalWellnessAI.hourRangeText),
+            habit_volatility_score: volatility,
+            recommended_plan_difficulty: recommendedDifficulty(adherence: adherence, relapses: relapses, selectionCount: selectionCount)
+        )
+    }
+
+    private static func makeCorrelations(daily: [DigitalWellnessDailyFeatures]) -> DigitalWellnessCorrelationFeatures {
+        let shortSleepDays = daily.filter { $0.short_sleep_flag == true }
+        let lowHRVDays = daily.filter { ($0.hrv_vs_baseline_percent ?? 0) <= -15 }
+        let lateBedtimeDays = daily.filter { $0.late_bedtime_flag == true }
+        let workoutDays = daily.filter { ($0.workout_total_minutes ?? 0) >= 20 }
+        let badSleepRelapses = shortSleepDays.reduce(0) { $0 + $1.relapses_count }
+        let workoutRelapses = workoutDays.reduce(0) { $0 + $1.relapses_count }
+        let workoutBlocks = workoutDays.reduce(0) { $0 + $1.blocks_completed }
+
+        return DigitalWellnessCorrelationFeatures(
+            relapses_after_short_sleep: badSleepRelapses,
+            relapses_after_low_hrv: lowHRVDays.reduce(0) { $0 + $1.relapses_count },
+            night_scroll_after_late_bedtime: lateBedtimeDays.contains { $0.night_scroll_risk == "high" },
+            morning_scroll_after_poor_sleep: shortSleepDays.contains { $0.first_phone_risk_after_wake == "high" },
+            focus_success_after_workout: workoutBlocks > workoutRelapses,
+            screen_risk_after_workout: workoutRelapses > workoutBlocks ? "high" : "low",
+            screen_risk_after_bad_sleep: badSleepRelapses > 0 ? "high" : "low"
+        )
+    }
+
+    private static func sessionsForDay(_ day: Date, sessions: [BlankSession], now: Date, calendar: Calendar) -> [BlankSession] {
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: day) else { return [] }
+        return sessions.filter { session in
+            let end = session.endedAt ?? now
+            return session.startedAt < dayEnd && end >= day
+        }
+    }
+
+    private static func eventsForDay(_ day: Date, events: [BlankUsageEvent], calendar: Calendar) -> [BlankUsageEvent] {
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: day) else { return [] }
+        return events.filter { $0.occurredAt >= day && $0.occurredAt < dayEnd }
+    }
+
+    private static func sleepEfficiency(sleep: Int?, inBed: Int?, awake: Int?) -> Double? {
+        guard let sleep else { return nil }
+        let denominator = inBed ?? (awake.map { sleep + $0 } ?? sleep)
+        guard denominator > 0 else { return nil }
+        return Double(sleep) / Double(denominator)
+    }
+
+    private static func sleepDebt(sleep: Int?, baseline: Int?) -> Int? {
+        guard let sleep else { return nil }
+        return max(0, (baseline ?? 8 * 60) - sleep)
+    }
+
+    private static func recoveryScore(sleepMinutes: Int?, hrvDelta: Int?, restingHRDelta: Int?, steps: Int?, stepsBaseline: Int?) -> Int? {
+        var parts: [Int] = []
+        if let sleepMinutes {
+            parts.append(min(100, max(0, Int(Double(sleepMinutes) / Double(8 * 60) * 100))))
+        }
+        if let hrvDelta {
+            parts.append(min(100, max(0, 70 + hrvDelta)))
+        }
+        if let restingHRDelta {
+            parts.append(min(100, max(0, 70 - restingHRDelta * 4)))
+        }
+        if let steps, let stepsBaseline, stepsBaseline > 0 {
+            parts.append(min(100, max(0, Int(Double(steps) / Double(stepsBaseline) * 70))))
+        }
+        return average(parts)
+    }
+
+    private static func workoutIntensityScore(workoutMinutes: Int?, activeEnergy: Int?, averageHeartRate: Int?) -> Int? {
+        guard workoutMinutes != nil || activeEnergy != nil || averageHeartRate != nil else { return nil }
+        let minuteScore = min(45, (workoutMinutes ?? 0) * 45 / 60)
+        let energyScore = min(35, (activeEnergy ?? 0) * 35 / 700)
+        let heartScore = min(20, max(0, ((averageHeartRate ?? 70) - 70) * 20 / 80))
+        return min(100, minuteScore + energyScore + heartScore)
+    }
+
+    private static func firstPhoneRiskAfterWake(wakeMinute: Int?, events: [BlankUsageEvent]) -> String? {
+        guard let wakeMinute else { return nil }
+        let risky = events.contains { event in
+            let eventMinute = event.localHour * 60
+            let distance = (eventMinute - wakeMinute + 24 * 60) % (24 * 60)
+            return distance <= 90
+        }
+        return risky ? "high" : "low"
+    }
+
+    private static func nightRisk(events: [BlankUsageEvent], sessions: [BlankSession], shortSleep: Bool, lowRecovery: Bool) -> String {
+        let nightEvents = events.filter { $0.localHour >= 21 || $0.localHour <= 2 }
+        let nightSessions = sessions.filter { ($0.localStartHour ?? 12) >= 21 || ($0.localStartHour ?? 12) <= 2 }
+        let score = nightEvents.count * 25 + nightSessions.count * 8 + (shortSleep ? 18 : 0) + (lowRecovery ? 18 : 0)
+        if score >= 45 { return "high" }
+        if score >= 20 { return "medium" }
+        return "low"
+    }
+
+    private static func riskWindowsFrom(hours: [Int]) -> [String] {
+        mostCommonValues(hours, limit: 3).map(DigitalWellnessAI.hourRangeText)
+    }
+
+    private static func bestFocusWindow(_ days: [DigitalWellnessDailyFeatures]) -> String? {
+        let candidates = days.filter { $0.blocks_completed > 0 && $0.relapses_count == 0 }.compactMap(\.weakest_hour)
+        return mostCommon(candidates).map(DigitalWellnessAI.hourRangeText)
+    }
+
+    private static func recoveryTrend(_ daily: [DigitalWellnessDailyFeatures]) -> String {
+        let scores = daily.compactMap(\.recovery_score)
+        guard scores.count >= 4 else { return "learning" }
+        let midpoint = scores.count / 2
+        let first = average(Array(scores.prefix(midpoint))) ?? 0
+        let second = average(Array(scores.suffix(scores.count - midpoint))) ?? 0
+        if second >= first + 8 { return "improving" }
+        if second <= first - 8 { return "worsening" }
+        return "stable"
+    }
+
+    private static func trainingLoadProxy(_ score: Int?) -> String? {
+        guard let score else { return nil }
+        if score >= 72 { return "high" }
+        if score >= 38 { return "medium" }
+        return "low"
+    }
+
+    private static func recommendedDifficulty(adherence: Int, relapses: Int, selectionCount: Int) -> String {
+        if selectionCount == 0 { return "setup_required" }
+        if relapses >= 3 || adherence < 45 { return "recovery" }
+        if adherence >= 80 && relapses == 0 { return "progressive" }
+        return "baseline"
+    }
+
+    private static func categoryMix(_ snapshot: BlankSelectionSnapshot) -> String {
+        let total = max(1, snapshot.totalCount)
+        let appShare = Double(snapshot.applicationCount) / Double(total)
+        let categoryShare = Double(snapshot.categoryCount) / Double(total)
+        let webShare = Double(snapshot.webDomainCount) / Double(total)
+        if appShare >= 0.60 { return "mostly_apps" }
+        if categoryShare >= 0.60 { return "mostly_categories" }
+        if webShare >= 0.60 { return "mostly_web" }
+        if snapshot.totalCount == 0 { return "none" }
+        return "mixed"
+    }
+
+    private static func distractionCluster(_ snapshot: BlankSelectionSnapshot) -> String {
+        if snapshot.totalCount == 0 { return "not_configured" }
+        if snapshot.webDomainCount > snapshot.applicationCount && snapshot.webDomainCount >= snapshot.categoryCount {
+            return "web_loop"
+        }
+        if snapshot.categoryCount >= snapshot.applicationCount && snapshot.categoryCount >= snapshot.webDomainCount {
+            return "category_loop"
+        }
+        return "app_loop"
+    }
+
+    private static func motivationCluster(goal: String?, profile: String?, weakMoment: String?) -> String {
+        let text = [goal, profile, weakMoment].compactMap { $0?.lowercased() }.joined(separator: " ")
+        if text.contains("sleep") || text.contains("night") || text.contains("bed") { return "sleep_protection" }
+        if text.contains("study") || text.contains("student") || text.contains("school") { return "study_focus" }
+        if text.contains("work") || text.contains("deep") { return "deep_work" }
+        if text.contains("mental") || text.contains("dopamine") { return "mental_wellness" }
+        return "general_control"
+    }
+
+    private static func average(_ values: [Int]) -> Int? {
+        values.isEmpty ? nil : values.reduce(0, +) / values.count
+    }
+
+    private static func circularAverage(_ values: [Int]) -> Int? {
+        guard !values.isEmpty else { return nil }
+        let adjusted = values.map { $0 < 12 * 60 ? $0 + 24 * 60 : $0 }
+        return (adjusted.reduce(0, +) / adjusted.count) % (24 * 60)
+    }
+
+    private static func delta(value: Int?, baseline: Int?) -> Int? {
+        guard let value, let baseline else { return nil }
+        return value - baseline
+    }
+
+    private static func percentDelta(value: Int?, baseline: Int?) -> Int? {
+        guard let value, let baseline, baseline > 0 else { return nil }
+        return Int(((Double(value) - Double(baseline)) / Double(baseline) * 100).rounded())
+    }
+
+    private static func minuteDistance(_ lhs: Int?, _ rhs: Int?) -> Int? {
+        guard let lhs, let rhs else { return nil }
+        let diff = abs(lhs - rhs)
+        return min(diff, 24 * 60 - diff)
+    }
+
+    private static func timeText(_ minute: Int) -> String {
+        String(format: "%02d:%02d", minute / 60, minute % 60)
+    }
+
+    private static func clean(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func mostCommon(_ values: [Int]) -> Int? {
+        mostCommonValues(values, limit: 1).first
+    }
+
+    private static func mostCommonValues(_ values: [Int], limit: Int) -> [Int] {
+        let counts = Dictionary(grouping: values, by: { $0 }).mapValues(\.count)
+        return counts
+            .sorted { first, second in
+                first.value == second.value ? first.key < second.key : first.value > second.value
+            }
+            .prefix(limit)
+            .map(\.key)
+    }
+}
+
 struct RelapseIntervention: Equatable {
     var headline: String
     var cost: String

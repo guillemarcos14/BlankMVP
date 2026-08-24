@@ -2240,7 +2240,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Apple Health",
-                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to generate local digital wellness insights. Blanked does not send Apple Health data to its backend in the current implementation."
+                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to generate local digital wellness insights. Blanked only sends aggregated wellness features to its backend after your explicit consent; it does not send raw Health samples."
                 ),
                 (
                     "Sharing",

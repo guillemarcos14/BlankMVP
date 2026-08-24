@@ -719,10 +719,10 @@ enum DigitalWellnessFeatureBuilder {
         var steps: Int?
 
         init(summaries: [HealthDaySummary]) {
-            sleep = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.sleepMinutes))
-            bedtime = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.bedtimeMinute))
-            wake = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap(\.wakeMinute))
-            restingHR = DigitalWellnessFeatureBuilder.average(summaries.compactMap(\.restingHeartRate))
+            sleep = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.sleepMinutes })
+            bedtime = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap { $0.bedtimeMinute })
+            wake = DigitalWellnessFeatureBuilder.circularAverage(summaries.compactMap { $0.wakeMinute })
+            restingHR = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.restingHeartRate })
             hrv = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.hrvSDNN })
             steps = DigitalWellnessFeatureBuilder.average(summaries.compactMap { $0.steps })
         }

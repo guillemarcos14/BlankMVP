@@ -5,10 +5,17 @@ struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
+    @State private var isSubmittingWellnessFeatures = false
+    @State private var wellnessSyncMessage: String?
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
     @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
     @AppStorage("blankWeeklyAIPlanSecond", store: BlankSharedState.defaults) private var storedPlanSecond = ""
     @AppStorage("blankWeeklyAIPlanThird", store: BlankSharedState.defaults) private var storedPlanThird = ""
+    @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = false
+    @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var onboardingAnonymousUserId = ""
+    @AppStorage("blankRemoteWellnessSummary", store: BlankSharedState.defaults) private var remoteWellnessSummary = ""
+    @AppStorage("blankRemoteWellnessNextStep", store: BlankSharedState.defaults) private var remoteWellnessNextStep = ""
+    @AppStorage("blankRemoteWellnessRecommendations", store: BlankSharedState.defaults) private var remoteWellnessRecommendations = ""
 
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
@@ -823,6 +830,7 @@ struct ReportView: View {
                         statCapsule(title: "Recovery", value: recoveryValue(context.recoveryScore), caption: "Context only", minHeight: 82)
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
                     }
+                    remoteWellnessInsightCard()
                     aiReportSection(title: "Why", items: forecast.reasons)
                     aiReportSection(title: "Unblank Pattern", items: unblankPatternInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
                     aiReportSection(title: "Intervention Learning", items: interventionLearningInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
@@ -849,6 +857,45 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func remoteWellnessInsightCard() -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !remoteWellnessSummary.isEmpty {
+                aiReportSection(
+                    title: "AI Weekly Insight",
+                    items: [remoteWellnessSummary, remoteWellnessNextStep].filter { !$0.isEmpty } + remoteRecommendationItems,
+                    tint: accentBlue
+                )
+            }
+
+            if let wellnessSyncMessage {
+                Text(wellnessSyncMessage)
+                    .font(.caption2)
+                    .foregroundStyle(reportSecondary.opacity(0.78))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Button {
+                submitDigitalWellnessFeatures()
+            } label: {
+                Text(isSubmittingWellnessFeatures ? "Syncing..." : (wellnessFeatureConsent ? "Sync AI insight" : "Improve AI with wellness features"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .background {
+                        Capsule()
+                            .fill(Color.white.opacity(0.22))
+                    }
+                    .overlay {
+                        Capsule()
+                            .stroke(reportPrimary.opacity(0.10), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .disabled(isSubmittingWellnessFeatures)
+        }
     }
 
     private func controlForecastCard(_ forecast: ControlForecast) -> some View {
@@ -2424,6 +2471,54 @@ struct ReportView: View {
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         return minutes == 0 ? "\(hours) h" : "\(hours) h \(minutes) min"
+    }
+
+    private var remoteRecommendationItems: [String] {
+        remoteWellnessRecommendations
+            .split(separator: "\n")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+    }
+
+    private func submitDigitalWellnessFeatures() {
+        guard !isSubmittingWellnessFeatures else { return }
+        isSubmittingWellnessFeatures = true
+        wellnessSyncMessage = nil
+
+        let payload = sessionStore.digitalWellnessFeaturePayload(healthSummaries: healthKitStore.summaries)
+        let anonymousUserId = currentAnonymousUserId()
+
+        Task {
+            do {
+                let insight = try await DigitalWellnessFeaturesClient().submit(
+                    payload: payload,
+                    anonymousUserId: anonymousUserId,
+                    consentText: "Improve AI with wellness features"
+                )
+                await MainActor.run {
+                    wellnessFeatureConsent = true
+                    remoteWellnessSummary = insight.summary
+                    remoteWellnessNextStep = insight.next_step
+                    remoteWellnessRecommendations = insight.recommendations.joined(separator: "\n")
+                    wellnessSyncMessage = "AI insight updated."
+                    isSubmittingWellnessFeatures = false
+                }
+            } catch {
+                await MainActor.run {
+                    wellnessSyncMessage = "AI sync failed. Please try again."
+                    isSubmittingWellnessFeatures = false
+                }
+            }
+        }
+    }
+
+    private func currentAnonymousUserId() -> String {
+        if !onboardingAnonymousUserId.isEmpty {
+            return onboardingAnonymousUserId
+        }
+        let created = UUID().uuidString
+        onboardingAnonymousUserId = created
+        return created
     }
 }
 

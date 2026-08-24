@@ -705,6 +705,103 @@ struct DigitalWellnessPrivacyFeatures: Codable, Equatable {
     var backend_payload_type: String
 }
 
+struct DigitalWellnessRemoteInsight: Codable, Equatable {
+    var schema_version: Int
+    var generated_at: Date
+    var confidence: Int
+    var motivation_cluster: String
+    var summary: String
+    var patterns: [String]
+    var recommendations: [String]
+    var next_step: String
+    var risk_window: String?
+}
+
+private struct DigitalWellnessFeatureEnvelope: Encodable {
+    var anonymous_user_id: String
+    var payload: DigitalWellnessFeaturePayload
+    var locale: String
+    var app_version: String
+    var build_number: String
+    var data_consent: Bool
+    var consent_text: String
+}
+
+private struct DigitalWellnessFeatureSubmitResponse: Decodable {
+    var ok: Bool
+    var insight: DigitalWellnessRemoteInsight
+}
+
+struct DigitalWellnessFeaturesClient {
+    private let baseURL: URL?
+    private let session: URLSession
+
+    init(baseURL: URL? = Self.configuredBaseURL(), session: URLSession = .shared) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func submit(payload: DigitalWellnessFeaturePayload, anonymousUserId: String, consentText: String) async throws -> DigitalWellnessRemoteInsight {
+        #if DEBUG
+        if baseURL == nil {
+            return DigitalWellnessRemoteInsight(
+                schema_version: 1,
+                generated_at: Date(),
+                confidence: 20,
+                motivation_cluster: payload.profile.motivation_cluster,
+                summary: "Debug build has no backend URL configured.",
+                patterns: ["Local feature payload generated without raw Health samples."],
+                recommendations: ["Configure the backend URL to sync wellness features."],
+                next_step: "Run a release-configured build.",
+                risk_window: payload.weekly.worst_focus_window
+            )
+        }
+        #endif
+
+        guard let baseURL else {
+            throw URLError(.badURL)
+        }
+
+        let envelope = DigitalWellnessFeatureEnvelope(
+            anonymous_user_id: anonymousUserId,
+            payload: payload,
+            locale: Locale.current.identifier,
+            app_version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            build_number: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+            data_consent: true,
+            consent_text: consentText
+        )
+
+        let url = baseURL.appendingPathComponent("digital-wellness-features")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        request.httpBody = try encoder.encode(envelope)
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(DigitalWellnessFeatureSubmitResponse.self, from: data).insight
+    }
+
+    private static func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+}
+
 enum DigitalWellnessFeatureBuilder {
     static func makePayload(
         defaults: UserDefaults = BlankSharedState.defaults,

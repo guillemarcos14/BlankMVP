@@ -62,6 +62,8 @@ struct ReportView: View {
                         context: healthContext
                     )
 
+                    v3SystemCapsule(system: sessionStore.digitalWellnessV3)
+
                     healthAccessCapsule()
 
                     if hasProgress {
@@ -529,6 +531,42 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             }
         }
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func v3SystemCapsule(system: DigitalWellnessV3System) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Adaptive Plan")
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
+                Text(system.weeklyInsight)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                statCapsule(title: "Adherence", value: "\(system.profile.adherenceScore)/100", caption: "Current plan score", minHeight: 84)
+                statCapsule(title: "Risk", value: "\(system.forecast.riskScore)/100", caption: system.forecast.riskWindow, minHeight: 84)
+            }
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(system.plan.weeklyGoal)
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                    .foregroundStyle(reportPrimary.opacity(0.90))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(system.plan.adjustmentReason)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(system.forecast.recommendedAction)
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(reportPrimary.opacity(0.86))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
     }

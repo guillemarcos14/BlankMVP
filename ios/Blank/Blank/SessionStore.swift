@@ -182,6 +182,16 @@ final class SessionStore: ObservableObject {
         return max(0, Self.maxEmergencyUnlocksPerWeek - emergencyUnlocksThisWeek)
     }
 
+    var digitalWellnessV3: DigitalWellnessV3System {
+        DigitalWellnessAI.v3System(
+            events: usageEvents,
+            sessions: sessions,
+            selectionCount: selectionCount,
+            modeName: currentMode.name,
+            emergencyUnlocksRemaining: emergencyUnlocksRemaining
+        )
+    }
+
     func handleNfcTag(uid: String) -> NfcResult {
         guard let savedUid = nfcTagUid else {
             nfcTagUid = uid

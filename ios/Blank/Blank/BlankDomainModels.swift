@@ -485,6 +485,49 @@ struct RelapseIntervention: Equatable {
     var alternative: String
 }
 
+struct DigitalWellnessV3Profile: Equatable {
+    var archetype: String
+    var primaryGoal: String
+    var weeklyProtectedMinutes: Int
+    var weeklySessionCount: Int
+    var weeklyBreakCount: Int
+    var adherenceScore: Int
+    var relapseRiskScore: Int
+    var strongestWindow: Int?
+    var weakestWindow: Int?
+    var dominantModeName: String?
+    var confidence: Int
+}
+
+struct AdaptiveFocusPlan: Equatable {
+    var title: String
+    var weeklyGoal: String
+    var recommendedStartHour: Int
+    var recommendedDurationMinutes: Int
+    var difficulty: String
+    var primaryAction: String
+    var secondaryAction: String
+    var adjustmentReason: String
+}
+
+struct DigitalWellnessV3Forecast: Equatable {
+    var title: String
+    var riskWindow: String
+    var riskScore: Int
+    var minutesUntilRisk: Int
+    var reason: String
+    var recommendedAction: String
+}
+
+struct DigitalWellnessV3System: Equatable {
+    var profile: DigitalWellnessV3Profile
+    var plan: AdaptiveFocusPlan
+    var forecast: DigitalWellnessV3Forecast
+    var relapseIntervention: RelapseIntervention
+    var dailySummary: String
+    var weeklyInsight: String
+}
+
 enum DigitalWellnessAI {
     private static let diagnosisKey = "blankDigitalWellnessDiagnosis"
 
@@ -596,6 +639,54 @@ enum DigitalWellnessAI {
         )
     }
 
+    static func v3System(
+        defaults: UserDefaults = BlankSharedState.defaults,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        selectionCount: Int,
+        modeName: String?,
+        emergencyUnlocksRemaining: Int,
+        now: Date = Date()
+    ) -> DigitalWellnessV3System {
+        let diagnosis = currentDiagnosis(
+            defaults: defaults,
+            events: events,
+            sessions: sessions,
+            selectionCount: selectionCount,
+            now: now
+        )
+        let profile = v3Profile(
+            diagnosis: diagnosis,
+            events: events,
+            sessions: sessions,
+            modeName: modeName,
+            now: now
+        )
+        let plan = adaptivePlan(
+            diagnosis: diagnosis,
+            profile: profile,
+            selectionCount: selectionCount,
+            emergencyUnlocksRemaining: emergencyUnlocksRemaining
+        )
+        let forecast = v3Forecast(profile: profile, plan: plan, now: now)
+        let relapse = v3RelapseIntervention(
+            diagnosis: diagnosis,
+            profile: profile,
+            forecast: forecast,
+            emergencyUnlocksRemaining: emergencyUnlocksRemaining,
+            now: now
+        )
+
+        return DigitalWellnessV3System(
+            profile: profile,
+            plan: plan,
+            forecast: forecast,
+            relapseIntervention: relapse,
+            dailySummary: dailySummary(profile: profile, plan: plan),
+            weeklyInsight: weeklyInsight(profile: profile, forecast: forecast)
+        )
+    }
+
     static func weakHour(events: [BlankUsageEvent], sessions: [BlankSession], now: Date = Date()) -> Int? {
         let calendar = Calendar.current
         let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
@@ -620,6 +711,166 @@ enum DigitalWellnessAI {
 
     static func hourRangeText(_ hour: Int) -> String {
         "\(String(format: "%02d:00", hour))-\(String(format: "%02d:00", (hour + 1) % 24))"
+    }
+
+    private static func v3Profile(
+        diagnosis: DigitalWellnessDiagnosis,
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        modeName: String?,
+        now: Date
+    ) -> DigitalWellnessV3Profile {
+        let calendar = Calendar.current
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let weeklySessions = sessions.filter { session in
+            let sessionEnd = session.endedAt ?? now
+            return session.startedAt <= now && sessionEnd >= weekStart
+        }
+        let weeklyEvents = events.filter { $0.occurredAt >= weekStart && $0.occurredAt <= now }
+        let brokenEvents = weeklyEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency || $0.endedReason == .manual }
+        let protectedMinutes = Int(weeklySessions.reduce(TimeInterval.zero) { $0 + $1.duration } / 60)
+        let breakCount = brokenEvents.count + weeklySessions.filter { $0.endedReason == .emergency || $0.endedReason == .manual }.count
+        let sessionCount = weeklySessions.count
+        let adherenceBase = min(72, sessionCount * 12) + min(28, protectedMinutes / 20)
+        let breakPenalty = min(58, breakCount * 14)
+        let adherence = min(100, max(0, adherenceBase - breakPenalty))
+        let riskScore = min(100, max(8, 36 + breakCount * 18 - sessionCount * 4 + (diagnosis.dailyHours >= 6 ? 12 : 0)))
+        let strongest = mostCommonValue(weeklySessions.compactMap(\.localStartHour) + weeklyEvents.filter { $0.kind == .blockStarted }.map(\.localHour))
+        let weakest = weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
+        let confidence = min(100, max(16, sessionCount * 13 + weeklyEvents.count * 4))
+
+        return DigitalWellnessV3Profile(
+            archetype: diagnosis.archetype,
+            primaryGoal: diagnosis.primaryGoal,
+            weeklyProtectedMinutes: protectedMinutes,
+            weeklySessionCount: sessionCount,
+            weeklyBreakCount: breakCount,
+            adherenceScore: adherence,
+            relapseRiskScore: riskScore,
+            strongestWindow: strongest,
+            weakestWindow: weakest,
+            dominantModeName: modeName,
+            confidence: confidence
+        )
+    }
+
+    private static func adaptivePlan(
+        diagnosis: DigitalWellnessDiagnosis,
+        profile: DigitalWellnessV3Profile,
+        selectionCount: Int,
+        emergencyUnlocksRemaining: Int
+    ) -> AdaptiveFocusPlan {
+        let weakHour = profile.weakestWindow ?? diagnosis.recommendedHour
+        let duration: Int
+        let difficulty: String
+        let reason: String
+
+        if profile.weeklyBreakCount >= 2 || emergencyUnlocksRemaining == 0 {
+            duration = max(15, diagnosis.initialBlockMinutes - 15)
+            difficulty = "Recovery"
+            reason = "Recent breaks suggest the next block should be easier, not harder."
+        } else if profile.adherenceScore >= 78 && profile.weeklySessionCount >= 4 {
+            duration = min(90, diagnosis.initialBlockMinutes + 15)
+            difficulty = "Progressive"
+            reason = "Your recent adherence is strong enough to extend one window."
+        } else {
+            duration = diagnosis.initialBlockMinutes
+            difficulty = "Baseline"
+            reason = "Blanked needs repeated sessions before increasing difficulty."
+        }
+
+        let mode = profile.dominantModeName ?? "main mode"
+        let appAction = selectionCount < 3
+            ? "Add at least 3 apps or categories before judging results."
+            : "Keep \(mode) unchanged for the next 3 sessions."
+
+        return AdaptiveFocusPlan(
+            title: "\(profile.archetype) plan",
+            weeklyGoal: weeklyGoal(profile: profile),
+            recommendedStartHour: weakHour,
+            recommendedDurationMinutes: duration,
+            difficulty: difficulty,
+            primaryAction: "Start \(duration) min at \(activationTimeText(before: weakHour)).",
+            secondaryAction: appAction,
+            adjustmentReason: reason
+        )
+    }
+
+    private static func v3Forecast(
+        profile: DigitalWellnessV3Profile,
+        plan: AdaptiveFocusPlan,
+        now: Date
+    ) -> DigitalWellnessV3Forecast {
+        let targetHour = profile.weakestWindow ?? plan.recommendedStartHour
+        let minutes = minutesUntilNextHour(targetHour, now: now)
+        let urgencyBonus = minutes <= 60 ? 18 : 0
+        let risk = min(100, profile.relapseRiskScore + urgencyBonus)
+        let reason: String
+        if profile.weeklyBreakCount > 0 {
+            reason = "Breaks clustered around \(hourRangeText(targetHour))."
+        } else if profile.weeklySessionCount == 0 {
+            reason = "Your onboarding profile points to this as the first window to protect."
+        } else {
+            reason = "This is the next window with the highest expected attention leak."
+        }
+
+        return DigitalWellnessV3Forecast(
+            title: risk >= 70 ? "High-risk window" : "Control forecast",
+            riskWindow: hourRangeText(targetHour),
+            riskScore: risk,
+            minutesUntilRisk: minutes,
+            reason: reason,
+            recommendedAction: plan.primaryAction
+        )
+    }
+
+    private static func v3RelapseIntervention(
+        diagnosis: DigitalWellnessDiagnosis,
+        profile: DigitalWellnessV3Profile,
+        forecast: DigitalWellnessV3Forecast,
+        emergencyUnlocksRemaining: Int,
+        now: Date
+    ) -> RelapseIntervention {
+        let currentHour = Calendar.current.component(.hour, from: now)
+        let weakHour = profile.weakestWindow ?? diagnosis.recommendedHour
+        let headline = currentHour == weakHour
+            ? "This is your highest-risk window."
+            : "This unlock trains the loop."
+        let cost = emergencyUnlocksRemaining <= 1
+            ? "You have \(emergencyUnlocksRemaining) emergency unlock left this week."
+            : "Breaking now lowers your \(profile.archetype.lowercased()) plan score."
+        let alternative = forecast.minutesUntilRisk <= 30
+            ? "Protect the next 5 minutes, then decide again."
+            : "Delay this unlock and repeat your weekly goal once."
+        return RelapseIntervention(headline: headline, cost: cost, alternative: alternative)
+    }
+
+    private static func dailySummary(profile: DigitalWellnessV3Profile, plan: AdaptiveFocusPlan) -> String {
+        if profile.weeklySessionCount == 0 {
+            return "No signal yet today. Start with \(plan.recommendedDurationMinutes) min."
+        }
+        if profile.weeklyBreakCount == 0 {
+            return "\(profile.weeklyProtectedMinutes) min protected this week with no emergency breaks."
+        }
+        return "\(profile.weeklyBreakCount) break signal\(profile.weeklyBreakCount == 1 ? "" : "s") detected. Use recovery difficulty."
+    }
+
+    private static func weeklyInsight(profile: DigitalWellnessV3Profile, forecast: DigitalWellnessV3Forecast) -> String {
+        "Score \(profile.adherenceScore)/100, confidence \(profile.confidence)%. Next risk: \(forecast.riskWindow)."
+    }
+
+    private static func weeklyGoal(profile: DigitalWellnessV3Profile) -> String {
+        if profile.weeklyBreakCount > 0 {
+            return "Complete 3 blocks without Emergency in your weak window."
+        }
+        if profile.weeklySessionCount < 5 {
+            return "Reach 5 protected sessions this week."
+        }
+        return "Increase protected time by 15% without adding breaks."
+    }
+
+    private static func activationTimeText(before hour: Int) -> String {
+        String(format: "%02d:50", (hour + 23) % 24)
     }
 
     private static func initialDiagnosis(

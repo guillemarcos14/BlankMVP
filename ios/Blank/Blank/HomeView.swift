@@ -29,8 +29,12 @@ struct HomeView: View {
     private var hasSeenFirstFocusBlockNudge = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "Shaping what we\ncreate with the\npower of time."
+    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     private let firstFocusBlockMinutes = 45
+
+    private var aiSystem: DigitalWellnessV3System {
+        sessionStore.digitalWellnessV3
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -273,6 +277,12 @@ struct HomeView: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
+            if !sessionStore.isBlankActive, configIssues.isEmpty {
+                ControlForecastCard(system: aiSystem)
+                    .frame(maxWidth: min(maxWidth, 330))
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
             bottomAction(width: actionWidth)
 
             centerStatus
@@ -354,7 +364,7 @@ struct HomeView: View {
                     return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank()
+                        sessionStore.activateBlank(durationMinutes: aiSystem.plan.recommendedDurationMinutes)
                     }
                     hasSeenFirstFocusBlockNudge = true
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
@@ -490,23 +500,16 @@ struct HomeView: View {
             return "Recovery looks light. Keep the next block simple."
         }
 
-        guard let weakHour = DigitalWellnessAI.weakHour(events: sessionStore.usageEvents, sessions: sessionStore.sessions, now: now),
-              minutesUntilNextHour(weakHour) <= 30 else {
+        guard aiSystem.forecast.minutesUntilRisk <= 30 else {
             return nil
         }
 
-        return "Your weak window is coming."
+        return "\(aiSystem.forecast.riskWindow) is a high-risk window. Start the plan."
     }
 
     private var relapseIntervention: RelapseIntervention {
-        let base = DigitalWellnessAI.relapseIntervention(
-            events: sessionStore.usageEvents,
-            sessions: sessionStore.sessions,
-            selectionCount: sessionStore.selectionCount,
-            now: now
-        )
         guard let recoveryScore = homeRecoveryScore(), recoveryScore < 45 else {
-            return base
+            return aiSystem.relapseIntervention
         }
         return RelapseIntervention(
             headline: "Make this easier, not broken.",
@@ -736,6 +739,65 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
+    }
+}
+
+private struct ControlForecastCard: View {
+    let system: DigitalWellnessV3System
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(system.forecast.title)
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    Text(system.plan.title)
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.66))
+                }
+
+                Spacer()
+
+                Text("\(system.forecast.riskScore)")
+                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
+                    .monospacedDigit()
+            }
+
+            Text(system.forecast.reason)
+                .font(.blankInter(size: 13, relativeTo: .footnote))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                forecastPill(system.forecast.riskWindow)
+                forecastPill("\(system.plan.recommendedDurationMinutes) min")
+                forecastPill(system.plan.difficulty)
+            }
+        }
+        .foregroundStyle(Color.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.black.opacity(0.13))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.10), radius: 16, y: 9)
+    }
+
+    private func forecastPill(_ text: String) -> some View {
+        Text(text)
+            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .padding(.horizontal, 9)
+            .frame(height: 25)
+            .background {
+                Capsule().fill(Color.white.opacity(0.14))
+            }
     }
 }
 

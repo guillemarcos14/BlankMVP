@@ -2,48 +2,6 @@ import Foundation
 import Combine
 import HealthKit
 
-struct HealthDaySummary: Identifiable, Equatable {
-    var id: Date { date }
-    var date: Date
-    var inBedMinutes: Int?
-    var sleepMinutes: Int?
-    var deepSleepMinutes: Int?
-    var remSleepMinutes: Int?
-    var coreSleepMinutes: Int?
-    var awakeMinutes: Int?
-    var bedtimeMinute: Int?
-    var wakeMinute: Int?
-    var steps: Int?
-    var distanceMeters: Int?
-    var activeEnergyKcal: Int?
-    var basalEnergyKcal: Int?
-    var workoutMinutes: Int?
-    var mindfulMinutes: Int?
-    var averageHeartRate: Int?
-    var restingHeartRate: Int?
-    var hrvSDNN: Int?
-
-    var hasSignals: Bool {
-        inBedMinutes != nil ||
-        sleepMinutes != nil ||
-        deepSleepMinutes != nil ||
-        remSleepMinutes != nil ||
-        coreSleepMinutes != nil ||
-        awakeMinutes != nil ||
-        bedtimeMinute != nil ||
-        wakeMinute != nil ||
-        steps != nil ||
-        distanceMeters != nil ||
-        activeEnergyKcal != nil ||
-        basalEnergyKcal != nil ||
-        workoutMinutes != nil ||
-        mindfulMinutes != nil ||
-        averageHeartRate != nil ||
-        restingHeartRate != nil ||
-        hrvSDNN != nil
-    }
-}
-
 private struct HealthSleepSummary {
     var inBedMinutes: Int?
     var sleepMinutes: Int?

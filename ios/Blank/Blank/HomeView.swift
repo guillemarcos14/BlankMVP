@@ -1,5 +1,6 @@
 import FamilyControls
 import SwiftUI
+import UIKit
 
 private enum HomeSection: Hashable {
     case modes
@@ -903,16 +904,18 @@ private struct HomeSectionScreen: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let visibleWidth = min(proxy.size.width, UIScreen.main.bounds.width)
+
             ZStack(alignment: .topLeading) {
                 VStack(spacing: 0) {
                     Spacer()
                         .frame(height: 76)
 
                     routeContent
-                        .frame(width: proxy.size.width, alignment: .top)
+                        .frame(width: visibleWidth, alignment: .top)
                         .frame(maxHeight: .infinity, alignment: .top)
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
+                .frame(width: visibleWidth, height: proxy.size.height, alignment: .top)
 
                 Button {
                     onClose()

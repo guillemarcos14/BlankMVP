@@ -116,8 +116,8 @@ struct ReportView: View {
         Group {
             if usesMainBackground {
                 GeometryReader { proxy in
-                    let viewportWidth = proxy.size.width
-                    let contentWidth = max(0, min(viewportWidth - 88, 304))
+                    let viewportWidth = min(proxy.size.width, UIScreen.main.bounds.width)
+                    let contentWidth = max(0, min(viewportWidth - 70, 304))
 
                     ScrollView(.vertical, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 0) {

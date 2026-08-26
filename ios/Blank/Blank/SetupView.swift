@@ -188,6 +188,19 @@ struct SetupView: View {
                     }
 
                     Spacer()
+
+                    #if DEBUG
+                    #if targetEnvironment(simulator)
+                    Button("Home") {
+                        skipToHomeForQA()
+                    }
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(Color.white.opacity(0.78))
+                    .frame(height: 42)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Skip onboarding and open Home")
+                    #endif
+                    #endif
                 }
                 .padding(.top, 2)
 
@@ -251,7 +264,7 @@ struct SetupView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             if currentStep == .apps, sessionStore.hasSelectedApps {
-                message = "\(sessionStore.selectionCount) selections protected"
+                message = "\(selectionCountText) ready"
             }
         }
         .sheet(item: $presentedLegalDocument) { document in
@@ -635,6 +648,7 @@ struct SetupView: View {
             .buttonStyle(PaywallPrimaryButtonStyle())
             .frame(maxWidth: 318)
             .padding(.top, 22)
+            .disabled(purchaseStore.isPurchasing || purchaseStore.isLoading)
 
             Button("Restore purchases") {
                 Task {
@@ -698,12 +712,12 @@ struct SetupView: View {
             lines: [
                 .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
                 .text(sessionStore.hasSelectedApps ? "is ready with" : "to block", icon: "app.badge.fill"),
-                .text(sessionStore.hasSelectedApps ? "\(sessionStore.selectionCount) selections" : onboardingNameText)
+                .text(sessionStore.hasSelectedApps ? selectionCountText : onboardingNameText)
             ],
             body: sessionStore.hasSelectedApps
                 ? weakMomentPreview
                 : "Pick the apps, categories or websites that trigger this pattern.",
-            primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
+            primaryTitle: sessionStore.hasSelectedApps ? "Start first blank" : "Select apps",
             primaryAction: selectAppsOrContinue,
             secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
             secondaryAction: sessionStore.hasSelectedApps ? { showingPicker = true } : nil
@@ -1189,9 +1203,13 @@ struct SetupView: View {
                 let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
                 notificationStatus = granted ? "On" : "Off"
                 goForward()
+                if !granted {
+                    message = "Notifications were not enabled. You can turn them on later."
+                }
             } catch {
                 notificationStatus = "Off"
-                message = "Notifications were not enabled. You can turn them on later"
+                goForward()
+                message = "Notifications were not enabled. You can turn them on later."
             }
         }
     }
@@ -1380,10 +1398,22 @@ struct SetupView: View {
                 dailyHours: storedDailyHours,
                 selectionCount: sessionStore.selectionCount
             )
+            _ = sessionStore.activateBlank(durationMinutes: initialBlockMinutesPreview)
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             sessionStore.finishSetup()
         } else {
             showingPicker = true
         }
+    }
+
+    private var selectionCountText: String {
+        let count = sessionStore.selectionCount
+        return "\(count) \(count == 1 ? "selection" : "selections")"
+    }
+
+    private func skipToHomeForQA() {
+        message = nil
+        sessionStore.finishSetup()
     }
 
     private func goForward() {

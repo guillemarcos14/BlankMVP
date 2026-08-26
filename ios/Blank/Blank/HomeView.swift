@@ -56,8 +56,8 @@ struct HomeView: View {
 
                 if let activeSection {
                     HomeSectionScreen(
-                        section: activeSection,
-                        showingPicker: $showingPicker
+                        showingPicker: $showingPicker,
+                        section: activeSection
                     ) {
                         closeSection()
                     }

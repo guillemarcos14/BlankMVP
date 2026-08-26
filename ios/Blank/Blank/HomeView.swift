@@ -1,7 +1,7 @@
 import FamilyControls
 import SwiftUI
 
-private enum SettingsRoute: Hashable {
+private enum HomeSection: Hashable {
     case modes
     case schedule
     case report
@@ -16,8 +16,7 @@ struct HomeView: View {
     @State private var message: String?
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
-    @State private var showingSettings = false
-    @State private var settingsRoute: SettingsRoute?
+    @State private var activeSection: HomeSection?
     @State private var showingEmergency = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
@@ -25,12 +24,10 @@ struct HomeView: View {
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
-    @AppStorage("hasSeenFirstFocusBlockNudge", store: BlankSharedState.defaults)
-    private var hasSeenFirstFocusBlockNudge = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
-    private let firstFocusBlockMinutes = 45
+    private let riskBlankMinutes = 30
 
     private var aiSystem: DigitalWellnessV3System {
         sessionStore.digitalWellnessV3
@@ -43,17 +40,33 @@ struct HomeView: View {
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive)
 
-                topBar
-                    .position(x: layout.centerX, y: layout.topBarCenterY)
-                    .zIndex(2)
+                if activeSection == nil {
+                    topBar
+                        .position(x: layout.centerX, y: layout.topBarCenterY)
+                        .zIndex(2)
 
-                configCard
-                    .padding(.horizontal, layout.horizontalPadding)
-                    .padding(.top, layout.configTopPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    topNotificationPanel
+                        .padding(.horizontal, layout.horizontalPadding)
+                        .padding(.top, layout.configTopPadding)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
-                    .position(x: layout.centerX, y: layout.messageCenterY)
+                    centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
+                        .position(x: layout.centerX, y: layout.messageCenterY)
+                }
+
+                if let activeSection {
+                    HomeSectionScreen(
+                        section: activeSection,
+                        showingPicker: $showingPicker
+                    ) {
+                        closeSection()
+                    }
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .trailing).combined(with: .opacity)
+                    ))
+                    .zIndex(5)
+                }
             }
         }
         .ignoresSafeArea()
@@ -61,6 +74,7 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
+        .animation(.spring(response: 0.48, dampingFraction: 0.88), value: activeSection)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
@@ -89,25 +103,12 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
-            openSettings(.modes)
+            openSection(.modes)
             sessionStore.shouldOpenBlockConfiguration = false
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
             guard shouldScan else { return }
             openWidgetScanIfNeeded()
-        }
-        .sheet(isPresented: $showingSettings, onDismiss: {
-            settingsRoute = nil
-        }) {
-            SettingsSheet(
-                initialRoute: $settingsRoute,
-                showingPicker: $showingPicker,
-                showingEmergency: $showingEmergency,
-                showingRelink: $showingRelink,
-                showingForgetConfirm: $showingForgetConfirm
-            )
-            .presentationDetents([.medium, .large])
-            .blankTransparentPresentation()
         }
         .sheet(isPresented: $showingEmergency) {
             EmergencySheet(
@@ -187,13 +188,13 @@ struct HomeView: View {
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
-                    openSettings(.report)
+                    openSection(.report)
                 }
                 topNavButton("Mode") {
-                    openSettings(.modes)
+                    openSection(.modes)
                 }
                 topNavButton("Habits") {
-                    openSettings(.schedule)
+                    openSection(.schedule)
                 }
             }
             .padding(.horizontal, 22)
@@ -228,42 +229,21 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
-    private func openSettings(_ route: SettingsRoute? = nil) {
-        settingsRoute = route
-        showingSettings = true
+    private func openSection(_ section: HomeSection) {
+        activeSection = section
+    }
+
+    private func closeSection() {
+        activeSection = nil
     }
 
     @ViewBuilder
-    private var configCard: some View {
+    private var topNotificationPanel: some View {
         let issues = configIssues
         if !issues.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(issues) { issue in
-                    Button {
-                        resolve(issue.action)
-                    } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: "exclamationmark.circle")
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(issue.title)
-                                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                                Text(issue.body)
-                                    .font(.blankInter(size: 13, relativeTo: .footnote))
-                                    .foregroundStyle(BlankColors.mutedInk)
-                            }
-                            Spacer(minLength: 8)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(BlankColors.mutedInk)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white.opacity(0.78))
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            configCard(issues)
+        } else if shouldShowRiskNotification {
+            aiRiskNotification
         }
     }
 
@@ -277,17 +257,41 @@ struct HomeView: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
-            if !sessionStore.isBlankActive, configIssues.isEmpty {
-                ControlForecastCard(system: aiSystem)
-                    .frame(maxWidth: min(maxWidth, 330))
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
             bottomAction(width: actionWidth)
 
             centerStatus
         }
         .frame(maxWidth: maxWidth)
+    }
+
+    private func configCard(_ issues: [ConfigIssue]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(issues) { issue in
+                Button {
+                    resolve(issue.action)
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.circle")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(issue.title)
+                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                            Text(issue.body)
+                                .font(.blankInter(size: 13, relativeTo: .footnote))
+                                .foregroundStyle(BlankColors.mutedInk)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(BlankColors.mutedInk)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.78))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
     @ViewBuilder
@@ -348,16 +352,6 @@ struct HomeView: View {
 
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
-            if let preventiveAlertText {
-                Text(preventiveAlertText)
-                    .font(.blankInter(size: 13, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.74))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.86)
-                    .frame(maxWidth: 244)
-            }
-
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
             Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start Blank") {
                 if sessionStore.isBlankActive {
@@ -366,12 +360,11 @@ struct HomeView: View {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
                         sessionStore.activateBlank(durationMinutes: aiSystem.plan.recommendedDurationMinutes)
                     }
-                    hasSeenFirstFocusBlockNudge = true
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     setMessage(for: result)
                 }
             }
-            .buttonStyle(HomeBlankearButtonStyle())
+            .buttonStyle(HomeBlankButtonStyle())
             .frame(width: buttonWidth)
             .overlay(alignment: .leading) {
                 if sessionStore.isBlankActive {
@@ -415,96 +408,91 @@ struct HomeView: View {
                         }
                     }
             )
+        }
+    }
 
-            if shouldShowFirstFocusBlockNudge {
-                Button {
-                    let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank(durationMinutes: firstFocusBlockMinutes)
+    private var aiRiskNotification: some View {
+        Button {
+            let result = withAnimation(.easeInOut(duration: 0.65)) {
+                sessionStore.activateBlank(durationMinutes: riskBlankMinutes)
+            }
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            setMessage(for: result)
+        } label: {
+            HStack(alignment: .center, spacing: 10) {
+                notificationIcon
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text("BLANKED")
+                            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+                            .foregroundStyle(BlankColors.ink.opacity(0.76))
+                        Text("now")
+                            .font(.blankInter(size: 11, relativeTo: .caption2))
+                            .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
+                        Spacer(minLength: 0)
                     }
-                    hasSeenFirstFocusBlockNudge = true
-                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    setMessage(for: result)
-                } label: {
-                    firstFocusBlockNotification
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
 
-    private var firstFocusBlockNotification: some View {
-        HStack(alignment: .top, spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(BlankColors.ink.opacity(0.92))
-                Image(systemName: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
+                    Text("High risk near \(riskWindowText). Start a \(riskBlankMinutes) min blank?")
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(BlankColors.ink.opacity(0.94))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.84)
+                }
+                .layoutPriority(1)
+
+                Text("Start \(riskBlankMinutes) min")
+                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
                     .foregroundStyle(Color.white)
-            }
-            .frame(width: 30, height: 30)
-
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text("BLANKED")
-                        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                        .foregroundStyle(BlankColors.ink.opacity(0.76))
-                    Text("now")
-                        .font(.blankInter(size: 11, relativeTo: .caption2))
-                        .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
-                    Spacer(minLength: 0)
-                }
-
-                Text("Try a 45 min focus block")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.ink.opacity(0.94))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.86)
-
-                Text("A gentle first session is ready.")
-                    .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.mutedInk.opacity(0.88))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.84)
+                    .minimumScaleFactor(0.78)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background {
+                        Capsule().fill(BlankColors.ink.opacity(0.92))
+                    }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: 330)
+            .background {
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .fill(Color.white.opacity(0.64))
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .stroke(Color.white.opacity(0.54), lineWidth: 1)
+            }
+            .shadow(color: BlankColors.ink.opacity(0.12), radius: 18, x: 0, y: 10)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: 286)
-        .background {
-            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                .fill(Color.white.opacity(0.64))
-            RoundedRectangle(cornerRadius: 19, style: .continuous)
-                .stroke(Color.white.opacity(0.54), lineWidth: 1)
-        }
-        .shadow(color: BlankColors.ink.opacity(0.12), radius: 18, x: 0, y: 10)
-        .accessibilityLabel("Try a 45 minute focus block")
+        .buttonStyle(.plain)
+        .accessibilityLabel("High risk near \(riskWindowText). Start a \(riskBlankMinutes) minute blank.")
     }
 
-    private var shouldShowFirstFocusBlockNudge: Bool {
-        !hasSeenFirstFocusBlockNudge &&
-        !sessionStore.isBlankActive &&
-        message == nil &&
-        configIssues.isEmpty
+    private var notificationIcon: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(BlankColors.ink.opacity(0.92))
+            Image(systemName: "sparkles")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.white)
+        }
+        .frame(width: 30, height: 30)
     }
 
-    private var preventiveAlertText: String? {
+    private var shouldShowRiskNotification: Bool {
         guard !sessionStore.isBlankActive,
               message == nil,
               configIssues.isEmpty else {
-            return nil
+            return false
         }
 
-        if let recoveryScore = homeRecoveryScore(), recoveryScore < 45 {
-            return "Recovery looks light. Keep the next block simple."
-        }
+        return aiSystem.forecast.riskScore >= 70 &&
+            aiSystem.forecast.minutesUntilRisk <= 90
+    }
 
-        guard aiSystem.forecast.minutesUntilRisk <= 30 else {
-            return nil
-        }
-
-        return "\(aiSystem.forecast.riskWindow) is a high-risk window. Start the plan."
+    private var riskWindowText: String {
+        aiSystem.forecast.riskWindow
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -539,24 +527,6 @@ struct HomeView: View {
 
     private func average(_ values: [Int]) -> Int? {
         values.isEmpty ? nil : values.reduce(0, +) / values.count
-    }
-
-    private func minutesUntilNextHour(_ hour: Int) -> Int {
-        let calendar = Calendar.current
-        let currentHour = calendar.component(.hour, from: now)
-        let currentMinute = calendar.component(.minute, from: now)
-        var minutes = (hour - currentHour) * 60 - currentMinute
-        if minutes < 0 {
-            minutes += 24 * 60
-        }
-        return minutes
-    }
-
-    private func mostCommonValue<T: Hashable>(_ values: [T]) -> T? {
-        let counts = values.reduce(into: [T: Int]()) { counts, value in
-            counts[value, default: 0] += 1
-        }
-        return counts.max { lhs, rhs in lhs.value < rhs.value }?.key
     }
 
     private var configIssues: [ConfigIssue] {
@@ -707,7 +677,7 @@ private struct HomeLayoutMetrics {
     }
 }
 
-private struct HomeBlankearButtonStyle: ButtonStyle {
+private struct HomeBlankButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let glassTint = Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0).opacity(configuration.isPressed ? 0.58 : 0.48)
         let capsuleBorder = LinearGradient(
@@ -739,65 +709,6 @@ private struct HomeBlankearButtonStyle: ButtonStyle {
             }
             .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
-    }
-}
-
-private struct ControlForecastCard: View {
-    let system: DigitalWellnessV3System
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(system.forecast.title)
-                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                    Text(system.plan.title)
-                        .font(.blankInter(size: 12, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.66))
-                }
-
-                Spacer()
-
-                Text("\(system.forecast.riskScore)")
-                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title3))
-                    .monospacedDigit()
-            }
-
-            Text(system.forecast.reason)
-                .font(.blankInter(size: 13, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.78))
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                forecastPill(system.forecast.riskWindow)
-                forecastPill("\(system.plan.recommendedDurationMinutes) min")
-                forecastPill(system.plan.difficulty)
-            }
-        }
-        .foregroundStyle(Color.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black.opacity(0.13))
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
-        }
-        .shadow(color: Color.black.opacity(0.10), radius: 16, y: 9)
-    }
-
-    private func forecastPill(_ text: String) -> some View {
-        Text(text)
-            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-            .lineLimit(1)
-            .minimumScaleFactor(0.82)
-            .padding(.horizontal, 9)
-            .frame(height: 25)
-            .background {
-                Capsule().fill(Color.white.opacity(0.14))
-            }
     }
 }
 
@@ -945,7 +856,7 @@ private struct ModesList: View {
         .tint(textColor)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
+        .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
@@ -979,112 +890,67 @@ private struct ModesList: View {
 
     private var blockedAppsText: String {
         let count = sessionStore.selectionCount
-        return "\(count) app \(count == 1 ? "blocked" : "blocked")"
+        return "\(count) \(count == 1 ? "app" : "apps") blocked"
     }
 }
 
-private struct SettingsSheet: View {
+private struct HomeSectionScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
-    @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
-    @Binding var initialRoute: SettingsRoute?
     @Binding var showingPicker: Bool
-    @Binding var showingEmergency: Bool
-    @Binding var showingRelink: Bool
-    @Binding var showingForgetConfirm: Bool
-    @Environment(\.dismiss) private var dismiss
+    let section: HomeSection
+    let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        Group {
-            if initialRoute == nil {
-                NavigationStack {
-                    settingsContent
-                }
-            } else {
-                routeContent
+        ZStack(alignment: .topLeading) {
+            routeContent
+                .padding(.top, 52)
+
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(textColor)
+                    .frame(width: 44, height: 44)
+                    .background {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                        Circle()
+                            .fill((sessionStore.isBlankActive ? Color.white : BlankColors.ink).opacity(sessionStore.isBlankActive ? 0.10 : 0.08))
+                        Circle()
+                            .stroke(Color.white.opacity(sessionStore.isBlankActive ? 0.18 : 0.42), lineWidth: 1)
+                    }
             }
+            .buttonStyle(.plain)
+            .padding(.leading, 18)
+            .padding(.top, 18)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
     @ViewBuilder
     private var routeContent: some View {
-        switch initialRoute {
+        switch section {
         case .modes:
             ModesList(showingPicker: $showingPicker) {
-                dismiss()
+                onClose()
             }
         case .schedule:
-            ScheduleEditorContent()
+            ScheduleEditorContent {
+                onClose()
+            }
         case .report:
-            ReportView()
-        case nil:
-            EmptyView()
+            ReportView(usesMainBackground: true)
         }
     }
-
-    private var settingsContent: some View {
-        List {
-            Text("Settings")
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
-            settingsButton("Link new Blank") {
-                showingRelink = true
-                dismiss()
-            }
-            settingsButton("I forgot my Blank") {
-                showingForgetConfirm = true
-                dismiss()
-            }
-            settingsButton("Emergency", role: .destructive) {
-                showingEmergency = true
-                dismiss()
-            }
-        }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .tint(textColor)
-    }
-
-    private func settingsButton(
-        _ label: String,
-        role: ButtonRole? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(role: role, action: action) {
-            HStack {
-                Text(label)
-                Spacer()
-            }
-        }
-        .foregroundStyle(role == .destructive ? Color.red : textColor)
-        .listRowBackground(Color.clear)
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func blankTransparentPresentation() -> some View {
-        if #available(iOS 16.4, *) {
-            self.presentationBackground(.clear)
-        } else {
-            self
-        }
-    }
-
 }
 
 private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
+    let onSave: () -> Void
     @State private var enabled = false
     @State private var startMinute = 23 * 60 + 30
     @State private var endMinute = 8 * 60
@@ -1138,7 +1004,7 @@ private struct ScheduleEditorContent: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive).ignoresSafeArea())
+        .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             enabled = sessionStore.schedule.enabled
@@ -1153,6 +1019,7 @@ private struct ScheduleEditorContent: View {
             startMinute: startMinute,
             endMinute: endMinute
         )
+        onSave()
         dismiss()
     }
 }
@@ -1246,7 +1113,7 @@ private struct EmergencySheet: View {
             TechnicalSheetDescription(intervention.headline, emphasized: true)
             TechnicalSheetDescription(intervention.cost)
             TechnicalSheetDescription(intervention.alternative, emphasized: true)
-            TechnicalSheetDescription("This turns Blank off without using your Blank and unlocks protected apps. Use it only if you need access now.")
+            TechnicalSheetDescription("This turns Blank off without the normal hold and unlocks protected apps. Use it only if you need access now.")
             TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "You have \(emergencyUnlocksRemaining) unlocks left this week." : "You have used your 3 unlocks this week.", emphasized: true)
             TechnicalSheetActions {
                 Button("Unlock") {

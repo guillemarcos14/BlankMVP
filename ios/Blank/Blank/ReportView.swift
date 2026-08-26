@@ -3,6 +3,8 @@ import UIKit
 
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    var usesMainBackground = false
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
     @State private var isSubmittingWellnessFeatures = false
@@ -120,12 +122,27 @@ struct ReportView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(ReportLiquidBackground(isActive: sessionStore.isBlankActive).ignoresSafeArea())
+        .background(reportBackground)
         .foregroundStyle(reportPrimary)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             healthKitStore.refresh()
         }
+    }
+
+    @ViewBuilder
+    private var reportBackground: some View {
+        if usesMainBackground {
+            Color.clear
+        } else {
+            ReportLiquidBackground(isActive: sessionStore.isBlankActive)
+                .ignoresSafeArea()
+        }
+    }
+
+    private func startBlank(durationMinutes: Int? = nil) {
+        _ = sessionStore.activateBlank(durationMinutes: durationMinutes)
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
     }
 
     private func reportHeader() -> some View {
@@ -333,7 +350,7 @@ struct ReportView: View {
                     .background { Capsule().fill(Color.white.opacity(0.16)) }
             } else {
                 Button {
-                    sessionStore.activateBlank()
+                    startBlank()
                 } label: {
                     Text("Activate Blanked")
                         .font(.caption.weight(.semibold))
@@ -345,7 +362,7 @@ struct ReportView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                    startBlank(durationMinutes: forecast.durationMinutes)
                 } label: {
                     Text("Try \(forecast.durationMinutes) min block")
                         .font(.caption.weight(.semibold))
@@ -930,7 +947,7 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             } else {
                 Button {
-                    sessionStore.activateBlank()
+                    startBlank()
                 } label: {
                     Text("Activate Blanked")
                         .font(.caption.weight(.semibold))
@@ -949,7 +966,7 @@ struct ReportView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    sessionStore.activateBlank(durationMinutes: forecast.durationMinutes)
+                    startBlank(durationMinutes: forecast.durationMinutes)
                 } label: {
                     Text("Try \(forecast.durationMinutes) min block")
                         .font(.caption.weight(.semibold))
@@ -1813,11 +1830,11 @@ struct ReportView: View {
         case .medium:
             duration = max(30, min(45, diagnosis.initialBlockMinutes))
             plan.append("Protect the same window again so Blanked can learn whether it prevents manual unblanking.")
-            plan.append("Optional: test a \(duration)-min block as a lighter version of full Blanked.")
+            plan.append("Optional: test a \(duration)-min block as a lighter version of full protection.")
         case .low:
             duration = max(45, diagnosis.initialBlockMinutes)
             plan.append("Use this as a strong control day: activate Blanked during your best window.")
-            plan.append("Optional: try a \(duration)-min block to compare timed protection with indefinite Blanked.")
+            plan.append("Optional: try a \(duration)-min block to compare timed and open-ended protection.")
         }
 
         let actionText: String
@@ -1914,10 +1931,10 @@ struct ReportView: View {
         }.count
 
         if completedIndefinite > manualIndefinite.count, completedIndefinite > 0 {
-            return ["Indefinite Blanked is working better than early exits this week. Keep it as the default."]
+            return ["Open-ended protection is working better than early exits this week. Keep it as the default."]
         }
         if timedCompleted > timedManual, timedCompleted > 0 {
-            return ["Timed blocks look easier to complete right now. Use them as a lighter entry into Blanked."]
+            return ["Timed blocks look easier to complete right now. Use them as a lighter entry into protection."]
         }
         if let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) {
             return ["Blanked is still learning the best intervention. For now, activate before \(DigitalWellnessAI.hourRangeText(weakHour))."]

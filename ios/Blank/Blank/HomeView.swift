@@ -905,7 +905,7 @@ private struct HomeSectionScreen: View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 routeContent
-                    .padding(.top, proxy.safeAreaInsets.top + 26)
+                    .padding(.top, 76)
 
                 Button {
                     onClose()
@@ -918,7 +918,7 @@ private struct HomeSectionScreen: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.leading, 18)
-                .padding(.top, proxy.safeAreaInsets.top + 8)
+                .padding(.top, 34)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }

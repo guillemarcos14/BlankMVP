@@ -115,13 +115,15 @@ struct ReportView: View {
 
         Group {
             if usesMainBackground {
-                ScrollView(showsIndicators: false) {
-                    content
-                        .padding(.horizontal, 16)
-                        .padding(.top, 2)
-                        .padding(.bottom, 34)
-                        .frame(maxWidth: 368)
-                        .frame(maxWidth: .infinity)
+                GeometryReader { proxy in
+                    let contentWidth = max(0, min(proxy.size.width - 44, 336))
+                    ScrollView(showsIndicators: false) {
+                        content
+                            .padding(.top, 0)
+                            .padding(.bottom, 34)
+                            .frame(width: contentWidth)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             } else {
                 List {
@@ -161,12 +163,33 @@ struct ReportView: View {
     }
 
     private func reportHeader() -> some View {
-        TopSheetHeader(
-            title: "Digital Wellness",
-            subtitle: "Understand your patterns\nand follow your next best block.",
-            titleColor: reportPrimary,
-            subtitleColor: reportSecondary
-        )
+        Group {
+            if usesMainBackground {
+                VStack(spacing: 7) {
+                    Text("Digital Wellness")
+                        .font(.blankInter(size: 29, weight: .medium, relativeTo: .largeTitle))
+                        .foregroundStyle(reportPrimary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text("Understand your patterns\nand follow your next best block.")
+                        .font(.blankInter(size: 15, relativeTo: .subheadline))
+                        .foregroundStyle(reportSecondary)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(1)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                TopSheetHeader(
+                    title: "Digital Wellness",
+                    subtitle: "Understand your patterns\nand follow your next best block.",
+                    titleColor: reportPrimary,
+                    subtitleColor: reportSecondary
+                )
+            }
+        }
     }
 
     private func minimalHero(savedTime: TimeInterval) -> some View {
@@ -195,8 +218,8 @@ struct ReportView: View {
         totalFocusTime: TimeInterval,
         context: HealthRecoveryContext
     ) -> some View {
-        VStack(alignment: .leading, spacing: usesMainBackground ? 16 : 20) {
-            HStack(alignment: .center, spacing: usesMainBackground ? 12 : 18) {
+        VStack(alignment: .leading, spacing: usesMainBackground ? 14 : 20) {
+            HStack(alignment: .center, spacing: usesMainBackground ? 10 : 18) {
                 controlRiskRing(forecast: forecast)
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -206,9 +229,9 @@ struct ReportView: View {
                         .lineLimit(1)
 
                     Text(forecast.riskLabel)
-                        .font(.blankInter(size: usesMainBackground ? 28 : 34, weight: .semibold, relativeTo: .title))
+                        .font(.blankInter(size: usesMainBackground ? 25 : 34, weight: .semibold, relativeTo: .title))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.62)
+                        .minimumScaleFactor(0.58)
 
                     Text(forecast.windowText)
                         .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
@@ -228,7 +251,7 @@ struct ReportView: View {
             todayMoveCard(forecast: forecast)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(usesMainBackground ? 16 : 20)
+        .padding(usesMainBackground ? 14 : 20)
         .liquidGlass(cornerRadius: usesMainBackground ? 24 : 28)
     }
 
@@ -261,7 +284,7 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             }
         }
-        .frame(width: usesMainBackground ? 96 : 112, height: usesMainBackground ? 96 : 112)
+        .frame(width: usesMainBackground ? 88 : 112, height: usesMainBackground ? 88 : 112)
         .accessibilityLabel("Control risk \(forecast.riskPercent) percent")
     }
 
@@ -295,9 +318,9 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
         }
-        .frame(maxWidth: .infinity, minHeight: usesMainBackground ? 66 : 72, alignment: .leading)
-        .padding(.horizontal, usesMainBackground ? 10 : 12)
-        .padding(.vertical, usesMainBackground ? 9 : 10)
+        .frame(maxWidth: .infinity, minHeight: usesMainBackground ? 60 : 72, alignment: .leading)
+        .padding(.horizontal, usesMainBackground ? 8 : 12)
+        .padding(.vertical, usesMainBackground ? 8 : 10)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(tint.opacity(0.10))

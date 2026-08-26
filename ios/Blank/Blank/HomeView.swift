@@ -1,6 +1,5 @@
 import FamilyControls
 import SwiftUI
-import UIKit
 
 private enum HomeSection: Hashable {
     case modes
@@ -38,8 +37,9 @@ struct HomeView: View {
         GeometryReader { proxy in
             let layout = HomeLayoutMetrics(size: proxy.size, safeAreaInsets: proxy.safeAreaInsets)
 
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 AppBackground(isActive: sessionStore.isBlankActive)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
 
                 if activeSection == nil {
                     topBar
@@ -58,10 +58,13 @@ struct HomeView: View {
                 if let activeSection {
                     HomeSectionScreen(
                         showingPicker: $showingPicker,
-                        section: activeSection
+                        section: activeSection,
+                        screenWidth: proxy.size.width,
+                        screenHeight: proxy.size.height
                     ) {
                         closeSection()
                     }
+                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing).combined(with: .opacity),
                         removal: .move(edge: .trailing).combined(with: .opacity)
@@ -69,6 +72,7 @@ struct HomeView: View {
                     .zIndex(5)
                 }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
         }
         .ignoresSafeArea()
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
@@ -899,39 +903,37 @@ private struct HomeSectionScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Binding var showingPicker: Bool
     let section: HomeSection
+    let screenWidth: CGFloat
+    let screenHeight: CGFloat
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        GeometryReader { proxy in
-            let visibleWidth = min(proxy.size.width, UIScreen.main.bounds.width)
+        ZStack(alignment: .topLeading) {
+            VStack(spacing: 0) {
+                Spacer()
+                    .frame(height: 76)
 
-            ZStack(alignment: .topLeading) {
-                VStack(spacing: 0) {
-                    Spacer()
-                        .frame(height: 76)
-
-                    routeContent
-                        .frame(width: visibleWidth, alignment: .top)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
-                .frame(width: visibleWidth, height: proxy.size.height, alignment: .top)
-
-                Button {
-                    onClose()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 22, weight: .regular))
-                        .foregroundStyle(textColor)
-                        .frame(width: 32, height: 32)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 18)
-                .padding(.top, 34)
+                routeContent
+                    .frame(width: screenWidth, alignment: .top)
+                    .frame(maxHeight: .infinity, alignment: .top)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(width: screenWidth, height: screenHeight, alignment: .top)
+
+            Button {
+                onClose()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundStyle(textColor)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 18)
+            .padding(.top, 34)
         }
+        .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 

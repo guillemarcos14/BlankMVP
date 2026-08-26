@@ -116,14 +116,22 @@ struct ReportView: View {
         Group {
             if usesMainBackground {
                 GeometryReader { proxy in
-                    let contentWidth = max(0, min(proxy.size.width - 44, 336))
-                    ScrollView(showsIndicators: false) {
-                        content
-                            .padding(.top, 0)
-                            .padding(.bottom, 34)
-                            .frame(width: contentWidth)
-                            .frame(maxWidth: .infinity)
+                    let viewportWidth = proxy.size.width
+                    let contentWidth = max(0, min(viewportWidth - 88, 304))
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        HStack(alignment: .top, spacing: 0) {
+                            Spacer(minLength: 0)
+
+                            content
+                                .padding(.bottom, 34)
+                                .frame(width: contentWidth, alignment: .top)
+
+                            Spacer(minLength: 0)
+                        }
+                        .frame(width: viewportWidth, alignment: .center)
                     }
+                    .frame(width: viewportWidth, height: proxy.size.height, alignment: .top)
                 }
             } else {
                 List {
@@ -293,10 +301,23 @@ struct ReportView: View {
         totalFocusTime: TimeInterval,
         forecast: ControlForecast
     ) -> some View {
-        HStack(spacing: usesMainBackground ? 8 : 10) {
-            keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: recoveryGreen, symbol: "arrow.counterclockwise")
-            keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: accentBlue, symbol: "shield.fill")
-            keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level), symbol: "waveform.path.ecg")
+        Group {
+            if usesMainBackground {
+                LazyVGrid(
+                    columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
+                    spacing: 8
+                ) {
+                    keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: recoveryGreen, symbol: "arrow.counterclockwise")
+                    keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: accentBlue, symbol: "shield.fill")
+                    keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level), symbol: "waveform.path.ecg")
+                }
+            } else {
+                HStack(spacing: 10) {
+                    keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: recoveryGreen, symbol: "arrow.counterclockwise")
+                    keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: accentBlue, symbol: "shield.fill")
+                    keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level), symbol: "waveform.path.ecg")
+                }
+            }
         }
     }
 
@@ -313,13 +334,13 @@ struct ReportView: View {
             }
 
             Text(value)
-                .font(.blankInter(size: 20, weight: .semibold, relativeTo: .body))
+                .font(.blankInter(size: usesMainBackground ? 18 : 20, weight: .semibold, relativeTo: .body))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
         }
         .frame(maxWidth: .infinity, minHeight: usesMainBackground ? 60 : 72, alignment: .leading)
-        .padding(.horizontal, usesMainBackground ? 8 : 12)
+        .padding(.horizontal, usesMainBackground ? 6 : 12)
         .padding(.vertical, usesMainBackground ? 8 : 10)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)

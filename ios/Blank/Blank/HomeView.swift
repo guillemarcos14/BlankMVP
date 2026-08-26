@@ -904,8 +904,14 @@ private struct HomeSectionScreen: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
-                routeContent
-                    .padding(.top, 76)
+                VStack(spacing: 0) {
+                    Spacer()
+                        .frame(height: 76)
+
+                    routeContent
+                        .frame(width: proxy.size.width, maxHeight: .infinity, alignment: .top)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
 
                 Button {
                     onClose()

@@ -909,7 +909,8 @@ private struct HomeSectionScreen: View {
                         .frame(height: 76)
 
                     routeContent
-                        .frame(width: proxy.size.width, maxHeight: .infinity, alignment: .top)
+                        .frame(width: proxy.size.width, alignment: .top)
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height, alignment: .top)
 

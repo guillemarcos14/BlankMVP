@@ -912,10 +912,13 @@ private struct HomeSectionScreen: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
+        let contentTop: CGFloat = 94
+        let contentHeight = max(0, screenHeight - contentTop)
+
         ZStack(alignment: .topLeading) {
             routeContent
-                .frame(width: screenWidth, height: max(0, screenHeight - 76), alignment: .top)
-                .position(x: screenWidth / 2, y: 76 + max(0, screenHeight - 76) / 2)
+                .frame(width: screenWidth, height: contentHeight, alignment: .top)
+                .position(x: screenWidth / 2, y: contentTop + contentHeight / 2)
 
             Button {
                 onClose()
@@ -927,7 +930,7 @@ private struct HomeSectionScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: 34, y: 50)
+            .position(x: 34, y: 64)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)

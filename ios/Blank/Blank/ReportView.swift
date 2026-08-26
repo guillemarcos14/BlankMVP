@@ -60,68 +60,83 @@ struct ReportView: View {
             diagnosis: diagnosis
         )
 
-        List {
-            VStack(alignment: .center, spacing: 22) {
-                    reportHeader()
+        let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
+            reportHeader()
 
-                    controlDashboardCapsule(
-                        forecast: controlForecast,
-                        savedTime: savedTime,
-                        totalFocusTime: totalFocusTime,
-                        context: healthContext
-                    )
+            controlDashboardCapsule(
+                forecast: controlForecast,
+                savedTime: savedTime,
+                totalFocusTime: totalFocusTime,
+                context: healthContext
+            )
 
-                    v3SystemCapsule(system: sessionStore.digitalWellnessV3)
+            v3SystemCapsule(system: sessionStore.digitalWellnessV3)
 
-                    healthAccessCapsule()
+            healthAccessCapsule()
 
-                    if hasProgress {
-                        weeklyVisualCapsule(
-                            activityDays: progress.recentActivity,
-                            weekly: weekly
-                        )
+            if hasProgress {
+                weeklyVisualCapsule(
+                    activityDays: progress.recentActivity,
+                    weekly: weekly
+                )
 
-                        statsDetailsCapsule(
-                            summary: dailyAISummary(
-                                events: sessionStore.usageEvents,
-                                sessions: sessionStore.sessions,
-                                progress: progress
-                            ),
-                            report: weeklyAIReport(
-                                events: sessionStore.usageEvents,
-                                sessions: sessionStore.sessions,
-                                progress: progress,
-                                healthContext: healthContext
-                            ),
-                            forecast: controlForecast,
-                            healthInsights: healthInsights,
-                            weekly: weekly,
-                            progress: progress,
-                            emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
-                        )
-                    } else {
-                        emptyState()
-                    }
-
-                    #if DEBUG
-                    aiDemoDataButton()
-                    #endif
-
-                    Text("For digital wellness only. Blanked does not provide medical diagnosis.")
-                        .font(.caption2)
-                        .foregroundStyle(reportSecondary.opacity(0.62))
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
+                statsDetailsCapsule(
+                    summary: dailyAISummary(
+                        events: sessionStore.usageEvents,
+                        sessions: sessionStore.sessions,
+                        progress: progress
+                    ),
+                    report: weeklyAIReport(
+                        events: sessionStore.usageEvents,
+                        sessions: sessionStore.sessions,
+                        progress: progress,
+                        healthContext: healthContext
+                    ),
+                    forecast: controlForecast,
+                    healthInsights: healthInsights,
+                    weekly: weekly,
+                    progress: progress,
+                    emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                )
+            } else {
+                emptyState()
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 24)
-            .padding(.bottom, 34)
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+
+            #if DEBUG
+            aiDemoDataButton()
+            #endif
+
+            Text("For digital wellness only. Blanked does not provide medical diagnosis.")
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.62))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+
+        Group {
+            if usesMainBackground {
+                ScrollView(showsIndicators: false) {
+                    content
+                        .padding(.horizontal, 16)
+                        .padding(.top, 2)
+                        .padding(.bottom, 34)
+                        .frame(maxWidth: 368)
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                List {
+                    content
+                        .padding(.horizontal, 22)
+                        .padding(.top, 24)
+                        .padding(.bottom, 34)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+        }
         .background(reportBackground)
         .foregroundStyle(reportPrimary)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -180,19 +195,20 @@ struct ReportView: View {
         totalFocusTime: TimeInterval,
         context: HealthRecoveryContext
     ) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .center, spacing: 18) {
+        VStack(alignment: .leading, spacing: usesMainBackground ? 16 : 20) {
+            HStack(alignment: .center, spacing: usesMainBackground ? 12 : 18) {
                 controlRiskRing(forecast: forecast)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Label("Control today", systemImage: "sparkle.magnifyingglass")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportSecondary)
+                        .lineLimit(1)
 
                     Text(forecast.riskLabel)
-                        .font(.blankInter(size: 34, weight: .semibold, relativeTo: .title))
+                        .font(.blankInter(size: usesMainBackground ? 28 : 34, weight: .semibold, relativeTo: .title))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .minimumScaleFactor(0.62)
 
                     Text(forecast.windowText)
                         .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
@@ -212,8 +228,8 @@ struct ReportView: View {
             todayMoveCard(forecast: forecast)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .liquidGlass(cornerRadius: 28)
+        .padding(usesMainBackground ? 16 : 20)
+        .liquidGlass(cornerRadius: usesMainBackground ? 24 : 28)
     }
 
     private func controlRiskRing(forecast: ControlForecast) -> some View {
@@ -238,14 +254,14 @@ struct ReportView: View {
 
             VStack(spacing: 0) {
                 Text("\(forecast.riskPercent)")
-                    .font(.blankInter(size: 29, weight: .semibold, relativeTo: .title3))
+                    .font(.blankInter(size: usesMainBackground ? 25 : 29, weight: .semibold, relativeTo: .title3))
                     .lineLimit(1)
                 Text("%")
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(reportSecondary)
             }
         }
-        .frame(width: 112, height: 112)
+        .frame(width: usesMainBackground ? 96 : 112, height: usesMainBackground ? 96 : 112)
         .accessibilityLabel("Control risk \(forecast.riskPercent) percent")
     }
 
@@ -254,7 +270,7 @@ struct ReportView: View {
         totalFocusTime: TimeInterval,
         forecast: ControlForecast
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: usesMainBackground ? 8 : 10) {
             keyMetricTile(title: "Recovered", value: formatDuration(savedTime), tint: recoveryGreen, symbol: "arrow.counterclockwise")
             keyMetricTile(title: "Blanked", value: formatDuration(totalFocusTime), tint: accentBlue, symbol: "shield.fill")
             keyMetricTile(title: "Risk", value: "\(forecast.riskPercent)%", tint: forecastColor(forecast.level), symbol: "waveform.path.ecg")
@@ -279,9 +295,9 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
         }
-        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, minHeight: usesMainBackground ? 66 : 72, alignment: .leading)
+        .padding(.horizontal, usesMainBackground ? 10 : 12)
+        .padding(.vertical, usesMainBackground ? 9 : 10)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(tint.opacity(0.10))

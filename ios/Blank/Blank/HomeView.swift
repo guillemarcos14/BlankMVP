@@ -902,31 +902,26 @@ private struct HomeSectionScreen: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            routeContent
-                .padding(.top, 52)
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                routeContent
+                    .padding(.top, proxy.safeAreaInsets.top + 26)
 
-            Button {
-                onClose()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(textColor)
-                    .frame(width: 44, height: 44)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                        Circle()
-                            .fill((sessionStore.isBlankActive ? Color.white : BlankColors.ink).opacity(sessionStore.isBlankActive ? 0.10 : 0.08))
-                        Circle()
-                            .stroke(Color.white.opacity(sessionStore.isBlankActive ? 0.18 : 0.42), lineWidth: 1)
-                    }
+                Button {
+                    onClose()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(textColor)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, 18)
+                .padding(.top, proxy.safeAreaInsets.top + 8)
             }
-            .buttonStyle(.plain)
-            .padding(.leading, 18)
-            .padding(.top, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 

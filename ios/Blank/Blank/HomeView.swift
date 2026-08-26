@@ -11,6 +11,7 @@ private enum HomeSection: Hashable {
 struct HomeView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var now = Date()
@@ -490,6 +491,7 @@ struct HomeView: View {
 
     private var shouldShowRiskNotification: Bool {
         guard !sessionStore.isBlankActive,
+              purchaseStore.hasPremiumAccess,
               message == nil,
               configIssues.isEmpty else {
             return false
@@ -1352,6 +1354,7 @@ private struct HomePreviewScene: View {
         HomeView()
             .environmentObject(sessionStore)
             .environmentObject(screenTimeBlocker)
+            .environmentObject(StoreKitPurchaseStore())
             .environment(\.font, .blankBody)
             .previewDisplayName(name)
     }

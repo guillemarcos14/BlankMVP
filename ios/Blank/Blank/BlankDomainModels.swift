@@ -208,7 +208,7 @@ struct BlankProfile: Codable, Identifiable, Equatable {
     init(
         id: UUID = UUID(),
         name: String,
-        strategy: BlankStrategyKind = .nfc,
+        strategy: BlankStrategyKind = .manual,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         physicalUnlockItems: [PhysicalUnlockItem] = [],

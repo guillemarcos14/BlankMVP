@@ -4,6 +4,7 @@ import UIKit
 struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
+    @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     var usesMainBackground = false
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
@@ -63,43 +64,55 @@ struct ReportView: View {
         let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
 
-            controlDashboardCapsule(
-                forecast: controlForecast,
-                savedTime: savedTime,
-                totalFocusTime: totalFocusTime,
-                context: healthContext
-            )
-
-            v3SystemCapsule(system: sessionStore.digitalWellnessV3)
-
-            healthAccessCapsule()
-
-            if hasProgress {
-                weeklyVisualCapsule(
-                    activityDays: progress.recentActivity,
-                    weekly: weekly
+            if purchaseStore.hasPremiumAccess {
+                controlDashboardCapsule(
+                    forecast: controlForecast,
+                    savedTime: savedTime,
+                    totalFocusTime: totalFocusTime,
+                    context: healthContext
                 )
 
-                statsDetailsCapsule(
-                    summary: dailyAISummary(
-                        events: sessionStore.usageEvents,
-                        sessions: sessionStore.sessions,
-                        progress: progress
-                    ),
-                    report: weeklyAIReport(
-                        events: sessionStore.usageEvents,
-                        sessions: sessionStore.sessions,
+                v3SystemCapsule(system: sessionStore.digitalWellnessV3)
+
+                healthAccessCapsule()
+
+                if hasProgress {
+                    weeklyVisualCapsule(
+                        activityDays: progress.recentActivity,
+                        weekly: weekly
+                    )
+
+                    statsDetailsCapsule(
+                        summary: dailyAISummary(
+                            events: sessionStore.usageEvents,
+                            sessions: sessionStore.sessions,
+                            progress: progress
+                        ),
+                        report: weeklyAIReport(
+                            events: sessionStore.usageEvents,
+                            sessions: sessionStore.sessions,
+                            progress: progress,
+                            healthContext: healthContext
+                        ),
+                        forecast: controlForecast,
+                        healthInsights: healthInsights,
+                        weekly: weekly,
                         progress: progress,
-                        healthContext: healthContext
-                    ),
-                    forecast: controlForecast,
-                    healthInsights: healthInsights,
+                        emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                    )
+                } else {
+                    emptyState()
+                }
+            } else {
+                freeProgressCapsule(
                     weekly: weekly,
+                    totalFocusTime: totalFocusTime,
+                    totalSessionCount: totalSessionCount,
                     progress: progress,
                     emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
                 )
-            } else {
-                emptyState()
+
+                premiumAccessCapsule()
             }
 
             #if DEBUG
@@ -1279,6 +1292,82 @@ struct ReportView: View {
                 .frame(maxWidth: 330)
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        .padding(20)
+        .liquidGlass(cornerRadius: 26)
+    }
+
+    private func freeProgressCapsule(
+        weekly: BlankWeeklyReport,
+        totalFocusTime: TimeInterval,
+        totalSessionCount: Int,
+        progress: BlankProgressReport,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        VStack(spacing: 14) {
+            Text("Basic stats")
+                .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
+
+            metricRow(title: "Time blanked", value: formatDuration(totalFocusTime), caption: "Total protected")
+            subtleDivider()
+            metricRow(title: "Total sessions", value: "\(totalSessionCount)", caption: "Since the beginning")
+            subtleDivider()
+            metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
+            subtleDivider()
+            metricRow(title: "Rescues used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+
+            if !progress.modeActivity.isEmpty {
+                subtleDivider()
+                ForEach(progress.modeActivity.prefix(3).indices, id: \.self) { index in
+                    modeRow(progress.modeActivity[index])
+                    if index < min(progress.modeActivity.count, 3) - 1 {
+                        subtleDivider()
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(18)
+        .liquidGlass(cornerRadius: 26)
+    }
+
+    private func premiumAccessCapsule() -> some View {
+        VStack(alignment: .center, spacing: 12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(reportPrimary)
+
+            Text("Unlock Pro")
+                .font(.blankInter(size: 20, weight: .medium, relativeTo: .headline))
+
+            Text("AI reports, adaptive plans, Health insights and preventive alerts are included in Pro.")
+                .font(.footnote)
+                .foregroundStyle(reportSecondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let remaining = purchaseStore.referralTrialRemainingText {
+                Text("Referral pass active: \(remaining).")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+            } else {
+                Button {
+                    Task {
+                        _ = await purchaseStore.purchase(productId: StoreKitPurchaseStore.annualProductId)
+                    }
+                } label: {
+                    Text(purchaseStore.isPurchasing ? "Opening..." : "Start Pro")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(Color.white.opacity(0.22)) }
+                }
+                .buttonStyle(.plain)
+                .disabled(purchaseStore.isPurchasing)
+            }
+        }
+        .frame(maxWidth: .infinity)
         .padding(20)
         .liquidGlass(cornerRadius: 26)
     }

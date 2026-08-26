@@ -260,6 +260,11 @@ struct SetupView: View {
             if step == .commitment {
                 resetCommitmentHold()
             }
+            if step == .trial {
+                Task {
+                    await purchaseStore.refreshReferralStatus(for: currentOnboardingAnonymousUserId())
+                }
+            }
         }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
@@ -598,7 +603,7 @@ struct SetupView: View {
                 eyebrow: nil,
                 lines: [
                     .text("Don't lose \(lostLifetimeYears) years."),
-                    .text("Start with 3 days free.")
+                    .text("Start free.")
                 ],
                 body: nil
             )
@@ -612,6 +617,8 @@ struct SetupView: View {
                 .padding(.top, 15)
 
             VStack(spacing: 9) {
+                referralTrialCard
+
                 PlanButton(
                     title: "Annual",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
@@ -650,10 +657,18 @@ struct SetupView: View {
             .padding(.top, 22)
             .disabled(purchaseStore.isPurchasing || purchaseStore.isLoading)
 
+            Button("Continue free") {
+                continueFree()
+            }
+            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+            .foregroundStyle(Color.white.opacity(0.82))
+            .buttonStyle(.plain)
+            .padding(.top, 13)
+
             Button("Restore purchases") {
                 Task {
                     await purchaseStore.restorePurchases()
-                    if purchaseStore.hasEntitlement {
+                    if purchaseStore.hasPremiumAccess {
                         trialStarted = true
                         goForward()
                     }
@@ -878,6 +893,78 @@ struct SetupView: View {
         return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
     }
 
+    private var referralTrialCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.88))
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Invite 3 friends")
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                    Text("Get 7 days of Pro when 3 friends activate Blanked with your code.")
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.62))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            TextField("Friend invite code", text: Binding(
+                get: { purchaseStore.pendingReferrerUserId },
+                set: { purchaseStore.savePendingReferrerUserId($0) }
+            ))
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+            .foregroundStyle(Color.white.opacity(0.88))
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(Capsule().fill(Color.white.opacity(0.10)))
+
+            HStack(spacing: 10) {
+                ShareLink(item: referralShareText) {
+                    Text("Share link")
+                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background(Capsule().fill(Color.white.opacity(0.16)))
+                }
+
+                Button("Refresh") {
+                    Task {
+                        await purchaseStore.refreshReferralStatus(for: currentOnboardingAnonymousUserId())
+                    }
+                }
+                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+                .background(Capsule().fill(Color.white.opacity(0.26)))
+            }
+            .buttonStyle(.plain)
+
+            Text(purchaseStore.isReferralTrialActive ? "Pro pass active: \(purchaseStore.referralTrialRemainingText ?? "active")." : "\(purchaseStore.referralCount)/3 activated friends.")
+                .font(.blankInter(size: 11, relativeTo: .caption2))
+                .foregroundStyle(Color.white.opacity(0.46))
+        }
+        .foregroundStyle(Color.white.opacity(0.90))
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.13), lineWidth: 1)
+        }
+    }
+
+    private var referralShareText: String {
+        let code = currentOnboardingAnonymousUserId()
+        return "Try Blanked with my invite code: \(code)\n\nOpen the app if you have it: blank://referral?ref=\(code)\n\nDownload: https://blanked.app/ios"
+    }
+
     private var legalDisclosure: some View {
         VStack(spacing: 4) {
             HStack(spacing: 3) {
@@ -887,7 +974,7 @@ struct SetupView: View {
                 Text("apply")
             }
 
-            Text("Full access today. \(selectedPlanRenewalDisclosure)")
+            Text("Free includes basic blocking. Pro includes AI, Health insights and adaptive plans. \(selectedPlanRenewalDisclosure)")
                 .multilineTextAlignment(.center)
         }
         .font(.blankInter(size: 11, relativeTo: .caption2))
@@ -917,7 +1004,9 @@ struct SetupView: View {
 
     private var usesAnchoredPrimaryAction: Bool {
         switch currentStep {
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .personalization, .trial, .notifications, .permission, .apps:
+        case .trial:
+            return false
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .profile, .commitment, .personalization, .notifications, .permission, .apps:
             return true
         }
     }
@@ -1401,9 +1490,17 @@ struct SetupView: View {
             _ = sessionStore.activateBlank(durationMinutes: initialBlockMinutesPreview)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             sessionStore.finishSetup()
+            Task {
+                await purchaseStore.registerReferredActivation(referredUserId: currentOnboardingAnonymousUserId())
+            }
         } else {
             showingPicker = true
         }
+    }
+
+    private func continueFree() {
+        trialStarted = false
+        goForward()
     }
 
     private var selectionCountText: String {
@@ -2234,6 +2331,10 @@ private struct LegalDocumentView: View {
                     "Blanked offers auto-renewable subscriptions through the App Store. If you start a free trial, it lasts 3 days. After the trial, Apple charges the price shown on the App Store purchase sheet for the selected plan unless you cancel before the trial ends."
                 ),
                 (
+                    "Referral Access",
+                    "Blanked may offer temporary Pro access when invited users activate the app with your invite code. Referral rewards are promotional, non-transferable and may be adjusted or removed if misuse is detected."
+                ),
+                (
                     "Renewal And Cancellation",
                     "Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. You can manage or cancel your subscription in App Store account settings. Apple handles billing, renewals, refunds, and payment method changes."
                 ),
@@ -2267,6 +2368,10 @@ private struct LegalDocumentView: View {
                 (
                     "Purchases",
                     "Subscriptions are processed by Apple through the App Store. Blanked can check whether you have an active entitlement, but Apple handles payment details and billing."
+                ),
+                (
+                    "Referrals",
+                    "If you use an invite code, Blanked stores anonymous referral IDs to count activated referrals and unlock temporary Pro access. Blanked does not need your contacts to do this."
                 ),
                 (
                     "Apple Health",

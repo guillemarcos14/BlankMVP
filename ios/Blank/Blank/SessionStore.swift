@@ -360,6 +360,7 @@ final class SessionStore: ObservableObject {
     }
 
     func syncFromSharedDefaults(now: Date = Date()) {
+        BlankSharedState.finishExpiredBlock(defaults: defaults, now: now)
         let activeState = BlankSharedState.loadActiveState(now: now, defaults: defaults)
         if isBlankActive != activeState.isActive {
             isBlankActive = activeState.isActive
@@ -457,7 +458,7 @@ final class SessionStore: ObservableObject {
         let snapshot = currentSelectionSnapshot
         let session = BlankSession(
             profileId: currentModeId,
-            strategy: .nfc,
+            strategy: .manual,
             startTag: tag,
             forceStarted: forceStarted,
             entryMode: entryMode,
@@ -844,7 +845,7 @@ extension SessionStore {
         let endedAt = startedAt.addingTimeInterval(TimeInterval(durationMinutes * 60))
         return BlankSession(
             profileId: currentModeId,
-            strategy: .nfc,
+            strategy: .manual,
             startTag: nfcTagUid,
             startedAt: startedAt,
             endedAt: min(endedAt, now.addingTimeInterval(-60)),

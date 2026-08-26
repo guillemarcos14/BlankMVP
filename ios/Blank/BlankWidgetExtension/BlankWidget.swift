@@ -5,8 +5,8 @@ import SwiftUI
 import WidgetKit
 
 struct StartQuickBlockIntent: AppIntent {
-    static var title: LocalizedStringResource = "Iniciar Blank"
-    static var description = IntentDescription("Inicia un bloqueo rápido con la configuración actual de Blank.")
+    static var title: LocalizedStringResource = "Start Blank"
+    static var description = IntentDescription("Starts a quick block with your current Blanked configuration.")
 
     func perform() async throws -> some IntentResult {
         let defaults = BlankSharedState.defaults
@@ -70,16 +70,17 @@ struct BlankWidgetProvider: TimelineProvider {
 
 struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
+    @Environment(\.widgetFamily) private var widgetFamily
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
     private var widgetURL: URL? {
-        URL(string: isActive ? "blank://scan-blank" : "blank://configure-block")
+        URL(string: isActive ? "blank://open" : "blank://configure-block")
     }
 
     var body: some View {
         actionContent
             .buttonStyle(.plain)
-            .blankWidgetBackground(isActive: entry.activeState.isActive)
+            .blankWidgetBackground(isActive: entry.activeState.isActive, family: widgetFamily)
             .widgetURL(widgetURL)
             .animation(.easeInOut(duration: 0.45), value: isActive)
     }
@@ -87,7 +88,7 @@ struct BlankWidgetView: View {
     @ViewBuilder
     private var actionContent: some View {
         if entry.activeState.isActive {
-            Link(destination: URL(string: "blank://scan-blank")!) {
+            Link(destination: URL(string: "blank://open")!) {
                 content
             }
         } else if entry.hasConfiguration {
@@ -109,10 +110,27 @@ struct BlankWidgetView: View {
 
     private var content: some View {
         Group {
-            if isActive {
-                activeContent
-            } else {
-                idleContent
+            switch widgetFamily {
+            case .accessoryInline:
+                Text(isActive ? "Blanked active" : "Start Blanked")
+            case .accessoryCircular:
+                Image(systemName: isActive ? "lock.fill" : "lock.open.fill")
+                    .font(.system(size: 18, weight: .semibold))
+            case .accessoryRectangular:
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isActive ? "Blanked" : "Start Blank")
+                        .font(.headline.weight(.semibold))
+                    Text(isActive ? "Protected now" : entry.hasConfiguration ? "Tap to block" : "Choose apps")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            default:
+                if isActive {
+                    activeContent
+                } else {
+                    idleContent
+                }
             }
         }
         .contentShape(Rectangle())
@@ -139,7 +157,7 @@ struct BlankWidgetView: View {
     }
 
     private var title: String {
-        entry.activeState.isActive ? "Blankeado" : "Blankear"
+        entry.activeState.isActive ? "Blanked" : "Start Blank"
     }
 }
 
@@ -232,8 +250,10 @@ private struct BlankWidgetGlassBackground: View {
 
 private extension View {
     @ViewBuilder
-    func blankWidgetBackground(isActive: Bool) -> some View {
-        if #available(iOSApplicationExtension 17.0, *) {
+    func blankWidgetBackground(isActive: Bool, family: WidgetFamily) -> some View {
+        if family == .accessoryInline || family == .accessoryCircular || family == .accessoryRectangular {
+            self
+        } else if #available(iOSApplicationExtension 17.0, *) {
             containerBackground(for: .widget) {
                 BlankWidgetGlassBackground(isActive: isActive)
             }
@@ -250,9 +270,9 @@ struct BlankQuickBlockWidget: Widget {
         StaticConfiguration(kind: kind, provider: BlankWidgetProvider()) { entry in
             BlankWidgetView(entry: entry)
         }
-        .configurationDisplayName("Blank")
-        .description("Inicia un bloqueo rápido.")
-        .supportedFamilies([.systemSmall])
+        .configurationDisplayName("Blanked")
+        .description("Start a quick block.")
+        .supportedFamilies([.systemSmall, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }
 }
 

@@ -39,7 +39,9 @@ struct BlankApp: App {
                 }
                 .onOpenURL { url in
                     guard url.scheme == "blank" else { return }
-                    if url.host == "scan-blank" {
+                    if url.host == "referral" {
+                        purchaseStore.captureReferral(from: url)
+                    } else if url.host == "scan-blank", BlankedRuntimeMode.legacyNfcEnabled {
                         sessionStore.requestBlankScanFromWidget()
                     } else if url.host == "configure-block" {
                         sessionStore.requestBlockConfiguration()

@@ -66,8 +66,13 @@ enum BlankSharedState {
         defaults.set(false, forKey: Keys.isBlankActive)
         defaults.removeObject(forKey: Keys.blankActiveSince)
         defaults.removeObject(forKey: Keys.blankActiveUntil)
-        endActiveSession(defaults: defaults, now: now, endedReason: .expired)
+        endActiveSession(defaults: defaults, now: now, endedReason: activeExpiredReason(defaults: defaults))
         return true
+    }
+
+    private static func activeExpiredReason(defaults: UserDefaults) -> BlankEndedReason {
+        let activeSession = loadSessions(defaults: defaults).last { $0.isActive }
+        return activeSession?.plannedDurationMinutes == nil ? .expired : .timer
     }
 
     private static func appendSession(defaults: UserDefaults, now: Date, entryMode: BlankEntryMode) {
@@ -76,7 +81,7 @@ enum BlankSharedState {
         let snapshot = selectionSnapshot(in: defaults)
         let session = BlankSession(
             profileId: modeId,
-            strategy: .manualStartNfcStop,
+            strategy: .manual,
             startedAt: now,
             entryMode: entryMode,
             selectionSnapshot: snapshot,

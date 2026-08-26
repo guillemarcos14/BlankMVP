@@ -1,5 +1,6 @@
 import FamilyControls
 import SwiftUI
+import UIKit
 
 private enum HomeSection: Hashable {
     case modes
@@ -35,11 +36,15 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let layout = HomeLayoutMetrics(size: proxy.size, safeAreaInsets: proxy.safeAreaInsets)
+            let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
+            let viewportHeight = max(proxy.size.height, UIScreen.main.bounds.height)
+            let xCorrection = -proxy.frame(in: .global).minX
+            let layout = HomeLayoutMetrics(size: CGSize(width: viewportWidth, height: viewportHeight), safeAreaInsets: proxy.safeAreaInsets)
 
             ZStack(alignment: .topLeading) {
                 AppBackground(isActive: sessionStore.isBlankActive)
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .frame(width: viewportWidth, height: viewportHeight)
+                    .clipped()
 
                 if activeSection == nil {
                     topBar
@@ -59,20 +64,18 @@ struct HomeView: View {
                     HomeSectionScreen(
                         showingPicker: $showingPicker,
                         section: activeSection,
-                        screenWidth: proxy.size.width,
-                        screenHeight: proxy.size.height
+                        screenWidth: viewportWidth,
+                        screenHeight: viewportHeight
                     ) {
                         closeSection()
                     }
-                    .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal: .move(edge: .trailing).combined(with: .opacity)
-                    ))
+                    .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+                    .offset(x: xCorrection)
+                    .transition(.opacity)
                     .zIndex(5)
                 }
             }
-            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
         .ignoresSafeArea()
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
@@ -910,15 +913,9 @@ private struct HomeSectionScreen: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            VStack(spacing: 0) {
-                Spacer()
-                    .frame(height: 76)
-
-                routeContent
-                    .frame(width: screenWidth, alignment: .top)
-                    .frame(maxHeight: .infinity, alignment: .top)
-            }
-            .frame(width: screenWidth, height: screenHeight, alignment: .top)
+            routeContent
+                .frame(width: screenWidth, height: max(0, screenHeight - 76), alignment: .top)
+                .position(x: screenWidth / 2, y: 76 + max(0, screenHeight - 76) / 2)
 
             Button {
                 onClose()
@@ -930,8 +927,7 @@ private struct HomeSectionScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.leading, 18)
-            .padding(.top, 34)
+            .position(x: 34, y: 50)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)

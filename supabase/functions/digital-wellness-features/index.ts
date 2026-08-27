@@ -214,7 +214,7 @@ function normalizeInsight(candidate: Record<string, any>, fallback: Record<strin
     patterns: (patterns.length ? patterns : fallback.patterns).slice(0, 3),
     recommendations: (recommendations.length ? recommendations : fallback.recommendations).slice(0, 3),
     next_step: cleanInsightText(source.next_step, 140) || fallback.next_step,
-    risk_window: source.risk_window === null ? null : cleanText(source.risk_window, 40) || fallback.risk_window || null,
+    risk_window: source.risk_window === null ? null : normalizeClockText(cleanText(source.risk_window, 40)) || fallback.risk_window || null,
     plan_update: normalizePlanUpdate(source.plan_update, fallback.plan_update),
   };
 }
@@ -232,7 +232,7 @@ function normalizePlanUpdate(candidate: Record<string, any>, fallback: Record<st
 }
 
 function cleanInsightText(value: unknown, maxLength: number) {
-  const text = cleanText(value, maxLength + 80).replace(/\s+/g, " ");
+  const text = normalizeClockText(cleanText(value, maxLength + 80)).replace(/\s+/g, " ");
   if (text.length <= maxLength) return closeInsightText(text);
 
   const sentence = text.slice(0, maxLength).match(/^(.+[.!?])\s/);
@@ -242,6 +242,14 @@ function cleanInsightText(value: unknown, maxLength: number) {
 
   const wordSafe = text.slice(0, maxLength - 1).replace(/\s+\S*$/, "").trim();
   return closeInsightText(wordSafe);
+}
+
+function normalizeClockText(text: unknown) {
+  return cleanText(text, 400).replace(/\b([01]?\d|2[0-3]):([0-5]\d)(?:\s*[-–]\s*([01]?\d|2[0-3]):([0-5]\d))?/g, (_match, hour, minute, endHour, endMinute) => {
+    const start = clockTimeText(Number(hour), Number(minute));
+    if (endHour === undefined) return start;
+    return `${start}-${clockTimeText(Number(endHour), Number(endMinute))}`;
+  });
 }
 
 function closeInsightText(text: string) {

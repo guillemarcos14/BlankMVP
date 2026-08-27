@@ -542,6 +542,59 @@ final class SessionStore: ObservableObject {
         if usageEvents.count > Self.maxUsageEvents {
             usageEvents.removeFirst(usageEvents.count - Self.maxUsageEvents)
         }
+        trackUsageEvent(
+            kind: kind,
+            entryMode: entryMode,
+            endedReason: endedReason,
+            duration: duration,
+            selectionSnapshot: selectionSnapshot,
+            modeName: modeName,
+            plannedDurationMinutes: plannedDurationMinutes
+        )
+    }
+
+    private func trackUsageEvent(
+        kind: BlankUsageEventKind,
+        entryMode: BlankEntryMode,
+        endedReason: BlankEndedReason?,
+        duration: TimeInterval?,
+        selectionSnapshot: BlankSelectionSnapshot,
+        modeName: String?,
+        plannedDurationMinutes: Int?
+    ) {
+        let eventName: String
+        switch kind {
+        case .blockStarted:
+            eventName = "block_started"
+        case .blockEnded:
+            eventName = "block_ended"
+        case .blockBroken:
+            eventName = "relapse_attempt"
+        }
+
+        var properties: [String: Any] = [
+            "entry_mode": entryMode.rawValue,
+            "selection_count": selectionSnapshot.totalCount,
+            "application_count": selectionSnapshot.applicationCount,
+            "category_count": selectionSnapshot.categoryCount,
+            "web_domain_count": selectionSnapshot.webDomainCount
+        ]
+        if let endedReason {
+            properties["ended_reason"] = endedReason.rawValue
+        }
+        if let duration {
+            properties["duration_seconds"] = Int(duration.rounded())
+        }
+        if let modeName {
+            properties["mode_name"] = modeName
+        }
+        if let plannedDurationMinutes {
+            properties["planned_duration_minutes"] = plannedDurationMinutes
+        }
+
+        Task {
+            await BlankFunnelAnalytics.track(eventName, properties: properties)
+        }
     }
 
     private func updateCurrentModeSelection(_ selection: FamilyActivitySelection) {

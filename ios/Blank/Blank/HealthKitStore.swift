@@ -62,6 +62,17 @@ final class HealthKitStore: ObservableObject {
                 } else {
                     self.state = .failed(error?.localizedDescription ?? "Health access was not granted.")
                 }
+                Task {
+                    await BlankFunnelAnalytics.track(
+                        "health_permission_result",
+                        properties: [
+                            "granted": success,
+                            "state": success ? "connected" : "failed",
+                            "error": error?.localizedDescription ?? ""
+                        ],
+                        defaults: self.defaults
+                    )
+                }
             }
         }
     }

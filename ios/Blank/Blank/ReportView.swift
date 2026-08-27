@@ -862,7 +862,7 @@ struct ReportView: View {
                 Button {
                     Task {
                         await BlankFunnelAnalytics.track(
-                            "health_permission_result",
+                            "health_permission_requested",
                             properties: ["requested": true, "state_before": "\(healthKitStore.state)"]
                         )
                     }

@@ -1,9 +1,9 @@
 package com.blanknfc.app.ui
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.addCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -58,6 +58,9 @@ class BlockActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        onBackPressedDispatcher.addCallback(this) {
+            // Stay on the blocking screen until the paired NFC tag ends the session.
+        }
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior =
@@ -85,11 +88,6 @@ class BlockActivity : ComponentActivity() {
         }
     }
 
-    @SuppressLint("MissingSuperCall")
-    @Deprecated("Use OnBackPressedDispatcher")
-    override fun onBackPressed() {
-        // Stay on the blocking screen until the paired NFC tag ends the session.
-    }
 }
 
 @Composable

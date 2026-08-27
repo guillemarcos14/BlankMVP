@@ -1936,7 +1936,6 @@ private fun progressPeriodSummaries(stats: FocusStats): List<ProgressPeriodSumma
         minimalDaysInFirstWeek = 4
     }
     val todayOrdinal = calendar.get(Calendar.YEAR) * 400 + calendar.get(Calendar.DAY_OF_YEAR)
-    val weekStartOrdinal = startOrdinal(calendar, Calendar.DAY_OF_WEEK)
     val monthStartOrdinal = startOrdinal(calendar, Calendar.DAY_OF_MONTH)
     val yearStartOrdinal = calendar.get(Calendar.YEAR) * 400 + 1
 

@@ -87,7 +87,7 @@ private enum BlankLegalDocument: Identifiable {
     }
 
     var updatedAt: String {
-        "Last updated: August 17, 2026"
+        "Last updated: August 27, 2026"
     }
 }
 
@@ -2492,11 +2492,15 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Data Stored On Device",
-                    "Blanked stores setup state, blocking status, selected Screen Time categories, session timing, onboarding progress, and app settings on your device. Your exact Screen Time app and website selections stay on your device."
+                    "Blanked stores setup state, blocking status, selected Screen Time categories, session timing, onboarding progress, app settings, and aggregated funnel events on your device. Your exact Screen Time app and website selections stay on your device."
                 ),
                 (
                     "Onboarding Data",
                     "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan and improve recommendations. Blanked does not share your app list or screen time data."
+                ),
+                (
+                    "Product Analytics",
+                    "Blanked may send aggregated product events such as onboarding step, permission status, selected item counts, trial actions, block starts, emergency exits, referral events, Health permission status, and AI insight sync status. These events do not include your exact app list, website list, raw Health samples, precise location, contacts, messages, payment card details, or advertising identifier."
                 ),
                 (
                     "Purchases",

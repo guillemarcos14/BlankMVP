@@ -1,49 +1,52 @@
-# Blank Privacy Policy Draft
+# Blanked Privacy Policy Draft
 
-Last updated: June 14, 2026
+Last updated: August 27, 2026
 
-Blank is an app blocker controlled by a paired NFC tag.
+Blanked is a digital wellness app that helps users block distracting apps and websites and build healthier screen habits.
 
-## Data Blank stores
+## Data Blanked Stores On Device
 
-Blank stores the following data locally on your device:
+Blanked stores setup state, blocking status, focus modes, session timing, onboarding progress, app settings, optional NFC legacy state, and the Screen Time selection on the user's device. The exact Screen Time app, category, and website selection stays on device.
 
-- The NFC tag ID paired with Blank.
-- The package names of apps you choose to block.
-- Whether Blank mode is active.
-- The time Blank mode was activated.
-- Whether setup has been completed.
+## Data Blanked May Send To Its Backend
 
-Blank may also collect the answers you provide during onboarding, such as your name, age range, goals, profile, estimated daily phone use, selected plan, locale, app version, and an anonymous user identifier. Blank uses this information to understand onboarding performance, improve the product, and make the experience more relevant. Blank does not collect the exact apps you choose to block.
+Blanked may send:
 
-On iPhone, Blank may optionally read Apple Health data that you explicitly allow, such as sleep, time in bed, steps, walking/running distance, active energy, resting energy, workouts, mindful minutes, heart rate, resting heart rate, and heart rate variability. Blank uses this data locally to generate digital wellness insights about screen habits. Blank does not use Apple Health data for medical diagnosis and does not send Apple Health data to its backend in the current implementation.
+- onboarding answers after the user taps `Personalize my plan`
+- anonymous user ID
+- locale, app version, and build number
+- aggregated product/funnel events
+- anonymous referral activation/reward events
+- aggregated digital wellness features after the user taps `Improve AI with wellness features`
 
-## Accessibility Use
+Product/funnel events may include onboarding step viewed, permission status, selected item counts, trial actions, free plan selection, first block, block starts and ends, emergency exits, Health permission status, and AI insight sync status.
 
-Blank uses Android Accessibility events to detect when the foreground app changes. If Blank mode is active and the foreground app is in your blocked list, Blank opens its blocking screen.
+## Data Blanked Does Not Send
 
-Blank does not use Accessibility to read screen text, passwords, messages, notifications, form contents, contacts, browsing history, or media.
+Blanked does not send exact Screen Time app/category/website selections, browsing history, contacts, messages, passwords, notification contents, payment card details, precise location, advertising identifier, raw Health samples, or raw sleep-stage timestamps.
 
-## Analytics And Crash Reporting
+## Apple Health
 
-The current MVP does not include a production third-party analytics or crash reporting SDK. During local beta builds, Blank may write technical events to device logs to help debug setup and blocking behavior.
+Apple Health access is optional. If allowed, Blanked may read Health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics. Health data is used for digital wellness insights, not medical advice, diagnosis, treatment, or therapy.
 
-If Firebase, Sentry, or another analytics/crash provider is added later, this policy and the app store privacy disclosures must be updated before release.
+Blanked sends only aggregated wellness features after explicit user consent. Raw Health samples are not sent.
+
+## AI
+
+Blanked may use aggregated app, habit, onboarding, and optional Health-derived features to generate AI-powered digital wellness insights. AI output must stay non-medical and must not claim diagnosis, therapy, or treatment.
+
+## Purchases
+
+iPhone subscriptions are processed by Apple through the App Store. Apple handles payment details, billing, renewals, refunds, and payment methods. Blanked may check active entitlement state.
+
+## Referrals
+
+Referrals use anonymous referral IDs to count activated friends and unlock temporary Pro access. Blanked does not access contacts.
 
 ## Sharing
 
-Blank may send onboarding responses to its backend for product analytics and improvement. Blank does not sell this data and does not share it with third-party advertisers.
-
-## Permissions
-
-Blank requires NFC to pair and read your physical tag. Blank requires Accessibility access to detect blocked apps. Blank may request battery optimization exclusion so Android does not stop the app while Blank mode is active.
-
-On iPhone, Apple Health access is optional and can be declined without blocking the app. You can stop Blank from using Apple Health inside the app, and you can revoke Health permissions in iOS Settings or Apple Health.
-
-## iPhone Version
-
-On iPhone, Blank cannot use Android Accessibility. The iPhone version uses Apple's Screen Time APIs, such as FamilyControls and ManagedSettings, so users can select apps/categories and Blank can shield them while Blank mode is active. Apple may require entitlement approval before this works in distributed builds.
+Blanked does not sell personal information collected by the iPhone app and does not share app data with third-party advertisers. Service providers may process data needed for hosting, database, AI infrastructure, website, store, payment, support, and infrastructure.
 
 ## Contact
 
-TODO: Add support email before public release.
+For privacy requests, contact hola@blankeate.com.

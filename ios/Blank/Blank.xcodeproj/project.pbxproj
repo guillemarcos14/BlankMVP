@@ -35,6 +35,10 @@
 		8A0000040000000000000003 /* BlankDomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001B /* BlankDomainModels.swift */; };
 		8A0000040000000000000004 /* BlankWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000040000000000000010 /* BlankWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8A0000040000000000000005 /* inter_variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000022 /* inter_variable.ttf */; };
+		8A0000050000000000000001 /* ShieldConfigurationExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000050000000000000011 /* ShieldConfigurationExtension.swift */; };
+		8A0000050000000000000002 /* BlankShieldConfiguration.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000050000000000000010 /* BlankShieldConfiguration.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8A0000060000000000000001 /* ShieldActionExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000060000000000000011 /* ShieldActionExtension.swift */; };
+		8A0000060000000000000002 /* BlankShieldAction.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 8A0000060000000000000010 /* BlankShieldAction.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +56,20 @@
 			remoteGlobalIDString = 8A0000040000000000000040;
 			remoteInfo = BlankWidgetExtension;
 		};
+		8A0000050000000000000042 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A0000010000000000000070 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8A0000050000000000000040;
+			remoteInfo = BlankShieldConfiguration;
+		};
+		8A0000060000000000000042 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8A0000010000000000000070 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8A0000060000000000000040;
+			remoteInfo = BlankShieldAction;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +81,8 @@
 			files = (
 				8A0000020000000000000002 /* BlankDeviceActivityMonitor.appex in Embed App Extensions */,
 				8A0000040000000000000004 /* BlankWidgetExtension.appex in Embed App Extensions */,
+				8A0000050000000000000002 /* BlankShieldConfiguration.appex in Embed App Extensions */,
+				8A0000060000000000000002 /* BlankShieldAction.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -102,6 +122,14 @@
 		8A0000040000000000000011 /* BlankWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankWidget.swift; sourceTree = "<group>"; };
 		8A0000040000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8A0000040000000000000013 /* BlankWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BlankWidgetExtension.entitlements; sourceTree = "<group>"; };
+		8A0000050000000000000010 /* BlankShieldConfiguration.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlankShieldConfiguration.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0000050000000000000011 /* ShieldConfigurationExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldConfigurationExtension.swift; sourceTree = "<group>"; };
+		8A0000050000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8A0000050000000000000013 /* BlankShieldConfiguration.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BlankShieldConfiguration.entitlements; sourceTree = "<group>"; };
+		8A0000060000000000000010 /* BlankShieldAction.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BlankShieldAction.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8A0000060000000000000011 /* ShieldActionExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShieldActionExtension.swift; sourceTree = "<group>"; };
+		8A0000060000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8A0000060000000000000013 /* BlankShieldAction.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BlankShieldAction.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +154,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8A0000050000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000060000000000000020 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -135,6 +177,8 @@
 				8A0000010000000000000031 /* Blank */,
 				8A0000020000000000000031 /* BlankDeviceActivityMonitor */,
 				8A0000040000000000000031 /* BlankWidgetExtension */,
+				8A0000050000000000000031 /* BlankShieldConfiguration */,
+				8A0000060000000000000031 /* BlankShieldAction */,
 				8A0000010000000000000032 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -205,12 +249,34 @@
 			path = BlankWidgetExtension;
 			sourceTree = "<group>";
 		};
+		8A0000050000000000000031 /* BlankShieldConfiguration */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000050000000000000011 /* ShieldConfigurationExtension.swift */,
+				8A0000050000000000000012 /* Info.plist */,
+				8A0000050000000000000013 /* BlankShieldConfiguration.entitlements */,
+			);
+			path = BlankShieldConfiguration;
+			sourceTree = "<group>";
+		};
+		8A0000060000000000000031 /* BlankShieldAction */ = {
+			isa = PBXGroup;
+			children = (
+				8A0000060000000000000011 /* ShieldActionExtension.swift */,
+				8A0000060000000000000012 /* Info.plist */,
+				8A0000060000000000000013 /* BlankShieldAction.entitlements */,
+			);
+			path = BlankShieldAction;
+			sourceTree = "<group>";
+		};
 		8A0000010000000000000032 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				8A0000010000000000000010 /* Blank.app */,
 				8A0000020000000000000010 /* BlankDeviceActivityMonitor.appex */,
 				8A0000040000000000000010 /* BlankWidgetExtension.appex */,
+				8A0000050000000000000010 /* BlankShieldConfiguration.appex */,
+				8A0000060000000000000010 /* BlankShieldAction.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -232,6 +298,8 @@
 			dependencies = (
 				8A0000020000000000000041 /* PBXTargetDependency */,
 				8A0000040000000000000041 /* PBXTargetDependency */,
+				8A0000050000000000000041 /* PBXTargetDependency */,
+				8A0000060000000000000041 /* PBXTargetDependency */,
 			);
 			name = Blank;
 			productName = Blank;
@@ -272,6 +340,40 @@
 			productReference = 8A0000040000000000000010 /* BlankWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		8A0000050000000000000040 /* BlankShieldConfiguration */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0000050000000000000080 /* Build configuration list for PBXNativeTarget "BlankShieldConfiguration" */;
+			buildPhases = (
+				8A0000050000000000000050 /* Sources */,
+				8A0000050000000000000020 /* Frameworks */,
+				8A0000050000000000000060 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BlankShieldConfiguration;
+			productName = BlankShieldConfiguration;
+			productReference = 8A0000050000000000000010 /* BlankShieldConfiguration.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8A0000060000000000000040 /* BlankShieldAction */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8A0000060000000000000080 /* Build configuration list for PBXNativeTarget "BlankShieldAction" */;
+			buildPhases = (
+				8A0000060000000000000050 /* Sources */,
+				8A0000060000000000000020 /* Frameworks */,
+				8A0000060000000000000060 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BlankShieldAction;
+			productName = BlankShieldAction;
+			productReference = 8A0000060000000000000010 /* BlankShieldAction.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -289,6 +391,12 @@
 						CreatedOnToolsVersion = 15.2;
 					};
 					8A0000040000000000000040 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					8A0000050000000000000040 = {
+						CreatedOnToolsVersion = 15.2;
+					};
+					8A0000060000000000000040 = {
 						CreatedOnToolsVersion = 15.2;
 					};
 				};
@@ -310,6 +418,8 @@
 				8A0000010000000000000040 /* Blank */,
 				8A0000020000000000000040 /* BlankDeviceActivityMonitor */,
 				8A0000040000000000000040 /* BlankWidgetExtension */,
+				8A0000050000000000000040 /* BlankShieldConfiguration */,
+				8A0000060000000000000040 /* BlankShieldAction */,
 			);
 		};
 /* End PBXProject section */
@@ -339,6 +449,20 @@
 			buildActionMask = 2147483647;
 			files = (
 				8A0000040000000000000005 /* inter_variable.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000050000000000000060 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000060000000000000060 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -386,6 +510,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8A0000050000000000000050 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0000050000000000000001 /* ShieldConfigurationExtension.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8A0000060000000000000050 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A0000060000000000000001 /* ShieldActionExtension.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -398,6 +538,16 @@
 			isa = PBXTargetDependency;
 			target = 8A0000040000000000000040 /* BlankWidgetExtension */;
 			targetProxy = 8A0000040000000000000042 /* PBXContainerItemProxy */;
+		};
+		8A0000050000000000000041 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8A0000050000000000000040 /* BlankShieldConfiguration */;
+			targetProxy = 8A0000050000000000000042 /* PBXContainerItemProxy */;
+		};
+		8A0000060000000000000041 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8A0000060000000000000040 /* BlankShieldAction */;
+			targetProxy = 8A0000060000000000000042 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -696,6 +846,122 @@
 			};
 			name = Release;
 		};
+		8A0000050000000000000092 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 60;
+				DEVELOPMENT_TEAM = GS54UV79RG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldconfiguration;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8A0000050000000000000093 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 60;
+				DEVELOPMENT_TEAM = GS54UV79RG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldconfiguration;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		8A0000060000000000000092 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 60;
+				DEVELOPMENT_TEAM = GS54UV79RG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankShieldAction/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldaction;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8A0000060000000000000093 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 60;
+				DEVELOPMENT_TEAM = GS54UV79RG;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BlankShieldAction/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldaction;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -731,6 +997,24 @@
 			buildConfigurations = (
 				8A0000040000000000000092 /* Debug */,
 				8A0000040000000000000093 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0000050000000000000080 /* Build configuration list for PBXNativeTarget "BlankShieldConfiguration" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0000050000000000000092 /* Debug */,
+				8A0000050000000000000093 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8A0000060000000000000080 /* Build configuration list for PBXNativeTarget "BlankShieldAction" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8A0000060000000000000092 /* Debug */,
+				8A0000060000000000000093 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

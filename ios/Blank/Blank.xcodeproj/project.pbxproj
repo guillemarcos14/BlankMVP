@@ -676,7 +676,7 @@
 				BLANK_MEMBERSHIP_API_BASE_URL = "https://getblank.netlify.app/.netlify/functions";
 				CODE_SIGN_ENTITLEMENTS = Blank/Blank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -707,7 +707,7 @@
 				BLANK_MEMBERSHIP_API_BASE_URL = "https://getblank.netlify.app/.netlify/functions";
 				CODE_SIGN_ENTITLEMENTS = Blank/Blank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -736,7 +736,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
@@ -765,7 +765,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
@@ -794,7 +794,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankWidgetExtension/BlankWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankWidgetExtension/Info.plist;
@@ -823,7 +823,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankWidgetExtension/BlankWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankWidgetExtension/Info.plist;
@@ -852,7 +852,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
@@ -881,7 +881,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
@@ -910,7 +910,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldAction/Info.plist;
@@ -939,7 +939,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 60;
+				CURRENT_PROJECT_VERSION = 62;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldAction/Info.plist;

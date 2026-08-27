@@ -26,6 +26,7 @@ const ALLOWED_EVENTS = new Set([
   "health_permission_result",
   "ai_insight_requested",
   "ai_insight_received",
+  "ai_plan_applied",
 ]);
 
 function cleanText(value, maxLength = 160) {

@@ -496,6 +496,8 @@ struct ReportView: View {
                 .buttonStyle(.plain)
             }
 
+            remoteWellnessInsightCard()
+
             Button {
                 healthKitStore.loadSyntheticAppleWatchData()
             } label: {
@@ -914,7 +916,6 @@ struct ReportView: View {
                         statCapsule(title: "Recovery", value: recoveryValue(context.recoveryScore), caption: "Context only", minHeight: 82)
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
                     }
-                    remoteWellnessInsightCard()
                     aiReportSection(title: "Why", items: forecast.reasons)
                     aiReportSection(title: "Unblank Pattern", items: unblankPatternInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
                     aiReportSection(title: "Intervention Learning", items: interventionLearningInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))

@@ -803,6 +803,7 @@ struct DigitalWellnessRemoteInsight: Codable, Equatable {
     var recommendations: [String]
     var next_step: String
     var risk_window: String?
+    var source: String?
 }
 
 private struct DigitalWellnessFeatureEnvelope: Encodable {

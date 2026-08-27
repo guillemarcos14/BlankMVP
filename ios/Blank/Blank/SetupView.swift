@@ -2500,7 +2500,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Product Analytics",
-                    "Blanked may send aggregated product events such as onboarding step, permission status, selected item counts, trial actions, block starts, emergency exits, referral events, Health permission status, and AI insight sync status. These events do not include your exact app list, website list, raw Health samples, precise location, contacts, messages, payment card details, or advertising identifier."
+                    "Blanked may send aggregated product events such as onboarding step, permission status, selected item counts, trial actions, block starts, emergency exits, referral events, Health permission status, and AI plan update status. These events do not include your exact app list, website list, raw Health samples, precise location, contacts, messages, payment card details, or advertising identifier."
                 ),
                 (
                     "Purchases",
@@ -2512,7 +2512,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Apple Health",
-                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to generate local digital wellness insights. Blanked only sends aggregated wellness features to its backend after your explicit consent; it does not send raw Health samples."
+                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to personalize your digital wellness plan. Blanked only sends aggregated wellness features to its backend after your explicit consent to activate AI plan updates; it does not send raw Health samples."
                 ),
                 (
                     "Sharing",

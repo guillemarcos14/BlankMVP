@@ -17,9 +17,9 @@ Blanked may send:
 - locale, app version, and build number
 - aggregated product/funnel events
 - anonymous referral activation/reward events
-- aggregated digital wellness features after the user taps `Improve AI with wellness features`
+- aggregated digital wellness features after the user activates AI plan updates
 
-Product/funnel events may include onboarding step viewed, permission status, selected item counts, trial actions, free plan selection, first block, block starts and ends, emergency exits, Health permission status, and AI insight sync status.
+Product/funnel events may include onboarding step viewed, permission status, selected item counts, trial actions, free plan selection, first block, block starts and ends, emergency exits, Health permission status, and AI plan update status.
 
 ## Data Blanked Does Not Send
 

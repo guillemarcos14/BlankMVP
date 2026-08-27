@@ -946,6 +946,17 @@ struct ReportView: View {
 
     private func remoteWellnessInsightCard() -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("AI plan updates", systemImage: "sparkles")
+                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .headline))
+                    .foregroundStyle(reportPrimary)
+
+                Text(wellnessFeatureConsent ? aiPlanStatusText : "Included in Pro. Allow Blanked AI to analyze your patterns and update your plan daily.")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if !remoteWellnessSummary.isEmpty {
                 aiReportSection(
                     title: "AI Weekly Insight",
@@ -998,14 +1009,14 @@ struct ReportView: View {
             Button {
                 submitDigitalWellnessFeatures()
             } label: {
-                Text(isSubmittingWellnessFeatures ? "Syncing..." : (wellnessFeatureConsent ? "Sync AI insight" : "Improve AI with wellness features"))
+                Text(aiPlanButtonText)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(reportPrimary)
+                    .foregroundStyle(wellnessFeatureConsent ? reportSecondary : reportPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background {
                         Capsule()
-                            .fill(Color.white.opacity(0.22))
+                            .fill(Color.white.opacity(wellnessFeatureConsent ? 0.12 : 0.22))
                     }
                     .overlay {
                         Capsule()
@@ -2683,6 +2694,26 @@ struct ReportView: View {
         "\(minuteText(remotePlanStartMinute))-\(minuteText(remotePlanEndMinute))"
     }
 
+    private var aiPlanButtonText: String {
+        if isSubmittingWellnessFeatures { return "Updating AI plan..." }
+        return wellnessFeatureConsent ? "Refresh plan" : "Activate AI plan updates"
+    }
+
+    private var aiPlanStatusText: String {
+        guard remoteWellnessLastSyncAt > 0 else {
+            return "Blanked AI will update your plan daily."
+        }
+
+        let lastSync = Date(timeIntervalSince1970: remoteWellnessLastSyncAt)
+        if Calendar.current.isDateInToday(lastSync) {
+            return "AI plan updated today."
+        }
+        if Calendar.current.isDateInYesterday(lastSync) {
+            return "AI plan last updated yesterday."
+        }
+        return "AI plan will refresh when new patterns are available."
+    }
+
     private func submitDigitalWellnessFeatures() {
         guard !isSubmittingWellnessFeatures else { return }
         isSubmittingWellnessFeatures = true
@@ -2715,7 +2746,7 @@ struct ReportView: View {
                 let insight = try await DigitalWellnessFeaturesClient().submit(
                     payload: payload,
                     anonymousUserId: anonymousUserId,
-                    consentText: "Improve AI with wellness features"
+                    consentText: "Activate AI plan updates"
                 )
                 await BlankFunnelAnalytics.track(
                     "ai_insight_received",
@@ -2727,12 +2758,12 @@ struct ReportView: View {
                 )
                 await MainActor.run {
                     applyRemoteInsight(insight)
-                    wellnessSyncMessage = showSuccessMessage ? "AI insight updated." : nil
+                    wellnessSyncMessage = showSuccessMessage ? "AI plan updated." : nil
                     isSubmittingWellnessFeatures = false
                 }
             } catch {
                 await MainActor.run {
-                    wellnessSyncMessage = showSuccessMessage ? "AI sync failed. Please try again." : nil
+                    wellnessSyncMessage = showSuccessMessage ? "AI plan update failed. Please try again." : nil
                     isSubmittingWellnessFeatures = false
                 }
             }

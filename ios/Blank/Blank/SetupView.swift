@@ -23,6 +23,28 @@ private enum OnboardingStep: Int, CaseIterable {
     case notifications
     case apps
 
+    var analyticsName: String {
+        switch self {
+        case .awareness: return "awareness"
+        case .lifetime: return "lifetime"
+        case .dopamine: return "dopamine"
+        case .name: return "name"
+        case .goal: return "goal"
+        case .age: return "age"
+        case .profile: return "profile"
+        case .dailyUse: return "daily_use"
+        case .result: return "result"
+        case .diagnosis: return "diagnosis"
+        case .recovery: return "recovery"
+        case .commitment: return "commitment"
+        case .personalization: return "personalization"
+        case .trial: return "trial"
+        case .permission: return "screen_time_permission"
+        case .notifications: return "notifications"
+        case .apps: return "apps_selection"
+        }
+    }
+
     var bottomGlowPalette: BottomGlowPalette {
         let palettes: [BottomGlowPalette] = [
             .init(id: 0, primary: Color(red: 0.48, green: 0.66, blue: 0.84), secondary: Color(red: 0.62, green: 0.76, blue: 0.90), accent: Color(red: 0.34, green: 0.52, blue: 0.72)),
@@ -239,6 +261,10 @@ struct SetupView: View {
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
             dailyHours = storedDailyHours
+            BlankFunnelAnalytics.trackStepOnce(currentStep.analyticsName)
+            Task {
+                await BlankFunnelAnalytics.track("onboarding_started", step: currentStep.analyticsName)
+            }
             await purchaseStore.loadProducts()
             await refreshScreenTimeAndContinueIfApproved()
             await refreshNotificationStatus()
@@ -265,11 +291,16 @@ struct SetupView: View {
                     await purchaseStore.refreshReferralStatus(for: currentOnboardingAnonymousUserId())
                 }
             }
+            BlankFunnelAnalytics.trackStepOnce(step.analyticsName, properties: onboardingAnalyticsProperties)
         }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
-            if currentStep == .apps, sessionStore.hasSelectedApps {
-                message = "\(selectionCountText) ready"
+            Task {
+                await BlankFunnelAnalytics.track(
+                    "apps_selection_updated",
+                    step: currentStep.analyticsName,
+                    properties: selectionAnalyticsProperties
+                )
             }
         }
         .sheet(item: $presentedLegalDocument) { document in
@@ -543,7 +574,7 @@ struct SetupView: View {
                 .text("to protecting", icon: "hand.raised.fill"),
                 .text(commitmentFocusText)
             ],
-            body: commitmentComplete ? "Done." : "Hold for \(max(0, 3 - commitmentSeconds)) seconds.",
+            body: commitmentComplete ? "Done" : "Hold for \(max(0, 3 - commitmentSeconds)) seconds",
             accessory: AnyView(commitmentHoldControl)
         )
     }
@@ -558,7 +589,7 @@ struct SetupView: View {
                             .text("Let's personalize"),
                             .text("the plan", icon: "sparkles")
                         ],
-                        body: personalizationShowsDetail ? "Use the answers to personalize my plan\nand improve the recommendations." : nil,
+                        body: personalizationShowsDetail ? "Use the answers to personalize my plan\nand improve the recommendations" : nil,
                         detailStartIndex: 2,
                         titleOpacity: personalizationShowsDetail ? 0.38 : 1
                     )
@@ -581,7 +612,7 @@ struct SetupView: View {
                     .frame(maxWidth: 318)
                     .disabled(isSubmittingOnboardingResponse)
 
-                    Text("We do not share the app list or screen time data.")
+                    Text("We do not share the app list or screen time data")
                         .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                         .foregroundStyle(Color.white.opacity(0.52))
                         .multilineTextAlignment(.center)
@@ -602,13 +633,13 @@ struct SetupView: View {
             ReferenceOnboardingText(
                 eyebrow: nil,
                 lines: [
-                    .text("Don't lose \(lostLifetimeYears) years."),
-                    .text("Start free.")
+                    .text("Don't lose \(lostLifetimeYears) years"),
+                    .text("Start with Blanked")
                 ],
                 body: nil
             )
 
-            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again.")
+            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again")
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
                 .foregroundStyle(Color.white.opacity(0.50))
                 .multilineTextAlignment(.leading)
@@ -617,8 +648,6 @@ struct SetupView: View {
                 .padding(.top, 15)
 
             VStack(spacing: 9) {
-                referralTrialCard
-
                 PlanButton(
                     title: "Annual",
                     price: purchaseStore.priceText(for: StoreKitPurchaseStore.annualProductId, fallback: "€19.99"),
@@ -638,6 +667,8 @@ struct SetupView: View {
                 ) {
                     selectedPlan = .monthly
                 }
+
+                referralTrialCard
             }
             .frame(maxWidth: 318)
             .padding(.top, 25)
@@ -649,7 +680,7 @@ struct SetupView: View {
                     ProgressView()
                         .tint(Color.black)
                 } else {
-                    Text("Start Free")
+                    Text("Start 3-day trial")
                 }
             }
             .buttonStyle(PaywallPrimaryButtonStyle())
@@ -657,7 +688,7 @@ struct SetupView: View {
             .padding(.top, 22)
             .disabled(purchaseStore.isPurchasing || purchaseStore.isLoading)
 
-            Button("Continue free") {
+            Button("Use basic free plan") {
                 continueFree()
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
@@ -680,8 +711,9 @@ struct SetupView: View {
             .padding(.top, 13)
 
             if isReviewDemoAccessAvailable {
-                Button("Continue in demo mode") {
+                Button("Unlock Pro for testing") {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    purchaseStore.enableDemoProAccess()
                     continueWithReviewDemoAccess()
                 }
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
@@ -727,11 +759,11 @@ struct SetupView: View {
             lines: [
                 .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
                 .text(sessionStore.hasSelectedApps ? "is ready with" : "to block", icon: "app.badge.fill"),
-                .text(sessionStore.hasSelectedApps ? selectionCountText : onboardingNameText)
+                .text(sessionStore.hasSelectedApps ? "your apps" : onboardingNameText)
             ],
             body: sessionStore.hasSelectedApps
                 ? weakMomentPreview
-                : "Pick the apps, categories or websites that trigger this pattern.",
+                : "Pick the apps, categories or websites that trigger this pattern",
             primaryTitle: sessionStore.hasSelectedApps ? "Start first blank" : "Select apps",
             primaryAction: selectAppsOrContinue,
             secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
@@ -890,7 +922,7 @@ struct SetupView: View {
             : StoreKitPurchaseStore.monthlyProductId
         let period = selectedPlan == .annual ? "year" : "month"
         let price = purchaseStore.priceText(for: productId, fallback: selectedPlan == .annual ? "€19.99" : "€2.99")
-        return "3 days free. Then \(price)/\(period). Cancel anytime in App Store settings"
+        return "3 days free · Then \(price)/\(period) · Cancel anytime in App Store settings"
     }
 
     private var referralTrialCard: some View {
@@ -904,7 +936,7 @@ struct SetupView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Invite 3 friends")
                         .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                    Text("Get 7 days of Pro when 3 friends activate Blanked with your code.")
+                    Text("Get 7 days of Pro when 3 friends activate Blanked with your code")
                         .font(.blankInter(size: 12, relativeTo: .caption))
                         .foregroundStyle(Color.white.opacity(0.62))
                         .fixedSize(horizontal: false, vertical: true)
@@ -944,7 +976,7 @@ struct SetupView: View {
             }
             .buttonStyle(.plain)
 
-            Text(purchaseStore.isReferralTrialActive ? "Pro pass active: \(purchaseStore.referralTrialRemainingText ?? "active")." : "\(purchaseStore.referralCount)/3 activated friends.")
+            Text(purchaseStore.isReferralTrialActive ? "Pro pass active: \(purchaseStore.referralTrialRemainingText ?? "active")" : "\(purchaseStore.referralCount)/3 activated friends")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
                 .foregroundStyle(Color.white.opacity(0.46))
         }
@@ -974,7 +1006,7 @@ struct SetupView: View {
                 Text("apply")
             }
 
-            Text("Free includes basic blocking. Pro includes AI, Health insights and adaptive plans. \(selectedPlanRenewalDisclosure)")
+            Text("Free includes basic blocking · Pro includes AI, Health insights and adaptive plans · \(selectedPlanRenewalDisclosure)")
                 .multilineTextAlignment(.center)
         }
         .font(.blankInter(size: 11, relativeTo: .caption2))
@@ -1197,15 +1229,15 @@ struct SetupView: View {
     private var riskBodyPreview: String {
         switch onboardingArchetype {
         case "Night Scroller":
-            return "Your highest leverage habit is protecting the final hour before sleep."
+            return "Your highest leverage habit is protecting the final hour before sleep"
         case "Dopamine Loop":
             return "You usually scroll when your energy is lowest"
         case "Presence Drifter":
-            return "The first win is protecting short windows where you want to be present."
+            return "The first win is protecting short windows where you want to be present"
         case "Focus Breaker":
-            return "Your biggest gain is starting a block before the first distraction."
+            return "Your biggest gain is starting a block before the first distraction"
         default:
-            return "Your plan should make the first block easy and repeatable."
+            return "Your plan should make the first block easy and repeatable"
         }
     }
 
@@ -1291,14 +1323,24 @@ struct SetupView: View {
             do {
                 let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
                 notificationStatus = granted ? "On" : "Off"
+                await BlankFunnelAnalytics.track(
+                    "notifications_permission_result",
+                    step: currentStep.analyticsName,
+                    properties: ["granted": granted]
+                )
                 goForward()
                 if !granted {
-                    message = "Notifications were not enabled. You can turn them on later."
+                    message = "Notifications were not enabled · You can turn them on later"
                 }
             } catch {
                 notificationStatus = "Off"
+                await BlankFunnelAnalytics.track(
+                    "notifications_permission_result",
+                    step: currentStep.analyticsName,
+                    properties: ["granted": false, "error": error.localizedDescription]
+                )
                 goForward()
-                message = "Notifications were not enabled. You can turn them on later."
+                message = "Notifications were not enabled · You can turn them on later"
             }
         }
     }
@@ -1309,9 +1351,25 @@ struct SetupView: View {
             : StoreKitPurchaseStore.monthlyProductId
 
         Task {
+            await BlankFunnelAnalytics.track(
+                "trial_cta_tapped",
+                step: currentStep.analyticsName,
+                properties: ["plan": selectedPlan.rawValue, "product_id": productId]
+            )
             if await purchaseStore.purchase(productId: productId) {
                 trialStarted = true
+                await BlankFunnelAnalytics.track(
+                    "trial_started",
+                    step: currentStep.analyticsName,
+                    properties: ["plan": selectedPlan.rawValue, "product_id": productId]
+                )
                 goForward()
+            } else {
+                await BlankFunnelAnalytics.track(
+                    "trial_failed",
+                    step: currentStep.analyticsName,
+                    properties: ["plan": selectedPlan.rawValue, "product_id": productId]
+                )
             }
         }
     }
@@ -1340,14 +1398,24 @@ struct SetupView: View {
         Task {
             do {
                 try await OnboardingResponsesClient().submit(payload)
+                await BlankFunnelAnalytics.track(
+                    "onboarding_personalization_submitted",
+                    step: currentStep.analyticsName,
+                    properties: onboardingAnalyticsProperties
+                )
                 await MainActor.run {
                     isSubmittingOnboardingResponse = false
                     goForward()
                 }
             } catch {
+                await BlankFunnelAnalytics.track(
+                    "onboarding_personalization_failed",
+                    step: currentStep.analyticsName,
+                    properties: ["error": error.localizedDescription]
+                )
                 await MainActor.run {
                     isSubmittingOnboardingResponse = false
-                    message = "We could not personalize your plan. Please try again."
+                    message = "We could not personalize your plan · Please try again"
                 }
             }
         }
@@ -1450,6 +1518,13 @@ struct SetupView: View {
 
     private func authorizeScreenTime() {
         if screenTimeBlocker.authorizationStatus == .approved {
+            Task {
+                await BlankFunnelAnalytics.track(
+                    "screen_time_permission_result",
+                    step: currentStep.analyticsName,
+                    properties: ["status": screenTimeBlocker.authorizationStatusLabel, "granted": true]
+                )
+            }
             goForward()
             message = nil
             return
@@ -1457,9 +1532,23 @@ struct SetupView: View {
 
         Task {
             if await screenTimeBlocker.requestAuthorization() {
+                await BlankFunnelAnalytics.track(
+                    "screen_time_permission_result",
+                    step: currentStep.analyticsName,
+                    properties: ["status": screenTimeBlocker.authorizationStatusLabel, "granted": true]
+                )
                 goForward()
                 message = nil
             } else {
+                await BlankFunnelAnalytics.track(
+                    "screen_time_permission_result",
+                    step: currentStep.analyticsName,
+                    properties: [
+                        "status": screenTimeBlocker.authorizationStatusLabel,
+                        "granted": false,
+                        "error": screenTimeBlocker.lastErrorMessage ?? ""
+                    ]
+                )
                 let status = "iOS status: \(screenTimeBlocker.authorizationStatusLabel)"
                 if let lastErrorMessage = screenTimeBlocker.lastErrorMessage {
                     message = "\(lastErrorMessage) \(status)"
@@ -1473,6 +1562,11 @@ struct SetupView: View {
     private func refreshScreenTimeAndContinueIfApproved() async {
         await screenTimeBlocker.refreshAuthorizationStatusUntilSettled()
         if screenTimeBlocker.authorizationStatus == .approved, currentStep == .permission {
+            await BlankFunnelAnalytics.track(
+                "screen_time_permission_result",
+                step: currentStep.analyticsName,
+                properties: ["status": screenTimeBlocker.authorizationStatusLabel, "granted": true, "source": "refresh"]
+            )
             currentStep = .notifications
             message = nil
         }
@@ -1487,9 +1581,18 @@ struct SetupView: View {
                 dailyHours: storedDailyHours,
                 selectionCount: sessionStore.selectionCount
             )
-            _ = sessionStore.activateBlank(durationMinutes: initialBlockMinutesPreview)
+            _ = sessionStore.activateBlank()
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-            sessionStore.finishSetup()
+            Task {
+                await BlankFunnelAnalytics.track(
+                    "first_block_started",
+                    step: currentStep.analyticsName,
+                    properties: selectionAnalyticsProperties
+                )
+            }
+            withAnimation(.easeInOut(duration: 0.85)) {
+                sessionStore.finishSetup()
+            }
             Task {
                 await purchaseStore.registerReferredActivation(referredUserId: currentOnboardingAnonymousUserId())
             }
@@ -1500,7 +1603,35 @@ struct SetupView: View {
 
     private func continueFree() {
         trialStarted = false
+        Task {
+            await BlankFunnelAnalytics.track(
+                "free_plan_selected",
+                step: currentStep.analyticsName,
+                properties: ["plan": selectedPlan.rawValue]
+            )
+        }
         goForward()
+    }
+
+    private var onboardingAnalyticsProperties: [String: Any] {
+        [
+            "goal": selectedOnboardingGoal,
+            "profile": selectedProfile,
+            "age_range": selectedAgeRange,
+            "daily_hours": storedDailyHours,
+            "selected_plan": selectedPlan.rawValue,
+            "trial_started": trialStarted,
+            "screen_time_status": screenTimeBlocker.authorizationStatusLabel,
+            "selection_count": sessionStore.selectionCount
+        ]
+    }
+
+    private var selectionAnalyticsProperties: [String: Any] {
+        [
+            "selection_count": sessionStore.selectionCount,
+            "has_selected_apps": sessionStore.hasSelectedApps,
+            "screen_time_status": screenTimeBlocker.authorizationStatusLabel
+        ]
     }
 
     private var selectionCountText: String {
@@ -1510,7 +1641,9 @@ struct SetupView: View {
 
     private func skipToHomeForQA() {
         message = nil
-        sessionStore.finishSetup()
+        withAnimation(.easeInOut(duration: 0.85)) {
+            sessionStore.finishSetup()
+        }
     }
 
     private func goForward() {
@@ -2065,22 +2198,22 @@ private struct BlankOnboardingBackground: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            BlankColors.ink.ignoresSafeArea()
 
             Image("blank_home_background_active")
                 .resizable()
                 .scaledToFill()
-                .opacity(0.14)
-                .blur(radius: 3)
-                .overlay(Color.black.opacity(0.74))
+                .opacity(0.52)
+                .blur(radius: 2)
+                .overlay(BlankColors.ink.opacity(0.46))
                 .ignoresSafeArea()
 
             ReferenceBottomGlow(palette: palette)
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.08),
-                    Color.black.opacity(0.22),
-                    Color.black.opacity(0.36)
+                    BlankColors.ink.opacity(0.12),
+                    BlankColors.ink.opacity(0.24),
+                    BlankColors.ink.opacity(0.36)
                 ],
                 startPoint: .top,
                 endPoint: .bottom

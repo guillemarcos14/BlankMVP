@@ -184,33 +184,13 @@ struct ReportView: View {
     }
 
     private func reportHeader() -> some View {
-        Group {
-            if usesMainBackground {
-                VStack(spacing: 7) {
-                    Text("Digital Wellness")
-                        .font(.blankInter(size: 29, weight: .medium, relativeTo: .largeTitle))
-                        .foregroundStyle(reportPrimary)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text("Understand your patterns\nand follow your next best block.")
-                        .font(.blankInter(size: 15, relativeTo: .subheadline))
-                        .foregroundStyle(reportSecondary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(1)
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity)
-            } else {
-                TopSheetHeader(
-                    title: "Digital Wellness",
-                    subtitle: "Understand your patterns\nand follow your next best block.",
-                    titleColor: reportPrimary,
-                    subtitleColor: reportSecondary
-                )
-            }
-        }
+        TopSheetHeader(
+            title: "Digital Wellness",
+            subtitle: "Understand your patterns\nand follow your next best block",
+            titleColor: reportPrimary,
+            subtitleColor: reportSecondary
+        )
+        .padding(.top, usesMainBackground ? 24 : 0)
     }
 
     private func minimalHero(savedTime: TimeInterval) -> some View {
@@ -880,6 +860,12 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             case .notRequested, .failed(_):
                 Button {
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "health_permission_result",
+                            properties: ["requested": true, "state_before": "\(healthKitStore.state)"]
+                        )
+                    }
                     healthKitStore.requestAccess()
                 } label: {
                     Text("Connect Apple Health")
@@ -2656,10 +2642,26 @@ struct ReportView: View {
 
         Task {
             do {
+                await BlankFunnelAnalytics.track(
+                    "ai_insight_requested",
+                    properties: [
+                        "health_days": healthKitStore.summaries.count,
+                        "usage_events": sessionStore.usageEvents.count,
+                        "selection_count": sessionStore.selectionCount
+                    ]
+                )
                 let insight = try await DigitalWellnessFeaturesClient().submit(
                     payload: payload,
                     anonymousUserId: anonymousUserId,
                     consentText: "Improve AI with wellness features"
+                )
+                await BlankFunnelAnalytics.track(
+                    "ai_insight_received",
+                    properties: [
+                        "source": insight.source,
+                        "health_days": healthKitStore.summaries.count,
+                        "usage_events": sessionStore.usageEvents.count
+                    ]
                 )
                 await MainActor.run {
                     wellnessFeatureConsent = true

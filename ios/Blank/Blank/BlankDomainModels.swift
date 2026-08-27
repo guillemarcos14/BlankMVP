@@ -1,5 +1,93 @@
 import Foundation
 
+enum BlankFunnelAnalytics {
+    private static let userIdKey = "blankOnboardingAnonymousUserId"
+    private static var seenStepKeys = Set<String>()
+
+    static func track(
+        _ event: String,
+        step: String? = nil,
+        properties: [String: Any] = [:],
+        defaults: UserDefaults = BlankSharedState.defaults
+    ) async {
+        guard let baseURL = configuredBaseURL() else { return }
+        var request = URLRequest(url: baseURL.appendingPathComponent("funnel-event"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "anonymous_user_id": anonymousUserId(defaults: defaults),
+            "event": event,
+            "properties": sanitizedProperties(properties),
+            "platform": "ios",
+            "locale": Locale.current.identifier,
+            "app_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            "build_number": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+            "data_consent": true,
+            "consent_text": "Product analytics"
+        ]
+        if let step, !step.isEmpty {
+            body["step"] = step
+        }
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+                return
+            }
+        } catch {
+            return
+        }
+    }
+
+    static func trackStepOnce(_ step: String, properties: [String: Any] = [:]) {
+        let key = "\(step)-\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "")"
+        guard !seenStepKeys.contains(key) else { return }
+        seenStepKeys.insert(key)
+        Task {
+            await track("onboarding_step_viewed", step: step, properties: properties)
+        }
+    }
+
+    private static func anonymousUserId(defaults: UserDefaults) -> String {
+        if let existing = defaults.string(forKey: userIdKey), !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString
+        defaults.set(created, forKey: userIdKey)
+        return created
+    }
+
+    private static func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+
+    private static func sanitizedProperties(_ properties: [String: Any]) -> [String: Any] {
+        properties.reduce(into: [:]) { result, item in
+            let key = String(item.key.prefix(64))
+            switch item.value {
+            case let value as String:
+                result[key] = String(value.prefix(240))
+            case let value as Int:
+                result[key] = value
+            case let value as Double:
+                result[key] = value
+            case let value as Bool:
+                result[key] = value
+            default:
+                result[key] = String(describing: item.value).prefix(240).description
+            }
+        }
+    }
+}
+
 struct HealthDaySummary: Identifiable, Equatable {
     var id: Date { date }
     var date: Date

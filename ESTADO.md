@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-08-03
+Ultima actualizacion: 2026-08-27
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,7 @@ Ultima actualizacion: 2026-08-03
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-08-27: Ajustes iOS en rama `health`: `Digital Wellness` usa el mismo header que `Habits`/`Mode`; el paywall ordena Annual, Monthly e invitacion; CTAs cambiados a `Start 3-day trial` y `Use basic free plan`; anadido `Unlock Pro for testing`; onboarding con fondo oscuro de app menos negro, sin puntos finales principales, sin `X selections ready`; el primer bloqueo tras onboarding y el CTA central quedan indefinidos; la transicion onboarding->Home usa fade/scale de 0.85s. Validado con `git diff --check` y busquedas de strings antiguos; iOS no compilado en Windows.
 - 2026-08-03: En MacinCloud/RDP se actualizo la copia iOS al commit `4b1de16` (`Record membership activation sync status`) mediante `git fetch origin codex/ios-device-activity-target` y `git checkout --detach origin/codex/ios-device-activity-target`, porque `git pull --ff-only` no movia el detached HEAD. Antes se preservo el cambio local tracked de MacinCloud en `ios/Blank/Blank.xcodeproj/project.pbxproj` con `git stash push -m macincloud-pre-membership-pull -- Blank.xcodeproj/project.pbxproj`; quedan sin trackear `Blank.xcodeproj/project.xcworkspace/` y `Blank.xcodeproj/xcuserdata/`. La compilacion final en `~/BlankMVP/ios/Blank` con `xcodebuild -project Blank.xcodeproj -scheme Blank -configuration Debug build` termino con `** BUILD SUCCEEDED **`.
 - 2026-08-03: Se comprobo que el flujo de activacion/membresia iOS si existia en la copia local `C:\Users\Guillem\Desktop\Blankeate\Código`, pero no estaba en MacinCloud porque seguia sin commitear/subir. Se creo y subio el commit `995c68f` (`Add iOS membership activation gate`) en `codex/ios-device-activity-target`, incluyendo `MembershipStore.swift`, `MembershipActivationView.swift`, el gate en `ContentView`, configuracion de endpoint y funciones/migracion de membresia. Queda pendiente hacer `git pull --ff-only` en MacinCloud y recompilar cuando la sesion RDP este de nuevo en escritorio/Terminal.
 - 2026-07-31: Se preparo una propuesta de estrategia go to market y ventas para Blank centrada en venta directa, embajadores de marca/creadores de nicho y aprendizaje rapido por cohortes. Queda pendiente aprobacion del usuario antes de convertirla en hoja de ruta cerrada.

@@ -9,11 +9,13 @@ final class StoreKitPurchaseStore: ObservableObject {
     private static let referralTrialEndsAtKey = "blankReferralTrialEndsAt"
     private static let referralCountKey = "blankReferralCount"
     private static let pendingReferrerUserIdKey = "blankPendingReferrerAnonymousUserId"
+    private static let demoProAccessKey = "blankDemoProAccess"
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var purchasedProductIds: Set<String> = []
     @Published private(set) var referralTrialEndsAt: Date?
     @Published private(set) var referralCount = 0
+    @Published private(set) var demoProAccess = false
     @Published var pendingReferrerUserId = ""
     @Published private(set) var isLoading = false
     @Published private(set) var isPurchasing = false
@@ -27,7 +29,7 @@ final class StoreKitPurchaseStore: ObservableObject {
     }
 
     var hasPremiumAccess: Bool {
-        hasEntitlement || isReferralTrialActive
+        hasEntitlement || isReferralTrialActive || demoProAccess
     }
 
     var isReferralTrialActive: Bool {
@@ -56,7 +58,14 @@ final class StoreKitPurchaseStore: ObservableObject {
             referralTrialEndsAt = Date(timeIntervalSince1970: timestamp)
         }
         referralCount = defaults.integer(forKey: Self.referralCountKey)
+        demoProAccess = defaults.bool(forKey: Self.demoProAccessKey)
         pendingReferrerUserId = defaults.string(forKey: Self.pendingReferrerUserIdKey) ?? ""
+    }
+
+    func enableDemoProAccess() {
+        demoProAccess = true
+        BlankSharedState.defaults.set(true, forKey: Self.demoProAccessKey)
+        message = "Pro test mode enabled"
     }
 
     func loadProducts() async {

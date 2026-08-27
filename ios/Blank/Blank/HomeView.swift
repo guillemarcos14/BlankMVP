@@ -129,6 +129,15 @@ struct HomeView: View {
                 }
                 if unlocked {
                     screenTimeBlocker.clear()
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "relapse_attempt",
+                            properties: [
+                                "source": "emergency",
+                                "remaining_after": sessionStore.emergencyUnlocksRemaining
+                            ]
+                        )
+                    }
                     message = nil
                     messageAction = nil
                 }
@@ -367,9 +376,10 @@ struct HomeView: View {
                     return
                 } else {
                     let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank(durationMinutes: aiSystem.plan.recommendedDurationMinutes)
+                        sessionStore.activateBlank()
                     }
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    trackBlockResult(result, source: "home_cta", plannedDurationMinutes: nil)
                     setMessage(for: result)
                 }
             }
@@ -395,6 +405,12 @@ struct HomeView: View {
                             sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
                         }
                         screenTimeBlocker.clear()
+                        Task {
+                            await BlankFunnelAnalytics.track(
+                                "relapse_attempt",
+                                properties: ["source": "hold_to_unblank"]
+                            )
+                        }
                         unblankHoldProgress = 0
                         isAnimatingUnblankHold = false
                         setMessage(for: result)
@@ -426,6 +442,7 @@ struct HomeView: View {
                 sessionStore.activateBlank(durationMinutes: riskBlankMinutes)
             }
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            trackBlockResult(result, source: "risk_notification", plannedDurationMinutes: riskBlankMinutes)
             setMessage(for: result)
         } label: {
             HStack(alignment: .center, spacing: 10) {
@@ -503,6 +520,21 @@ struct HomeView: View {
 
     private var riskWindowText: String {
         aiSystem.forecast.riskWindow
+    }
+
+    private func trackBlockResult(_ result: SessionStore.NfcResult, source: String, plannedDurationMinutes: Int?) {
+        guard result == .blanked else { return }
+        Task {
+            await BlankFunnelAnalytics.track(
+                "block_started",
+                properties: [
+                    "source": source,
+                    "planned_duration_minutes": plannedDurationMinutes as Any,
+                    "selection_count": sessionStore.selectionCount,
+                    "screen_time_status": screenTimeBlocker.authorizationStatusLabel
+                ]
+            )
+        }
     }
 
     private var relapseIntervention: RelapseIntervention {

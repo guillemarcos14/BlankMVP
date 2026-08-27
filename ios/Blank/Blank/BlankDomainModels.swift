@@ -893,7 +893,7 @@ struct DigitalWellnessFeaturesClient {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .blankFlexibleISO8601
         return try decoder.decode(DigitalWellnessFeatureSubmitResponse.self, from: data).insight
     }
 
@@ -906,6 +906,28 @@ struct DigitalWellnessFeaturesClient {
             return nil
         }
         return URL(string: trimmed)
+    }
+}
+
+private extension JSONDecoder.DateDecodingStrategy {
+    static let blankFlexibleISO8601 = custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+
+        let fractionalFormatter = ISO8601DateFormatter()
+        fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractionalFormatter.date(from: value) {
+            return date
+        }
+
+        if let date = ISO8601DateFormatter().date(from: value) {
+            return date
+        }
+
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Invalid ISO8601 date: \(value)"
+        )
     }
 }
 
@@ -1550,7 +1572,7 @@ enum DigitalWellnessAI {
     }
 
     static func hourRangeText(_ hour: Int) -> String {
-        "\(clockTimeText(hour: hour))-\(clockTimeText(hour: (hour + 1) % 24))"
+        "\(clockTimeText(hour: hour)) to \(clockTimeText(hour: (hour + 1) % 24))"
     }
 
     private static func v3Profile(

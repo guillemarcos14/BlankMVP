@@ -65,7 +65,7 @@ final class StoreKitPurchaseStore: ObservableObject {
     func enableDemoProAccess() {
         demoProAccess = true
         BlankSharedState.defaults.set(true, forKey: Self.demoProAccessKey)
-        message = "Pro test mode enabled"
+        message = "Review access enabled"
     }
 
     func loadProducts() async {

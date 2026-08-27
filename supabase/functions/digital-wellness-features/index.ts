@@ -60,7 +60,7 @@ function hourWindow(hour: unknown) {
   const start = Number(hour);
   if (!Number.isFinite(start)) return null;
   const end = (start + 2) % 24;
-  return `${clockTimeText(start)}-${clockTimeText(end)}`;
+  return `${clockTimeText(start)} to ${clockTimeText(end)}`;
 }
 
 function clockTimeText(hour: number, minute = 0) {
@@ -248,7 +248,7 @@ function normalizeClockText(text: unknown) {
   return cleanText(text, 400).replace(/\b([01]?\d|2[0-3]):([0-5]\d)(?:\s*[-–]\s*([01]?\d|2[0-3]):([0-5]\d))?/g, (_match, hour, minute, endHour, endMinute) => {
     const start = clockTimeText(Number(hour), Number(minute));
     if (endHour === undefined) return start;
-    return `${start}-${clockTimeText(Number(endHour), Number(endMinute))}`;
+    return `${start} to ${clockTimeText(Number(endHour), Number(endMinute))}`;
   });
 }
 
@@ -371,7 +371,10 @@ serve(async (request) => {
       const message = error instanceof Error ? error.message : String(error);
       modelResult = { insight: fallbackInsight, source: "deterministic_fallback_after_model_error", error: message };
     }
-    const insight = modelResult.insight;
+    const insight = {
+      ...modelResult.insight,
+      source: modelResult.source,
+    };
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { data, error } = await supabase
@@ -382,7 +385,7 @@ serve(async (request) => {
         period_start: payload.period_start,
         period_end: payload.period_end,
         payload,
-        insight: { ...insight, source: modelResult.source, model_error: modelResult.error || null },
+        insight: { ...insight, model_error: modelResult.error || null },
         platform: "ios",
         locale: cleanText(body.locale, 40),
         app_version: cleanText(body.app_version, 40),

@@ -2586,7 +2586,7 @@ struct ReportView: View {
     }
 
     private func hourRangeText(_ hour: Int) -> String {
-        "\(clockTimeText(hour: hour))-\(clockTimeText(hour: (hour + 1) % 24))"
+        "\(clockTimeText(hour: hour)) to \(clockTimeText(hour: (hour + 1) % 24))"
     }
 
     private func activationTimeText(before hour: Int) -> String {
@@ -2683,7 +2683,7 @@ struct ReportView: View {
     }
 
     private var remotePlanWindowText: String {
-        "\(minuteText(remotePlanStartMinute))-\(minuteText(remotePlanEndMinute))"
+        "\(minuteText(remotePlanStartMinute)) to \(minuteText(remotePlanEndMinute))"
     }
 
     private var aiPlanButtonText: String {

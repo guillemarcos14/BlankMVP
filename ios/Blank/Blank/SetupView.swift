@@ -711,7 +711,7 @@ struct SetupView: View {
             .padding(.top, 13)
 
             if isReviewDemoAccessAvailable {
-                Button("Unlock Pro for testing") {
+                Button("Continue with review access") {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     purchaseStore.enableDemoProAccess()
                     continueWithReviewDemoAccess()

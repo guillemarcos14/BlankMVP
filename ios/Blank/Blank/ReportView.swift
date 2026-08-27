@@ -19,6 +19,13 @@ struct ReportView: View {
     @AppStorage("blankRemoteWellnessSummary", store: BlankSharedState.defaults) private var remoteWellnessSummary = ""
     @AppStorage("blankRemoteWellnessNextStep", store: BlankSharedState.defaults) private var remoteWellnessNextStep = ""
     @AppStorage("blankRemoteWellnessRecommendations", store: BlankSharedState.defaults) private var remoteWellnessRecommendations = ""
+    @AppStorage("blankRemotePlanTitle", store: BlankSharedState.defaults) private var remotePlanTitle = ""
+    @AppStorage("blankRemotePlanEvidence", store: BlankSharedState.defaults) private var remotePlanEvidence = ""
+    @AppStorage("blankRemotePlanStartMinute", store: BlankSharedState.defaults) private var remotePlanStartMinute = -1
+    @AppStorage("blankRemotePlanEndMinute", store: BlankSharedState.defaults) private var remotePlanEndMinute = -1
+    @AppStorage("blankRemotePlanDurationDays", store: BlankSharedState.defaults) private var remotePlanDurationDays = 5
+    @AppStorage("blankRemotePlanActionLabel", store: BlankSharedState.defaults) private var remotePlanActionLabel = "Apply preventive block"
+    @AppStorage("blankRemoteWellnessLastSyncAt", store: BlankSharedState.defaults) private var remoteWellnessLastSyncAt = 0.0
 
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
@@ -165,6 +172,7 @@ struct ReportView: View {
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             healthKitStore.refresh()
+            refreshDailyAIIfNeeded()
         }
     }
 
@@ -943,6 +951,40 @@ struct ReportView: View {
                     items: [remoteWellnessSummary, remoteWellnessNextStep].filter { !$0.isEmpty } + remoteRecommendationItems,
                     tint: accentBlue
                 )
+            }
+
+            if hasRemotePlanUpdate {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(remotePlanTitle)
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                        .foregroundStyle(reportPrimary.opacity(0.92))
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(remotePlanEvidence)
+                        .font(.caption)
+                        .foregroundStyle(reportSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text("\(remotePlanWindowText) for \(remotePlanDurationDays) days")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary.opacity(0.86))
+
+                    Button {
+                        applyRemotePlanUpdate()
+                    } label: {
+                        Text(remotePlanActionLabel)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(reportPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background {
+                                Capsule()
+                                    .fill(accentBlue.opacity(0.22))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 2)
             }
 
             if let wellnessSyncMessage {
@@ -2632,11 +2674,30 @@ struct ReportView: View {
             .filter { !$0.isEmpty }
     }
 
+    private var hasRemotePlanUpdate: Bool {
+        !remotePlanTitle.isEmpty && remotePlanStartMinute >= 0 && remotePlanEndMinute >= 0
+    }
+
+    private var remotePlanWindowText: String {
+        "\(minuteText(remotePlanStartMinute))-\(minuteText(remotePlanEndMinute))"
+    }
+
     private func submitDigitalWellnessFeatures() {
         guard !isSubmittingWellnessFeatures else { return }
         isSubmittingWellnessFeatures = true
         wellnessSyncMessage = nil
+        syncDigitalWellnessFeatures(showSuccessMessage: true)
+    }
 
+    private func refreshDailyAIIfNeeded() {
+        guard wellnessFeatureConsent, !isSubmittingWellnessFeatures else { return }
+        let elapsed = Date().timeIntervalSince1970 - remoteWellnessLastSyncAt
+        guard elapsed > 20 * 60 * 60 else { return }
+        isSubmittingWellnessFeatures = true
+        syncDigitalWellnessFeatures(showSuccessMessage: false)
+    }
+
+    private func syncDigitalWellnessFeatures(showSuccessMessage: Bool) {
         let payload = sessionStore.digitalWellnessFeaturePayload(healthSummaries: healthKitStore.summaries)
         let anonymousUserId = currentAnonymousUserId()
 
@@ -2658,26 +2719,68 @@ struct ReportView: View {
                 await BlankFunnelAnalytics.track(
                     "ai_insight_received",
                     properties: [
-                        "source": insight.source,
+                        "source": insight.source ?? "unknown",
                         "health_days": healthKitStore.summaries.count,
                         "usage_events": sessionStore.usageEvents.count
                     ]
                 )
                 await MainActor.run {
-                    wellnessFeatureConsent = true
-                    remoteWellnessSummary = insight.summary
-                    remoteWellnessNextStep = insight.next_step
-                    remoteWellnessRecommendations = insight.recommendations.joined(separator: "\n")
-                    wellnessSyncMessage = "AI insight updated."
+                    applyRemoteInsight(insight)
+                    wellnessSyncMessage = showSuccessMessage ? "AI insight updated." : nil
                     isSubmittingWellnessFeatures = false
                 }
             } catch {
                 await MainActor.run {
-                    wellnessSyncMessage = "AI sync failed. Please try again."
+                    wellnessSyncMessage = showSuccessMessage ? "AI sync failed. Please try again." : nil
                     isSubmittingWellnessFeatures = false
                 }
             }
         }
+    }
+
+    private func applyRemoteInsight(_ insight: DigitalWellnessRemoteInsight) {
+        wellnessFeatureConsent = true
+        remoteWellnessLastSyncAt = Date().timeIntervalSince1970
+        remoteWellnessSummary = insight.summary
+        remoteWellnessNextStep = insight.next_step
+        remoteWellnessRecommendations = insight.recommendations.joined(separator: "\n")
+
+        guard let plan = insight.plan_update else { return }
+        remotePlanTitle = plan.title
+        remotePlanEvidence = plan.evidence
+        remotePlanStartMinute = plan.proposed_start_minute
+        remotePlanEndMinute = plan.proposed_end_minute
+        remotePlanDurationDays = plan.duration_days
+        remotePlanActionLabel = plan.action_label
+    }
+
+    private func applyRemotePlanUpdate() {
+        guard hasRemotePlanUpdate else { return }
+        sessionStore.applyAdaptivePlan(
+            startMinute: remotePlanStartMinute,
+            endMinute: remotePlanEndMinute,
+            durationDays: remotePlanDurationDays
+        )
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        wellnessSyncMessage = "Preventive plan applied."
+
+        Task {
+            await BlankFunnelAnalytics.track(
+                "ai_plan_applied",
+                properties: [
+                    "start_minute": remotePlanStartMinute,
+                    "end_minute": remotePlanEndMinute,
+                    "duration_days": remotePlanDurationDays
+                ]
+            )
+        }
+    }
+
+    private func minuteText(_ minute: Int) -> String {
+        let safeMinute = max(0, min(1439, minute))
+        let hour = safeMinute / 60
+        let minutes = safeMinute % 60
+        return "\(String(format: "%02d", hour)):\(String(format: "%02d", minutes))"
     }
 
     private func currentAnonymousUserId() -> String {

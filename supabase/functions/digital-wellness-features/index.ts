@@ -116,6 +116,28 @@ function buildInsight(payload: Record<string, any>) {
     recommendations: recommendations.slice(0, 3),
     next_step: nextStep,
     risk_window: weakWindow || null,
+    plan_update: buildPlanUpdate(payload, weakWindow),
+  };
+}
+
+function buildPlanUpdate(payload: Record<string, any>, weakWindow: string | null) {
+  const weekly = payload.weekly || {};
+  const correlations = payload.correlations || {};
+  const startHour = Number.isFinite(Number(weekly.weakest_hour)) ? Number(weekly.weakest_hour) : 22;
+  const startMinute = Math.max(0, Math.min(1439, startHour * 60 - 30));
+  const endMinute = (startMinute + 9 * 60) % (24 * 60);
+  const sleepPattern = correlations.night_scroll_after_late_bedtime || correlations.screen_risk_after_bad_sleep === "high";
+  const evidence = sleepPattern
+    ? "Night scroll signals are overlapping with weaker sleep and recovery."
+    : `Your riskiest window is ${weakWindow || hourWindow(startHour) || "later in the day"}.`;
+
+  return {
+    title: sleepPattern ? "Protect nights before the scroll starts." : "Protect your next risk window.",
+    evidence,
+    proposed_start_minute: startMinute,
+    proposed_end_minute: endMinute,
+    duration_days: 5,
+    action_label: "Apply preventive block",
   };
 }
 
@@ -130,6 +152,7 @@ const insightSchema = {
     "recommendations",
     "next_step",
     "risk_window",
+    "plan_update",
   ],
   properties: {
     confidence: { type: "integer", minimum: 20, maximum: 100 },
@@ -149,6 +172,19 @@ const insightSchema = {
     },
     next_step: { type: "string", maxLength: 140 },
     risk_window: { type: ["string", "null"], maxLength: 40 },
+    plan_update: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "evidence", "proposed_start_minute", "proposed_end_minute", "duration_days", "action_label"],
+      properties: {
+        title: { type: "string", maxLength: 120 },
+        evidence: { type: "string", maxLength: 180 },
+        proposed_start_minute: { type: "integer", minimum: 0, maximum: 1439 },
+        proposed_end_minute: { type: "integer", minimum: 0, maximum: 1439 },
+        duration_days: { type: "integer", minimum: 1, maximum: 14 },
+        action_label: { type: "string", maxLength: 60 },
+      },
+    },
   },
 };
 
@@ -171,6 +207,19 @@ function normalizeInsight(candidate: Record<string, any>, fallback: Record<strin
     recommendations: (recommendations.length ? recommendations : fallback.recommendations).slice(0, 3),
     next_step: cleanInsightText(source.next_step, 140) || fallback.next_step,
     risk_window: source.risk_window === null ? null : cleanText(source.risk_window, 40) || fallback.risk_window || null,
+    plan_update: normalizePlanUpdate(source.plan_update, fallback.plan_update),
+  };
+}
+
+function normalizePlanUpdate(candidate: Record<string, any>, fallback: Record<string, any>) {
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  return {
+    title: cleanInsightText(source.title, 120) || fallback.title,
+    evidence: cleanInsightText(source.evidence, 180) || fallback.evidence,
+    proposed_start_minute: Math.min(1439, Math.max(0, Math.round(cleanNumber(source.proposed_start_minute) ?? fallback.proposed_start_minute))),
+    proposed_end_minute: Math.min(1439, Math.max(0, Math.round(cleanNumber(source.proposed_end_minute) ?? fallback.proposed_end_minute))),
+    duration_days: Math.min(14, Math.max(1, Math.round(cleanNumber(source.duration_days) ?? fallback.duration_days))),
+    action_label: cleanText(source.action_label, 60) || fallback.action_label,
   };
 }
 
@@ -240,7 +289,7 @@ async function buildModelInsight(payload: Record<string, any>, fallback: Record<
         {
           role: "system",
           content:
-            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided. Do not claim medical diagnosis, therapy, or health treatment. Do not use the word coach. Every summary, pattern, recommendation, and next_step must be a complete sentence ending with punctuation. Return practical, specific, non-alarming English.",
+            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided. Do not claim medical diagnosis, therapy, or health treatment. Do not use the word coach. Every summary, pattern, recommendation, and next_step must be a complete sentence ending with punctuation. plan_update must propose one preventive daily blocking window that can reduce screen time based on the signals. Return practical, specific, non-alarming English.",
         },
         {
           role: "user",

@@ -68,6 +68,10 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(schedulePausedUntil?.timeIntervalSince1970, forKey: Keys.schedulePausedUntil) }
     }
 
+    @Published private(set) var adaptiveScheduleExpiresAt: Date? = nil {
+        didSet { defaults.set(adaptiveScheduleExpiresAt?.timeIntervalSince1970, forKey: Keys.adaptiveScheduleExpiresAt) }
+    }
+
     @Published private(set) var emergencyUnlocksThisWeek: Int {
         didSet { defaults.set(emergencyUnlocksThisWeek, forKey: Keys.emergencyUnlocksThisWeek) }
     }
@@ -128,6 +132,11 @@ final class SessionStore: ObservableObject {
             schedulePausedUntil = Date(timeIntervalSince1970: timestamp)
         } else {
             schedulePausedUntil = nil
+        }
+        if let timestamp = defaults.object(forKey: Keys.adaptiveScheduleExpiresAt) as? TimeInterval, timestamp > 0 {
+            adaptiveScheduleExpiresAt = Date(timeIntervalSince1970: timestamp)
+        } else {
+            adaptiveScheduleExpiresAt = nil
         }
 
         let currentMode = loadedFocusModes.first { $0.id == loadedModeId }
@@ -310,6 +319,17 @@ final class SessionStore: ObservableObject {
 
         guard schedule.enabled else {
             schedulePausedUntil = nil
+            adaptiveScheduleExpiresAt = nil
+            return
+        }
+
+        if let adaptiveScheduleExpiresAt, date >= adaptiveScheduleExpiresAt {
+            schedule = BlankFocusSchedule()
+            schedulePausedUntil = nil
+            self.adaptiveScheduleExpiresAt = nil
+            if isBlankActive, activeSessionStartedBySchedule {
+                _ = deactivateBlank(entryMode: .schedule, endedReason: .schedule)
+            }
             return
         }
 
@@ -417,6 +437,21 @@ final class SessionStore: ObservableObject {
             endMinute: (startMinute + 60) % (24 * 60)
         )
         schedulePausedUntil = nil
+    }
+
+    func applyAdaptivePlan(startMinute: Int, endMinute: Int, durationDays: Int) {
+        schedule = BlankFocusSchedule(
+            enabled: true,
+            startMinute: startMinute,
+            endMinute: endMinute
+        )
+        schedulePausedUntil = nil
+        adaptiveScheduleExpiresAt = Calendar.current.date(
+            byAdding: .day,
+            value: max(1, min(14, durationDays)),
+            to: Date()
+        )
+        applyScheduleWindow()
     }
 
     func renameMode(_ modeId: UUID, name: String) {
@@ -741,6 +776,7 @@ final class SessionStore: ObservableObject {
             Keys.schedule,
             Keys.deviceActivityTimerScheduled,
             Keys.schedulePausedUntil,
+            Keys.adaptiveScheduleExpiresAt,
             Keys.emergencyUnlockWeekKey,
             Keys.emergencyUnlocksThisWeek
         ].forEach { key in
@@ -773,6 +809,7 @@ final class SessionStore: ObservableObject {
         static let schedule = "blankFocusSchedule"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
         static let schedulePausedUntil = "blankSchedulePausedUntil"
+        static let adaptiveScheduleExpiresAt = "blankAdaptiveScheduleExpiresAt"
         static let emergencyUnlockWeekKey = "blankEmergencyUnlockWeekKey"
         static let emergencyUnlocksThisWeek = "blankEmergencyUnlocksThisWeek"
     }

@@ -793,6 +793,15 @@ struct DigitalWellnessPrivacyFeatures: Codable, Equatable {
     var backend_payload_type: String
 }
 
+struct DigitalWellnessPlanUpdate: Codable, Equatable {
+    var title: String
+    var evidence: String
+    var proposed_start_minute: Int
+    var proposed_end_minute: Int
+    var duration_days: Int
+    var action_label: String
+}
+
 struct DigitalWellnessRemoteInsight: Codable, Equatable {
     var schema_version: Int
     var generated_at: Date
@@ -804,6 +813,7 @@ struct DigitalWellnessRemoteInsight: Codable, Equatable {
     var next_step: String
     var risk_window: String?
     var source: String?
+    var plan_update: DigitalWellnessPlanUpdate?
 }
 
 private struct DigitalWellnessFeatureEnvelope: Encodable {
@@ -842,7 +852,15 @@ struct DigitalWellnessFeaturesClient {
                 patterns: ["Local feature payload generated without raw Health samples."],
                 recommendations: ["Configure the backend URL to sync wellness features."],
                 next_step: "Run a release-configured build.",
-                risk_window: payload.weekly.worst_focus_window
+                risk_window: payload.weekly.worst_focus_window,
+                plan_update: DigitalWellnessPlanUpdate(
+                    title: "Protect your next risk window.",
+                    evidence: "Debug build generated a local plan proposal.",
+                    proposed_start_minute: 21 * 60 + 30,
+                    proposed_end_minute: 7 * 60,
+                    duration_days: 5,
+                    action_label: "Apply preventive block"
+                )
             )
         }
         #endif

@@ -2345,7 +2345,7 @@ struct ReportView: View {
         if let hour = mostCommonValue(brokenEvents.map(\.localHour)) {
             signal = "Today sensitive window was \(hourRangeText(hour))."
         } else if let hour = mostCommonHour(from: startedEvents, sessions: todaySessions) {
-            signal = "Today you used Blank most around \(String(format: "%02d:00", hour))."
+            signal = "Today you used Blank most around \(clockTimeText(hour: hour))."
         } else if let modeName {
             signal = "Today's active mode was \(modeName)."
         } else {
@@ -2429,7 +2429,7 @@ struct ReportView: View {
         if let bedtimeDrift = healthContext.bedtimeDriftMinutes, bedtimeDrift >= 75 {
             patterns.append("Sleep timing varies by about \(bedtimeDrift) min across recent Health data.")
         } else if let bestHour {
-            patterns.append("Your most repeated window starts around \(String(format: "%02d:00", bestHour)).")
+            patterns.append("Your most repeated window starts around \(clockTimeText(hour: bestHour)).")
         } else if let bestWeekday {
             patterns.append("The highest-use day was \(weekdayDisplayName(bestWeekday)).")
         } else {
@@ -2467,7 +2467,7 @@ struct ReportView: View {
         } else if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
             recommendations.append("Keep today's block short: 25-30 min before the risky window.")
         } else if let bestHour {
-            recommendations.append("Start Blank 10 min before \(String(format: "%02d:00", bestHour)).")
+            recommendations.append("Start Blank 10 min before \(clockTimeText(hour: bestHour)).")
         } else {
             recommendations.append("Choose a fixed window to measure better.")
         }
@@ -2586,11 +2586,11 @@ struct ReportView: View {
     }
 
     private func hourRangeText(_ hour: Int) -> String {
-        "\(String(format: "%02d:00", hour))-\(String(format: "%02d:00", (hour + 1) % 24))"
+        "\(clockTimeText(hour: hour))-\(clockTimeText(hour: (hour + 1) % 24))"
     }
 
     private func activationTimeText(before hour: Int) -> String {
-        String(format: "%02d:50", (hour + 23) % 24)
+        clockTimeText(hour: (hour + 23) % 24, minute: 50)
     }
 
     private func minutesUntilNextHour(_ hour: Int, now: Date) -> Int {
@@ -2804,7 +2804,15 @@ struct ReportView: View {
         let safeMinute = max(0, min(1439, minute))
         let hour = safeMinute / 60
         let minutes = safeMinute % 60
-        return "\(String(format: "%02d", hour)):\(String(format: "%02d", minutes))"
+        return clockTimeText(hour: hour, minute: minutes)
+    }
+
+    private func clockTimeText(hour: Int, minute: Int = 0) -> String {
+        let safeHour = ((hour % 24) + 24) % 24
+        let safeMinute = max(0, min(59, minute))
+        let displayHour = safeHour % 12 == 0 ? 12 : safeHour % 12
+        let meridiem = safeHour < 12 ? "AM" : "PM"
+        return "\(displayHour):\(String(format: "%02d", safeMinute)) \(meridiem)"
     }
 
     private func currentAnonymousUserId() -> String {

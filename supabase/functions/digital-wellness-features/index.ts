@@ -60,7 +60,15 @@ function hourWindow(hour: unknown) {
   const start = Number(hour);
   if (!Number.isFinite(start)) return null;
   const end = (start + 2) % 24;
-  return `${String(start).padStart(2, "0")}:00-${String(end).padStart(2, "0")}:00`;
+  return `${clockTimeText(start)}-${clockTimeText(end)}`;
+}
+
+function clockTimeText(hour: number, minute = 0) {
+  const safeHour = ((Number(hour) % 24) + 24) % 24;
+  const safeMinute = Math.min(59, Math.max(0, Number(minute) || 0));
+  const displayHour = safeHour % 12 === 0 ? 12 : safeHour % 12;
+  const meridiem = safeHour < 12 ? "AM" : "PM";
+  return `${displayHour}:${String(safeMinute).padStart(2, "0")} ${meridiem}`;
 }
 
 function buildInsight(payload: Record<string, any>) {

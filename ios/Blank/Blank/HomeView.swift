@@ -1304,7 +1304,9 @@ private struct TimerStartSheet: View {
 private func formatMinute(_ minuteOfDay: Int) -> String {
     let hour = max(0, min(23, minuteOfDay / 60))
     let minute = max(0, min(59, minuteOfDay % 60))
-    return String(format: "%02d:%02d", hour, minute)
+    let displayHour = hour % 12 == 0 ? 12 : hour % 12
+    let meridiem = hour < 12 ? "AM" : "PM"
+    return "\(displayHour):\(String(format: "%02d", minute)) \(meridiem)"
 }
 
 private func parseMinute(_ value: String) -> Int? {

@@ -1292,7 +1292,7 @@ enum DigitalWellnessFeatureBuilder {
     }
 
     private static func timeText(_ minute: Int) -> String {
-        String(format: "%02d:%02d", minute / 60, minute % 60)
+        clockTimeText(hour: minute / 60, minute: minute % 60)
     }
 
     private static func clean(_ value: String?) -> String? {
@@ -1546,7 +1546,7 @@ enum DigitalWellnessAI {
     }
 
     static func hourRangeText(_ hour: Int) -> String {
-        "\(String(format: "%02d:00", hour))-\(String(format: "%02d:00", (hour + 1) % 24))"
+        "\(clockTimeText(hour: hour))-\(clockTimeText(hour: (hour + 1) % 24))"
     }
 
     private static func v3Profile(
@@ -1706,7 +1706,15 @@ enum DigitalWellnessAI {
     }
 
     private static func activationTimeText(before hour: Int) -> String {
-        String(format: "%02d:50", (hour + 23) % 24)
+        clockTimeText(hour: (hour + 23) % 24, minute: 50)
+    }
+
+    private static func clockTimeText(hour: Int, minute: Int = 0) -> String {
+        let safeHour = ((hour % 24) + 24) % 24
+        let safeMinute = max(0, min(59, minute))
+        let displayHour = safeHour % 12 == 0 ? 12 : safeHour % 12
+        let meridiem = safeHour < 12 ? "AM" : "PM"
+        return "\(displayHour):\(String(format: "%02d", safeMinute)) \(meridiem)"
     }
 
     private static func initialDiagnosis(

@@ -1292,7 +1292,11 @@ enum DigitalWellnessFeatureBuilder {
     }
 
     private static func timeText(_ minute: Int) -> String {
-        clockTimeText(hour: minute / 60, minute: minute % 60)
+        let safeMinuteOfDay = ((minute % (24 * 60)) + (24 * 60)) % (24 * 60)
+        let hour = safeMinuteOfDay / 60
+        let displayHour = hour % 12 == 0 ? 12 : hour % 12
+        let meridiem = hour < 12 ? "AM" : "PM"
+        return "\(displayHour):\(String(format: "%02d", safeMinuteOfDay % 60)) \(meridiem)"
     }
 
     private static func clean(_ value: String?) -> String? {

@@ -947,7 +947,7 @@ struct ReportView: View {
     private func remoteWellnessInsightCard() -> some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Label("AI plan updates", systemImage: "sparkles")
+                Label("Blanked AI", systemImage: "sparkles")
                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .headline))
                     .foregroundStyle(reportPrimary)
 

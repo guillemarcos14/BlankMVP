@@ -269,7 +269,8 @@ final class SessionStore: ObservableObject {
     }
 
     func pauseScheduleWithNfc(minutes: Int = 5) -> NfcResult {
-        schedulePausedUntil = Date().addingTimeInterval(TimeInterval(minutes * 60))
+        let now = Date()
+        schedulePausedUntil = scheduleEndDate(containing: now) ?? now.addingTimeInterval(TimeInterval(minutes * 60))
         _ = deactivateBlank(entryMode: .nfc, endedReason: .nfc)
         return .schedulePaused
     }
@@ -283,11 +284,16 @@ final class SessionStore: ObservableObject {
             return .unblanked
         }
 
+        let endedAt = Date()
+        if endedReason == .manual || endedReason == .emergency || endedReason == .nfc {
+            pauseScheduleForUserUnlock(at: endedAt)
+        }
+
         isBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
         if endedReason == .manual {
-            lastManualUnblankedAt = Date()
+            lastManualUnblankedAt = endedAt
         }
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
@@ -544,6 +550,29 @@ final class SessionStore: ObservableObject {
             minutes = (24 * 60 - schedule.startMinute) + schedule.endMinute
         }
         return max(1, minutes)
+    }
+
+    private func pauseScheduleForUserUnlock(at date: Date) {
+        guard let windowEnd = scheduleEndDate(containing: date) else { return }
+        if schedulePausedUntil == nil || schedulePausedUntil! < windowEnd {
+            schedulePausedUntil = windowEnd
+        }
+    }
+
+    private func scheduleEndDate(containing date: Date, calendar: Calendar = .current) -> Date? {
+        guard schedule.enabled, schedule.contains(date, calendar: calendar) else { return nil }
+
+        let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        let dayStart = calendar.startOfDay(for: date)
+        let endDay: Date
+
+        if schedule.startMinute >= schedule.endMinute, minute >= schedule.startMinute {
+            endDay = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
+        } else {
+            endDay = dayStart
+        }
+
+        return calendar.date(byAdding: .minute, value: schedule.endMinute, to: endDay)
     }
 
     private var currentSelectionSnapshot: BlankSelectionSnapshot {

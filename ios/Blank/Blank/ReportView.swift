@@ -137,7 +137,7 @@ struct ReportView: View {
             if usesMainBackground {
                 GeometryReader { proxy in
                     let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
-                    let contentWidth = max(0, min(viewportWidth - 52, 320))
+                    let contentWidth = max(0, min(viewportWidth - 32, 360))
 
                     ScrollView(.vertical, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 0) {
@@ -959,7 +959,7 @@ struct ReportView: View {
 
             if !remoteWellnessSummary.isEmpty {
                 aiReportSection(
-                    title: "AI Weekly Insight",
+                    title: "Weekly insight",
                     items: [remoteWellnessSummary, remoteWellnessNextStep].filter { !$0.isEmpty } + remoteRecommendationItems,
                     tint: accentBlue
                 )
@@ -1308,15 +1308,7 @@ struct ReportView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(13)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(sectionTint.opacity(0.08))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(sectionTint.opacity(0.14), lineWidth: 1)
-        }
+        .padding(.vertical, 2)
     }
 
     private func nextStepCard(progress: BlankProgressReport) -> some View {

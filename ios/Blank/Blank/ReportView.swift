@@ -498,6 +498,7 @@ struct ReportView: View {
 
             remoteWellnessInsightCard()
 
+            #if DEBUG
             Button {
                 healthKitStore.loadSyntheticAppleWatchData()
             } label: {
@@ -506,6 +507,7 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             }
             .buttonStyle(.plain)
+            #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
@@ -843,6 +845,7 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            #if DEBUG
             Button {
                 healthKitStore.loadSyntheticAppleWatchData()
             } label: {
@@ -861,6 +864,7 @@ struct ReportView: View {
                     }
             }
             .buttonStyle(.plain)
+            #endif
 
             switch healthKitStore.state {
             case .unavailable:

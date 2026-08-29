@@ -6,6 +6,7 @@ private enum HomeSection: Hashable {
     case modes
     case schedule
     case report
+    case emergency
 }
 
 struct HomeView: View {
@@ -19,13 +20,15 @@ struct HomeView: View {
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
-    @State private var showingEmergency = false
+    @State private var showingTimer = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
+    @State private var delayedManualUnlockAt: Date?
+    @State private var delayedManualUnlockTask: Task<Void, Never>?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -66,7 +69,9 @@ struct HomeView: View {
                         showingPicker: $showingPicker,
                         section: activeSection,
                         screenWidth: viewportWidth,
-                        screenHeight: viewportHeight
+                        screenHeight: viewportHeight,
+                        intervention: relapseIntervention,
+                        onEmergencyUnlock: performEmergencyUnlock
                     ) {
                         closeSection()
                     }
@@ -90,6 +95,7 @@ struct HomeView: View {
             sessionStore.syncFromSharedDefaults(now: date)
             sessionStore.applyScheduleWindow(at: date)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            updateDelayedUnlockMessage(now: date)
         }
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
@@ -119,29 +125,13 @@ struct HomeView: View {
             guard shouldScan else { return }
             openWidgetScanIfNeeded()
         }
-        .sheet(isPresented: $showingEmergency) {
-            EmergencySheet(
-                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-                intervention: relapseIntervention
-            ) {
-                let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.deactivateForEmergency()
+        .sheet(isPresented: $showingTimer) {
+            TimerStartSheet { minutes, hardMode in
+                let result = withAnimation(.easeInOut(duration: 0.65)) {
+                    sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
                 }
-                if unlocked {
-                    screenTimeBlocker.clear()
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "relapse_attempt",
-                            properties: [
-                                "source": "emergency",
-                                "remaining_after": sessionStore.emergencyUnlocksRemaining
-                            ]
-                        )
-                    }
-                    message = nil
-                    messageAction = nil
-                }
-                return unlocked
+                screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                setMessage(for: result)
             }
             .presentationDetents([.medium])
         }
@@ -183,7 +173,7 @@ struct HomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                showingEmergency = true
+                openSection(.emergency)
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
@@ -276,6 +266,8 @@ struct HomeView: View {
                 .minimumScaleFactor(0.78)
 
             bottomAction(width: actionWidth)
+
+            aiHealthShortcuts
 
             centerStatus
         }
@@ -371,7 +363,7 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? "Hold to Unblank" : "Start Blank") {
+            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Start Blank") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
@@ -384,8 +376,9 @@ struct HomeView: View {
             }
             .buttonStyle(HomeBlankButtonStyle())
             .frame(width: buttonWidth)
+            .opacity(sessionStore.hardBlankActive ? 0.86 : 1)
             .overlay(alignment: .leading) {
-                if sessionStore.isBlankActive {
+                if sessionStore.isBlankActive, !sessionStore.hardBlankActive {
                     GeometryReader { proxy in
                         Capsule()
                             .fill(Color.white.opacity(0.18))
@@ -399,26 +392,16 @@ struct HomeView: View {
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 20)
                     .onEnded { _ in
-                        guard sessionStore.isBlankActive else { return }
-                        let result = withAnimation(.easeInOut(duration: 0.65)) {
-                            sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
-                        }
-                        screenTimeBlocker.clear()
-                        Task {
-                            await BlankFunnelAnalytics.track(
-                                "relapse_attempt",
-                                properties: ["source": "hold_to_unblank"]
-                            )
-                        }
+                        guard sessionStore.isBlankActive, !sessionStore.hardBlankActive else { return }
+                        scheduleDelayedManualUnlock()
                         unblankHoldProgress = 0
                         isAnimatingUnblankHold = false
-                        setMessage(for: result)
                     }
             )
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        guard sessionStore.isBlankActive, !isAnimatingUnblankHold else { return }
+                        guard sessionStore.isBlankActive, !sessionStore.hardBlankActive, !isAnimatingUnblankHold else { return }
                         isAnimatingUnblankHold = true
                         unblankHoldProgress = 0
                         withAnimation(.linear(duration: 20)) {
@@ -432,7 +415,120 @@ struct HomeView: View {
                         }
                     }
             )
+
+            if !sessionStore.isBlankActive {
+                Button {
+                    showingTimer = true
+                } label: {
+                    Label("Timer", systemImage: "timer")
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .background {
+                            Capsule().fill(Color.white.opacity(0.14))
+                        }
+                }
+                .buttonStyle(.plain)
+            } else if sessionStore.hardBlankActive {
+                Button {
+                    openSection(.emergency)
+                } label: {
+                    Text("Emergency unlock only")
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                }
+                .buttonStyle(.plain)
+            }
         }
+    }
+
+    private var aiHealthShortcuts: some View {
+        HStack(spacing: 10) {
+            featureShortcut(title: "AI Plan", icon: "sparkles")
+            featureShortcut(title: "Health", icon: "heart.text.square.fill")
+        }
+        .frame(maxWidth: 270)
+    }
+
+    private func featureShortcut(title: String, icon: String) -> some View {
+        Button {
+            openSection(.report)
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(title)
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+            }
+            .foregroundStyle(Color.white.opacity(0.92))
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background {
+                Capsule().fill(Color.white.opacity(0.14))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func performEmergencyUnlock() -> Bool {
+        cancelDelayedManualUnlock()
+        let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
+            sessionStore.deactivateForEmergency()
+        }
+        if unlocked {
+            screenTimeBlocker.clear()
+            Task {
+                await BlankFunnelAnalytics.track(
+                    "relapse_attempt",
+                    properties: [
+                        "source": "emergency",
+                        "remaining_after": sessionStore.emergencyUnlocksRemaining
+                    ]
+                )
+            }
+            message = nil
+            messageAction = nil
+            closeSection()
+        }
+        return unlocked
+    }
+
+    private func scheduleDelayedManualUnlock() {
+        guard delayedManualUnlockTask == nil else { return }
+        let unlockAt = Date().addingTimeInterval(60)
+        delayedManualUnlockAt = unlockAt
+        updateDelayedUnlockMessage(now: Date())
+        Task {
+            await BlankFunnelAnalytics.track(
+                "relapse_attempt",
+                properties: ["source": "hold_to_unblank", "delay_seconds": 60]
+            )
+        }
+        delayedManualUnlockTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 60_000_000_000)
+            guard !Task.isCancelled else { return }
+            let result = withAnimation(.easeInOut(duration: 0.65)) {
+                sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+            }
+            screenTimeBlocker.clear()
+            delayedManualUnlockAt = nil
+            delayedManualUnlockTask = nil
+            setMessage(for: result)
+        }
+    }
+
+    private func cancelDelayedManualUnlock() {
+        delayedManualUnlockTask?.cancel()
+        delayedManualUnlockTask = nil
+        delayedManualUnlockAt = nil
+    }
+
+    private func updateDelayedUnlockMessage(now: Date) {
+        guard let delayedManualUnlockAt else { return }
+        let seconds = max(0, Int(ceil(delayedManualUnlockAt.timeIntervalSince(now))))
+        message = seconds > 0 ? "Unlocking in \(seconds)s" : "Unlocking..."
+        messageAction = nil
     }
 
     private var aiRiskNotification: some View {
@@ -635,6 +731,9 @@ struct HomeView: View {
         case .noAppsSelected:
             message = "No apps selected"
             messageAction = .selectApps
+        case .hardBlankLocked:
+            message = "Hard Blanked: use Emergency to unlock early."
+            messageAction = nil
         }
     }
 
@@ -925,6 +1024,8 @@ private struct HomeSectionScreen: View {
     let section: HomeSection
     let screenWidth: CGFloat
     let screenHeight: CGFloat
+    let intervention: RelapseIntervention
+    let onEmergencyUnlock: () -> Bool
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -966,6 +1067,12 @@ private struct HomeSectionScreen: View {
             }
         case .report:
             ReportView(usesMainBackground: true)
+        case .emergency:
+            EmergencyScreen(
+                emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
+                intervention: intervention,
+                onUnlock: onEmergencyUnlock
+            )
         }
     }
 }
@@ -974,9 +1081,7 @@ private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     let onSave: () -> Void
-    @State private var enabled = false
-    @State private var startMinute = 23 * 60 + 30
-    @State private var endMinute = 8 * 60
+    @State private var windows: [BlankHabitWindow] = []
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
@@ -985,37 +1090,51 @@ private struct ScheduleEditorContent: View {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Habits",
-                    subtitle: "Schedule when Blank starts automatically\nand save your daily routine.",
+                    subtitle: "Run more than one automatic block\nduring your day.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
 
-                    Toggle("Daily schedule", isOn: $enabled)
-                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                VStack(spacing: 12) {
+                    ForEach($windows) { $window in
+                        HabitWindowCard(
+                            window: $window,
+                            canDelete: windows.count > 1,
+                            textColor: textColor,
+                            secondaryColor: secondaryColor
+                        ) {
+                            deleteWindow(window.id)
+                        }
+                    }
+                }
+
+                Button {
+                    addWindow()
+                } label: {
+                    Label("Add habit", systemImage: "plus")
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                         .foregroundStyle(textColor)
-                        .padding(.horizontal, 18)
-                        .frame(height: 56)
-                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.22)
+                }
+                .buttonStyle(.plain)
 
-                    VStack(spacing: 10) {
-                        TimeMenuRow(title: "Start", minute: $startMinute, textColor: textColor)
-                        TimeMenuRow(title: "End", minute: $endMinute, textColor: textColor)
-                        StaticScheduleRow(title: "Days", value: "Every day", textColor: textColor)
-                    }
+                StaticScheduleRow(title: "Days", value: "Every day", textColor: textColor)
 
-                    Text("To exit earlier, use Blank or Emergency.")
-                        .font(.footnote)
-                        .foregroundStyle(secondaryColor)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 280)
-                        .padding(.top, 2)
+                Text("Scheduled blocks end automatically. Manual exits pause only the current habit window.")
+                    .font(.footnote)
+                    .foregroundStyle(secondaryColor)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 300)
+                    .padding(.top, 2)
 
-                    Button {
-                        saveSchedule()
-                    } label: {
-                        TopSheetPrimaryButtonLabel(title: "Save")
-                    }
-                    .padding(.top, 6)
+                Button {
+                    saveSchedule()
+                } label: {
+                    TopSheetPrimaryButtonLabel(title: "Save")
+                }
+                .padding(.top, 6)
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 24)
@@ -1030,20 +1149,116 @@ private struct ScheduleEditorContent: View {
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
-            enabled = sessionStore.schedule.enabled
-            startMinute = sessionStore.schedule.startMinute
-            endMinute = sessionStore.schedule.endMinute
+            windows = sessionStore.schedule.windows.isEmpty
+                ? [BlankHabitWindow(name: "Habit 1", enabled: false)]
+                : sessionStore.schedule.windows
         }
     }
 
     private func saveSchedule() {
+        let normalized = windows.enumerated().map { index, window in
+            BlankHabitWindow(
+                id: window.id,
+                name: window.name.isEmpty ? "Habit \(index + 1)" : window.name,
+                enabled: window.enabled,
+                startMinute: window.startMinute,
+                endMinute: window.endMinute
+            )
+        }
+        let first = normalized.first ?? BlankHabitWindow(enabled: false)
         sessionStore.schedule = BlankFocusSchedule(
-            enabled: enabled,
-            startMinute: startMinute,
-            endMinute: endMinute
+            enabled: normalized.contains { $0.enabled },
+            startMinute: first.startMinute,
+            endMinute: first.endMinute,
+            windows: normalized
         )
         onSave()
         dismiss()
+    }
+
+    private func addWindow() {
+        let number = windows.count + 1
+        windows.append(BlankHabitWindow(name: "Habit \(number)", enabled: true, startMinute: 9 * 60, endMinute: 10 * 60))
+    }
+
+    private func deleteWindow(_ id: UUID) {
+        guard windows.count > 1 else { return }
+        windows.removeAll { $0.id == id }
+    }
+}
+
+private struct HabitWindowCard: View {
+    @Binding var window: BlankHabitWindow
+    let canDelete: Bool
+    let textColor: Color
+    let secondaryColor: Color
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                TextField("Habit", text: $window.name)
+                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(textColor)
+
+                Toggle("", isOn: $window.enabled)
+                    .labelsHidden()
+
+                if canDelete {
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(secondaryColor)
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 12) {
+                WheelTimePicker(title: "Start", minute: $window.startMinute, textColor: textColor, secondaryColor: secondaryColor)
+                WheelTimePicker(title: "End", minute: $window.endMinute, textColor: textColor, secondaryColor: secondaryColor)
+            }
+        }
+        .padding(16)
+        .blankGlassCard(cornerRadius: 18, tintOpacity: window.enabled ? 0.30 : 0.18)
+    }
+}
+
+private struct WheelTimePicker: View {
+    let title: String
+    @Binding var minute: Int
+    let textColor: Color
+    let secondaryColor: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                Spacer()
+                Text(formatMinute(minute))
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(textColor)
+                    .monospacedDigit()
+            }
+
+            DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .frame(height: 96)
+                .clipped()
+                .colorScheme(.dark)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var dateBinding: Binding<Date> {
+        Binding(
+            get: { dateForMinute(minute) },
+            set: { minute = minuteOfDay(from: $0) }
+        )
     }
 }
 
@@ -1124,35 +1339,94 @@ private struct ForgetBlankConfirmSheet: View {
     }
 }
 
-private struct EmergencySheet: View {
-    @Environment(\.dismiss) private var dismiss
+private struct EmergencyScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     let emergencyUnlocksRemaining: Int
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
+    @State private var isConfirming = false
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        TechnicalSettingsSheetLayout {
-            TechnicalSheetTitle("Emergency")
-            TechnicalSheetDescription(intervention.headline, emphasized: true)
-            TechnicalSheetDescription(intervention.cost)
-            TechnicalSheetDescription(intervention.alternative, emphasized: true)
-            TechnicalSheetDescription("This turns Blank off without the normal hold and unlocks protected apps. Use it only if you need access now.")
-            TechnicalSheetDescription(emergencyUnlocksRemaining > 0 ? "You have \(emergencyUnlocksRemaining) unlocks left this week." : "You have used your 3 unlocks this week.", emphasized: true)
-            TechnicalSheetActions {
-                Button("Unlock") {
-                    if onUnlock() {
-                        dismiss()
+        List {
+            VStack(alignment: .center, spacing: 18) {
+                TopSheetHeader(
+                    title: isConfirming ? "Are you sure?" : "Emergency",
+                    subtitle: isConfirming
+                        ? "This will use 1 emergency unlock."
+                        : "Use only when you need access now.",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+
+                if isConfirming {
+                    VStack(spacing: 10) {
+                        emergencyMetric(title: "Remaining after unlock", value: "\(max(0, emergencyUnlocksRemaining - 1))")
+                        emergencyMetric(title: "This week", value: "\(3 - emergencyUnlocksRemaining)/3 used")
                     }
+                    .padding(.top, 4)
+
+                    Button("Use emergency") {
+                        _ = onUnlock()
+                    }
+                    .buttonStyle(BlankPrimaryButtonStyle())
+                    .disabled(emergencyUnlocksRemaining <= 0)
+
+                    Button("Keep blocking") {
+                        isConfirming = false
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(secondaryColor)
+                } else {
+                    VStack(spacing: 10) {
+                        emergencyMetric(title: "Unlocks left", value: "\(emergencyUnlocksRemaining)")
+                        emergencyMetric(title: "AI read", value: intervention.headline)
+                        emergencyMetric(title: "Better next step", value: intervention.alternative)
+                    }
+
+                    Button("Spend emergency") {
+                        isConfirming = true
+                    }
+                    .buttonStyle(BlankPrimaryButtonStyle())
+                    .disabled(emergencyUnlocksRemaining <= 0 || !sessionStore.isBlankActive)
+
+                    Text(sessionStore.isBlankActive ? intervention.cost : "Emergency unlocks are available while a block is active.")
+                        .font(.footnote)
+                        .foregroundStyle(secondaryColor)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 300)
                 }
-                .buttonStyle(BlankPrimaryButtonStyle())
-                .disabled(emergencyUnlocksRemaining <= 0)
-                Button("Cancel") {
-                    dismiss()
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .padding(.bottom, 34)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private func emergencyMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(secondaryColor)
+            Text(value)
+                .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                .foregroundStyle(textColor)
+                .lineLimit(2)
+                .minimumScaleFactor(0.76)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .frame(minHeight: 62)
+        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
     }
 }
 
@@ -1264,20 +1538,27 @@ private struct TechnicalSheetActions<Content: View>: View {
 
 private struct TimerStartSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let onStart: (Int) -> Void
+    @State private var hardMode = false
+    let onStart: (Int, Bool) -> Void
     private let options = [15, 30, 45, 60, 90, 120]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("Timer")
                 .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text("Blank turns off automatically when the timer ends. To exit earlier, use Blank or Emergency.")
+            Text(hardMode ? "Hard Blanked ends when the timer finishes. Early exit spends an emergency." : "Blank turns off automatically when the timer ends.")
                 .foregroundStyle(.secondary)
+
+            Toggle("Hard Blanked", isOn: $hardMode)
+                .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
+                .padding(.horizontal, 18)
+                .frame(height: 56)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(options, id: \.self) { minutes in
                     Button(formatDuration(minutes)) {
-                        onStart(minutes)
+                        onStart(minutes, hardMode)
                         dismiss()
                     }
                     .buttonStyle(BlankSecondaryButtonStyle())

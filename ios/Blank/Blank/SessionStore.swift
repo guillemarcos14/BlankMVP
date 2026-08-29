@@ -28,6 +28,10 @@ final class SessionStore: ObservableObject {
         }
     }
 
+    @Published var hardBlankActive: Bool {
+        didSet { defaults.set(hardBlankActive, forKey: Keys.hardBlankActive) }
+    }
+
     @Published var nfcTagUid: String? {
         didSet { defaults.set(nfcTagUid, forKey: Keys.nfcTagUid) }
     }
@@ -104,6 +108,7 @@ final class SessionStore: ObservableObject {
         } else {
             blankActiveUntil = nil
         }
+        hardBlankActive = defaults.bool(forKey: Keys.hardBlankActive)
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
         let loadedSelection = Self.loadSelection(from: defaults)
@@ -227,6 +232,9 @@ final class SessionStore: ObservableObject {
         }
 
         if isBlankActive {
+            if hardBlankActive {
+                return .hardBlankLocked
+            }
             if schedule.enabled, schedule.contains(Date()) {
                 return pauseScheduleWithNfc()
             }
@@ -239,6 +247,7 @@ final class SessionStore: ObservableObject {
     func activateBlank(
         forceStarted: Bool = false,
         durationMinutes: Int? = nil,
+        hardMode: Bool = false,
         entryMode: BlankEntryMode = .app
     ) -> NfcResult {
         guard hasSelectedApps else {
@@ -253,6 +262,7 @@ final class SessionStore: ObservableObject {
         }
 
         isBlankActive = true
+        hardBlankActive = hardMode
         blankActiveSince = Date()
         if let durationMinutes, durationMinutes > 0 {
             blankActiveUntil = Date().addingTimeInterval(TimeInterval(durationMinutes * 60))
@@ -285,11 +295,15 @@ final class SessionStore: ObservableObject {
         }
 
         let endedAt = Date()
+        if hardBlankActive, endedReason != .emergency, endedReason != .timer, endedReason != .expired, endedReason != .schedule {
+            return .hardBlankLocked
+        }
         if endedReason == .manual || endedReason == .emergency || endedReason == .nfc {
             pauseScheduleForUserUnlock(at: endedAt)
         }
 
         isBlankActive = false
+        hardBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
         if endedReason == .manual {
@@ -323,7 +337,7 @@ final class SessionStore: ObservableObject {
             return
         }
 
-        guard schedule.enabled else {
+        guard schedule.enabled, !schedule.activeWindows.isEmpty else {
             schedulePausedUntil = nil
             adaptiveScheduleExpiresAt = nil
             return
@@ -349,10 +363,10 @@ final class SessionStore: ObservableObject {
             self.schedulePausedUntil = nil
         }
 
-        if schedule.contains(date) {
+        if let activeWindow = schedule.window(containing: date) {
             _ = activateBlank(
                 forceStarted: true,
-                durationMinutes: schedulePlannedDurationMinutes,
+                durationMinutes: activeWindow.remainingMinutes(from: date),
                 entryMode: .schedule
             )
         } else if isBlankActive, activeSessionStartedBySchedule {
@@ -364,6 +378,7 @@ final class SessionStore: ObservableObject {
         endActiveSession(entryMode: .app, endedReason: .unknown, broken: true)
         nfcTagUid = nil
         isBlankActive = false
+        hardBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
@@ -396,6 +411,9 @@ final class SessionStore: ObservableObject {
         }
         if blankActiveUntil != activeState.endsAt {
             blankActiveUntil = activeState.endsAt
+        }
+        if !activeState.isActive, hardBlankActive {
+            hardBlankActive = false
         }
 
         let sharedSessions = Self.loadSessions(from: defaults)
@@ -440,7 +458,10 @@ final class SessionStore: ObservableObject {
         schedule = BlankFocusSchedule(
             enabled: true,
             startMinute: startMinute,
-            endMinute: (startMinute + 60) % (24 * 60)
+            endMinute: (startMinute + 60) % (24 * 60),
+            windows: [
+                BlankHabitWindow(name: "AI Plan", enabled: true, startMinute: startMinute, endMinute: (startMinute + 60) % (24 * 60))
+            ]
         )
         schedulePausedUntil = nil
     }
@@ -449,7 +470,10 @@ final class SessionStore: ObservableObject {
         schedule = BlankFocusSchedule(
             enabled: true,
             startMinute: startMinute,
-            endMinute: endMinute
+            endMinute: endMinute,
+            windows: [
+                BlankHabitWindow(name: "AI Plan", enabled: true, startMinute: startMinute, endMinute: endMinute)
+            ]
         )
         schedulePausedUntil = nil
         adaptiveScheduleExpiresAt = Calendar.current.date(
@@ -542,16 +566,6 @@ final class SessionStore: ObservableObject {
         )
     }
 
-    private var schedulePlannedDurationMinutes: Int {
-        let minutes: Int
-        if schedule.startMinute < schedule.endMinute {
-            minutes = schedule.endMinute - schedule.startMinute
-        } else {
-            minutes = (24 * 60 - schedule.startMinute) + schedule.endMinute
-        }
-        return max(1, minutes)
-    }
-
     private func pauseScheduleForUserUnlock(at date: Date) {
         guard let windowEnd = scheduleEndDate(containing: date) else { return }
         if schedulePausedUntil == nil || schedulePausedUntil! < windowEnd {
@@ -560,19 +574,19 @@ final class SessionStore: ObservableObject {
     }
 
     private func scheduleEndDate(containing date: Date, calendar: Calendar = .current) -> Date? {
-        guard schedule.enabled, schedule.contains(date, calendar: calendar) else { return nil }
+        guard schedule.enabled, let window = schedule.window(containing: date, calendar: calendar) else { return nil }
 
         let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
         let dayStart = calendar.startOfDay(for: date)
         let endDay: Date
 
-        if schedule.startMinute >= schedule.endMinute, minute >= schedule.startMinute {
+        if window.startMinute >= window.endMinute, minute >= window.startMinute {
             endDay = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
         } else {
             endDay = dayStart
         }
 
-        return calendar.date(byAdding: .minute, value: schedule.endMinute, to: endDay)
+        return calendar.date(byAdding: .minute, value: window.endMinute, to: endDay)
     }
 
     private var currentSelectionSnapshot: BlankSelectionSnapshot {
@@ -795,6 +809,7 @@ final class SessionStore: ObservableObject {
             Keys.isBlankActive,
             Keys.blankActiveSince,
             Keys.blankActiveUntil,
+            Keys.hardBlankActive,
             Keys.nfcTagUid,
             Keys.setupComplete,
             Keys.selection,
@@ -822,12 +837,14 @@ final class SessionStore: ObservableObject {
         case schedulePaused
         case wrongTag
         case noAppsSelected
+        case hardBlankLocked
     }
 
     private enum Keys {
         static let isBlankActive = BlankSharedState.Keys.isBlankActive
         static let blankActiveSince = BlankSharedState.Keys.blankActiveSince
         static let blankActiveUntil = BlankSharedState.Keys.blankActiveUntil
+        static let hardBlankActive = "blankHardBlankActive"
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection
@@ -942,6 +959,7 @@ extension SessionStore {
         store.schedule = schedule
         store.schedulePausedUntil = schedulePausedUntil
         store.isBlankActive = isBlankActive
+        store.hardBlankActive = false
         store.blankActiveSince = isBlankActive ? Date().addingTimeInterval(-24 * 60) : nil
         store.blankActiveUntil = timedUntil
         store.deviceActivityTimerScheduled = timedUntil != nil

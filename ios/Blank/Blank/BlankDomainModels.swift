@@ -336,23 +336,119 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
     }
 }
 
-struct BlankFocusSchedule: Codable, Equatable {
+struct BlankHabitWindow: Codable, Identifiable, Equatable {
+    var id: UUID
+    var name: String
     var enabled: Bool
     var startMinute: Int
     var endMinute: Int
 
-    init(enabled: Bool = false, startMinute: Int = 23 * 60 + 30, endMinute: Int = 8 * 60) {
+    init(
+        id: UUID = UUID(),
+        name: String = "Habit",
+        enabled: Bool = true,
+        startMinute: Int = 23 * 60 + 30,
+        endMinute: Int = 8 * 60
+    ) {
+        self.id = id
+        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Habit"
+            : name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.enabled = enabled
         self.startMinute = min(max(startMinute, 0), 1439)
         self.endMinute = min(max(endMinute, 0), 1439)
     }
 
     func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        guard enabled else { return false }
         let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
         if startMinute < endMinute {
             return minute >= startMinute && minute < endMinute
         }
         return minute >= startMinute || minute < endMinute
+    }
+
+    var durationMinutes: Int {
+        if startMinute < endMinute {
+            return max(1, endMinute - startMinute)
+        }
+        return max(1, (24 * 60 - startMinute) + endMinute)
+    }
+
+    func remainingMinutes(from date: Date, calendar: Calendar = .current) -> Int {
+        let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        let remaining: Int
+        if startMinute < endMinute {
+            remaining = endMinute - minute
+        } else if minute >= startMinute {
+            remaining = (24 * 60 - minute) + endMinute
+        } else {
+            remaining = endMinute - minute
+        }
+        return max(1, remaining)
+    }
+}
+
+struct BlankFocusSchedule: Codable, Equatable {
+    var enabled: Bool
+    var startMinute: Int
+    var endMinute: Int
+    var windows: [BlankHabitWindow]
+
+    init(
+        enabled: Bool = false,
+        startMinute: Int = 23 * 60 + 30,
+        endMinute: Int = 8 * 60,
+        windows: [BlankHabitWindow]? = nil
+    ) {
+        self.enabled = enabled
+        self.startMinute = min(max(startMinute, 0), 1439)
+        self.endMinute = min(max(endMinute, 0), 1439)
+        if let windows {
+            self.windows = windows
+        } else if enabled {
+            self.windows = [
+                BlankHabitWindow(name: "Habit 1", enabled: true, startMinute: self.startMinute, endMinute: self.endMinute)
+            ]
+        } else {
+            self.windows = []
+        }
+    }
+
+    var activeWindows: [BlankHabitWindow] {
+        windows.filter(\.enabled)
+    }
+
+    func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
+        activeWindows.contains { $0.contains(date, calendar: calendar) }
+    }
+
+    func window(containing date: Date, calendar: Calendar = .current) -> BlankHabitWindow? {
+        activeWindows.first { $0.contains(date, calendar: calendar) }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case startMinute
+        case endMinute
+        case windows
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        startMinute = min(max(try container.decodeIfPresent(Int.self, forKey: .startMinute) ?? 23 * 60 + 30, 0), 1439)
+        endMinute = min(max(try container.decodeIfPresent(Int.self, forKey: .endMinute) ?? 8 * 60, 0), 1439)
+        let decodedWindows = try container.decodeIfPresent([BlankHabitWindow].self, forKey: .windows)
+        if let decodedWindows, !decodedWindows.isEmpty {
+            windows = decodedWindows
+        } else if enabled {
+            windows = [
+                BlankHabitWindow(name: "Habit 1", enabled: true, startMinute: startMinute, endMinute: endMinute)
+            ]
+        } else {
+            windows = []
+        }
     }
 }
 

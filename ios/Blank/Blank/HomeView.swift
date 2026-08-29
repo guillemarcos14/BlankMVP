@@ -936,7 +936,7 @@ private struct ModesList: View {
                     .foregroundStyle(textColor)
                     .padding(.horizontal, 18)
                     .frame(height: 56)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
+                    .blankInlineField(lineOpacity: 0.22)
 
                 Button {
                     sessionStore.createMode(named: newModeName)
@@ -967,7 +967,7 @@ private struct ModesList: View {
                 .foregroundStyle(textColor)
                 .padding(.horizontal, 18)
                 .frame(height: 56)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
+                .blankInlinePanel(lineOpacity: 0.8)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
@@ -1007,7 +1007,7 @@ private struct ModesList: View {
             .foregroundStyle(isSelected ? textColor.opacity(0.84) : textColor)
             .padding(.horizontal, 18)
             .frame(height: 68)
-            .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
+            .blankInlinePanel(lineOpacity: isSelected ? 1 : 0.55)
         }
         .buttonStyle(.plain)
     }
@@ -1116,7 +1116,7 @@ private struct ScheduleEditorContent: View {
                         .foregroundStyle(textColor)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.22)
+                        .blankInlinePanel(lineOpacity: 0.62)
                 }
                 .buttonStyle(.plain)
 
@@ -1221,7 +1221,7 @@ private struct HabitWindowCard: View {
             }
         }
         .padding(16)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: window.enabled ? 0.30 : 0.18)
+        .blankInlinePanel(lineOpacity: window.enabled ? 0.85 : 0.45)
     }
 }
 
@@ -1278,7 +1278,7 @@ private struct StaticScheduleRow: View {
         .foregroundStyle(textColor)
         .padding(.horizontal, 18)
         .frame(height: 56)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
+        .blankInlinePanel(lineOpacity: 0.75)
     }
 }
 
@@ -1308,7 +1308,7 @@ private struct TimeMenuRow: View {
             .foregroundStyle(textColor)
             .padding(.horizontal, 18)
             .frame(height: 56)
-            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
+            .blankInlinePanel(lineOpacity: 0.75)
         }
     }
 }
@@ -1426,7 +1426,7 @@ private struct EmergencyScreen: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18)
         .frame(minHeight: 62)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+        .blankInlinePanel(lineOpacity: 0.72)
     }
 }
 
@@ -1553,7 +1553,7 @@ private struct TimerStartSheet: View {
                 .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
                 .padding(.horizontal, 18)
                 .frame(height: 56)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+                .blankInlinePanel(lineOpacity: 0.72)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ForEach(options, id: \.self) { minutes in

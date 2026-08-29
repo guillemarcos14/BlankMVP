@@ -354,13 +354,10 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, minHeight: usesMainBackground ? 60 : 72, alignment: .leading)
         .padding(.horizontal, usesMainBackground ? 6 : 12)
         .padding(.vertical, usesMainBackground ? 8 : 10)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(tint.opacity(0.10))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(tint.opacity(0.16), lineWidth: 1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(tint.opacity(0.28))
+                .frame(height: 1)
         }
     }
 
@@ -446,13 +443,15 @@ struct ReportView: View {
             }
         }
         .padding(14)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(forecastColor(forecast.level).opacity(0.10))
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(forecastColor(forecast.level).opacity(0.24))
+                .frame(height: 1)
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(forecastColor(forecast.level).opacity(0.18), lineWidth: 1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(forecastColor(forecast.level).opacity(0.16))
+                .frame(height: 0.8)
         }
     }
 
@@ -1577,13 +1576,10 @@ struct ReportView: View {
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 12)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(reportPrimary.opacity(0.05))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(reportPrimary.opacity(0.065), lineWidth: 1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(reportPrimary.opacity(0.08))
+                .frame(height: 0.8)
         }
     }
 
@@ -1723,7 +1719,11 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, minHeight: minHeight)
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
-        .liquidGlass(cornerRadius: 24)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(reportPrimary.opacity(0.08))
+                .frame(height: 0.8)
+        }
     }
 
     private func savedSeries(from days: [BlankActivityDay]) -> [TimeInterval] {
@@ -3055,23 +3055,16 @@ private struct ReportLiquidBackground: View {
 private extension View {
     func liquidGlass(cornerRadius: CGFloat) -> some View {
         self
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.18))
-                    BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .opacity(0.58)
-                }
-                .allowsHitTesting(false)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(BlankColors.glassBorder.opacity(0.58))
+                    .frame(height: 0.8)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 0.8)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(BlankColors.glassBorder.opacity(0.34))
+                    .frame(height: 0.8)
             }
-            .shadow(color: BlankColors.ink.opacity(0.038), radius: 18, x: 0, y: 10)
     }
 }
 

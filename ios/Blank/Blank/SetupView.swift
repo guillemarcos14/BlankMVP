@@ -394,7 +394,7 @@ struct SetupView: View {
                     .multilineTextAlignment(.leading)
                     .padding(.horizontal, 18)
                     .frame(height: 54)
-                    .blankInlineField(lineOpacity: 0.22)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.34)
                     .frame(maxWidth: 280, alignment: .leading)
             )
         )
@@ -982,15 +982,13 @@ struct SetupView: View {
         }
         .foregroundStyle(Color.white.opacity(0.90))
         .padding(14)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.white.opacity(0.16))
-                .frame(height: 0.8)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.08))
         }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.white.opacity(0.12))
-                .frame(height: 0.8)
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.13), lineWidth: 1)
         }
     }
 
@@ -2075,10 +2073,13 @@ private struct OnboardingInsightCard: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.white.opacity(0.18))
-                .frame(height: 0.8)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
     }
 }
@@ -2110,10 +2111,13 @@ private struct OnboardingPlanPreviewRow: View {
             Spacer(minLength: 0)
         }
         .padding(16)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.white.opacity(0.18))
-                .frame(height: 0.8)
+        .background {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(Color.white.opacity(0.09))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         }
     }
 }
@@ -2170,11 +2174,19 @@ private struct OnboardingChoiceButton: View {
             }
             .padding(.horizontal, 18)
             .frame(minHeight: 58)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.14))
-                    .frame(height: selected ? 1.4 : 0.8)
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                }
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+            }
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -2381,11 +2393,19 @@ private struct PlanButton: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 17)
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.14))
-                    .frame(height: selected ? 1.4 : 0.8)
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                }
             }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+            }
+            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)

@@ -161,48 +161,9 @@ private struct BlankGlassCardModifier: ViewModifier {
     }
 }
 
-private struct BlankInlinePanelModifier: ViewModifier {
-    let lineOpacity: Double
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(BlankColors.glassBorder.opacity(lineOpacity))
-                    .frame(height: 0.8)
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(BlankColors.glassBorder.opacity(lineOpacity * 0.72))
-                    .frame(height: 0.8)
-            }
-    }
-}
-
-private struct BlankInlineFieldModifier: ViewModifier {
-    let lineOpacity: Double
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(BlankColors.ink.opacity(lineOpacity))
-                    .frame(height: 1)
-            }
-    }
-}
-
 extension View {
     func blankGlassCard(cornerRadius: CGFloat = 22, tintOpacity: Double = 0.34) -> some View {
         modifier(BlankGlassCardModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity))
-    }
-
-    func blankInlinePanel(lineOpacity: Double = 1) -> some View {
-        modifier(BlankInlinePanelModifier(lineOpacity: lineOpacity))
-    }
-
-    func blankInlineField(lineOpacity: Double = 0.18) -> some View {
-        modifier(BlankInlineFieldModifier(lineOpacity: lineOpacity))
     }
 }
 

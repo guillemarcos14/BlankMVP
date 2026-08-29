@@ -38,7 +38,7 @@ struct MembershipActivationView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 18)
                         .frame(height: 54)
-                        .blankInlineField(lineOpacity: 0.22)
+                        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.38)
                         .padding(.top, 18)
                         .frame(maxWidth: 314)
 

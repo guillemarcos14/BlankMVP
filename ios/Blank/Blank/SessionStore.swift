@@ -484,6 +484,28 @@ final class SessionStore: ObservableObject {
         applyScheduleWindow()
     }
 
+    func applyAIPlan(durationMinutes: Int? = nil) {
+        let system = digitalWellnessV3
+        let startMinute = (system.plan.recommendedStartHour * 60 + (24 * 60 - 10)) % (24 * 60)
+        let duration = durationMinutes ?? system.plan.recommendedDurationMinutes
+        let endMinute = (startMinute + max(15, min(120, duration))) % (24 * 60)
+        applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: 7)
+    }
+
+    func recordRelapseReview(_ reason: RelapseReviewReason) {
+        defaults.set(reason.rawValue, forKey: "blankLastRelapseReviewReason")
+        defaults.set(Date().timeIntervalSince1970, forKey: "blankLastRelapseReviewAt")
+        Task {
+            await BlankFunnelAnalytics.track(
+                "relapse_review_submitted",
+                properties: [
+                    "reason": reason.rawValue,
+                    "adjustment": reason.planAdjustment
+                ]
+            )
+        }
+    }
+
     func renameMode(_ modeId: UUID, name: String) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanName.isEmpty else { return }

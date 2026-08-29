@@ -638,9 +638,9 @@ struct ReportView: View {
     private func v3SystemCapsule(system: DigitalWellnessV3System) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Adaptive Plan")
+                Text("AI Focus Plan")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
-                Text(system.weeklyInsight)
+                Text("Today: \(system.plan.recommendedDurationMinutes) min before \(system.forecast.riskWindow)")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -665,6 +665,90 @@ struct ReportView: View {
                     .foregroundStyle(reportPrimary.opacity(0.86))
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            HStack(spacing: 8) {
+                Button {
+                    startBlank(durationMinutes: system.plan.recommendedDurationMinutes)
+                } label: {
+                    Text("Start now")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    sessionStore.applyAIPlan(durationMinutes: system.plan.recommendedDurationMinutes)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_ai_plan"]
+                        )
+                    }
+                } label: {
+                    Text("Apply week")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background { Capsule().fill(accentBlue.opacity(0.22)) }
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    let easierDuration = max(15, system.plan.recommendedDurationMinutes - 15)
+                    sessionStore.applyAIPlan(durationMinutes: easierDuration)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_make_easier", "duration_minutes": easierDuration]
+                        )
+                    }
+                } label: {
+                    Text("Easier")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background { Capsule().fill(Color.white.opacity(0.12)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    let harderDuration = min(120, system.plan.recommendedDurationMinutes + 15)
+                    sessionStore.applyAIPlan(durationMinutes: harderDuration)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_make_harder", "duration_minutes": harderDuration]
+                        )
+                    }
+                } label: {
+                    Text("Harder")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background { Capsule().fill(Color.white.opacity(0.12)) }
+                }
+                .buttonStyle(.plain)
+            }
+
+            aiReportSection(
+                title: "Weak Hours",
+                items: system.weakWindows.map { "\($0.windowText): \($0.reason)" },
+                tint: activityOrange
+            )
+
+            aiReportSection(
+                title: "Relapse Review",
+                items: [system.relapseReview],
+                tint: accentBlue
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)

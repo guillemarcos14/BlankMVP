@@ -1443,6 +1443,54 @@ struct RelapseIntervention: Equatable {
     var alternative: String
 }
 
+enum RelapseReviewReason: String, CaseIterable, Identifiable, Codable {
+    case bored
+    case anxious
+    case tired
+    case neededApp
+    case procrastinating
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .bored: return "Bored"
+        case .anxious: return "Anxious"
+        case .tired: return "Tired"
+        case .neededApp: return "Needed app"
+        case .procrastinating: return "Procrastinating"
+        case .other: return "Other"
+        }
+    }
+
+    var planAdjustment: String {
+        switch self {
+        case .neededApp:
+            return "Keep the block shorter and review whether that app belongs in this mode."
+        case .tired:
+            return "Move protection earlier and use sleep difficulty tonight."
+        case .bored:
+            return "Start the block before idle time begins."
+        case .anxious:
+            return "Use a shorter recovery block with extra friction."
+        case .procrastinating:
+            return "Protect the transition before work starts."
+        case .other:
+            return "Repeat this window once more before changing the plan."
+        }
+    }
+}
+
+struct AIWeakWindow: Identifiable, Equatable {
+    var hour: Int
+    var count: Int
+    var reason: String
+
+    var id: Int { hour }
+    var windowText: String { DigitalWellnessAI.hourRangeText(hour) }
+}
+
 struct DigitalWellnessV3Profile: Equatable {
     var archetype: String
     var primaryGoal: String
@@ -1482,6 +1530,8 @@ struct DigitalWellnessV3System: Equatable {
     var plan: AdaptiveFocusPlan
     var forecast: DigitalWellnessV3Forecast
     var relapseIntervention: RelapseIntervention
+    var weakWindows: [AIWeakWindow]
+    var relapseReview: String
     var dailySummary: String
     var weeklyInsight: String
 }
@@ -1640,6 +1690,8 @@ enum DigitalWellnessAI {
             plan: plan,
             forecast: forecast,
             relapseIntervention: relapse,
+            weakWindows: weakWindows(events: events, sessions: sessions, diagnosis: diagnosis, now: now),
+            relapseReview: relapseReviewText(defaults: defaults, profile: profile),
             dailySummary: dailySummary(profile: profile, plan: plan),
             weeklyInsight: weeklyInsight(profile: profile, forecast: forecast)
         )
@@ -1669,6 +1721,10 @@ enum DigitalWellnessAI {
 
     static func hourRangeText(_ hour: Int) -> String {
         "\(clockTimeText(hour: hour)) to \(clockTimeText(hour: (hour + 1) % 24))"
+    }
+
+    static func interventionNotificationText(system: DigitalWellnessV3System) -> String {
+        "Your weak window starts soon. Block \(system.profile.dominantModeName ?? "distractions") for \(system.plan.recommendedDurationMinutes) min?"
     }
 
     private static func v3Profile(
@@ -1815,6 +1871,67 @@ enum DigitalWellnessAI {
 
     private static func weeklyInsight(profile: DigitalWellnessV3Profile, forecast: DigitalWellnessV3Forecast) -> String {
         "Score \(profile.adherenceScore)/100, confidence \(profile.confidence)%. Next risk: \(forecast.riskWindow)."
+    }
+
+    private static func weakWindows(
+        events: [BlankUsageEvent],
+        sessions: [BlankSession],
+        diagnosis: DigitalWellnessDiagnosis,
+        now: Date
+    ) -> [AIWeakWindow] {
+        let calendar = Calendar.current
+        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
+        let eventHours = events
+            .filter { event in
+                event.occurredAt >= weekStart &&
+                event.occurredAt <= now &&
+                (event.kind == .blockBroken || event.endedReason == .emergency || event.endedReason == .manual)
+            }
+            .map(\.localHour)
+        let sessionHours = sessions
+            .filter { session in
+                let end = session.endedAt ?? now
+                return session.startedAt <= now &&
+                    end >= weekStart &&
+                    (session.endedReason == .emergency || session.endedReason == .manual)
+            }
+            .compactMap(\.localStartHour)
+        let counted = (eventHours + sessionHours).reduce(into: [Int: Int]()) { $0[$1, default: 0] += 1 }
+        let ranked = counted.sorted { lhs, rhs in
+            lhs.value == rhs.value ? lhs.key < rhs.key : lhs.value > rhs.value
+        }
+
+        let windows = ranked.prefix(3).map { hour, count in
+            AIWeakWindow(hour: hour, count: count, reason: weakWindowReason(hour: hour, count: count))
+        }
+        if windows.isEmpty {
+            return [
+                AIWeakWindow(hour: diagnosis.recommendedHour, count: 0, reason: "Predicted from onboarding until Blanked has enough real relapse data.")
+            ]
+        }
+        return windows
+    }
+
+    private static func weakWindowReason(hour: Int, count: Int) -> String {
+        let daypart: String
+        switch hour {
+        case 5..<10: daypart = "morning checking"
+        case 10..<17: daypart = "work or study avoidance"
+        case 17..<21: daypart = "transition time"
+        case 21...23, 0..<2: daypart = "night scrolling"
+        default: daypart = "low-energy scrolling"
+        }
+        return count > 0
+            ? "\(count) break signal\(count == 1 ? "" : "s") point to \(daypart)."
+            : "Predicted \(daypart) risk."
+    }
+
+    private static func relapseReviewText(defaults: UserDefaults, profile: DigitalWellnessV3Profile) -> String {
+        guard let raw = defaults.string(forKey: "blankLastRelapseReviewReason"),
+              let reason = RelapseReviewReason(rawValue: raw) else {
+            return "After the next manual unlock, Blanked will ask why and adjust this plan."
+        }
+        return "\(reason.title): \(reason.planAdjustment)"
     }
 
     private static func weeklyGoal(profile: DigitalWellnessV3Profile) -> String {

@@ -22,6 +22,7 @@ const ALLOWED_EVENTS = new Set([
   "block_started",
   "block_ended",
   "relapse_attempt",
+  "relapse_review_submitted",
   "health_permission_requested",
   "health_permission_result",
   "ai_insight_requested",

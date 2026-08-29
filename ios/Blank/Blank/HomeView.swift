@@ -1,6 +1,7 @@
 import FamilyControls
 import SwiftUI
 import UIKit
+import UserNotifications
 
 private enum HomeSection: Hashable {
     case modes
@@ -29,6 +30,7 @@ struct HomeView: View {
     @State private var isAnimatingUnblankHold = false
     @State private var delayedManualUnlockAt: Date?
     @State private var delayedManualUnlockTask: Task<Void, Never>?
+    @State private var showingRelapseReview = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -103,6 +105,7 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
+            scheduleDailyInterventionIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -111,6 +114,7 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
+            scheduleDailyInterventionIfNeeded()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
@@ -144,6 +148,22 @@ struct HomeView: View {
                 sessionStore.forgetNfcTag()
                 screenTimeBlocker.clear()
             }
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingRelapseReview) {
+            RelapseReviewSheet(
+                intervention: relapseIntervention,
+                onSelect: { reason in
+                    sessionStore.recordRelapseReview(reason)
+                    sessionStore.applyAIPlan()
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "relapse_review", "reason": reason.rawValue]
+                        )
+                    }
+                }
+            )
             .presentationDetents([.medium])
         }
     }
@@ -265,6 +285,10 @@ struct HomeView: View {
                 .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
+            if !sessionStore.isBlankActive, purchaseStore.hasPremiumAccess {
+                aiPlanHomeCard(width: actionWidth)
+            }
+
             bottomAction(width: actionWidth)
 
             aiHealthShortcuts
@@ -272,6 +296,97 @@ struct HomeView: View {
             centerStatus
         }
         .frame(maxWidth: maxWidth)
+    }
+
+    private func aiPlanHomeCard(width: CGFloat) -> some View {
+        let system = aiSystem
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Today")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                Spacer()
+                Text(system.plan.difficulty)
+                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+                    .padding(.horizontal, 8)
+                    .frame(height: 24)
+                    .background { Capsule().fill(Color.white.opacity(0.14)) }
+            }
+            .foregroundStyle(Color.white.opacity(0.88))
+
+            Text("\(system.plan.recommendedDurationMinutes) min before \(system.forecast.riskWindow)")
+                .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                .foregroundStyle(Color.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+
+            Text(system.forecast.reason)
+                .font(.blankInter(size: 12, relativeTo: .caption))
+                .foregroundStyle(Color.white.opacity(0.68))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button {
+                    let result = withAnimation(.easeInOut(duration: 0.65)) {
+                        sessionStore.activateBlank(durationMinutes: system.plan.recommendedDurationMinutes)
+                    }
+                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    setMessage(for: result)
+                } label: {
+                    Text("Start")
+                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(BlankColors.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background { Capsule().fill(Color.white.opacity(0.86)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    sessionStore.applyAIPlan()
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "home_ai_plan"]
+                        )
+                    }
+                    message = "AI Plan applied to Habits."
+                    messageAction = nil
+                } label: {
+                    Text("Apply")
+                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(Color.white.opacity(0.92))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background { Capsule().fill(Color.white.opacity(0.14)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    openSection(.schedule)
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.92))
+                        .frame(width: 42, height: 34)
+                        .background { Capsule().fill(Color.white.opacity(0.14)) }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .frame(width: min(width, 330), alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.black.opacity(0.14))
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        }
     }
 
     private func configCard(_ issues: [ConfigIssue]) -> some View {
@@ -490,6 +605,7 @@ struct HomeView: View {
             message = nil
             messageAction = nil
             closeSection()
+            showingRelapseReview = true
         }
         return unlocked
     }
@@ -515,6 +631,7 @@ struct HomeView: View {
             delayedManualUnlockAt = nil
             delayedManualUnlockTask = nil
             setMessage(for: result)
+            showingRelapseReview = true
         }
     }
 
@@ -614,6 +731,38 @@ struct HomeView: View {
 
     private var riskWindowText: String {
         aiSystem.forecast.riskWindow
+    }
+
+    private func scheduleDailyInterventionIfNeeded() {
+        guard !sessionStore.isBlankActive,
+              purchaseStore.hasPremiumAccess,
+              aiSystem.forecast.minutesUntilRisk > 15,
+              aiSystem.forecast.minutesUntilRisk <= 180 else {
+            return
+        }
+
+        let defaults = BlankSharedState.defaults
+        let dayKey = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? 0
+        let scheduledKey = "blankLastAIInterventionNotificationDay"
+        guard defaults.integer(forKey: scheduledKey) != dayKey else { return }
+        let system = aiSystem
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Blanked"
+            content.body = DigitalWellnessAI.interventionNotificationText(system: system)
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(
+                timeInterval: TimeInterval(max(60, (system.forecast.minutesUntilRisk - 15) * 60)),
+                repeats: false
+            )
+            let request = UNNotificationRequest(identifier: "blank-ai-daily-intervention", content: content, trigger: trigger)
+            UNUserNotificationCenter.current().add(request) { error in
+                guard error == nil else { return }
+                defaults.set(dayKey, forKey: scheduledKey)
+            }
+        }
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -1336,6 +1485,61 @@ private struct ForgetBlankConfirmSheet: View {
                 .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private struct RelapseReviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let intervention: RelapseIntervention
+    let onSelect: (RelapseReviewReason) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Relapse review", systemImage: "sparkles")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(BlankColors.mutedInk)
+
+                Text("Why now?")
+                    .font(.blankInter(size: 30, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(BlankColors.ink)
+
+                Text(intervention.alternative)
+                    .font(.blankInter(size: 14, relativeTo: .subheadline))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(RelapseReviewReason.allCases) { reason in
+                    Button {
+                        onSelect(reason)
+                        dismiss()
+                    } label: {
+                        Text(reason.title)
+                            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(BlankColors.ink)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.white.opacity(0.78))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Button("Skip") {
+                dismiss()
+            }
+            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+            .foregroundStyle(BlankColors.mutedInk)
+            .frame(maxWidth: .infinity)
+            .buttonStyle(.plain)
+        }
+        .padding(24)
+        .background(BlankColors.background.ignoresSafeArea())
     }
 }
 

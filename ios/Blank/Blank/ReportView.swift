@@ -67,6 +67,7 @@ struct ReportView: View {
             sessions: sessionStore.sessions,
             diagnosis: diagnosis
         )
+        let v3System = sessionStore.digitalWellnessV3
 
         let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
@@ -79,7 +80,17 @@ struct ReportView: View {
                     context: healthContext
                 )
 
-                v3SystemCapsule(system: sessionStore.digitalWellnessV3)
+                v3SystemCapsule(system: v3System)
+
+                aiWellnessExpansionCapsule(
+                    expansion: aiWellnessExpansion(
+                        system: v3System,
+                        progress: progress,
+                        context: healthContext,
+                        forecast: controlForecast,
+                        diagnosis: diagnosis
+                    )
+                )
 
                 healthAccessCapsule()
 
@@ -654,6 +665,31 @@ struct ReportView: View {
                     .foregroundStyle(reportPrimary.opacity(0.86))
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func aiWellnessExpansionCapsule(expansion: AIWellnessExpansion) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AI Digital Wellness")
+                    .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
+                Text(expansion.scoreCaption)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                statCapsule(title: "Wellness score", value: "\(expansion.score)/100", caption: "Weekly control", minHeight: 84)
+                statCapsule(title: "Sleep mode", value: expansion.sleepModeValue, caption: expansion.sleepModeCaption, minHeight: 84)
+            }
+
+            aiReportSection(title: "Digital triggers", items: expansion.triggers, tint: activityOrange)
+            aiReportSection(title: "Relapse review", items: expansion.relapseReview, tint: accentBlue)
+            aiReportSection(title: "Sleep protection", items: expansion.sleepProtectionPlan, tint: sleepBlue)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
@@ -1914,6 +1950,107 @@ struct ReportView: View {
         return "Repeat your strongest window one more day before changing the plan."
     }
 
+    private func aiWellnessExpansion(
+        system: DigitalWellnessV3System,
+        progress: BlankProgressReport,
+        context: HealthRecoveryContext,
+        forecast: ControlForecast,
+        diagnosis: DigitalWellnessDiagnosis
+    ) -> AIWellnessExpansion {
+        let events = sessionStore.usageEvents
+        let sessions = sessionStore.sessions
+        let calendar = Calendar.current
+        let now = Date()
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let recentEvents = events.filter { $0.occurredAt >= weekAgo && $0.occurredAt <= now }
+        let recentSessions = sessions.filter { session in
+            let end = session.endedAt ?? now
+            return session.startedAt <= now && end >= weekAgo
+        }
+        let manualExits = recentEvents.filter { $0.endedReason == .manual }
+        let emergencyExits = recentEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }
+        let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
+        let wellnessScore = digitalWellnessScore(system: system, context: context, forecast: forecast)
+        let scoreCaption: String
+        if wellnessScore >= 75 {
+            scoreCaption = "Strong week. Keep the plan stable before making it harder."
+        } else if wellnessScore >= 50 {
+            scoreCaption = "Useful signal. Your plan should stay simple this week."
+        } else {
+            scoreCaption = "Recovery week. Reduce friction and protect one clear window."
+        }
+
+        var triggers: [String] = []
+        triggers.append("\(DigitalWellnessAI.hourRangeText(weakHour)) is the main risk window Blanked is tracking.")
+        if let riskyDay = riskiestDay(activityDays: progress.recentActivity) {
+            triggers.append("\(weekdayName(for: riskyDay.date)) is the day with the strongest recent pattern.")
+        }
+        if sessionStore.selectionCount < 3 {
+            triggers.append("Your app list is still light; add the apps that most often restart the loop.")
+        } else {
+            triggers.append("Selected apps are stable enough to test behavior before changing the list.")
+        }
+
+        let averageManualMinutes = average(manualExits.compactMap { event in
+            event.duration.map { Int($0 / 60) }
+        })
+        var relapseReview: [String] = []
+        if manualExits.isEmpty && emergencyExits.isEmpty {
+            relapseReview.append("No relapse signal this week. Completed blocks are setting the baseline.")
+        } else {
+            relapseReview.append("\(manualExits.count) hold-to-unblank exit\(manualExits.count == 1 ? "" : "s") and \(emergencyExits.count) emergency signal\(emergencyExits.count == 1 ? "" : "s") this week.")
+        }
+        if let averageManualMinutes {
+            relapseReview.append("Average protection before a hold exit is \(averageManualMinutes) min.")
+        } else {
+            relapseReview.append("After a hold exit, Blanked waits 60s before unlocking and records the signal.")
+        }
+        relapseReview.append(recentSessions.count >= 3 ? "Review result: keep the same mode for the next 3 starts." : "Review result: collect 3 starts before changing the plan.")
+
+        let hasSleepRisk = context.averageSleepMinutes.map { $0 < 6 * 60 + 30 } == true ||
+            context.bedtimeDriftMinutes.map { $0 >= 75 } == true ||
+            weakHour >= 21 ||
+            weakHour <= 2
+        let sleepModeValue = hasSleepRisk ? "On" : "Watch"
+        let sleepModeCaption = hasSleepRisk ? DigitalWellnessAI.hourRangeText(max(0, weakHour)) : "Learning"
+        let startText = activationTimeText(before: weakHour)
+        let sleepPlan: [String]
+        if hasSleepRisk {
+            sleepPlan = [
+                "Start sleep protection at \(startText) and keep it through the weak window.",
+                "If the next morning feels better, repeat the same window for 3 nights.",
+                "Use lighter blocks after short sleep instead of increasing difficulty."
+            ]
+        } else {
+            sleepPlan = [
+                "Blanked has not found a strong sleep-risk pattern yet.",
+                "Protect one evening window this week so the signal becomes comparable.",
+                "Connect Apple Health for optional sleep context."
+            ]
+        }
+
+        return AIWellnessExpansion(
+            score: wellnessScore,
+            scoreCaption: scoreCaption,
+            triggers: Array(triggers.prefix(3)),
+            relapseReview: Array(relapseReview.prefix(3)),
+            sleepModeValue: sleepModeValue,
+            sleepModeCaption: sleepModeCaption,
+            sleepProtectionPlan: sleepPlan
+        )
+    }
+
+    private func digitalWellnessScore(
+        system: DigitalWellnessV3System,
+        context: HealthRecoveryContext,
+        forecast: ControlForecast
+    ) -> Int {
+        let adherence = system.profile.adherenceScore
+        let riskControl = max(0, 100 - forecast.riskPercent)
+        let recovery = context.recoveryScore ?? 62
+        return min(100, max(0, Int(Double(adherence) * 0.45 + Double(riskControl) * 0.35 + Double(recovery) * 0.20)))
+    }
+
     private func healthControlForecast(
         context: HealthRecoveryContext,
         events: [BlankUsageEvent],
@@ -2864,6 +3001,16 @@ private struct HealthRecoveryContext {
     let bedtimeDriftMinutes: Int?
     let wakeDriftMinutes: Int?
     let recoveryScore: Int?
+}
+
+private struct AIWellnessExpansion {
+    let score: Int
+    let scoreCaption: String
+    let triggers: [String]
+    let relapseReview: [String]
+    let sleepModeValue: String
+    let sleepModeCaption: String
+    let sleepProtectionPlan: [String]
 }
 
 private struct ControlForecast {

@@ -28,6 +28,7 @@ const ALLOWED_EVENTS = new Set([
   "ai_insight_requested",
   "ai_insight_received",
   "ai_plan_applied",
+  "agent_plan_applied",
 ]);
 
 function cleanText(value, maxLength = 160) {

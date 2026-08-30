@@ -34,7 +34,7 @@ struct HomeView: View {
     @State private var showingRelapseReview = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
+    private let homeTagline = "Ready to focus?"
     private let riskBlankMinutes = 30
 
     private var aiSystem: DigitalWellnessV3System {
@@ -58,13 +58,16 @@ struct HomeView: View {
                         .position(x: layout.centerX, y: layout.topBarCenterY)
                         .zIndex(2)
 
-                    topNotificationPanel
+                    topHomePanel(width: layout.actionWidth)
                         .padding(.horizontal, layout.horizontalPadding)
                         .padding(.top, layout.configTopPadding)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
                     centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
                         .position(x: layout.centerX, y: layout.messageCenterY)
+
+                    bottomShortcutBar(width: layout.actionWidth)
+                        .position(x: layout.centerX, y: layout.bottomShortcutCenterY)
                 }
 
                 if let activeSection {
@@ -306,34 +309,25 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private var topNotificationPanel: some View {
+    private func topHomePanel(width: CGFloat) -> some View {
         let issues = configIssues
         if !issues.isEmpty {
             configCard(issues)
-        } else if shouldShowRiskNotification {
-            aiRiskNotification
+        } else if !sessionStore.isBlankActive, purchaseStore.hasPremiumAccess {
+            aiPlanHomeCard(width: width)
         }
     }
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
-        VStack(spacing: 22) {
+        VStack(spacing: 28) {
             Text(homeTagline)
-                .font(.blankInter(size: 32.4, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineSpacing(-2)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
-
-            if !sessionStore.isBlankActive, purchaseStore.hasPremiumAccess {
-                aiPlanHomeCard(width: actionWidth)
-            }
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
 
             bottomAction(width: actionWidth)
-
-            aiHealthShortcuts
-
-            centerStatus
         }
         .frame(maxWidth: maxWidth)
     }
@@ -365,7 +359,7 @@ struct HomeView: View {
             Text(system.forecast.reason)
                 .font(.blankInter(size: 12, relativeTo: .caption))
                 .foregroundStyle(Color.white.opacity(0.68))
-                .lineLimit(2)
+                .lineLimit(1)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
@@ -393,7 +387,7 @@ struct HomeView: View {
                             properties: ["source": "home_ai_plan"]
                         )
                     }
-                    message = "AI Plan applied to Habits."
+                    message = "Blanked AI applied to Habits."
                     messageAction = nil
                 } label: {
                     Text("Apply")
@@ -420,12 +414,12 @@ struct HomeView: View {
         .padding(14)
         .frame(width: min(width, 330), alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black.opacity(0.14))
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.black.opacity(0.10))
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
         }
     }
 
@@ -571,21 +565,7 @@ struct HomeView: View {
                     }
             )
 
-            if !sessionStore.isBlankActive {
-                Button {
-                    showingTimer = true
-                } label: {
-                    Label("Timer", systemImage: "timer")
-                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(Color.white.opacity(0.88))
-                        .padding(.horizontal, 14)
-                        .frame(height: 38)
-                        .background {
-                            Capsule().fill(Color.white.opacity(0.14))
-                        }
-                }
-                .buttonStyle(.plain)
-            } else if sessionStore.hardBlankActive {
+            if sessionStore.hardBlankActive {
                 Button {
                     openSection(.emergency)
                 } label: {
@@ -598,30 +578,35 @@ struct HomeView: View {
         }
     }
 
-    private var aiHealthShortcuts: some View {
-        HStack(spacing: 10) {
-            featureShortcut(title: "AI Plan", icon: "sparkles")
-            featureShortcut(title: "Health", icon: "heart.text.square.fill")
+    private func bottomShortcutBar(width: CGFloat) -> some View {
+        HStack(spacing: 0) {
+            footerShortcut(title: "Timer", icon: "timer") {
+                showingTimer = true
+            }
+            footerShortcut(title: "Blanked AI", icon: "sparkles") {
+                openSection(.report)
+            }
+            footerShortcut(title: "Health", icon: "heart.text.square.fill") {
+                openSection(.report)
+            }
         }
-        .frame(maxWidth: 270)
+        .frame(width: min(width, 330), height: 44)
     }
 
-    private func featureShortcut(title: String, icon: String) -> some View {
-        Button {
-            openSection(.report)
-        } label: {
-            HStack(spacing: 7) {
+    private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                 Text(title)
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
             }
-            .foregroundStyle(Color.white.opacity(0.92))
+            .foregroundStyle(Color.white.opacity(0.72))
             .frame(maxWidth: .infinity)
-            .frame(height: 38)
-            .background {
-                Capsule().fill(Color.white.opacity(0.14))
-            }
+            .frame(height: 44)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -872,7 +857,7 @@ struct HomeView: View {
         case .screenTime:
             Task { @MainActor in
                 let approved = await screenTimeBlocker.requestAuthorization()
-                message = approved ? "Screen Time authorized." : "Screen Time is still pending."
+                message = approved ? nil : "Screen Time is still pending."
                 messageAction = approved ? nil : .screenTime
             }
         case .relinkNfc:
@@ -982,6 +967,7 @@ private struct HomeLayoutMetrics {
     let centerX: CGFloat
     let topBarCenterY: CGFloat
     let messageCenterY: CGFloat
+    let bottomShortcutCenterY: CGFloat
 
     init(size: CGSize, safeAreaInsets: EdgeInsets) {
         let width = max(size.width, 320)
@@ -996,6 +982,7 @@ private struct HomeLayoutMetrics {
         centerX = width / 2
         topBarCenterY = topPadding + 47 / 2
         messageCenterY = height * 0.52
+        bottomShortcutCenterY = height - bottomPadding - 22
     }
 }
 

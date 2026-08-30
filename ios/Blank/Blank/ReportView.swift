@@ -619,6 +619,8 @@ struct ReportView: View {
                     metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
                     metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
                 }
+
+                aiReportSection(title: "Milestones", items: focusMilestones(weekly: weekly, progress: progress), tint: recoveryGreen)
             }
             .padding(.top, 10)
         } label: {
@@ -1730,6 +1732,26 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .liquidGlass(cornerRadius: 22)
+    }
+
+    private func focusMilestones(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> [String] {
+        var milestones: [String] = []
+        if progress.currentStreakDays >= 3 {
+            milestones.append("\(progress.currentStreakDays)-day streak active.")
+        } else {
+            milestones.append("Reach 3 days in a row to unlock your first streak milestone.")
+        }
+        if weekly.completedSessionCount >= 5 {
+            milestones.append("Weekly rhythm: \(weekly.completedSessionCount) sessions completed.")
+        } else {
+            milestones.append("\(max(0, 5 - weekly.completedSessionCount)) sessions to a weekly rhythm milestone.")
+        }
+        if weekly.totalFocusTime >= 3 * 60 * 60 {
+            milestones.append("Deep week: \(formatDuration(weekly.totalFocusTime)) protected.")
+        } else {
+            milestones.append("Protect \(formatDuration(max(0, 3 * 60 * 60 - weekly.totalFocusTime))) more for a deep week.")
+        }
+        return milestones
     }
 
     private func insightText(totalSessionCount: Int, savedTime: TimeInterval, progress: BlankProgressReport) -> String {

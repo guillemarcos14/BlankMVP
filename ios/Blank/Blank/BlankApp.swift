@@ -22,7 +22,12 @@ struct BlankApp: App {
                         await membershipStore.refreshIfNeeded()
                     }
                     await screenTimeBlocker.restore(selection: sessionStore.selection)
+                    screenTimeBlocker.updateAdvancedControls(
+                        allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
+                        adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
+                    )
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    sessionStore.refreshDailyLimitMonitoring()
                 }
                 .task {
                     await purchaseStore.observeTransactionUpdates()
@@ -35,6 +40,11 @@ struct BlankApp: App {
                             }
                         }
                         screenTimeBlocker.refreshAuthorizationStatus()
+                        screenTimeBlocker.updateAdvancedControls(
+                            allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
+                            adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
+                        )
+                        sessionStore.refreshDailyLimitMonitoring()
                     }
                 }
                 .onOpenURL { url in
@@ -45,6 +55,16 @@ struct BlankApp: App {
                         sessionStore.requestBlankScanFromWidget()
                     } else if url.host == "configure-block" {
                         sessionStore.requestBlockConfiguration()
+                    } else if url.host == "start" || url.host == "start-blank" {
+                        _ = sessionStore.activateBlank(entryMode: .app)
+                        screenTimeBlocker.updateAdvancedControls(
+                            allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
+                            adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
+                        )
+                        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    } else if url.host == "stop" || url.host == "stop-blank" {
+                        _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual, broken: true)
+                        screenTimeBlocker.clear()
                     }
                 }
         }

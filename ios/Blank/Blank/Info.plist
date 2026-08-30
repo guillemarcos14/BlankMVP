@@ -47,6 +47,8 @@
 	<string>Blanked reads Apple Health data you allow, including sleep, steps, workouts, mindful minutes, heart rate, resting heart rate, HRV and energy, to generate digital wellness insights. It does not provide medical diagnosis.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Blanked does not write data to Apple Health.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Blanked uses Face ID or your device passcode to protect advanced blocking settings when you enable PIN protection.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

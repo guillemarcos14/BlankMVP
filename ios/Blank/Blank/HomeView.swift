@@ -1,4 +1,5 @@
 import FamilyControls
+import LocalAuthentication
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -101,7 +102,7 @@ struct HomeView: View {
         }
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            applyScreenTimeControls()
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
@@ -110,7 +111,7 @@ struct HomeView: View {
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             sessionStore.syncFromSharedDefaults()
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            applyScreenTimeControls()
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
@@ -119,6 +120,13 @@ struct HomeView: View {
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
+            sessionStore.refreshDailyLimitMonitoring()
+        }
+        .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
+            applyScreenTimeControls()
+        }
+        .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
+            applyScreenTimeControls()
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
@@ -258,7 +266,36 @@ struct HomeView: View {
     }
 
     private func openSection(_ section: HomeSection) {
+        if section == .modes, sessionStore.pinProtectionEnabled {
+            unlockAdvancedSettings {
+                activeSection = section
+            }
+            return
+        }
         activeSection = section
+    }
+
+    private func unlockAdvancedSettings(onSuccess: @escaping () -> Void) {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            message = "Device passcode is required for PIN protection."
+            messageAction = nil
+            return
+        }
+        context.evaluatePolicy(
+            .deviceOwnerAuthentication,
+            localizedReason: "Unlock Blanked advanced settings."
+        ) { success, _ in
+            Task { @MainActor in
+                if success {
+                    onSuccess()
+                } else {
+                    message = "Advanced settings stayed locked."
+                    messageAction = nil
+                }
+            }
+        }
     }
 
     private func closeSection() {
@@ -584,6 +621,15 @@ struct HomeView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func applyScreenTimeControls() {
+        screenTimeBlocker.updateAdvancedControls(
+            allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
+            adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
+        )
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        sessionStore.refreshDailyLimitMonitoring()
     }
 
     private func performEmergencyUnlock() -> Bool {
@@ -1121,6 +1167,19 @@ private struct ModesList: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
             .padding(.top, 16)
+            .padding(.bottom, 8)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            AdvancedModeControls(
+                showingPicker: $showingPicker,
+                onFinish: onFinish,
+                textColor: textColor,
+                secondaryColor: secondaryColor
+            )
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
             .padding(.bottom, 34)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
@@ -1164,6 +1223,112 @@ private struct ModesList: View {
     private var blockedAppsText: String {
         let count = sessionStore.selectionCount
         return "\(count) \(count == 1 ? "app" : "apps") blocked"
+    }
+}
+
+private struct AdvancedModeControls: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    @Binding var showingPicker: Bool
+    let onFinish: () -> Void
+    let textColor: Color
+    let secondaryColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Advanced")
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .headline))
+                .foregroundStyle(secondaryColor)
+
+            Toggle("Allow Only", isOn: $sessionStore.allowOnlyModeEnabled)
+                .advancedControlStyle(textColor: textColor)
+
+            Toggle("Adult website filter", isOn: $sessionStore.adultContentBlockingEnabled)
+                .advancedControlStyle(textColor: textColor)
+
+            Toggle("PIN protection", isOn: $sessionStore.pinProtectionEnabled)
+                .advancedControlStyle(textColor: textColor)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle("Daily time limit", isOn: $sessionStore.dailyLimitEnabled)
+                    .advancedControlStyle(textColor: textColor)
+
+                if sessionStore.dailyLimitEnabled {
+                    Stepper(value: $sessionStore.dailyLimitMinutes, in: 5...240, step: 5) {
+                        HStack {
+                            Text("Limit")
+                            Spacer()
+                            Text("\(sessionStore.dailyLimitMinutes) min")
+                                .monospacedDigit()
+                        }
+                    }
+                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(textColor)
+                    .padding(.horizontal, 18)
+                    .frame(height: 52)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(shortcutsText)
+                    .font(.caption)
+                    .foregroundStyle(secondaryColor)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    shortcutPill("Start URL", value: "blank://start")
+                    shortcutPill("Stop URL", value: "blank://stop")
+                }
+            }
+            .padding(.top, 2)
+
+            if sessionStore.allowOnlyModeEnabled && sessionStore.selection.applicationTokens.isEmpty && sessionStore.selection.webDomainTokens.isEmpty {
+                Button {
+                    showingPicker = true
+                    onFinish()
+                } label: {
+                    Text("Choose allowed apps")
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(textColor)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var shortcutsText: String {
+        "Shortcuts can run Blanked with Open URL actions. Use the URLs below with app, Focus, time, or location automations."
+    }
+
+    private func shortcutPill(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(secondaryColor)
+            Text(value)
+                .font(.caption.monospaced())
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .frame(height: 52)
+        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.18)
+    }
+}
+
+private extension View {
+    func advancedControlStyle(textColor: Color) -> some View {
+        self
+            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.24)
     }
 }
 
@@ -1271,6 +1436,11 @@ private struct ScheduleEditorContent: View {
 
                 StaticScheduleRow(title: "Days", value: "Every day", textColor: textColor)
 
+                VacationModeCard(
+                    textColor: textColor,
+                    secondaryColor: secondaryColor
+                )
+
                 Text("Scheduled blocks end automatically. Manual exits pause only the current habit window.")
                     .font(.footnote)
                     .foregroundStyle(secondaryColor)
@@ -1333,6 +1503,67 @@ private struct ScheduleEditorContent: View {
     private func deleteWindow(_ id: UUID) {
         guard windows.count > 1 else { return }
         windows.removeAll { $0.id == id }
+    }
+}
+
+private struct VacationModeCard: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    let textColor: Color
+    let secondaryColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Vacation Mode")
+                        .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
+                        .foregroundStyle(textColor)
+                    Text(statusText)
+                        .font(.caption)
+                        .foregroundStyle(secondaryColor)
+                }
+                Spacer()
+                if sessionStore.isVacationModeActive {
+                    Button("Off") {
+                        sessionStore.disableVacationMode()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(textColor)
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if !sessionStore.isVacationModeActive {
+                HStack(spacing: 10) {
+                    vacationButton("Today", hours: 24)
+                    vacationButton("Weekend", hours: 72)
+                    vacationButton("Week", hours: 168)
+                }
+            }
+        }
+        .padding(16)
+        .blankGlassCard(cornerRadius: 18, tintOpacity: sessionStore.isVacationModeActive ? 0.32 : 0.20)
+    }
+
+    private var statusText: String {
+        guard let until = sessionStore.vacationModeUntil, until > Date() else {
+            return "Pause Habits and daily limits temporarily."
+        }
+        return "Paused until \(formatMinute(minuteOfDay(from: until)))."
+    }
+
+    private func vacationButton(_ title: String, hours: Int) -> some View {
+        Button {
+            sessionStore.enableVacationMode(hours: hours)
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(textColor)
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+                .blankGlassCard(cornerRadius: 14, tintOpacity: 0.20)
+        }
+        .buttonStyle(.plain)
     }
 }
 

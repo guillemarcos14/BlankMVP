@@ -9,6 +9,8 @@ final class ScreenTimeBlocker: ObservableObject {
 
     private let store = ManagedSettingsStore()
     private var selection = FamilyActivitySelection()
+    private var allowOnlyModeEnabled = false
+    private var adultContentBlockingEnabled = false
     #if DEBUG
     private var usesPreviewAuthorizationStatus = false
     #endif
@@ -71,15 +73,30 @@ final class ScreenTimeBlocker: ObservableObject {
         apply(isBlankActive: isBlankActive)
     }
 
+    func updateAdvancedControls(allowOnlyModeEnabled: Bool, adultContentBlockingEnabled: Bool) {
+        self.allowOnlyModeEnabled = allowOnlyModeEnabled
+        self.adultContentBlockingEnabled = adultContentBlockingEnabled
+    }
+
     func apply(isBlankActive: Bool) {
         guard isBlankActive else {
             clear()
             return
         }
 
-        store.shield.applications = selection.applicationTokens
-        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
-        store.shield.webDomains = selection.webDomainTokens
+        if allowOnlyModeEnabled {
+            store.shield.applications = nil
+            store.shield.webDomains = nil
+            store.shield.applicationCategories = .all(except: selection.applicationTokens)
+            store.shield.webDomainCategories = .all(except: selection.webDomainTokens)
+        } else {
+            store.shield.applications = selection.applicationTokens
+            store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+            store.shield.webDomains = selection.webDomainTokens
+            store.shield.webDomainCategories = nil
+        }
+
+        store.webContent.blockedByFilter = adultContentBlockingEnabled ? .auto() : nil
     }
 
     func clear() {

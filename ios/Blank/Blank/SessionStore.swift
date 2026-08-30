@@ -32,6 +32,48 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(hardBlankActive, forKey: Keys.hardBlankActive) }
     }
 
+    @Published var allowOnlyModeEnabled: Bool {
+        didSet { defaults.set(allowOnlyModeEnabled, forKey: Keys.allowOnlyModeEnabled) }
+    }
+
+    @Published var adultContentBlockingEnabled: Bool {
+        didSet { defaults.set(adultContentBlockingEnabled, forKey: Keys.adultContentBlockingEnabled) }
+    }
+
+    @Published var dailyLimitEnabled: Bool {
+        didSet {
+            defaults.set(dailyLimitEnabled, forKey: Keys.dailyLimitEnabled)
+            refreshDailyLimitMonitoring()
+        }
+    }
+
+    @Published var dailyLimitMinutes: Int {
+        didSet {
+            let clamped = min(max(dailyLimitMinutes, 5), 240)
+            if dailyLimitMinutes != clamped {
+                dailyLimitMinutes = clamped
+                return
+            }
+            defaults.set(dailyLimitMinutes, forKey: Keys.dailyLimitMinutes)
+            refreshDailyLimitMonitoring()
+        }
+    }
+
+    @Published var vacationModeUntil: Date? {
+        didSet {
+            defaults.set(vacationModeUntil?.timeIntervalSince1970, forKey: Keys.vacationModeUntil)
+            refreshDailyLimitMonitoring()
+        }
+    }
+
+    @Published var pinProtectionEnabled: Bool {
+        didSet { defaults.set(pinProtectionEnabled, forKey: Keys.pinProtectionEnabled) }
+    }
+
+    @Published var focusSoundscapeEnabled: Bool {
+        didSet { defaults.set(focusSoundscapeEnabled, forKey: Keys.focusSoundscapeEnabled) }
+    }
+
     @Published var nfcTagUid: String? {
         didSet { defaults.set(nfcTagUid, forKey: Keys.nfcTagUid) }
     }
@@ -109,6 +151,18 @@ final class SessionStore: ObservableObject {
             blankActiveUntil = nil
         }
         hardBlankActive = defaults.bool(forKey: Keys.hardBlankActive)
+        allowOnlyModeEnabled = defaults.bool(forKey: Keys.allowOnlyModeEnabled)
+        adultContentBlockingEnabled = defaults.bool(forKey: Keys.adultContentBlockingEnabled)
+        dailyLimitEnabled = defaults.bool(forKey: Keys.dailyLimitEnabled)
+        let storedDailyLimit = defaults.integer(forKey: Keys.dailyLimitMinutes)
+        dailyLimitMinutes = storedDailyLimit > 0 ? min(max(storedDailyLimit, 5), 240) : 30
+        if let timestamp = defaults.object(forKey: Keys.vacationModeUntil) as? TimeInterval, timestamp > 0 {
+            vacationModeUntil = Date(timeIntervalSince1970: timestamp)
+        } else {
+            vacationModeUntil = nil
+        }
+        pinProtectionEnabled = defaults.bool(forKey: Keys.pinProtectionEnabled)
+        focusSoundscapeEnabled = defaults.bool(forKey: Keys.focusSoundscapeEnabled)
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
         let loadedSelection = Self.loadSelection(from: defaults)
@@ -161,6 +215,11 @@ final class SessionStore: ObservableObject {
 
     var hasSelectedApps: Bool {
         selectionCount > 0
+    }
+
+    var isVacationModeActive: Bool {
+        guard let vacationModeUntil else { return false }
+        return vacationModeUntil > Date()
     }
 
     var selectionCount: Int {
@@ -331,6 +390,16 @@ final class SessionStore: ObservableObject {
         resetEmergencyUnlocksIfNeeded(for: date)
         BlankSharedState.finishExpiredBlock(defaults: defaults, now: date)
 
+        if let vacationModeUntil {
+            if date < vacationModeUntil {
+                if isBlankActive, activeSessionStartedBySchedule {
+                    _ = deactivateBlank(entryMode: .schedule, endedReason: .schedule)
+                }
+                return
+            }
+            self.vacationModeUntil = nil
+        }
+
         if let blankActiveUntil, isBlankActive, date >= blankActiveUntil {
             let reason: BlankEndedReason = activeSession?.plannedDurationMinutes == nil ? .expired : .timer
             _ = deactivateBlank(entryMode: activeSession?.entryMode ?? .app, endedReason: reason)
@@ -490,6 +559,26 @@ final class SessionStore: ObservableObject {
         let duration = durationMinutes ?? system.plan.recommendedDurationMinutes
         let endMinute = (startMinute + max(15, min(120, duration))) % (24 * 60)
         applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: 7)
+    }
+
+    func enableVacationMode(hours: Int) {
+        vacationModeUntil = Date().addingTimeInterval(TimeInterval(max(1, min(168, hours)) * 60 * 60))
+        if isBlankActive, activeSessionStartedBySchedule {
+            _ = deactivateBlank(entryMode: .schedule, endedReason: .schedule)
+        }
+    }
+
+    func disableVacationMode() {
+        vacationModeUntil = nil
+        applyScheduleWindow()
+    }
+
+    func refreshDailyLimitMonitoring() {
+        guard dailyLimitEnabled, !isVacationModeActive, hasSelectedApps else {
+            DeviceActivityTimerScheduler.stopDailyLimit()
+            return
+        }
+        _ = DeviceActivityTimerScheduler.startDailyLimit(selection: selection, thresholdMinutes: dailyLimitMinutes)
     }
 
     func recordRelapseReview(_ reason: RelapseReviewReason) {
@@ -832,6 +921,13 @@ final class SessionStore: ObservableObject {
             Keys.blankActiveSince,
             Keys.blankActiveUntil,
             Keys.hardBlankActive,
+            Keys.allowOnlyModeEnabled,
+            Keys.adultContentBlockingEnabled,
+            Keys.dailyLimitEnabled,
+            Keys.dailyLimitMinutes,
+            Keys.vacationModeUntil,
+            Keys.pinProtectionEnabled,
+            Keys.focusSoundscapeEnabled,
             Keys.nfcTagUid,
             Keys.setupComplete,
             Keys.selection,
@@ -867,6 +963,13 @@ final class SessionStore: ObservableObject {
         static let blankActiveSince = BlankSharedState.Keys.blankActiveSince
         static let blankActiveUntil = BlankSharedState.Keys.blankActiveUntil
         static let hardBlankActive = "blankHardBlankActive"
+        static let allowOnlyModeEnabled = "blankAllowOnlyModeEnabled"
+        static let adultContentBlockingEnabled = "blankAdultContentBlockingEnabled"
+        static let dailyLimitEnabled = "blankDailyLimitEnabled"
+        static let dailyLimitMinutes = "blankDailyLimitMinutes"
+        static let vacationModeUntil = "blankVacationModeUntil"
+        static let pinProtectionEnabled = "blankPinProtectionEnabled"
+        static let focusSoundscapeEnabled = "blankFocusSoundscapeEnabled"
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection

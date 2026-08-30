@@ -2,10 +2,13 @@ import Foundation
 
 #if canImport(DeviceActivity)
 import DeviceActivity
+import FamilyControls
 #endif
 
 enum DeviceActivityTimerScheduler {
     static let strategyActivityPrefix = "BlankStrategyTimer"
+    static let dailyLimitActivity = "BlankDailyLimit"
+    static let dailyLimitEvent = "BlankDailyLimitReached"
 
     static func start(modeId: UUID, durationMinutes: Int) -> Bool {
         guard durationMinutes > 0 else { return false }
@@ -40,6 +43,42 @@ enum DeviceActivityTimerScheduler {
         #if canImport(DeviceActivity)
         let center = DeviceActivityCenter()
         center.stopMonitoring([DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(modeId.uuidString)")])
+        #endif
+    }
+
+    static func startDailyLimit(selection: FamilyActivitySelection, thresholdMinutes: Int) -> Bool {
+        #if canImport(DeviceActivity)
+        guard thresholdMinutes > 0 else { return false }
+        let center = DeviceActivityCenter()
+        let activityName = DeviceActivityName(rawValue: dailyLimitActivity)
+        let eventName = DeviceActivityEvent.Name(dailyLimitEvent)
+        let schedule = DeviceActivitySchedule(
+            intervalStart: DateComponents(hour: 0, minute: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59),
+            repeats: true
+        )
+        let event = DeviceActivityEvent(
+            applications: selection.applicationTokens,
+            categories: selection.categoryTokens,
+            webDomains: selection.webDomainTokens,
+            threshold: DateComponents(minute: thresholdMinutes)
+        )
+
+        center.stopMonitoring([activityName])
+        do {
+            try center.startMonitoring(activityName, during: schedule, events: [eventName: event])
+            return true
+        } catch {
+            return false
+        }
+        #else
+        return false
+        #endif
+    }
+
+    static func stopDailyLimit() {
+        #if canImport(DeviceActivity)
+        DeviceActivityCenter().stopMonitoring([DeviceActivityName(rawValue: dailyLimitActivity)])
         #endif
     }
 

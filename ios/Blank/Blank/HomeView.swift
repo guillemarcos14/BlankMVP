@@ -34,7 +34,7 @@ struct HomeView: View {
     @State private var showingRelapseReview = false
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "Ready to focus?"
+    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     private let riskBlankMinutes = 30
 
     private var aiSystem: DigitalWellnessV3System {

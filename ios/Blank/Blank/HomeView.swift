@@ -229,7 +229,7 @@ struct HomeView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: 0) {
-                topNavButton("Stats") {
+                topNavButton("Blanked AI") {
                     openSection(.report)
                 }
                 topNavButton("Mode") {
@@ -239,8 +239,8 @@ struct HomeView: View {
                     openSection(.schedule)
                 }
             }
-            .padding(.horizontal, 22)
-            .frame(width: 236, height: 47)
+            .padding(.horizontal, 18)
+            .frame(width: 270, height: 47)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
@@ -254,7 +254,7 @@ struct HomeView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .frame(width: 291, height: 47)
+        .frame(width: 325, height: 47)
     }
 
     private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
@@ -591,18 +591,12 @@ struct HomeView: View {
     }
 
     private func bottomShortcutBar(width: CGFloat) -> some View {
-        HStack(spacing: 0) {
+        HStack {
             footerShortcut(title: "Timer", icon: "timer") {
                 showingTimer = true
             }
-            footerShortcut(title: "Blanked AI", icon: "sparkles") {
-                openSection(.report)
-            }
-            footerShortcut(title: "Health", icon: "heart.text.square.fill") {
-                openSection(.report)
-            }
         }
-        .frame(width: min(width, 330), height: 44)
+        .frame(width: min(width, 118), height: 44)
     }
 
     private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {

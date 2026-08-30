@@ -72,6 +72,8 @@ struct ReportView: View {
         let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
 
+            milestoneHeroCapsule(weekly: weekly, progress: progress)
+
             if purchaseStore.hasPremiumAccess {
                 controlDashboardCapsule(
                     forecast: controlForecast,
@@ -1752,6 +1754,67 @@ struct ReportView: View {
             milestones.append("Protect \(formatDuration(max(0, 3 * 60 * 60 - weekly.totalFocusTime))) more for a deep week.")
         }
         return milestones
+    }
+
+    private func milestoneHeroCapsule(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> some View {
+        let streakTarget = max(3, progress.currentStreakDays + (progress.currentStreakDays >= 3 ? 1 : 0))
+        let streakProgress = min(1, Double(progress.currentStreakDays) / Double(streakTarget))
+        let sessionsLeft = max(0, 5 - weekly.completedSessionCount)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .stroke(reportPrimary.opacity(0.12), lineWidth: 7)
+                    Circle()
+                        .trim(from: 0, to: streakProgress)
+                        .stroke(recoveryGreen, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Image(systemName: progress.currentStreakDays >= 3 ? "flame.fill" : "sparkles")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(recoveryGreen)
+                }
+                .frame(width: 54, height: 54)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(progress.currentStreakDays >= 3 ? "\(progress.currentStreakDays)-day streak" : "First streak")
+                        .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                        .foregroundStyle(reportPrimary)
+                    Text(sessionsLeft == 0 ? "Weekly rhythm unlocked." : "\(sessionsLeft) sessions to unlock weekly rhythm.")
+                        .font(.caption)
+                        .foregroundStyle(reportSecondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                miniReward(title: "Streak", value: "\(progress.currentStreakDays)d")
+                miniReward(title: "Best", value: bestDayText(report: weekly))
+                miniReward(title: "Week", value: "\(weekly.completedSessionCount)/5")
+            }
+        }
+        .padding(16)
+        .liquidGlass(cornerRadius: 26)
+    }
+
+    private func miniReward(title: String, value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 48)
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(sessionStore.isBlankActive ? 0.10 : 0.26))
+        }
     }
 
     private func insightText(totalSessionCount: Int, savedTime: TimeInterval, progress: BlankProgressReport) -> String {

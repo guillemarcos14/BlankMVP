@@ -124,6 +124,9 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
+            if sessionStore.allowOnlyModeEnabled && !sessionStore.hasSelectedApps {
+                showingPicker = true
+            }
         }
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             applyScreenTimeControls()
@@ -1434,8 +1437,6 @@ private struct ScheduleEditorContent: View {
                 }
                 .buttonStyle(.plain)
 
-                StaticScheduleRow(title: "Days", value: "Every day", textColor: textColor)
-
                 VacationModeCard(
                     textColor: textColor,
                     secondaryColor: secondaryColor
@@ -1481,7 +1482,8 @@ private struct ScheduleEditorContent: View {
                 name: window.name.isEmpty ? "Habit \(index + 1)" : window.name,
                 enabled: window.enabled,
                 startMinute: window.startMinute,
-                endMinute: window.endMinute
+                endMinute: window.endMinute,
+                weekdays: window.weekdays
             )
         }
         let first = normalized.first ?? BlankHabitWindow(enabled: false)
@@ -1599,9 +1601,108 @@ private struct HabitWindowCard: View {
                 WheelTimePicker(title: "Start", minute: $window.startMinute, textColor: textColor, secondaryColor: secondaryColor)
                 WheelTimePicker(title: "End", minute: $window.endMinute, textColor: textColor, secondaryColor: secondaryColor)
             }
+
+            HabitDaysPicker(
+                selectedWeekdays: $window.weekdays,
+                textColor: textColor,
+                secondaryColor: secondaryColor
+            )
         }
         .padding(16)
         .blankGlassCard(cornerRadius: 18, tintOpacity: window.enabled ? 0.30 : 0.18)
+    }
+}
+
+private struct HabitDaysPicker: View {
+    @Binding var selectedWeekdays: [Int]
+    let textColor: Color
+    let secondaryColor: Color
+
+    private let days: [(id: Int, label: String)] = [
+        (2, "M"),
+        (3, "T"),
+        (4, "W"),
+        (5, "T"),
+        (6, "F"),
+        (7, "S"),
+        (1, "S")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Days")
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                Spacer()
+                Text(summary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(textColor.opacity(0.86))
+            }
+
+            HStack(spacing: 7) {
+                ForEach(days, id: \.id) { day in
+                    Button {
+                        toggle(day.id)
+                    } label: {
+                        Text(day.label)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(isSelected(day.id) ? BlankColors.ink : textColor)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 34)
+                            .background {
+                                Capsule()
+                                    .fill(isSelected(day.id) ? Color.white.opacity(0.82) : Color.white.opacity(0.12))
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            HStack(spacing: 8) {
+                presetButton("Every day", weekdays: Array(1...7))
+                presetButton("Weekdays", weekdays: [2, 3, 4, 5, 6])
+                presetButton("Weekend", weekdays: [1, 7])
+            }
+        }
+    }
+
+    private var summary: String {
+        let set = Set(selectedWeekdays)
+        if set == Set(1...7) { return "Every day" }
+        if set == Set([2, 3, 4, 5, 6]) { return "Weekdays" }
+        if set == Set([1, 7]) { return "Weekend" }
+        return "\(selectedWeekdays.count) days"
+    }
+
+    private func presetButton(_ title: String, weekdays: [Int]) -> some View {
+        Button {
+            selectedWeekdays = weekdays
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(textColor)
+                .frame(maxWidth: .infinity)
+                .frame(height: 30)
+                .background {
+                    Capsule().fill(Color.white.opacity(Set(selectedWeekdays) == Set(weekdays) ? 0.20 : 0.10))
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func isSelected(_ weekday: Int) -> Bool {
+        selectedWeekdays.contains(weekday)
+    }
+
+    private func toggle(_ weekday: Int) {
+        var set = Set(selectedWeekdays)
+        if set.contains(weekday), set.count > 1 {
+            set.remove(weekday)
+        } else {
+            set.insert(weekday)
+        }
+        selectedWeekdays = set.sorted()
     }
 }
 

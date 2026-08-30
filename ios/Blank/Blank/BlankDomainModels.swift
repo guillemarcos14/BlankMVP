@@ -342,13 +342,15 @@ struct BlankHabitWindow: Codable, Identifiable, Equatable {
     var enabled: Bool
     var startMinute: Int
     var endMinute: Int
+    var weekdays: [Int]
 
     init(
         id: UUID = UUID(),
         name: String = "Habit",
         enabled: Bool = true,
         startMinute: Int = 23 * 60 + 30,
-        endMinute: Int = 8 * 60
+        endMinute: Int = 8 * 60,
+        weekdays: [Int] = Array(1...7)
     ) {
         self.id = id
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -357,11 +359,14 @@ struct BlankHabitWindow: Codable, Identifiable, Equatable {
         self.enabled = enabled
         self.startMinute = min(max(startMinute, 0), 1439)
         self.endMinute = min(max(endMinute, 0), 1439)
+        self.weekdays = Self.normalizedWeekdays(weekdays)
     }
 
     func contains(_ date: Date, calendar: Calendar = .current) -> Bool {
         guard enabled else { return false }
         let minute = calendar.component(.hour, from: date) * 60 + calendar.component(.minute, from: date)
+        let activeWeekday = activeWeekday(for: date, minute: minute, calendar: calendar)
+        guard weekdays.contains(activeWeekday) else { return false }
         if startMinute < endMinute {
             return minute >= startMinute && minute < endMinute
         }
@@ -386,6 +391,42 @@ struct BlankHabitWindow: Codable, Identifiable, Equatable {
             remaining = endMinute - minute
         }
         return max(1, remaining)
+    }
+
+    var runsEveryDay: Bool {
+        Set(weekdays) == Set(1...7)
+    }
+
+    private func activeWeekday(for date: Date, minute: Int, calendar: Calendar) -> Int {
+        let weekday = calendar.component(.weekday, from: date)
+        guard startMinute >= endMinute, minute < endMinute else {
+            return weekday
+        }
+        return weekday == 1 ? 7 : weekday - 1
+    }
+
+    private static func normalizedWeekdays(_ weekdays: [Int]) -> [Int] {
+        let unique = Array(Set(weekdays.filter { (1...7).contains($0) })).sorted()
+        return unique.isEmpty ? Array(1...7) : unique
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case enabled
+        case startMinute
+        case endMinute
+        case weekdays
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "Habit"
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        startMinute = min(max(try container.decodeIfPresent(Int.self, forKey: .startMinute) ?? 23 * 60 + 30, 0), 1439)
+        endMinute = min(max(try container.decodeIfPresent(Int.self, forKey: .endMinute) ?? 8 * 60, 0), 1439)
+        weekdays = Self.normalizedWeekdays(try container.decodeIfPresent([Int].self, forKey: .weekdays) ?? Array(1...7))
     }
 }
 

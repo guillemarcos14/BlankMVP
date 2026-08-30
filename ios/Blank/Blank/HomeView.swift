@@ -335,51 +335,45 @@ struct HomeView: View {
     private func aiPlanHomeCard(width: CGFloat) -> some View {
         let system = aiSystem
 
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Today")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                Spacer()
-                Text(system.plan.difficulty)
-                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background { Capsule().fill(Color.white.opacity(0.14)) }
-            }
-            .foregroundStyle(Color.white.opacity(0.88))
+        return HStack(alignment: .center, spacing: 10) {
+            notificationIcon
 
-            Text("\(system.plan.recommendedDurationMinutes) min before \(system.forecast.riskWindow)")
-                .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
-                .foregroundStyle(Color.white)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-
-            Text(system.forecast.reason)
-                .font(.blankInter(size: 12, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.68))
-                .lineLimit(1)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                Button {
-                    let result = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.activateBlank(durationMinutes: system.plan.recommendedDurationMinutes)
-                    }
-                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    setMessage(for: result)
-                } label: {
-                    Text("Start")
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("Blanked AI")
                         .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(BlankColors.ink)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .background { Capsule().fill(Color.white.opacity(0.86)) }
+                    Text("now")
+                        .font(.blankInter(size: 11, relativeTo: .caption2))
+                        .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
 
-                Button {
+                Text("\(system.plan.recommendedDurationMinutes) min before \(system.forecast.riskWindow)")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.84)
+            }
+            .layoutPriority(1)
+
+            Button {
+                let result = withAnimation(.easeInOut(duration: 0.65)) {
+                    sessionStore.activateBlank(durationMinutes: system.plan.recommendedDurationMinutes)
+                }
+                screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                setMessage(for: result)
+            } label: {
+                Text("Start")
+                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
+                    .foregroundStyle(Color.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background { Capsule().fill(BlankColors.ink.opacity(0.92)) }
+            }
+            .buttonStyle(.plain)
+
+            Menu {
+                Button("Apply to Habits") {
                     sessionStore.applyAIPlan()
                     Task {
                         await BlankFunnelAnalytics.track(
@@ -389,68 +383,86 @@ struct HomeView: View {
                     }
                     message = "Blanked AI applied to Habits."
                     messageAction = nil
-                } label: {
-                    Text("Apply")
-                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.92))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .background { Capsule().fill(Color.white.opacity(0.14)) }
                 }
-                .buttonStyle(.plain)
-
-                Button {
+                Button("Edit in Habits") {
                     openSection(.schedule)
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.92))
-                        .frame(width: 42, height: 34)
-                        .background { Capsule().fill(Color.white.opacity(0.14)) }
                 }
-                .buttonStyle(.plain)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(BlankColors.ink.opacity(0.72))
+                    .frame(width: 28, height: 28)
+                    .contentShape(Rectangle())
             }
         }
-        .padding(14)
+        .foregroundStyle(BlankColors.ink)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(width: min(width, 330), alignment: .leading)
         .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.black.opacity(0.10))
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.66))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.54), lineWidth: 1)
         }
+        .shadow(color: BlankColors.ink.opacity(0.10), radius: 16, x: 0, y: 8)
     }
 
     private func configCard(_ issues: [ConfigIssue]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             ForEach(issues) { issue in
                 Button {
                     resolve(issue.action)
                 } label: {
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "exclamationmark.circle")
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(issue.title)
-                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                            Text(issue.body)
-                                .font(.blankInter(size: 13, relativeTo: .footnote))
-                                .foregroundStyle(BlankColors.mutedInk)
+                    HStack(alignment: .center, spacing: 10) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(BlankColors.ink.opacity(0.92))
+                            Image(systemName: "exclamationmark")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.white)
                         }
+                        .frame(width: 30, height: 30)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text("Blanked")
+                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                                Text("now")
+                                    .font(.blankInter(size: 11, relativeTo: .caption2))
+                                    .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
+                            }
+                            Text(issue.title)
+                                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.84)
+                        }
+                        .layoutPriority(1)
+
                         Spacer(minLength: 8)
                         Image(systemName: "chevron.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(BlankColors.mutedInk)
                     }
+                    .foregroundStyle(BlankColors.ink)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(Color.white.opacity(0.74))
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.white.opacity(0.54), lineWidth: 1)
+                    }
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.78))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .frame(maxWidth: 330, alignment: .leading)
+        .shadow(color: BlankColors.ink.opacity(0.10), radius: 16, x: 0, y: 8)
     }
 
     @ViewBuilder

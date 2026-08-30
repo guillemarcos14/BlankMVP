@@ -229,7 +229,7 @@ struct HomeView: View {
             .buttonStyle(.plain)
 
             HStack(spacing: 0) {
-                topNavButton("Blanked AI") {
+                topNavButton("Stats") {
                     openSection(.report)
                 }
                 topNavButton("Mode") {
@@ -239,8 +239,8 @@ struct HomeView: View {
                     openSection(.schedule)
                 }
             }
-            .padding(.horizontal, 18)
-            .frame(width: 270, height: 47)
+            .padding(.horizontal, 22)
+            .frame(width: 236, height: 47)
             .background {
                 ZStack {
                     Capsule().fill(.ultraThinMaterial)
@@ -254,7 +254,7 @@ struct HomeView: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
-        .frame(width: 325, height: 47)
+        .frame(width: 291, height: 47)
     }
 
     private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {

@@ -71,7 +71,7 @@ private struct ConversationalHomeView: View {
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
-                let topBarCenterY = topSafeArea + 6 + 47 / 2
+                let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 14
 
                 ZStack(alignment: .top) {
@@ -116,6 +116,7 @@ private struct ConversationalHomeView: View {
                 }
             }
         }
+        .ignoresSafeArea()
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .toolbar(.hidden, for: .navigationBar)

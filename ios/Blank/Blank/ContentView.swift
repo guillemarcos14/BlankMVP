@@ -1,4 +1,5 @@
 import FamilyControls
+import Foundation
 import SwiftUI
 import UserNotifications
 
@@ -66,15 +67,19 @@ private struct ConversationalHomeView: View {
         ZStack {
             BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
 
-            VStack(spacing: 0) {
-                header
+            GeometryReader { proxy in
+                let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
+                let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
+                let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
 
-                ScrollViewReader { proxy in
+                VStack(spacing: 0) {
+                    topBar
+                        .padding(.top, topSafeArea + 26)
+                        .padding(.bottom, 14)
+
+                    ScrollViewReader { scrollProxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 12) {
-                            stateStrip
-                                .padding(.bottom, 6)
-
                             ForEach(messages) { message in
                                 AgentBubble(message: message)
                                     .id(message.id)
@@ -90,21 +95,22 @@ private struct ConversationalHomeView: View {
                                 .id(activePlan.id)
                             }
                         }
-                        .padding(.horizontal, 18)
-                        .padding(.top, 12)
+                        .padding(.horizontal, horizontalPadding)
+                        .padding(.top, 4)
                         .padding(.bottom, 18)
                     }
                     .onChange(of: messages.count) { _ in
-                        scrollToBottom(proxy)
+                        scrollToBottom(scrollProxy)
                     }
                     .onChange(of: activePlan?.id) { _ in
-                        scrollToBottom(proxy)
+                        scrollToBottom(scrollProxy)
                     }
                 }
 
                 composer
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 10)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, max(bottomSafeArea + 8, 18))
+                }
             }
         }
         .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
@@ -152,55 +158,90 @@ private struct ConversationalHomeView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Blanked")
-                    .font(.blankInter(size: 22, weight: .semibold, relativeTo: .title2))
-                Text("Your phone protection agent")
-                    .font(.blankInter(size: 13, relativeTo: .caption))
-                    .foregroundStyle(currentSecondaryColor)
-            }
+    private var topBar: some View {
+        let glassTint = Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0).opacity(0.42)
+        let logoReflection = RadialGradient(
+            colors: [
+                Color.white.opacity(0.22),
+                Color.white.opacity(0.07),
+                Color.white.opacity(0.00)
+            ],
+            center: .topLeading,
+            startRadius: 0,
+            endRadius: 52
+        )
+        let topNavBorder = LinearGradient(
+            colors: [
+                Color.white.opacity(0.42),
+                Color.white.opacity(0.16),
+                Color.white.opacity(0.04),
+                Color.white.opacity(0.00)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
 
-            Spacer()
-
+        return HStack(alignment: .center, spacing: 8) {
             Button {
                 showingLegacyHome = true
             } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 42, height: 42)
-                    .blankGlassCard(cornerRadius: 21, tintOpacity: sessionStore.isBlankActive ? 0.18 : 0.34)
+                Image(systemName: "sparkle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Color.white)
+                    .foregroundColor(Color.white)
+                    .frame(width: 47, height: 47)
+                    .background {
+                        ZStack {
+                            Circle().fill(.ultraThinMaterial)
+                            Circle().fill(glassTint)
+                            Circle().fill(logoReflection)
+                            Circle().stroke(topNavBorder, lineWidth: 1)
+                        }
+                        .allowsHitTesting(false)
+                    }
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Advanced controls")
+
+            HStack(spacing: 0) {
+                topNavButton("Stats")
+                topNavButton("Mode")
+                topNavButton("Habits")
+            }
+            .padding(.horizontal, 22)
+            .frame(width: 236, height: 47)
+            .background {
+                ZStack {
+                    Capsule().fill(.ultraThinMaterial)
+                    Capsule().fill(glassTint)
+                    BlankGlassCornerHighlight(width: 78, height: 30, xOffset: -79, yOffset: -15)
+                        .clipShape(Capsule())
+                    Capsule().stroke(topNavBorder, lineWidth: 1)
+                }
+                .allowsHitTesting(false)
+            }
+            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 18)
-        .padding(.bottom, 8)
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(width: 291, height: 47)
     }
 
-    private var stateStrip: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                AgentStatusPill(title: "Mode", value: sessionStore.isBlankActive ? "Active" : "Open")
-                AgentStatusPill(title: "Score", value: "\(system.profile.adherenceScore)")
-                AgentStatusPill(title: "Apps", value: "\(sessionStore.selectionCount)")
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(statusLine)
-                    .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.86)
-                Text(nextRecommendation)
-                    .font(.blankInter(size: 14, relativeTo: .subheadline))
-                    .foregroundStyle(currentSecondaryColor)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+    private func topNavButton(_ title: String) -> some View {
+        Button {
+            showingLegacyHome = true
+        } label: {
+            Text(title)
+                .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
+                .foregroundStyle(Color.white)
+                .foregroundColor(Color.white)
+                .frame(width: 64, height: 47)
+                .contentShape(Rectangle())
         }
-        .padding(16)
-        .blankGlassCard(cornerRadius: 22, tintOpacity: sessionStore.isBlankActive ? 0.16 : 0.40)
+        .frame(width: 64, height: 47)
+        .contentShape(Rectangle())
+        .buttonStyle(.plain)
     }
 
     private var composer: some View {
@@ -564,6 +605,11 @@ private struct AgentMessage: Identifiable, Equatable {
 private enum BlankedAgentPlanner {
     static func plan(for prompt: String, context: AgentContext) -> AgentPlan {
         let intent = classify(prompt)
+        if let window = explicitTimeWindow(in: prompt),
+           [.sleep, .focus, .social, .general].contains(intent) {
+            return explicitWindowPlan(intent: intent == .general ? .social : intent, window: window, context: context)
+        }
+
         switch intent {
         case .sleep:
             return sleepPlan(context: context)
@@ -588,11 +634,33 @@ private enum BlankedAgentPlanner {
         }
     }
 
+    private static func explicitWindowPlan(intent: AgentIntent, window: AgentTimeWindow, context: AgentContext) -> AgentPlan {
+        let start = agentMinuteText(window.startMinute)
+        let end = agentMinuteText(window.endMinute)
+        return AgentPlan(
+            intent: intent,
+            title: intent == .sleep ? "Sleep Protection Plan" : "Scroll Control Plan",
+            responseText: "I can protect that window from \(start) to \(end).",
+            bullets: [
+                "Block selected distracting apps from \(start) to \(end).",
+                "Keep the same window for 7 days so Blanked can learn.",
+                context.hasSelectedApps ? "Use your current app selection." : "Choose the apps Blanked should control first."
+            ],
+            primaryLabel: "Apply plan",
+            secondaryLabel: "Choose apps",
+            actions: [
+                .applySchedule(name: intent == .sleep ? "Sleep Protection" : "Scroll Control", startMinute: window.startMinute, endMinute: window.endMinute, weekdays: Array(1...7), durationDays: 7)
+            ],
+            requiresSelectedApps: true,
+            requiresScreenTimeAuthorization: true
+        )
+    }
+
     private static func classify(_ prompt: String) -> AgentIntent {
         let text = prompt.lowercased()
         if contains(text, ["sleep", "night", "bed", "dormir", "noche", "scroll por la noche"]) { return .sleep }
         if contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"]) { return .study }
-        if contains(text, ["losing control", "perdiendo el control", "reca", "urge", "emergency", "now"]) { return .emergency }
+        if contains(text, ["losing control", "perdiendo el control", "reca", "urge", "emergency"]) { return .emergency }
         if contains(text, ["allow only", "whatsapp", "maps", "solo", "only"]) { return .allowOnly }
         if contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa"]) { return .vacation }
         if contains(text, ["week", "semana", "analy", "diagn"]) { return .weeklyReview }
@@ -794,6 +862,56 @@ private enum BlankedAgentPlanner {
     private static func contains(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0) }
     }
+
+    private static func explicitTimeWindow(in prompt: String) -> AgentTimeWindow? {
+        let text = prompt.lowercased()
+        let pattern = #"(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+        let nsText = text as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: fullRange) else { return nil }
+
+        func value(_ index: Int) -> String? {
+            let range = match.range(at: index)
+            guard range.location != NSNotFound else { return nil }
+            return nsText.substring(with: range)
+        }
+
+        guard let startHour = Int(value(1) ?? ""),
+              let endHour = Int(value(4) ?? "") else {
+            return nil
+        }
+
+        let startMinutePart = Int(value(2) ?? "") ?? 0
+        let endMinutePart = Int(value(5) ?? "") ?? 0
+        guard (0...59).contains(startMinutePart), (0...59).contains(endMinutePart) else { return nil }
+
+        let endMeridiem = value(6)
+        let startMeridiem = value(3) ?? endMeridiem
+        let start = minuteOfDay(hour: startHour, minute: startMinutePart, meridiem: startMeridiem)
+        let end = minuteOfDay(hour: endHour, minute: endMinutePart, meridiem: endMeridiem)
+        guard let start, let end, start != end else { return nil }
+        return AgentTimeWindow(startMinute: start, endMinute: end)
+    }
+
+    private static func minuteOfDay(hour: Int, minute: Int, meridiem: String?) -> Int? {
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        var resolvedHour = hour
+        if let meridiem {
+            guard (1...12).contains(hour) else { return nil }
+            if meridiem == "am" {
+                resolvedHour = hour == 12 ? 0 : hour
+            } else if meridiem == "pm" {
+                resolvedHour = hour == 12 ? 12 : hour + 12
+            }
+        }
+        return resolvedHour * 60 + minute
+    }
+}
+
+private struct AgentTimeWindow {
+    var startMinute: Int
+    var endMinute: Int
 }
 
 private struct BlankedAgentClient {

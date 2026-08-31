@@ -28,12 +28,46 @@ function classify(prompt) {
   return "general";
 }
 
+function minuteOfDay(hour, minute, meridiem) {
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || minute < 0 || minute > 59) return null;
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return null;
+    if (meridiem === "am") return (hour === 12 ? 0 : hour) * 60 + minute;
+    if (meridiem === "pm") return (hour === 12 ? 12 : hour + 12) * 60 + minute;
+    return null;
+  }
+  if (hour < 0 || hour > 23) return null;
+  return hour * 60 + minute;
+}
+
+function explicitTimeWindow(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (!match) return null;
+
+  const endMeridiem = match[6] || null;
+  const startMeridiem = match[3] || endMeridiem;
+  const start = minuteOfDay(Number(match[1]), Number(match[2] || 0), startMeridiem);
+  const end = minuteOfDay(Number(match[4]), Number(match[5] || 0), endMeridiem);
+  if (start == null || end == null || start === end) return null;
+  return { start, end };
+}
+
+function minuteText(minuteOfDayValue) {
+  const hour = Math.max(0, Math.min(23, Math.floor(minuteOfDayValue / 60)));
+  const minute = Math.max(0, Math.min(59, minuteOfDayValue % 60));
+  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
+  const meridiem = hour < 12 ? "AM" : "PM";
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${meridiem}`;
+}
+
 function fallbackPlan(prompt, context = {}) {
   const intent = classify(prompt);
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
   const duration = cleanNumber(context.recommended_duration_minutes, 30, 5, 240);
   const riskWindow = cleanText(context.risk_window, 60) || "your next risk window";
+  const timeWindow = explicitTimeWindow(prompt);
 
   const base = {
     intent,
@@ -50,6 +84,24 @@ function fallbackPlan(prompt, context = {}) {
     requires_selected_apps: true,
     requires_screen_time_authorization: true,
   };
+
+  if (timeWindow && ["sleep", "focus", "social", "general"].includes(intent)) {
+    const start = minuteText(timeWindow.start);
+    const end = minuteText(timeWindow.end);
+    const planIntent = intent === "general" ? "social" : intent;
+    return {
+      ...base,
+      intent: planIntent,
+      title: planIntent === "sleep" ? "Sleep Protection Plan" : "Scroll Control Plan",
+      response_text: `I can protect that window from ${start} to ${end}.`,
+      bullets: [
+        `Block selected distracting apps from ${start} to ${end}.`,
+        "Keep the same window for 7 days so Blanked can learn.",
+        selected ? "Use your current app selection." : "Choose the apps Blanked should control first.",
+      ],
+      actions: [{ type: "apply_schedule", name: planIntent === "sleep" ? "Sleep Protection" : "Scroll Control", start_minute: timeWindow.start, end_minute: timeWindow.end, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 }],
+    };
+  }
 
   if (intent === "sleep") {
     return {
@@ -357,6 +409,9 @@ exports.handler = async (event) => {
       result = await modelPlan(prompt, context, fallback);
     } catch (error) {
       result = { plan: fallback, source: "deterministic_fallback_after_model_error", error: error.message };
+    }
+    if (explicitTimeWindow(prompt)) {
+      result.plan = fallback;
     }
 
     return json(200, {

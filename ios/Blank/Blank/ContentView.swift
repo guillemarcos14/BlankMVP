@@ -69,58 +69,60 @@ private struct ConversationalHomeView: View {
             BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
 
             GeometryReader { proxy in
+                let visibleWidth = min(proxy.size.width, UIScreen.main.bounds.width)
+                let visibleCenterX = visibleWidth / 2
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
-                let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
+                let horizontalPadding = min(max(visibleWidth * 0.075, 28), 36)
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
-                let composerWidth = min(max(proxy.size.width - horizontalPadding * 2, 260), 342)
+                let composerWidth = min(max(visibleWidth - horizontalPadding * 2, 260), 342)
                 let composerCenterY = proxy.size.height - max(bottomSafeArea + 18, 34) - 29
 
                 ZStack(alignment: .top) {
                     topBar
-                        .position(x: proxy.size.width / 2, y: topBarCenterY)
+                        .position(x: visibleCenterX, y: topBarCenterY)
                         .zIndex(2)
 
                     if messages.isEmpty && activePlan == nil {
                         welcomeHero
-                            .frame(width: min(max(proxy.size.width - horizontalPadding * 2, 280), 350))
-                            .position(x: proxy.size.width / 2, y: proxy.size.height * 0.40)
+                            .frame(width: min(max(visibleWidth - horizontalPadding * 2, 280), 350))
+                            .position(x: visibleCenterX, y: proxy.size.height * 0.40)
                     }
 
                     ScrollViewReader { scrollProxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(messages) { message in
-                                AgentBubble(message: message)
-                                    .id(message.id)
-                            }
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 12) {
+                                ForEach(messages) { message in
+                                    AgentBubble(message: message)
+                                        .id(message.id)
+                                }
 
-                            if let activePlan {
-                                AgentPlanCard(
-                                    plan: activePlan,
-                                    canApply: canApply(activePlan),
-                                    onPrimary: { apply(activePlan) },
-                                    onSecondary: { handleSecondary(activePlan) }
-                                )
-                                .id(activePlan.id)
+                                if let activePlan {
+                                    AgentPlanCard(
+                                        plan: activePlan,
+                                        canApply: canApply(activePlan),
+                                        onPrimary: { apply(activePlan) },
+                                        onSecondary: { handleSecondary(activePlan) }
+                                    )
+                                    .id(activePlan.id)
+                                }
                             }
+                            .padding(.horizontal, horizontalPadding)
+                            .padding(.top, contentTopPadding)
+                            .padding(.bottom, 118)
                         }
-                        .padding(.horizontal, horizontalPadding)
-                        .padding(.top, contentTopPadding)
-                        .padding(.bottom, 118)
+                        .onChange(of: messages.count) { _ in
+                            scrollToBottom(scrollProxy)
+                        }
+                        .onChange(of: activePlan?.id) { _ in
+                            scrollToBottom(scrollProxy)
+                        }
                     }
-                    .onChange(of: messages.count) { _ in
-                        scrollToBottom(scrollProxy)
-                    }
-                    .onChange(of: activePlan?.id) { _ in
-                        scrollToBottom(scrollProxy)
-                    }
-                }
 
-                composer
-                    .frame(width: composerWidth)
-                    .position(x: proxy.size.width / 2, y: composerCenterY)
+                    composer
+                        .frame(width: composerWidth)
+                        .position(x: visibleCenterX, y: composerCenterY)
                 }
             }
         }

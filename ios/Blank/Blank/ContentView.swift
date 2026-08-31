@@ -71,7 +71,7 @@ private struct ConversationalHomeView: View {
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
-                let topBarCenterY = topSafeArea + 26 + 47 / 2
+                let topBarCenterY = topSafeArea + 6 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 14
 
                 ZStack(alignment: .top) {
@@ -110,7 +110,7 @@ private struct ConversationalHomeView: View {
                 }
 
                 composer
-                    .padding(.horizontal, 18)
+                    .padding(.horizontal, horizontalPadding)
                     .padding(.bottom, max(bottomSafeArea + 8, 18))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
@@ -1104,14 +1104,53 @@ private struct AgentBubble: View {
                 .padding(.horizontal, 15)
                 .padding(.vertical, 12)
                 .background {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(message.role == .user ? BlankColors.ink.opacity(0.94) : Color.white.opacity(0.64))
+                    bubbleBackground
                 }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(bubbleStroke, lineWidth: 1)
+                }
+                .shadow(color: bubbleShadow, radius: message.role == .user ? 8 : 18, x: 0, y: message.role == .user ? 4 : 10)
 
             if message.role == .blanked {
                 Spacer(minLength: 42)
             }
         }
+    }
+
+    private var bubbleBackground: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(message.role == .user ? AnyShapeStyle(BlankColors.ink.opacity(0.94)) : AnyShapeStyle(.ultraThinMaterial))
+            .overlay {
+                if message.role == .blanked {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.78),
+                                    Color.white.opacity(0.48),
+                                    Color(red: 206 / 255.0, green: 224 / 255.0, blue: 246 / 255.0).opacity(0.24)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
+    }
+
+    private var bubbleStroke: LinearGradient {
+        LinearGradient(
+            colors: message.role == .user
+                ? [Color.white.opacity(0.10), Color.white.opacity(0.02)]
+                : [Color.white.opacity(0.74), Color.white.opacity(0.22), Color.white.opacity(0.04)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var bubbleShadow: Color {
+        message.role == .user ? BlankColors.ink.opacity(0.08) : BlankColors.ink.opacity(0.07)
     }
 }
 

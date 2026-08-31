@@ -252,7 +252,7 @@ private struct ConversationalHomeView: View {
             TextField("Tell Blanked what you need", text: $input, axis: .vertical)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .lineLimit(1...2)
-                .foregroundStyle(currentPrimaryColor)
+                .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
                 .padding(.leading, 22)
 
             Button {

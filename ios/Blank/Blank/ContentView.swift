@@ -71,11 +71,13 @@ private struct ConversationalHomeView: View {
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
+                let topBarCenterY = topSafeArea + 26 + 47 / 2
+                let contentTopPadding = topSafeArea + 26 + 47 + 14
 
-                VStack(spacing: 0) {
+                ZStack(alignment: .top) {
                     topBar
-                        .padding(.top, topSafeArea + 26)
-                        .padding(.bottom, 14)
+                        .position(x: proxy.size.width / 2, y: topBarCenterY)
+                        .zIndex(2)
 
                     ScrollViewReader { scrollProxy in
                     ScrollView {
@@ -96,8 +98,8 @@ private struct ConversationalHomeView: View {
                             }
                         }
                         .padding(.horizontal, horizontalPadding)
-                        .padding(.top, 4)
-                        .padding(.bottom, 18)
+                        .padding(.top, contentTopPadding)
+                        .padding(.bottom, 118)
                     }
                     .onChange(of: messages.count) { _ in
                         scrollToBottom(scrollProxy)
@@ -110,6 +112,7 @@ private struct ConversationalHomeView: View {
                 composer
                     .padding(.horizontal, 18)
                     .padding(.bottom, max(bottomSafeArea + 8, 18))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
             }
         }
@@ -245,40 +248,38 @@ private struct ConversationalHomeView: View {
     }
 
     private var composer: some View {
-        VStack(spacing: 10) {
-            quickActions
+        HStack(spacing: 12) {
+            TextField("Tell Blanked what you need", text: $input, axis: .vertical)
+                .font(.blankInter(size: 16, relativeTo: .body))
+                .lineLimit(1...2)
+                .foregroundStyle(currentPrimaryColor)
+                .padding(.leading, 22)
 
-            HStack(spacing: 10) {
-                TextField("Tell Blanked what you need", text: $input, axis: .vertical)
-                    .font(.blankInter(size: 16, relativeTo: .body))
-                    .lineLimit(1...3)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 13)
-                    .background {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(Color.white.opacity(sessionStore.isBlankActive ? 0.14 : 0.58))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .stroke(Color.white.opacity(0.40), lineWidth: 1)
-                    }
-
-                Button {
-                    submit()
-                } label: {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .frame(width: 46, height: 46)
-                        .background(Circle().fill(BlankColors.ink.opacity(0.94)))
-                }
-                .buttonStyle(.plain)
-                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+            Button {
+                submit()
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(BlankColors.ink.opacity(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.22 : 0.88)))
             }
+            .buttonStyle(.plain)
+            .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .padding(.trailing, 7)
         }
-        .padding(8)
-        .blankGlassCard(cornerRadius: 30, tintOpacity: sessionStore.isBlankActive ? 0.12 : 0.28)
+        .frame(height: 58)
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+            Capsule()
+                .fill(Color.white.opacity(sessionStore.isBlankActive ? 0.10 : 0.36))
+        }
+        .overlay {
+            Capsule()
+                .stroke(Color.white.opacity(sessionStore.isBlankActive ? 0.18 : 0.34), lineWidth: 1)
+        }
+        .shadow(color: BlankColors.ink.opacity(0.06), radius: 16, x: 0, y: 8)
     }
 
     private var quickActions: some View {

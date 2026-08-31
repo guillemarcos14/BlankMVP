@@ -3,8 +3,6 @@ name: iOS Build
 on:
   workflow_dispatch:
   push:
-    branches:
-      - health
     paths:
       - "ios/**"
       - ".github/workflows/ios-build.yml"
@@ -16,6 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
+      - name: Validate bundle executable setting
+        run: |
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" ios/Blank/Blank/Info.plist | grep -Fx '$(EXECUTABLE_NAME)'
       - name: Build simulator
         run: |
           xcodebuild \

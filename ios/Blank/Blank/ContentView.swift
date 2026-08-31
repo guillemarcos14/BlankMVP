@@ -23,6 +23,7 @@ private struct ConversationalHomeView: View {
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var onboardingName = ""
 
     @State private var input = ""
     @State private var messages: [AgentMessage] = AgentMessage.openingThread
@@ -72,12 +73,20 @@ private struct ConversationalHomeView: View {
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
-                let contentTopPadding = topSafeArea + 26 + 47 + 14
+                let contentTopPadding = topSafeArea + 26 + 47 + 34
+                let composerWidth = min(max(proxy.size.width - horizontalPadding * 2, 260), 342)
+                let composerCenterY = proxy.size.height - max(bottomSafeArea + 18, 34) - 29
 
                 ZStack(alignment: .top) {
                     topBar
                         .position(x: proxy.size.width / 2, y: topBarCenterY)
                         .zIndex(2)
+
+                    if messages.isEmpty && activePlan == nil {
+                        welcomeHero
+                            .frame(width: min(max(proxy.size.width - horizontalPadding * 2, 280), 350))
+                            .position(x: proxy.size.width / 2, y: proxy.size.height * 0.40)
+                    }
 
                     ScrollViewReader { scrollProxy in
                     ScrollView {
@@ -110,9 +119,8 @@ private struct ConversationalHomeView: View {
                 }
 
                 composer
-                    .padding(.horizontal, horizontalPadding)
-                    .padding(.bottom, max(bottomSafeArea + 8, 18))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .frame(width: composerWidth)
+                    .position(x: proxy.size.width / 2, y: composerCenterY)
                 }
             }
         }
@@ -160,6 +168,26 @@ private struct ConversationalHomeView: View {
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             restoreRuntimeState()
         }
+    }
+
+    private var welcomeHero: some View {
+        VStack(spacing: 14) {
+            Text("Hello \(displayName)")
+                .font(.blankInter(size: 17, weight: .regular, relativeTo: .headline))
+                .foregroundStyle(BlankColors.ink.opacity(0.58))
+
+            Text("How can I help\nyou today?")
+                .font(.blankInter(size: 34, weight: .semibold, relativeTo: .largeTitle))
+                .foregroundStyle(BlankColors.ink)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var displayName: String {
+        let trimmed = onboardingName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "there" : trimmed
     }
 
     private var topBar: some View {
@@ -596,12 +624,7 @@ private struct AgentMessage: Identifiable, Equatable {
     var role: Role
     var text: String
 
-    static let openingThread = [
-        AgentMessage(
-            role: .blanked,
-            text: "Tell me what you want to change. I can turn it into a protection plan and apply it."
-        )
-    ]
+    static let openingThread: [AgentMessage] = []
 }
 
 private enum BlankedAgentPlanner {

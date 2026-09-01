@@ -79,7 +79,7 @@ private struct ConversationalHomeView: View {
                 let contentWidth = viewportWidth - horizontalPadding * 2
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
-                let composerWidth = min(max(contentWidth, 260), 342)
+                let composerWidth = min(contentWidth, 342)
                 let composerCenterY = viewportHeight - max(bottomSafeArea + 18, 34) - 29
 
                 ZStack(alignment: .topLeading) {
@@ -89,7 +89,7 @@ private struct ConversationalHomeView: View {
 
                     if messages.isEmpty && activePlan == nil {
                         welcomeHero
-                            .frame(width: min(max(contentWidth, 280), 350))
+                            .frame(width: min(contentWidth, 350))
                             .position(x: centerX, y: viewportHeight * 0.40)
                     }
 
@@ -1209,11 +1209,15 @@ private struct AgentPlanCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plan.title)
                         .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.82)
                     Text(canApply ? "Ready to execute" : "Needs setup first")
                         .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                         .foregroundStyle(BlankColors.mutedInk)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(plan.bullets, id: \.self) { bullet in
@@ -1249,6 +1253,8 @@ private struct AgentPlanCard: View {
                 Button(plan.secondaryLabel, action: onSecondary)
                     .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                     .foregroundStyle(BlankColors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                     .frame(width: 104, height: 50)
                     .background {
                         Capsule().fill(Color.white.opacity(0.46))

@@ -97,7 +97,7 @@ private struct ConversationalHomeView: View {
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 12) {
                                 ForEach(messages) { message in
-                                    AgentBubble(message: message)
+                                    AgentBubble(message: message, maxWidth: contentWidth)
                                         .id(message.id)
                                 }
 
@@ -1122,17 +1122,15 @@ private enum BlankedAgentMemory {
 
 private struct AgentBubble: View {
     let message: AgentMessage
+    let maxWidth: CGFloat
 
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer(minLength: 42)
-            }
-
+        HStack(spacing: 0) {
+            if message.role == .user { Spacer(minLength: 0) }
             Text(message.text)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(message.role == .user ? Color.white : BlankColors.ink)
-                .frame(maxWidth: 284, alignment: .leading)
+                .frame(maxWidth: min(maxWidth * 0.84, 304), alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 15)
                 .padding(.vertical, 12)
@@ -1145,10 +1143,9 @@ private struct AgentBubble: View {
                 }
                 .shadow(color: bubbleShadow, radius: message.role == .user ? 8 : 18, x: 0, y: message.role == .user ? 4 : 10)
 
-            if message.role == .blanked {
-                Spacer(minLength: 42)
-            }
+            if message.role == .blanked { Spacer(minLength: 0) }
         }
+        .frame(width: maxWidth, alignment: message.role == .user ? .trailing : .leading)
     }
 
     private var bubbleBackground: some View {
@@ -1226,10 +1223,20 @@ private struct AgentPlanCard: View {
             }
 
             HStack(spacing: 10) {
-                Button(plan.primaryLabel, action: onPrimary)
-                    .buttonStyle(BlankPrimaryButtonStyle())
-                    .frame(maxWidth: .infinity)
-                    .opacity(canApply ? 1 : 0.62)
+                Button(action: onPrimary) {
+                    Text(plan.primaryLabel)
+                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .foregroundStyle(Color.white)
+                        .background {
+                            Capsule().fill(BlankColors.glassTint.opacity(0.48))
+                        }
+                }
+                .buttonStyle(.plain)
+                .opacity(canApply ? 1 : 0.62)
 
                 Button(plan.secondaryLabel, action: onSecondary)
                     .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))

@@ -69,25 +69,28 @@ private struct ConversationalHomeView: View {
             BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
 
             GeometryReader { proxy in
-                let visibleWidth = min(proxy.size.width, UIScreen.main.bounds.width)
-                let visibleCenterX = visibleWidth / 2
+                let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
+                let viewportHeight = max(proxy.size.height, UIScreen.main.bounds.height)
+                let xCorrection = -proxy.frame(in: .global).minX
+                let centerX = viewportWidth / 2
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
-                let horizontalPadding = min(max(visibleWidth * 0.075, 28), 36)
+                let horizontalPadding = min(max(viewportWidth * 0.075, 28), 36)
+                let contentWidth = viewportWidth - horizontalPadding * 2
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
-                let composerWidth = min(max(visibleWidth - horizontalPadding * 2, 260), 342)
-                let composerCenterY = proxy.size.height - max(bottomSafeArea + 18, 34) - 29
+                let composerWidth = min(max(contentWidth, 260), 342)
+                let composerCenterY = viewportHeight - max(bottomSafeArea + 18, 34) - 29
 
-                ZStack(alignment: .top) {
+                ZStack(alignment: .topLeading) {
                     topBar
-                        .position(x: visibleCenterX, y: topBarCenterY)
+                        .position(x: centerX, y: topBarCenterY)
                         .zIndex(2)
 
                     if messages.isEmpty && activePlan == nil {
                         welcomeHero
-                            .frame(width: min(max(visibleWidth - horizontalPadding * 2, 280), 350))
-                            .position(x: visibleCenterX, y: proxy.size.height * 0.40)
+                            .frame(width: min(max(contentWidth, 280), 350))
+                            .position(x: centerX, y: viewportHeight * 0.40)
                     }
 
                     ScrollViewReader { scrollProxy in
@@ -108,6 +111,7 @@ private struct ConversationalHomeView: View {
                                     .id(activePlan.id)
                                 }
                             }
+                            .frame(width: contentWidth, alignment: .leading)
                             .padding(.horizontal, horizontalPadding)
                             .padding(.top, contentTopPadding)
                             .padding(.bottom, 118)
@@ -122,8 +126,10 @@ private struct ConversationalHomeView: View {
 
                     composer
                         .frame(width: composerWidth)
-                        .position(x: visibleCenterX, y: composerCenterY)
+                        .position(x: centerX, y: composerCenterY)
                 }
+                .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+                .offset(x: xCorrection)
             }
         }
         .ignoresSafeArea()
@@ -1126,6 +1132,7 @@ private struct AgentBubble: View {
             Text(message.text)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .foregroundStyle(message.role == .user ? Color.white : BlankColors.ink)
+                .frame(maxWidth: 284, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 15)
                 .padding(.vertical, 12)
@@ -1221,6 +1228,7 @@ private struct AgentPlanCard: View {
             HStack(spacing: 10) {
                 Button(plan.primaryLabel, action: onPrimary)
                     .buttonStyle(BlankPrimaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                     .opacity(canApply ? 1 : 0.62)
 
                 Button(plan.secondaryLabel, action: onSecondary)
@@ -1234,6 +1242,7 @@ private struct AgentPlanCard: View {
             }
         }
         .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .blankGlassCard(cornerRadius: 24, tintOpacity: 0.50)
     }
 

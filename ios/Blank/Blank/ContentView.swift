@@ -179,16 +179,24 @@ private struct ConversationalHomeView: View {
     }
 
     private var welcomeHero: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 7) {
             Text("Hello \(displayName)")
-                .font(.blankInter(size: 17, weight: .regular, relativeTo: .headline))
+                .font(.blankInter(size: 14, weight: .regular, relativeTo: .subheadline))
                 .foregroundStyle(BlankColors.ink.opacity(0.58))
+                .tracking(0)
 
-            Text("How can I help\nyou today?")
-                .font(.blankInter(size: 34, weight: .semibold, relativeTo: .largeTitle))
+            (
+                Text("How can I ")
+                    .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
+                + Text("help")
+                    .font(.blankSerif(size: 42, relativeTo: .largeTitle))
+                + Text("\nyou today?")
+                    .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
+            )
                 .foregroundStyle(BlankColors.ink)
                 .multilineTextAlignment(.center)
-                .lineSpacing(2)
+                .lineSpacing(0)
+                .tracking(0)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

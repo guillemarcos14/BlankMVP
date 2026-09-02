@@ -1392,7 +1392,7 @@ private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     let onSave: () -> Void
-    @State private var windows: [BlankHabitWindow] = []
+    @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Habit 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 

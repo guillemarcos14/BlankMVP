@@ -14,7 +14,7 @@ struct ReportView: View {
     @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
     @AppStorage("blankWeeklyAIPlanSecond", store: BlankSharedState.defaults) private var storedPlanSecond = ""
     @AppStorage("blankWeeklyAIPlanThird", store: BlankSharedState.defaults) private var storedPlanThird = ""
-    @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = false
+    @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = true
     @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var onboardingAnonymousUserId = ""
     @AppStorage("blankRemoteWellnessSummary", store: BlankSharedState.defaults) private var remoteWellnessSummary = ""
     @AppStorage("blankRemoteWellnessNextStep", store: BlankSharedState.defaults) private var remoteWellnessNextStep = ""
@@ -184,6 +184,7 @@ struct ReportView: View {
         .foregroundStyle(reportPrimary)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
+            wellnessFeatureConsent = true
             healthKitStore.refresh()
             refreshDailyAIIfNeeded()
         }
@@ -1079,7 +1080,7 @@ struct ReportView: View {
                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .headline))
                     .foregroundStyle(reportPrimary)
 
-                Text(wellnessFeatureConsent ? aiPlanStatusText : "Included in Pro. Allow Blanked AI to analyze your patterns and update your plan daily.")
+                Text(aiPlanStatusText)
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1139,12 +1140,12 @@ struct ReportView: View {
             } label: {
                 Text(aiPlanButtonText)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(wellnessFeatureConsent ? reportSecondary : reportPrimary)
+                    .foregroundStyle(reportSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
                     .background {
                         Capsule()
-                            .fill(Color.white.opacity(wellnessFeatureConsent ? 0.12 : 0.22))
+                            .fill(Color.white.opacity(0.12))
                     }
                     .overlay {
                         Capsule()
@@ -2998,7 +2999,7 @@ struct ReportView: View {
 
     private var aiPlanButtonText: String {
         if isSubmittingWellnessFeatures { return "Updating AI plan..." }
-        return wellnessFeatureConsent ? "Refresh plan" : "Activate AI plan updates"
+        return "Refresh plan"
     }
 
     private var aiPlanStatusText: String {
@@ -3048,7 +3049,7 @@ struct ReportView: View {
                 let insight = try await DigitalWellnessFeaturesClient().submit(
                     payload: payload,
                     anonymousUserId: anonymousUserId,
-                    consentText: "Activate AI plan updates"
+                    consentText: "Personalize my plan"
                 )
                 await BlankFunnelAnalytics.track(
                     "ai_insight_received",

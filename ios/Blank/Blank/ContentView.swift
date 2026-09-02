@@ -566,6 +566,9 @@ private struct ConversationalHomeView: View {
     }
 
     private func canApply(_ plan: AgentPlan) -> Bool {
+        if !plan.hasExecutableActions {
+            return false
+        }
         if plan.requiresSelectedApps && !sessionStore.hasSelectedApps {
             return false
         }
@@ -636,7 +639,7 @@ private struct ConversationalHomeView: View {
                 "agent_plan_applied",
                 properties: [
                     "intent": plan.intent.rawValue,
-                    "action_count": plan.actions.count,
+                    "action_count": plan.executableActionCount,
                     "selection_count": sessionStore.selectionCount
                 ]
             )
@@ -761,6 +764,14 @@ private struct AgentPlan: Identifiable, Equatable {
     var requiresScreenTimeAuthorization: Bool
     var source: String? = nil
     var modelError: String? = nil
+
+    var executableActionCount: Int {
+        actions.filter { $0 != .none }.count
+    }
+
+    var hasExecutableActions: Bool {
+        executableActionCount > 0
+    }
 }
 
 private struct AgentMessage: Identifiable, Equatable {
@@ -779,9 +790,15 @@ private struct AgentMessage: Identifiable, Equatable {
 private enum BlankedAgentPlanner {
     static func plan(for prompt: String, context: AgentContext) -> AgentPlan {
         let intent = classify(prompt)
+        if let missingContextPlan = missingContextPlan(for: prompt, intent: intent, context: context) {
+            return missingContextPlan
+        }
         if let window = explicitTimeWindow(in: prompt),
            [.sleep, .focus, .social, .general].contains(intent) {
             return explicitWindowPlan(intent: intent == .general ? .social : intent, window: window, context: context)
+        }
+        if intent == .sleep, let bedtime = explicitSingleTime(in: prompt) {
+            return bedtimeBoundaryPlan(bedtime: bedtime, context: context)
         }
 
         switch intent {
@@ -844,6 +861,57 @@ private enum BlankedAgentPlanner {
         return .general
     }
 
+    private static func missingContextPlan(for prompt: String, intent: AgentIntent, context: AgentContext) -> AgentPlan? {
+        let text = prompt.lowercased()
+        if intent == .sleep,
+           explicitTimeWindow(in: prompt) == nil,
+           explicitSingleTime(in: prompt) == nil,
+           !hasExplicitBlockRequest(text) {
+            return AgentPlan(
+                intent: .sleep,
+                title: "Bedtime Scroll Read",
+                responseText: "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.",
+                bullets: [
+                    "Read: you want nights to feel less automatic.",
+                    "Pattern: the risky window depends on when you actually go to sleep.",
+                    "Move: tell me your usual bedtime, then I can suggest the right boundary."
+                ],
+                primaryLabel: "Got it",
+                secondaryLabel: "Open report",
+                actions: [],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
+
+        if intent == .social,
+           contains(text, ["scroll", "doomscroll"]),
+           explicitTimeWindow(in: prompt) == nil,
+           !contains(text, ["tiktok", "instagram", "youtube", "app"]) {
+            return AgentPlan(
+                intent: .social,
+                title: "Scroll Pattern",
+                responseText: "I can help with that, but first I need to know where the loop happens.",
+                bullets: [
+                    "Read: this is a scroll habit, not a generic focus issue.",
+                    "Pattern: the useful protection depends on the app and time window.",
+                    "Move: tell me the main app or the time of day it usually starts."
+                ],
+                primaryLabel: "Got it",
+                secondaryLabel: "Open report",
+                actions: [],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
+
+        return nil
+    }
+
+    private static func hasExplicitBlockRequest(_ text: String) -> Bool {
+        contains(text, ["block", "bloquea", "bloquear", "shield", "protect", "schedule", "limit", "from"])
+    }
+
     private static func behaviorPattern(_ prompt: String) -> String {
         let text = prompt.lowercased()
         if contains(text, ["anxious", "anxiety", "ansiedad", "stress"]) { return "an anxiety scroll loop" }
@@ -861,14 +929,33 @@ private enum BlankedAgentPlanner {
             title: "Bedtime Scroll Loop",
             responseText: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.",
             bullets: [
-                "Pattern: the phone is extending the day when your body needs shutdown.",
-                "Move: protect the last hour before bed first.",
-                "Start with a 10:30 PM to 7:30 AM shield for 7 days."
+                "Read: nights are the risky context.",
+                "Pattern: the phone extends the day when your body needs shutdown.",
+                "Move: tell me your usual bedtime before I suggest a block."
             ],
-            primaryLabel: "Apply plan",
+            primaryLabel: "Got it",
+            secondaryLabel: "Open report",
+            actions: [],
+            requiresSelectedApps: false,
+            requiresScreenTimeAuthorization: false
+        )
+    }
+
+    private static func bedtimeBoundaryPlan(bedtime: Int, context: AgentContext) -> AgentPlan {
+        let start = (bedtime + 24 * 60 - 30) % (24 * 60)
+        AgentPlan(
+            intent: .sleep,
+            title: "Bedtime Boundary",
+            responseText: "That sleep target gives us the missing boundary.",
+            bullets: [
+                "Read: your target bedtime is \(agentMinuteText(bedtime)).",
+                "Pattern: the phone needs to become less available before the final scroll starts.",
+                "Move: protect distracting apps from \(agentMinuteText(start)) to \(agentMinuteText(bedtime)) first."
+            ],
+            primaryLabel: "Apply boundary",
             secondaryLabel: "Choose apps",
             actions: [
-                .applySchedule(name: "Night Protection", startMinute: 22 * 60 + 30, endMinute: 7 * 60 + 30, weekdays: Array(1...7), durationDays: 7)
+                .applySchedule(name: "Sleep Boundary", startMinute: start, endMinute: bedtime, weekdays: Array(1...7), durationDays: 7)
             ],
             requiresSelectedApps: true,
             requiresScreenTimeAuthorization: true
@@ -1071,12 +1158,38 @@ private enum BlankedAgentPlanner {
         let endMinutePart = Int(value(5) ?? "") ?? 0
         guard (0...59).contains(startMinutePart), (0...59).contains(endMinutePart) else { return nil }
 
-        let endMeridiem = value(6)
-        let startMeridiem = value(3) ?? endMeridiem
+        let looksNightly = contains(text, ["night", "sleep", "bed", "dormir", "noche"]) ||
+            (contains(text, ["block", "bloquea", "bloquear", "instagram", "tiktok", "youtube", "scroll"]) &&
+             (7...11).contains(startHour) &&
+             (1...9).contains(endHour))
+        let explicitEndMeridiem = value(6)
+        let explicitStartMeridiem = value(3)
+        let endMeridiem = explicitEndMeridiem ?? (looksNightly && explicitStartMeridiem == nil ? "am" : nil)
+        let startMeridiem = explicitStartMeridiem ?? (looksNightly ? "pm" : endMeridiem)
         let start = minuteOfDay(hour: startHour, minute: startMinutePart, meridiem: startMeridiem)
         let end = minuteOfDay(hour: endHour, minute: endMinutePart, meridiem: endMeridiem)
         guard let start, let end, start != end else { return nil }
         return AgentTimeWindow(startMinute: start, endMinute: end)
+    }
+
+    private static func explicitSingleTime(in prompt: String) -> Int? {
+        let text = prompt.lowercased()
+        let pattern = #"(?:sleep|bed|dormir|duermo|acuesto|bedtime)[^\d]*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+        let nsText = text as NSString
+        let fullRange = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: fullRange) else { return nil }
+
+        func value(_ index: Int) -> String? {
+            let range = match.range(at: index)
+            guard range.location != NSNotFound else { return nil }
+            return nsText.substring(with: range)
+        }
+
+        guard let hour = Int(value(1) ?? "") else { return nil }
+        let minute = Int(value(2) ?? "") ?? 0
+        let meridiem = value(3) ?? ((6...11).contains(hour) ? "pm" : nil)
+        return minuteOfDay(hour: hour, minute: minute, meridiem: meridiem)
     }
 
     private static func minuteOfDay(hour: Int, minute: Int, meridiem: String?) -> Int? {
@@ -1119,15 +1232,6 @@ private struct BlankedAgentClient {
         var plan = decoded.plan.toAgentPlan(fallback: BlankedAgentPlanner.plan(for: prompt, context: context))
         plan.source = decoded.source
         plan.modelError = decoded.model_error
-        #if targetEnvironment(simulator)
-        if let source = decoded.source, !source.isEmpty {
-            plan.bullets.append("QA: \(source)")
-        }
-        if let error = decoded.model_error, !error.isEmpty {
-            plan.bullets.append("QA error: \(String(error.prefix(90)))")
-        }
-        plan.bullets = Array(plan.bullets.prefix(4))
-        #endif
         return plan
     }
 
@@ -1217,6 +1321,8 @@ private struct RemoteAgentAction: Decodable {
 
     var agentAction: AgentAction? {
         switch type {
+        case "none":
+            return .none
         case "start_protection":
             return .startProtection(minutes: clamp(minutes ?? 30, 5, 240), hardMode: hard_mode ?? false)
         case "apply_schedule":
@@ -1370,7 +1476,7 @@ private struct AgentPlanCard: View {
                         .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
-                    Text(canApply ? "Ready to execute" : "Needs setup first")
+                    Text(statusText)
                         .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                         .foregroundStyle(BlankColors.mutedInk)
                 }
@@ -1394,32 +1500,34 @@ private struct AgentPlanCard: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                Button(action: onPrimary) {
-                    Text(plan.primaryLabel)
-                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .foregroundStyle(Color.white)
-                        .background {
-                            Capsule().fill(BlankColors.glassTint.opacity(0.48))
-                        }
-                }
-                .buttonStyle(.plain)
-                .opacity(canApply ? 1 : 0.62)
-
-                Button(plan.secondaryLabel, action: onSecondary)
-                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(BlankColors.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.62)
-                    .frame(width: 96, height: 50)
-                    .background {
-                        Capsule().fill(Color.white.opacity(0.46))
+            if plan.hasExecutableActions {
+                HStack(spacing: 8) {
+                    Button(action: onPrimary) {
+                        Text(plan.primaryLabel)
+                            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundStyle(Color.white)
+                            .background {
+                                Capsule().fill(BlankColors.glassTint.opacity(0.48))
+                            }
                     }
                     .buttonStyle(.plain)
+                    .opacity(canApply ? 1 : 0.62)
+
+                    Button(plan.secondaryLabel, action: onSecondary)
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(BlankColors.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.62)
+                        .frame(width: 96, height: 50)
+                        .background {
+                            Capsule().fill(Color.white.opacity(0.46))
+                        }
+                        .buttonStyle(.plain)
+                }
             }
         }
         .padding(18)
@@ -1450,6 +1558,13 @@ private struct AgentPlanCard: View {
         case .general:
             return "sparkles"
         }
+    }
+
+    private var statusText: String {
+        if !plan.hasExecutableActions {
+            return "Understanding first"
+        }
+        return canApply ? "Ready to execute" : "Needs setup first"
     }
 }
 

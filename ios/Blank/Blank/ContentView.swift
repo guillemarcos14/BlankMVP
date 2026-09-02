@@ -83,69 +83,71 @@ private struct ConversationalHomeView: View {
                 let visualCenterCorrection: CGFloat = -24
 
                 ZStack(alignment: .top) {
-                    VStack(spacing: 0) {
-                        topBar
-                            .offset(x: visualCenterCorrection)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.top, topBarCenterY - 47 / 2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .zIndex(2)
-
-                    if messages.isEmpty && activePlan == nil {
+                    if activeSection == nil {
                         VStack(spacing: 0) {
-                            Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
-                            welcomeHero
-                                .frame(width: min(contentWidth, 350))
+                            topBar
                                 .offset(x: visualCenterCorrection)
                             Spacer(minLength: 0)
                         }
+                        .padding(.top, topBarCenterY - 47 / 2)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    }
+                        .zIndex(2)
 
-                    if !messages.isEmpty || activePlan != nil {
-                        ScrollViewReader { scrollProxy in
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 12) {
-                                    ForEach(messages) { message in
-                                        AgentBubble(message: message, maxWidth: chatWidth)
-                                            .id(message.id)
-                                    }
+                        if messages.isEmpty && activePlan == nil {
+                            VStack(spacing: 0) {
+                                Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
+                                welcomeHero
+                                    .frame(width: min(contentWidth, 350))
+                                    .offset(x: visualCenterCorrection)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        }
 
-                                    if let activePlan {
-                                        AgentPlanCard(
-                                            plan: activePlan,
-                                            canApply: canApply(activePlan),
-                                            maxWidth: chatWidth,
-                                            onPrimary: { apply(activePlan) },
-                                            onSecondary: { handleSecondary(activePlan) }
-                                        )
-                                        .id(activePlan.id)
+                        if !messages.isEmpty || activePlan != nil {
+                            ScrollViewReader { scrollProxy in
+                                ScrollView {
+                                    LazyVStack(alignment: .leading, spacing: 12) {
+                                        ForEach(messages) { message in
+                                            AgentBubble(message: message, maxWidth: chatWidth)
+                                                .id(message.id)
+                                        }
+
+                                        if let activePlan {
+                                            AgentPlanCard(
+                                                plan: activePlan,
+                                                canApply: canApply(activePlan),
+                                                maxWidth: chatWidth,
+                                                onPrimary: { apply(activePlan) },
+                                                onSecondary: { handleSecondary(activePlan) }
+                                            )
+                                            .id(activePlan.id)
+                                        }
                                     }
+                                    .frame(width: chatWidth, alignment: .leading)
+                                    .padding(.top, contentTopPadding)
+                                    .padding(.bottom, 118)
                                 }
-                                .frame(width: chatWidth, alignment: .leading)
-                                .padding(.top, contentTopPadding)
-                                .padding(.bottom, 118)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .offset(x: visualCenterCorrection)
-                            .onChange(of: messages.count) { _ in
-                                scrollToBottom(scrollProxy)
-                            }
-                            .onChange(of: activePlan?.id) { _ in
-                                scrollToBottom(scrollProxy)
+                                .frame(maxWidth: .infinity)
+                                .offset(x: visualCenterCorrection)
+                                .onChange(of: messages.count) { _ in
+                                    scrollToBottom(scrollProxy)
+                                }
+                                .onChange(of: activePlan?.id) { _ in
+                                    scrollToBottom(scrollProxy)
+                                }
                             }
                         }
-                    }
 
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        composer
-                            .frame(width: composerWidth)
-                            .offset(x: visualCenterCorrection)
+                        VStack(spacing: 0) {
+                            Spacer(minLength: 0)
+                            composer
+                                .frame(width: composerWidth)
+                                .offset(x: visualCenterCorrection)
+                        }
+                        .padding(.bottom, composerBottomPadding)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
-                    .padding(.bottom, composerBottomPadding)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
                     if let activeSection {
                         HomeSectionScreen(

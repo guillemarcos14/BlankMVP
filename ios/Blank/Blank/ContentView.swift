@@ -161,6 +161,7 @@ private struct ConversationalHomeView: View {
                             self.activeSection = nil
                         }
                         .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+                        .offset(x: visualCenterCorrection)
                         .transition(.opacity)
                         .zIndex(5)
                     }

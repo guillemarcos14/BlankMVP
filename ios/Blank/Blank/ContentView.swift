@@ -28,8 +28,8 @@ private struct ConversationalHomeView: View {
     @State private var input = ""
     @State private var messages: [AgentMessage] = AgentMessage.openingThread
     @State private var activePlan: AgentPlan?
+    @State private var activeSection: HomeSection?
     @State private var showingPicker = false
-    @State private var showingLegacyHome = false
     @State private var now = Date()
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -66,7 +66,7 @@ private struct ConversationalHomeView: View {
 
     var body: some View {
         ZStack {
-            BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
+            AppBackground(isActive: sessionStore.isBlankActive)
 
             GeometryReader { proxy in
                 let viewportWidth = proxy.size.width
@@ -146,6 +146,22 @@ private struct ConversationalHomeView: View {
                     }
                     .padding(.bottom, composerBottomPadding)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+                    if let activeSection {
+                        HomeSectionScreen(
+                            showingPicker: $showingPicker,
+                            section: activeSection,
+                            screenWidth: viewportWidth,
+                            screenHeight: viewportHeight,
+                            intervention: system.relapseIntervention,
+                            onEmergencyUnlock: performEmergencyUnlock
+                        ) {
+                            self.activeSection = nil
+                        }
+                        .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+                        .transition(.opacity)
+                        .zIndex(5)
+                    }
                 }
                 .frame(width: viewportWidth, height: viewportHeight, alignment: .top)
             }
@@ -156,12 +172,6 @@ private struct ConversationalHomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden()
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
-        .sheet(isPresented: $showingLegacyHome) {
-            HomeView()
-                .environmentObject(sessionStore)
-                .environmentObject(screenTimeBlocker)
-                .environmentObject(purchaseStore)
-        }
         .onAppear {
             restoreRuntimeState()
             scheduleDailyInterventionIfNeeded()
@@ -205,9 +215,9 @@ private struct ConversationalHomeView: View {
 
             Text("How can I help\nyou today?")
                 .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(BlankColors.ink)
+                .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineSpacing(-3)
+                .lineSpacing(0)
                 .tracking(0)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -243,7 +253,7 @@ private struct ConversationalHomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                showingLegacyHome = true
+                activeSection = .emergency
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
@@ -266,9 +276,15 @@ private struct ConversationalHomeView: View {
             .accessibilityLabel("Advanced controls")
 
             HStack(spacing: 0) {
-                topNavButton("Stats")
-                topNavButton("Mode")
-                topNavButton("Habits")
+                topNavButton("Stats") {
+                    activeSection = .report
+                }
+                topNavButton("Mode") {
+                    activeSection = .modes
+                }
+                topNavButton("Habits") {
+                    activeSection = .schedule
+                }
             }
             .padding(.horizontal, 22)
             .frame(width: 236, height: 47)
@@ -288,10 +304,8 @@ private struct ConversationalHomeView: View {
         .frame(width: 291, height: 47)
     }
 
-    private func topNavButton(_ title: String) -> some View {
-        Button {
-            showingLegacyHome = true
-        } label: {
+    private func topNavButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Text(title)
                 .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
                 .foregroundStyle(Color.white)
@@ -559,7 +573,23 @@ private struct ConversationalHomeView: View {
             messages.append(AgentMessage(role: .blanked, text: "I need Screen Time permission before I can protect your phone."))
             return
         }
-        showingLegacyHome = true
+        activeSection = .schedule
+    }
+
+    private func performEmergencyUnlock() -> Bool {
+        guard sessionStore.emergencyUnlocksRemaining > 0 else {
+            messages.append(AgentMessage(role: .blanked, text: "No emergency unlocks left today."))
+            return false
+        }
+        let unlocked = withAnimation(.easeInOut(duration: 0.65)) {
+            sessionStore.deactivateForEmergency()
+        }
+        if unlocked {
+            screenTimeBlocker.clear()
+            activeSection = nil
+            messages.append(AgentMessage(role: .blanked, text: "Emergency unlock used. Apps are available now."))
+        }
+        return unlocked
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {

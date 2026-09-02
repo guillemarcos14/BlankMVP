@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-private enum HomeSection: Hashable {
+enum HomeSection: Hashable {
     case modes
     case schedule
     case report
@@ -1064,7 +1064,7 @@ private struct ConfigIssue: Identifiable {
     var id: String { title }
 }
 
-private struct AppBackground: View {
+struct AppBackground: View {
     let isActive: Bool
 
     var body: some View {
@@ -1326,7 +1326,7 @@ private extension View {
     }
 }
 
-private struct HomeSectionScreen: View {
+struct HomeSectionScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Binding var showingPicker: Bool
     let section: HomeSection

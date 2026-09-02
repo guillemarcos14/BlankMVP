@@ -1340,11 +1340,13 @@ struct HomeSectionScreen: View {
     var body: some View {
         let contentTop: CGFloat = 94
         let contentHeight = max(0, screenHeight - contentTop)
+        let contentWidth = min(max(0, screenWidth - 32), 360)
 
         ZStack(alignment: .topLeading) {
             routeContent
+                .frame(width: contentWidth, height: contentHeight, alignment: .top)
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
-                .position(x: screenWidth / 2, y: contentTop + contentHeight / 2)
+                .offset(y: contentTop)
 
             Button {
                 onClose()
@@ -1588,7 +1590,7 @@ private struct HabitWindowCard: View {
                 }
             }
 
-            HStack(spacing: 12) {
+            VStack(spacing: 12) {
                 WheelTimePicker(title: "Start", minute: $window.startMinute, textColor: textColor, secondaryColor: secondaryColor)
                 WheelTimePicker(title: "End", minute: $window.endMinute, textColor: textColor, secondaryColor: secondaryColor)
             }

@@ -149,7 +149,7 @@ struct ReportView: View {
         Group {
             if usesMainBackground {
                 GeometryReader { proxy in
-                    let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
+                    let viewportWidth = proxy.size.width
                     let contentWidth = max(0, min(viewportWidth - 32, 360))
 
                     ScrollView(.vertical, showsIndicators: false) {

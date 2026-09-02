@@ -1079,7 +1079,7 @@ struct ReportView: View {
                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .headline))
                     .foregroundStyle(reportPrimary)
 
-                Text(wellnessFeatureConsent ? aiPlanStatusText : "Included in Pro. Allow Blanked AI to analyze your patterns and update your plan daily.")
+                Text(wellnessFeatureConsent ? aiPlanStatusText : "Personalize your plan during onboarding to enable AI plan updates.")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1134,25 +1134,27 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button {
-                submitDigitalWellnessFeatures()
-            } label: {
-                Text(aiPlanButtonText)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(wellnessFeatureConsent ? reportSecondary : reportPrimary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background {
-                        Capsule()
-                            .fill(Color.white.opacity(wellnessFeatureConsent ? 0.12 : 0.22))
-                    }
-                    .overlay {
-                        Capsule()
-                            .stroke(reportPrimary.opacity(0.10), lineWidth: 1)
-                    }
+            if wellnessFeatureConsent {
+                Button {
+                    submitDigitalWellnessFeatures()
+                } label: {
+                    Text(aiPlanButtonText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background {
+                            Capsule()
+                                .fill(Color.white.opacity(0.12))
+                        }
+                        .overlay {
+                            Capsule()
+                                .stroke(reportPrimary.opacity(0.10), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(isSubmittingWellnessFeatures)
             }
-            .buttonStyle(.plain)
-            .disabled(isSubmittingWellnessFeatures)
         }
     }
 
@@ -2998,7 +3000,7 @@ struct ReportView: View {
 
     private var aiPlanButtonText: String {
         if isSubmittingWellnessFeatures { return "Updating AI plan..." }
-        return wellnessFeatureConsent ? "Refresh plan" : "Activate AI plan updates"
+        return "Refresh plan"
     }
 
     private var aiPlanStatusText: String {
@@ -3017,7 +3019,7 @@ struct ReportView: View {
     }
 
     private func submitDigitalWellnessFeatures() {
-        guard !isSubmittingWellnessFeatures else { return }
+        guard wellnessFeatureConsent, !isSubmittingWellnessFeatures else { return }
         isSubmittingWellnessFeatures = true
         wellnessSyncMessage = nil
         syncDigitalWellnessFeatures(showSuccessMessage: true)
@@ -3048,7 +3050,7 @@ struct ReportView: View {
                 let insight = try await DigitalWellnessFeaturesClient().submit(
                     payload: payload,
                     anonymousUserId: anonymousUserId,
-                    consentText: "Activate AI plan updates"
+                    consentText: "Personalize my plan"
                 )
                 await BlankFunnelAnalytics.track(
                     "ai_insight_received",

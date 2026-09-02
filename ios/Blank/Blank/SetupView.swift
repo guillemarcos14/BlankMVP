@@ -187,6 +187,7 @@ struct SetupView: View {
     @AppStorage("blankOnboardingProfile", store: BlankSharedState.defaults) private var selectedProfile = ""
     @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
+    @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = false
 
     var onFinishForQA: (() -> Void)?
 
@@ -1408,6 +1409,7 @@ struct SetupView: View {
                     properties: onboardingAnalyticsProperties
                 )
                 await MainActor.run {
+                    wellnessFeatureConsent = true
                     isSubmittingOnboardingResponse = false
                     goForward()
                 }
@@ -2501,7 +2503,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Onboarding Data",
-                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan and improve recommendations. Blanked does not share your app list or screen time data."
+                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan, improve recommendations, and generate AI-powered plan updates when available. Blanked does not share your app list or raw screen time data."
                 ),
                 (
                     "Product Analytics",
@@ -2517,7 +2519,7 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Apple Health",
-                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to personalize your digital wellness plan. Blanked only sends aggregated wellness features to its backend after your explicit consent to activate AI plan updates; it does not send raw Health samples."
+                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to personalize your digital wellness plan. Blanked only sends aggregated wellness features to its backend after you have chosen to personalize your plan; it does not send raw Health samples."
                 ),
                 (
                     "Sharing",

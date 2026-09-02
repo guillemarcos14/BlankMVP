@@ -12,12 +12,12 @@ Blanked stores setup state, blocking status, focus modes, session timing, onboar
 
 Blanked may send:
 
-- onboarding answers after the user taps `Personalize my plan`
+- onboarding answers after the user taps `Personalize my plan`, including for AI-powered plan personalization when available
 - anonymous user ID
 - locale, app version, and build number
 - aggregated product/funnel events
 - anonymous referral activation/reward events
-- aggregated digital wellness features after the user activates AI plan updates
+- aggregated digital wellness features after the user chooses to personalize their plan
 
 Product/funnel events may include onboarding step viewed, permission status, selected item counts, trial actions, free plan selection, first block, block starts and ends, emergency exits, Health permission status, and AI plan update status.
 
@@ -29,11 +29,11 @@ Blanked does not send exact Screen Time app/category/website selections, browsin
 
 Apple Health access is optional. If allowed, Blanked may read Health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics. Health data is used for digital wellness insights, not medical advice, diagnosis, treatment, or therapy.
 
-Blanked sends only aggregated wellness features after explicit user consent. Raw Health samples are not sent.
+Blanked sends only aggregated wellness features after the user chooses to personalize their plan. Raw Health samples are not sent.
 
 ## AI
 
-Blanked may use aggregated app, habit, onboarding, and optional Health-derived features to generate AI-powered digital wellness insights. AI output must stay non-medical and must not claim diagnosis, therapy, or treatment.
+Blanked may use onboarding answers, aggregated app and habit signals, and optional Health-derived features to generate AI-powered digital wellness insights, recommendations, and plan updates. AI output must stay non-medical and must not claim diagnosis, therapy, or treatment.
 
 ## Purchases
 

@@ -943,7 +943,7 @@ private enum BlankedAgentPlanner {
 
     private static func bedtimeBoundaryPlan(bedtime: Int, context: AgentContext) -> AgentPlan {
         let start = (bedtime + 24 * 60 - 30) % (24 * 60)
-        AgentPlan(
+        return AgentPlan(
             intent: .sleep,
             title: "Bedtime Boundary",
             responseText: "That sleep target gives us the missing boundary.",
@@ -1322,7 +1322,7 @@ private struct RemoteAgentAction: Decodable {
     var agentAction: AgentAction? {
         switch type {
         case "none":
-            return .none
+            return AgentAction.none
         case "start_protection":
             return .startProtection(minutes: clamp(minutes ?? 30, 5, 240), hardMode: hard_mode ?? false)
         case "apply_schedule":

@@ -155,13 +155,13 @@ private struct ConversationalHomeView: View {
                             section: activeSection,
                             screenWidth: viewportWidth,
                             screenHeight: viewportHeight,
+                            horizontalOffset: visualCenterCorrection,
                             intervention: system.relapseIntervention,
                             onEmergencyUnlock: performEmergencyUnlock
                         ) {
                             self.activeSection = nil
                         }
                         .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                        .offset(x: visualCenterCorrection)
                         .transition(.opacity)
                         .zIndex(5)
                     }

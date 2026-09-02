@@ -1332,6 +1332,7 @@ struct HomeSectionScreen: View {
     let section: HomeSection
     let screenWidth: CGFloat
     let screenHeight: CGFloat
+    var horizontalOffset: CGFloat = 0
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
     let onClose: () -> Void
@@ -1346,7 +1347,7 @@ struct HomeSectionScreen: View {
             routeContent
                 .frame(width: contentWidth, height: contentHeight, alignment: .top)
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
-                .offset(y: contentTop)
+                .offset(x: horizontalOffset, y: contentTop)
 
             Button {
                 onClose()

@@ -11,10 +11,27 @@ enum BlankedRuntimeMode {
 
 struct ContentView: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @State private var showingOnboardingDemo = false
 
     var body: some View {
-        ConversationalHomeView()
-            .transition(.opacity.combined(with: .scale(scale: 1.01, anchor: .center)))
+        ZStack {
+            if showingOnboardingDemo {
+                SetupView {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        showingOnboardingDemo = false
+                    }
+                }
+                .transition(.opacity)
+            } else {
+                ConversationalHomeView {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        showingOnboardingDemo = true
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.35), value: showingOnboardingDemo)
     }
 }
 
@@ -31,8 +48,13 @@ private struct ConversationalHomeView: View {
     @State private var activeSection: HomeSection?
     @State private var showingPicker = false
     @State private var now = Date()
+    let onOpenOnboardingDemo: () -> Void
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    init(_ onOpenOnboardingDemo: @escaping () -> Void = {}) {
+        self.onOpenOnboardingDemo = onOpenOnboardingDemo
+    }
 
     private var system: DigitalWellnessV3System {
         sessionStore.digitalWellnessV3
@@ -96,9 +118,12 @@ private struct ConversationalHomeView: View {
                         if messages.isEmpty && activePlan == nil {
                             VStack(spacing: 0) {
                                 Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
-                                welcomeHero
-                                    .frame(width: min(contentWidth, 350))
-                                    .offset(x: visualCenterCorrection)
+                                VStack(spacing: 18) {
+                                    welcomeHero
+                                    demoButtons
+                                }
+                                .frame(width: min(contentWidth, 350))
+                                .offset(x: visualCenterCorrection)
                                 Spacer(minLength: 0)
                             }
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -137,6 +162,7 @@ private struct ConversationalHomeView: View {
                                     scrollToBottom(scrollProxy)
                                 }
                             }
+                            .scrollIndicators(.hidden)
                         }
 
                         VStack(spacing: 0) {
@@ -159,7 +185,7 @@ private struct ConversationalHomeView: View {
                             intervention: system.relapseIntervention,
                             onEmergencyUnlock: performEmergencyUnlock
                         ) {
-                            self.activeSection = nil
+                            closeSection()
                         }
                         .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
                         .transition(.opacity)
@@ -167,6 +193,7 @@ private struct ConversationalHomeView: View {
                     }
                 }
                 .frame(width: viewportWidth, height: viewportHeight, alignment: .top)
+                .animation(.easeInOut(duration: 0.35), value: activeSection)
             }
         }
         .ignoresSafeArea()
@@ -256,7 +283,7 @@ private struct ConversationalHomeView: View {
 
         return HStack(alignment: .center, spacing: 8) {
             Button {
-                activeSection = .emergency
+                openSection(.emergency)
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
@@ -280,13 +307,13 @@ private struct ConversationalHomeView: View {
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
-                    activeSection = .report
+                    openSection(.report)
                 }
                 topNavButton("Mode") {
-                    activeSection = .modes
+                    openSection(.modes)
                 }
                 topNavButton("Habits") {
-                    activeSection = .schedule
+                    openSection(.schedule)
                 }
             }
             .padding(.horizontal, 22)
@@ -356,6 +383,41 @@ private struct ConversationalHomeView: View {
         .shadow(color: BlankColors.ink.opacity(0.06), radius: 16, x: 0, y: 8)
     }
 
+    @ViewBuilder
+    private var demoButtons: some View {
+        #if targetEnvironment(simulator)
+        HStack(spacing: 10) {
+            Button {
+                onOpenOnboardingDemo()
+            } label: {
+                demoButtonLabel("Onboarding", systemImage: "rectangle.stack")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                purchaseStore.enableDemoProAccess()
+            } label: {
+                demoButtonLabel(purchaseStore.hasPremiumAccess ? "Pro active" : "Pro demo", systemImage: "crown")
+            }
+            .buttonStyle(.plain)
+        }
+        #endif
+    }
+
+    private func demoButtonLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+            .foregroundStyle(Color.white.opacity(0.92))
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background {
+                Capsule().fill(Color.white.opacity(0.18))
+            }
+            .overlay {
+                Capsule().stroke(Color.white.opacity(0.22), lineWidth: 1)
+            }
+    }
+
     private var quickActions: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -384,6 +446,18 @@ private struct ConversationalHomeView: View {
 
     private var currentSecondaryColor: Color {
         sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk
+    }
+
+    private func openSection(_ section: HomeSection) {
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeSection = section
+        }
+    }
+
+    private func closeSection() {
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeSection = nil
+        }
     }
 
     private func restoreRuntimeState() {

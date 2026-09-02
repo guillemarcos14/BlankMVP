@@ -92,7 +92,7 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
-        .animation(.spring(response: 0.48, dampingFraction: 0.88), value: activeSection)
+        .animation(.easeInOut(duration: 0.35), value: activeSection)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
@@ -272,11 +272,15 @@ struct HomeView: View {
     private func openSection(_ section: HomeSection) {
         if section == .modes, sessionStore.pinProtectionEnabled {
             unlockAdvancedSettings {
-                activeSection = section
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    activeSection = section
+                }
             }
             return
         }
-        activeSection = section
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeSection = section
+        }
     }
 
     private func unlockAdvancedSettings(onSuccess: @escaping () -> Void) {
@@ -303,7 +307,9 @@ struct HomeView: View {
     }
 
     private func closeSection() {
-        activeSection = nil
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeSection = nil
+        }
     }
 
     @ViewBuilder
@@ -1182,6 +1188,7 @@ private struct ModesList: View {
         .tint(textColor)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
@@ -1294,7 +1301,7 @@ private struct AdvancedModeControls: View {
     }
 
     private var shortcutsText: String {
-        "Shortcuts can run Blanked with Open URL actions. Use the URLs below with app, Focus, time, or location automations."
+        "iOS Shortcuts can open these links automatically. Use Start to turn Blanked on and Stop to turn it off from time, location, Focus, or app automations."
     }
 
     private func shortcutPill(_ title: String, value: String) -> some View {
@@ -1460,6 +1467,7 @@ private struct ScheduleEditorContent: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
@@ -1592,8 +1600,8 @@ private struct HabitWindowCard: View {
             }
 
             VStack(spacing: 12) {
-                WheelTimePicker(title: "Start", minute: $window.startMinute, textColor: textColor, secondaryColor: secondaryColor)
-                WheelTimePicker(title: "End", minute: $window.endMinute, textColor: textColor, secondaryColor: secondaryColor)
+                WheelTimePicker(minute: $window.startMinute)
+                WheelTimePicker(minute: $window.endMinute)
             }
 
             HabitDaysPicker(
@@ -1701,31 +1709,15 @@ private struct HabitDaysPicker: View {
 }
 
 private struct WheelTimePicker: View {
-    let title: String
     @Binding var minute: Int
-    let textColor: Color
-    let secondaryColor: Color
 
     var body: some View {
-        VStack(spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
-                Spacer()
-                Text(formatMinute(minute))
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(textColor)
-                    .monospacedDigit()
-            }
-
-            DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .frame(height: 96)
-                .clipped()
-                .colorScheme(.dark)
-        }
+        DatePicker("", selection: dateBinding, displayedComponents: .hourAndMinute)
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .frame(height: 96)
+            .clipped()
+            .colorScheme(.dark)
         .frame(maxWidth: .infinity)
     }
 

@@ -188,6 +188,12 @@ struct SetupView: View {
     @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
 
+    var onFinishForQA: (() -> Void)?
+
+    init(_ onFinishForQA: (() -> Void)? = nil) {
+        self.onFinishForQA = onFinishForQA
+    }
+
     var body: some View {
         ZStack {
             BlankOnboardingBackground(palette: currentStep.bottomGlowPalette)
@@ -211,7 +217,6 @@ struct SetupView: View {
 
                     Spacer()
 
-                    #if DEBUG
                     #if targetEnvironment(simulator)
                     Button("Home") {
                         skipToHomeForQA()
@@ -221,7 +226,6 @@ struct SetupView: View {
                     .frame(height: 42)
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip onboarding and open Home")
-                    #endif
                     #endif
                 }
                 .padding(.top, 2)
@@ -1643,6 +1647,7 @@ struct SetupView: View {
         message = nil
         withAnimation(.easeInOut(duration: 0.85)) {
             sessionStore.finishSetup()
+            onFinishForQA?()
         }
     }
 

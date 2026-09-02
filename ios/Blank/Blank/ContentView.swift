@@ -75,6 +75,7 @@ private struct ConversationalHomeView: View {
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(viewportWidth * 0.075, 28), 36)
                 let contentWidth = viewportWidth - horizontalPadding * 2
+                let chatWidth = min(contentWidth, 342)
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
                 let composerWidth = min(contentWidth, 342)
@@ -107,7 +108,7 @@ private struct ConversationalHomeView: View {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 12) {
                                     ForEach(messages) { message in
-                                        AgentBubble(message: message, maxWidth: contentWidth)
+                                        AgentBubble(message: message, maxWidth: chatWidth)
                                             .id(message.id)
                                     }
 
@@ -115,17 +116,19 @@ private struct ConversationalHomeView: View {
                                         AgentPlanCard(
                                             plan: activePlan,
                                             canApply: canApply(activePlan),
+                                            maxWidth: chatWidth,
                                             onPrimary: { apply(activePlan) },
                                             onSecondary: { handleSecondary(activePlan) }
                                         )
                                         .id(activePlan.id)
                                     }
                                 }
-                                .frame(width: contentWidth, alignment: .leading)
-                                .padding(.horizontal, horizontalPadding)
+                                .frame(width: chatWidth, alignment: .leading)
                                 .padding(.top, contentTopPadding)
                                 .padding(.bottom, 118)
                             }
+                            .frame(maxWidth: .infinity)
+                            .offset(x: visualCenterCorrection)
                             .onChange(of: messages.count) { _ in
                                 scrollToBottom(scrollProxy)
                             }
@@ -200,17 +203,11 @@ private struct ConversationalHomeView: View {
                 .foregroundStyle(BlankColors.ink.opacity(0.58))
                 .tracking(0)
 
-            (
-                Text("How can I ")
-                    .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
-                + Text("help")
-                    .font(.blankSerif(size: 42, relativeTo: .largeTitle))
-                + Text("\nyou today?")
-                    .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
-            )
+            Text("How can I help\nyou today?")
+                .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(BlankColors.ink)
                 .multilineTextAlignment(.center)
-                .lineSpacing(0)
+                .lineSpacing(-3)
                 .tracking(0)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -1210,6 +1207,7 @@ private struct AgentBubble: View {
 private struct AgentPlanCard: View {
     let plan: AgentPlan
     let canApply: Bool
+    let maxWidth: CGFloat
     let onPrimary: () -> Void
     let onSecondary: () -> Void
 
@@ -1244,12 +1242,13 @@ private struct AgentPlanCard: View {
                         Text(bullet)
                             .font(.blankInter(size: 15, relativeTo: .subheadline))
                             .foregroundStyle(BlankColors.ink.opacity(0.84))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Button(action: onPrimary) {
                     Text(plan.primaryLabel)
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
@@ -1269,8 +1268,8 @@ private struct AgentPlanCard: View {
                     .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                     .foregroundStyle(BlankColors.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                    .frame(width: 104, height: 50)
+                    .minimumScaleFactor(0.62)
+                    .frame(width: 96, height: 50)
                     .background {
                         Capsule().fill(Color.white.opacity(0.46))
                     }
@@ -1278,8 +1277,10 @@ private struct AgentPlanCard: View {
             }
         }
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: maxWidth, alignment: .leading)
         .blankGlassCard(cornerRadius: 24, tintOpacity: 0.50)
+        .frame(width: maxWidth)
+        .clipped()
     }
 
     private var iconName: String {

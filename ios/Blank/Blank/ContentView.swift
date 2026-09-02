@@ -525,17 +525,29 @@ private struct ConversationalHomeView: View {
             )
         )
         BlankedAgentMemory.recordUserPrompt(text, inferredIntent: fallbackPlan.intent)
-        activePlan = fallbackPlan
-        messages.append(AgentMessage(role: .blanked, text: fallbackPlan.responseText))
+        activePlan = nil
+        let thinkingMessage = AgentMessage(role: .blanked, text: "Reading the pattern...")
+        messages.append(thinkingMessage)
 
         let context = currentAgentContext()
         Task {
-            guard let remotePlan = try? await BlankedAgentClient().plan(prompt: text, context: context) else { return }
+            let resolvedPlan: AgentPlan
+            do {
+                resolvedPlan = try await BlankedAgentClient().plan(prompt: text, context: context)
+            } catch {
+                #if targetEnvironment(simulator)
+                var debugPlan = fallbackPlan
+                debugPlan.source = "local_fallback"
+                debugPlan.modelError = error.localizedDescription
+                resolvedPlan = debugPlan
+                #else
+                resolvedPlan = fallbackPlan
+                #endif
+            }
             await MainActor.run {
-                guard activePlan?.id == fallbackPlan.id else { return }
-                activePlan = remotePlan
-                if let index = messages.lastIndex(where: { $0.text == fallbackPlan.responseText && $0.role == .blanked }) {
-                    messages[index].text = remotePlan.responseText
+                activePlan = resolvedPlan
+                if let index = messages.firstIndex(where: { $0.id == thinkingMessage.id }) {
+                    messages[index].text = resolvedPlan.responseText
                 }
             }
         }
@@ -747,6 +759,8 @@ private struct AgentPlan: Identifiable, Equatable {
     var actions: [AgentAction]
     var requiresSelectedApps: Bool
     var requiresScreenTimeAuthorization: Bool
+    var source: String? = nil
+    var modelError: String? = nil
 }
 
 private struct AgentMessage: Identifiable, Equatable {
@@ -800,10 +814,10 @@ private enum BlankedAgentPlanner {
         return AgentPlan(
             intent: intent,
             title: intent == .sleep ? "Sleep Protection Plan" : "Scroll Control Plan",
-            responseText: "I can protect that window from \(start) to \(end).",
+            responseText: "I read this as a specific protection window: \(start) to \(end).",
             bullets: [
-                "Block selected distracting apps from \(start) to \(end).",
-                "Keep the same window for 7 days so Blanked can learn.",
+                "Pattern: the risky moment is already clear, so guessing is unnecessary.",
+                "Move: shield distracting apps from \(start) to \(end).",
                 context.hasSelectedApps ? "Use your current app selection." : "Choose the apps Blanked should control first."
             ],
             primaryLabel: "Apply plan",
@@ -818,27 +832,38 @@ private enum BlankedAgentPlanner {
 
     private static func classify(_ prompt: String) -> AgentIntent {
         let text = prompt.lowercased()
-        if contains(text, ["sleep", "night", "bed", "dormir", "noche", "scroll por la noche"]) { return .sleep }
+        if contains(text, ["porn", "porno", "adult", "xxx"]) { return .adultContent }
+        if contains(text, ["losing control", "perdiendo el control", "reca", "relapse", "urge", "emergency", "can't stop", "no puedo parar"]) { return .emergency }
+        if contains(text, ["sleep", "night", "bed", "dormir", "noche", "scroll por la noche", "tired", "cansado", "morning"]) { return .sleep }
         if contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"]) { return .study }
-        if contains(text, ["losing control", "perdiendo el control", "reca", "urge", "emergency"]) { return .emergency }
         if contains(text, ["allow only", "whatsapp", "maps", "solo", "only"]) { return .allowOnly }
         if contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa"]) { return .vacation }
         if contains(text, ["week", "semana", "analy", "diagn"]) { return .weeklyReview }
-        if contains(text, ["porn", "porno", "adult", "xxx"]) { return .adultContent }
-        if contains(text, ["social", "tiktok", "instagram", "youtube", "gaming", "game", "dopamine", "scroll"]) { return .social }
+        if contains(text, ["social", "tiktok", "instagram", "youtube", "gaming", "game", "dopamine", "scroll", "doomscroll", "anxious", "anxiety", "ansiedad", "bored", "aburr", "guilt", "culpa"]) { return .social }
         if contains(text, ["focus", "work", "productiv", "foco", "trabaj"]) { return .focus }
         return .general
+    }
+
+    private static func behaviorPattern(_ prompt: String) -> String {
+        let text = prompt.lowercased()
+        if contains(text, ["anxious", "anxiety", "ansiedad", "stress"]) { return "an anxiety scroll loop" }
+        if contains(text, ["bored", "aburr"]) { return "a boredom scroll loop" }
+        if contains(text, ["sleep", "night", "bed", "dormir", "noche", "tired"]) { return "a bedtime scroll loop" }
+        if contains(text, ["whatsapp", "check", "notification", "notif"]) { return "a compulsive checking loop" }
+        if contains(text, ["avoid", "procrast", "work", "study", "exam"]) { return "an avoidance loop" }
+        if contains(text, ["relapse", "reca", "broke", "failed"]) { return "a relapse pattern" }
+        return "a screen habit loop"
     }
 
     private static func sleepPlan(context: AgentContext) -> AgentPlan {
         AgentPlan(
             intent: .sleep,
-            title: "Night Protection Plan",
-            responseText: "I can protect your nights before the scroll starts.",
+            title: "Bedtime Scroll Loop",
+            responseText: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.",
             bullets: [
-                "Block distracting apps from 10:30 PM to 7:30 AM.",
-                "Use medium difficulty for the first 7 days.",
-                "Send prevention before the weak window."
+                "Pattern: the phone is extending the day when your body needs shutdown.",
+                "Move: protect the last hour before bed first.",
+                "Start with a 10:30 PM to 7:30 AM shield for 7 days."
             ],
             primaryLabel: "Apply plan",
             secondaryLabel: "Choose apps",
@@ -855,9 +880,9 @@ private enum BlankedAgentPlanner {
         return AgentPlan(
             intent: .focus,
             title: "Focus Block",
-            responseText: "I can start a protected focus block now.",
+            responseText: "This is an execution moment, so the useful move is immediate friction.",
             bullets: [
-                "Start \(minutes) minutes now.",
+                "Move: start \(minutes) minutes now.",
                 "Keep your current protected apps.",
                 context.system.forecast.reason
             ],
@@ -893,12 +918,12 @@ private enum BlankedAgentPlanner {
     private static func emergencyPlan(context: AgentContext) -> AgentPlan {
         AgentPlan(
             intent: .emergency,
-            title: "Immediate Protection",
-            responseText: context.isBlankActive ? "You are already protected. I can make the next step harder." : "I can protect you immediately.",
+            title: "Loss Of Control",
+            responseText: context.isBlankActive ? "You are already protected; changing settings now would weaken the boundary." : "This is a high-risk moment. Reduce choice immediately.",
             bullets: [
                 context.emergencyUnlocksRemaining > 0 ? "\(context.emergencyUnlocksRemaining) emergency unlocks left this week." : "No emergency unlocks left this week.",
-                "Start a 30 minute hard block now.",
-                "Review the trigger after the block."
+                "Move: use a short hard block, then review what triggered it.",
+                "Do not redesign the whole plan while the urge is active."
             ],
             primaryLabel: context.isBlankActive ? "Keep blocking" : "Start hard block",
             secondaryLabel: "Change apps",
@@ -983,12 +1008,12 @@ private enum BlankedAgentPlanner {
     private static func socialPlan(context: AgentContext) -> AgentPlan {
         AgentPlan(
             intent: .social,
-            title: "Scroll Control Plan",
-            responseText: "I can reduce social scrolling with a daily limit and one preventive window.",
+            title: "Scroll Loop",
+            responseText: "This reads like \(behaviorPattern(context.system.profile.dominantModeName ?? "")): the app is filling a state, not just spare time.",
             bullets: [
-                "Daily limit: 25 minutes.",
-                "Preventive block: 8:30 PM to 11:00 PM.",
-                "Keep the same apps for 7 days so Blanked can learn."
+                "Pattern: the trigger matters more than total screen time.",
+                "Move: block before the usual scroll window and cap fallback use.",
+                "Start with a 25 minute daily limit plus an evening shield."
             ],
             primaryLabel: "Apply plan",
             secondaryLabel: "Choose apps",
@@ -1004,18 +1029,18 @@ private enum BlankedAgentPlanner {
     private static func generalPlan(context: AgentContext) -> AgentPlan {
         AgentPlan(
             intent: .general,
-            title: "Adaptive Protection Plan",
-            responseText: "I can turn that into a simple adaptive protection plan.",
+            title: "Digital Wellness Read",
+            responseText: "This looks like a screen habit loop, not just a willpower problem.",
             bullets: [
-                context.system.plan.weeklyGoal,
-                "Start before \(context.system.forecast.riskWindow).",
-                "Adjust difficulty after the next break signal."
+                "Pattern: your phone is becoming the default response around \(context.system.forecast.riskWindow).",
+                "Move: add friction before the loop starts, not after you are already scrolling.",
+                context.hasSelectedApps ? "Protection can run with your current setup." : "Choose the apps Blanked can control first."
             ],
-            primaryLabel: "Apply adaptive plan",
-            secondaryLabel: "Choose apps",
-            actions: [.applyAIPlan],
-            requiresSelectedApps: true,
-            requiresScreenTimeAuthorization: true
+            primaryLabel: context.hasSelectedApps ? "Apply protection" : "Set up",
+            secondaryLabel: "Open report",
+            actions: context.hasSelectedApps ? [.applyAIPlan] : [.openAppPicker],
+            requiresSelectedApps: !context.hasSelectedApps,
+            requiresScreenTimeAuthorization: context.hasSelectedApps
         )
     }
 
@@ -1091,7 +1116,19 @@ private struct BlankedAgentClient {
         }
 
         let decoded = try JSONDecoder().decode(RemoteAgentResponse.self, from: data)
-        return decoded.plan.toAgentPlan(fallback: BlankedAgentPlanner.plan(for: prompt, context: context))
+        var plan = decoded.plan.toAgentPlan(fallback: BlankedAgentPlanner.plan(for: prompt, context: context))
+        plan.source = decoded.source
+        plan.modelError = decoded.model_error
+        #if targetEnvironment(simulator)
+        if let source = decoded.source, !source.isEmpty {
+            plan.bullets.append("QA: \(source)")
+        }
+        if let error = decoded.model_error, !error.isEmpty {
+            plan.bullets.append("QA error: \(String(error.prefix(90)))")
+        }
+        plan.bullets = Array(plan.bullets.prefix(4))
+        #endif
+        return plan
     }
 
     private func payload(prompt: String, context: AgentContext) -> [String: Any] {
@@ -1130,6 +1167,8 @@ private struct BlankedAgentClient {
 
 private struct RemoteAgentResponse: Decodable {
     var plan: RemoteAgentPlan
+    var source: String?
+    var model_error: String?
 }
 
 private struct RemoteAgentPlan: Decodable {
@@ -1153,7 +1192,7 @@ private struct RemoteAgentPlan: Decodable {
             bullets: cleanedBullets.isEmpty ? fallback.bullets : Array(cleanedBullets.prefix(4)),
             primaryLabel: clean(primary_label, fallback.primaryLabel),
             secondaryLabel: clean(secondary_label, fallback.secondaryLabel),
-            actions: mappedActions.isEmpty ? fallback.actions : mappedActions,
+            actions: mappedActions,
             requiresSelectedApps: requires_selected_apps,
             requiresScreenTimeAuthorization: requires_screen_time_authorization
         )
@@ -1227,7 +1266,7 @@ private enum BlankedAgentMemory {
     private static let lastPlanAppliedAtKey = "blankedAgentLastPlanAppliedAt"
 
     static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
-        defaults.set(String(prompt.prefix(500)), forKey: lastPromptKey)
+        defaults.removeObject(forKey: lastPromptKey)
         defaults.set(inferredIntent.rawValue, forKey: lastIntentKey)
     }
 
@@ -1239,7 +1278,7 @@ private enum BlankedAgentMemory {
 
     static func snapshot() -> [String: Any] {
         [
-            "last_prompt": defaults.string(forKey: lastPromptKey) ?? "",
+            "last_prompt": "",
             "last_intent": defaults.string(forKey: lastIntentKey) ?? "",
             "last_plan_title": defaults.string(forKey: lastPlanTitleKey) ?? "",
             "last_plan_applied_at": defaults.double(forKey: lastPlanAppliedAtKey)

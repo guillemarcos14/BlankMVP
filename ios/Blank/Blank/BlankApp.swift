@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct BlankApp: App {
@@ -7,6 +8,11 @@ struct BlankApp: App {
     @StateObject private var purchaseStore = StoreKitPurchaseStore()
     @StateObject private var screenTimeBlocker = ScreenTimeBlocker()
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        UIScrollView.appearance().showsVerticalScrollIndicator = false
+        UIScrollView.appearance().showsHorizontalScrollIndicator = false
+    }
 
     var body: some Scene {
         WindowGroup {

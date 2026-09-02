@@ -850,24 +850,27 @@ final class SessionStore: ObservableObject {
         if let data = defaults.data(forKey: Keys.focusModes),
            let decoded = try? JSONDecoder().decode([BlankFocusMode].self, from: data),
            !decoded.isEmpty {
-            return decoded.map { mode in
+            let migrated = decoded.compactMap { mode -> BlankFocusMode? in
                 switch mode.name {
                 case "Rutina diaria":
                     return BlankFocusMode(id: mode.id, name: "Routine", selectionData: mode.selectionData, createdAt: mode.createdAt, updatedAt: mode.updatedAt)
                 case "Estudio":
-                    return BlankFocusMode(id: mode.id, name: "Focus", selectionData: mode.selectionData, createdAt: mode.createdAt, updatedAt: mode.updatedAt)
+                    return nil
                 case "Dormir":
-                    return BlankFocusMode(id: mode.id, name: "Work", selectionData: mode.selectionData, createdAt: mode.createdAt, updatedAt: mode.updatedAt)
+                    return nil
+                case "Focus", "Work":
+                    return mode.selectionData == nil ? nil : mode
                 default:
                     return mode
                 }
             }
+            if !migrated.isEmpty {
+                return migrated
+            }
         }
 
         return [
-            BlankFocusMode(id: Self.defaultModeId, name: "Routine", selectionData: encodedSelection(fallbackSelection)),
-            BlankFocusMode(name: "Focus"),
-            BlankFocusMode(name: "Work")
+            BlankFocusMode(id: Self.defaultModeId, name: "Routine", selectionData: encodedSelection(fallbackSelection))
         ]
     }
 

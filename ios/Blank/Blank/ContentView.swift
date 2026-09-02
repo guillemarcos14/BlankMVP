@@ -69,10 +69,8 @@ private struct ConversationalHomeView: View {
             BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
 
             GeometryReader { proxy in
-                let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
-                let viewportHeight = max(proxy.size.height, UIScreen.main.bounds.height)
-                let xCorrection = -proxy.frame(in: .global).minX
-                let centerX = viewportWidth / 2
+                let viewportWidth = proxy.size.width
+                let viewportHeight = proxy.size.height
                 let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
                 let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
                 let horizontalPadding = min(max(viewportWidth * 0.075, 28), 36)
@@ -80,56 +78,73 @@ private struct ConversationalHomeView: View {
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
                 let composerWidth = min(contentWidth, 342)
-                let composerCenterY = viewportHeight - max(bottomSafeArea + 18, 34) - 29
+                let composerBottomPadding = max(bottomSafeArea + 18, 34)
+                let visualCenterCorrection: CGFloat = -24
 
-                ZStack(alignment: .topLeading) {
-                    topBar
-                        .position(x: centerX, y: topBarCenterY)
-                        .zIndex(2)
+                ZStack(alignment: .top) {
+                    VStack(spacing: 0) {
+                        topBar
+                            .offset(x: visualCenterCorrection)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, topBarCenterY - 47 / 2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .zIndex(2)
 
                     if messages.isEmpty && activePlan == nil {
-                        welcomeHero
-                            .frame(width: min(contentWidth, 350))
-                            .position(x: centerX, y: viewportHeight * 0.40)
+                        VStack(spacing: 0) {
+                            Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
+                            welcomeHero
+                                .frame(width: min(contentWidth, 350))
+                                .offset(x: visualCenterCorrection)
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     }
 
-                    ScrollViewReader { scrollProxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 12) {
-                                ForEach(messages) { message in
-                                    AgentBubble(message: message, maxWidth: contentWidth)
-                                        .id(message.id)
-                                }
+                    if !messages.isEmpty || activePlan != nil {
+                        ScrollViewReader { scrollProxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 12) {
+                                    ForEach(messages) { message in
+                                        AgentBubble(message: message, maxWidth: contentWidth)
+                                            .id(message.id)
+                                    }
 
-                                if let activePlan {
-                                    AgentPlanCard(
-                                        plan: activePlan,
-                                        canApply: canApply(activePlan),
-                                        onPrimary: { apply(activePlan) },
-                                        onSecondary: { handleSecondary(activePlan) }
-                                    )
-                                    .id(activePlan.id)
+                                    if let activePlan {
+                                        AgentPlanCard(
+                                            plan: activePlan,
+                                            canApply: canApply(activePlan),
+                                            onPrimary: { apply(activePlan) },
+                                            onSecondary: { handleSecondary(activePlan) }
+                                        )
+                                        .id(activePlan.id)
+                                    }
                                 }
+                                .frame(width: contentWidth, alignment: .leading)
+                                .padding(.horizontal, horizontalPadding)
+                                .padding(.top, contentTopPadding)
+                                .padding(.bottom, 118)
                             }
-                            .frame(width: contentWidth, alignment: .leading)
-                            .padding(.horizontal, horizontalPadding)
-                            .padding(.top, contentTopPadding)
-                            .padding(.bottom, 118)
-                        }
-                        .onChange(of: messages.count) { _ in
-                            scrollToBottom(scrollProxy)
-                        }
-                        .onChange(of: activePlan?.id) { _ in
-                            scrollToBottom(scrollProxy)
+                            .onChange(of: messages.count) { _ in
+                                scrollToBottom(scrollProxy)
+                            }
+                            .onChange(of: activePlan?.id) { _ in
+                                scrollToBottom(scrollProxy)
+                            }
                         }
                     }
 
-                    composer
-                        .frame(width: composerWidth)
-                        .position(x: centerX, y: composerCenterY)
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        composer
+                            .frame(width: composerWidth)
+                            .offset(x: visualCenterCorrection)
+                    }
+                    .padding(.bottom, composerBottomPadding)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                 }
-                .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                .offset(x: xCorrection)
+                .frame(width: viewportWidth, height: viewportHeight, alignment: .top)
             }
         }
         .ignoresSafeArea()

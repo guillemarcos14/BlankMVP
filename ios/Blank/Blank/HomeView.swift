@@ -43,9 +43,8 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let viewportWidth = max(proxy.size.width, UIScreen.main.bounds.width)
-            let viewportHeight = max(proxy.size.height, UIScreen.main.bounds.height)
-            let xCorrection = -proxy.frame(in: .global).minX
+            let viewportWidth = proxy.size.width
+            let viewportHeight = proxy.size.height
             let layout = HomeLayoutMetrics(size: CGSize(width: viewportWidth, height: viewportHeight), safeAreaInsets: proxy.safeAreaInsets)
 
             ZStack(alignment: .topLeading) {
@@ -82,7 +81,6 @@ struct HomeView: View {
                         closeSection()
                     }
                     .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                    .offset(x: xCorrection)
                     .transition(.opacity)
                     .zIndex(5)
                 }

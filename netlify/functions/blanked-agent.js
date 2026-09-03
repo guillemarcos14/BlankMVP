@@ -55,13 +55,19 @@ function namedApp(prompt) {
   return match ? match[1] : "the app";
 }
 
+function requestedAppCategory(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  if (contains(text, ["social media", "social apps", "social networks", "redes sociales"])) return "social apps";
+  return "";
+}
+
 function requestedUnknownApp(prompt) {
   const text = cleanText(prompt, 600);
   const match = text.match(/\b(?:block|limit|bloquea|bloquear)\s+([a-z][a-z0-9._+-]{1,30})\b/i);
   if (!match) return "";
   const raw = match[1];
   const lowered = raw.toLowerCase();
-  const blockedWords = new Set(["everything", "all", "todos", "todas", "adult", "websites", "apps", "app", "my", "me", "now", "for", "from", "during", "strict", "hard"]);
+  const blockedWords = new Set(["everything", "all", "todos", "todas", "adult", "websites", "apps", "app", "social", "media", "networks", "redes", "my", "me", "now", "for", "from", "during", "strict", "hard"]);
   if (blockedWords.has(lowered)) return "";
   if (namedApp(raw) !== "the app") return "";
   return raw.charAt(0).toUpperCase() + raw.slice(1);
@@ -130,7 +136,7 @@ function classify(prompt) {
   if (contains(text, ["allow only", "whatsapp", "maps", "solo", "only"])) return "allowOnly";
   if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa", "resume my rules", "resume rules"])) return "vacation";
   if (contains(text, ["week", "semana", "analy", "diagn", "report", "review"])) return "weeklyReview";
-  if (contains(text, ["tiktok", "instagram", "youtube", "reddit", "twitter", "facebook", "snapchat", "gaming", "game", "dopamine", "scroll", "doomscroll", "notification", "notifications"])) return "social";
+  if (contains(text, ["social media", "social apps", "social networks", "redes sociales", "tiktok", "instagram", "youtube", "reddit", "twitter", "facebook", "snapchat", "gaming", "game", "dopamine", "scroll", "doomscroll", "notification", "notifications"])) return "social";
   if (requestedUnknownApp(prompt)) return "social";
   if (contains(text, ["anxious", "anxiety", "ansiedad", "bored", "boring", "aburr", "lonely", "stress", "guilt", "culpa"])) return "social";
   if (contains(text, ["focus", "work", "productiv", "foco", "trabaj", "deep work", "now"])) return "focus";
@@ -250,6 +256,7 @@ function fallbackPlan(prompt, context = {}) {
   const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
   const promptApp = namedApp(prompt);
   const activeApp = promptApp !== "the app" ? promptApp : memoryApp;
+  const appCategory = requestedAppCategory(prompt);
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
@@ -317,6 +324,24 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   const unknownApp = requestedUnknownApp(prompt);
+  if (intent === "social" && appCategory && hasExplicitBlockRequest(prompt) && (!selected || !authorized)) {
+    const setupAction = !selected ? "open_app_picker" : "request_screen_time_permission";
+    return {
+      intent: "social",
+      title: "Choose Apps",
+      response_text: `Choose the social apps in Screen Time first, then I can apply the block.`,
+      bullets: [
+        "Read: this is a category of apps, not one exact app.",
+        "Pattern: iOS needs you to choose the apps before Blanked can shield them.",
+        "Move: choose the social apps now, then apply the boundary."
+      ],
+      primary_label: !selected ? "Choose apps" : "Allow Screen Time",
+      secondary_label: "Not now",
+      actions: [action(setupAction)],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
   if (intent === "social" && unknownApp) {
     return {
       intent: "social",
@@ -645,10 +670,14 @@ function normalizePlan(parsed, fallback) {
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback):/i.test(item)).length >= 2;
+  const preserveFallbackText = contains(fallback.response_text, [
+    "already protected",
+    "Choose the social apps in Screen Time first",
+  ]);
   return {
     intent: planIntent,
     title: userFacingText(plan.title, 70) || fallback.title,
-    response_text: userFacingText(plan.response_text, 180) || interpretation || fallback.response_text,
+    response_text: preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text,
     bullets: visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
     primary_label: cleanText(plan.primary_label, 32) || fallback.primary_label,
     secondary_label: cleanText(plan.secondary_label, 32) || fallback.secondary_label,

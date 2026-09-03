@@ -584,6 +584,23 @@
     }
   },
   {
+    "id": "block_social_media_category_not_app",
+    "prompt": "Block social media after lunch",
+    "context": {
+      "has_selected_apps": false,
+      "selection_count": 0
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": ["open_app_picker"],
+      "text_matches": ["social apps|Screen Time|choose"],
+      "ui_text_matches": ["Choose the social apps in Screen Time first"],
+      "ui_text_not_matches": ["block Social|Read: Social|Social is the app"],
+      "requires_selected_apps": false,
+      "requires_screen_time_authorization": false
+    }
+  },
+  {
     "id": "block_instagram_setup_overrides_tiktok_memory",
     "prompt": "Block Instagram",
     "context": {

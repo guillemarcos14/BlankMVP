@@ -1,5 +1,7 @@
+import AVFoundation
 import FamilyControls
 import Foundation
+import Speech
 import SwiftUI
 import UserNotifications
 
@@ -48,6 +50,8 @@ private struct ConversationalHomeView: View {
     @State private var activeSection: HomeSection?
     @State private var showingPicker = false
     @State private var now = Date()
+    @State private var dictationBaseInput = ""
+    @StateObject private var dictation = SpeechDictationController()
     let onOpenOnboardingDemo: () -> Void
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -99,9 +103,11 @@ private struct ConversationalHomeView: View {
                 let contentWidth = viewportWidth - horizontalPadding * 2
                 let chatWidth = min(contentWidth, 342)
                 let topBarCenterY = topSafeArea + 26 + 47 / 2
+                let topBarBottom = topSafeArea + 26 + 47
                 let contentTopPadding = topSafeArea + 26 + 47 + 34
                 let composerWidth = min(contentWidth, 342)
                 let composerBottomPadding = max(bottomSafeArea + 18, 34)
+                let chatBottomClearance = composerBottomPadding + 150
                 let visualCenterCorrection: CGFloat = -24
 
                 ZStack(alignment: .top) {
@@ -151,10 +157,19 @@ private struct ConversationalHomeView: View {
                                     }
                                     .frame(width: chatWidth, alignment: .leading)
                                     .padding(.top, contentTopPadding)
-                                    .padding(.bottom, 118)
+                                    .padding(.bottom, chatBottomClearance)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .offset(x: visualCenterCorrection)
+                                .mask(
+                                    chatVisibilityMask(
+                                        height: viewportHeight,
+                                        topFadeStart: topBarBottom - 6,
+                                        topFadeEnd: contentTopPadding,
+                                        bottomFadeStart: viewportHeight - chatBottomClearance - 18,
+                                        bottomFadeEnd: viewportHeight - composerBottomPadding + 8
+                                    )
+                                )
                                 .onChange(of: messages.count) { _ in
                                     scrollToBottom(scrollProxy)
                                 }
@@ -163,6 +178,13 @@ private struct ConversationalHomeView: View {
                                 }
                             }
                             .scrollIndicators(.hidden)
+                            .overlay {
+                                chatFadeOverlays(
+                                    topHeight: contentTopPadding,
+                                    bottomHeight: chatBottomClearance,
+                                    bottomPadding: composerBottomPadding
+                                )
+                            }
                         }
 
                         VStack(spacing: 0) {
@@ -233,6 +255,13 @@ private struct ConversationalHomeView: View {
         }
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             restoreRuntimeState()
+        }
+        .onChange(of: dictation.transcript) { transcript in
+            updateInputFromDictation(transcript)
+        }
+        .onChange(of: dictation.errorMessage) { message in
+            guard let message else { return }
+            messages.append(AgentMessage(role: .blanked, text: message))
         }
     }
 
@@ -348,13 +377,89 @@ private struct ConversationalHomeView: View {
         .buttonStyle(.plain)
     }
 
+    private func chatVisibilityMask(
+        height: CGFloat,
+        topFadeStart: CGFloat,
+        topFadeEnd: CGFloat,
+        bottomFadeStart: CGFloat,
+        bottomFadeEnd: CGFloat
+    ) -> some View {
+        let safeHeight = max(height, 1)
+        let topStart = min(max(topFadeStart / safeHeight, 0), 1)
+        let topEnd = min(max(topFadeEnd / safeHeight, topStart), 1)
+        let bottomStart = min(max(bottomFadeStart / safeHeight, topEnd), 1)
+        let bottomEnd = min(max(bottomFadeEnd / safeHeight, bottomStart), 1)
+
+        return LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0),
+                .init(color: .clear, location: topStart),
+                .init(color: .black, location: topEnd),
+                .init(color: .black, location: bottomStart),
+                .init(color: .clear, location: bottomEnd),
+                .init(color: .clear, location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private func chatFadeOverlays(topHeight: CGFloat, bottomHeight: CGFloat, bottomPadding: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: max(topHeight, 0))
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black.opacity(0.9), location: 0.55),
+                            .init(color: .clear, location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Spacer(minLength: 0)
+
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: max(bottomHeight, bottomPadding + 96))
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .black.opacity(0.9), location: 0.45),
+                            .init(color: .black, location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        }
+        .allowsHitTesting(false)
+    }
+
     private var composer: some View {
         HStack(spacing: 12) {
-            TextField("Tell Blanked what you need", text: $input, axis: .vertical)
+            TextField(dictation.isRecording ? "Listening..." : "Tell Blanked what you need", text: $input, axis: .vertical)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .lineLimit(1...2)
                 .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
                 .padding(.leading, 22)
+
+            Button {
+                toggleDictation()
+            } label: {
+                Image(systemName: dictation.isRecording ? "stop.fill" : "mic.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(dictation.isRecording ? Color.red.opacity(0.86) : BlankColors.ink.opacity(0.66)))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(dictation.isRecording ? "Stop dictation" : "Start dictation")
 
             Button {
                 submit()
@@ -506,8 +611,25 @@ private struct ConversationalHomeView: View {
     private func submit() {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        dictation.stop()
         input = ""
         runPrompt(text)
+    }
+
+    private func toggleDictation() {
+        if dictation.isRecording {
+            dictation.stop()
+            return
+        }
+        dictationBaseInput = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        dictation.start()
+    }
+
+    private func updateInputFromDictation(_ transcript: String) {
+        guard dictation.isRecording else { return }
+        let spokenText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !spokenText.isEmpty else { return }
+        input = dictationBaseInput.isEmpty ? spokenText : "\(dictationBaseInput) \(spokenText)"
     }
 
     private func runPrompt(_ text: String) {
@@ -721,6 +843,98 @@ private struct ConversationalHomeView: View {
             return "Protection is off"
         case .wrongTag:
             return "Wrong Blank"
+        }
+    }
+}
+
+@MainActor
+private final class SpeechDictationController: NSObject, ObservableObject {
+    @Published var isRecording = false
+    @Published var transcript = ""
+    @Published var errorMessage: String?
+
+    private let audioEngine = AVAudioEngine()
+    private let speechRecognizer = SFSpeechRecognizer()
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+
+    func start() {
+        guard !isRecording else { return }
+        transcript = ""
+        errorMessage = nil
+
+        SFSpeechRecognizer.requestAuthorization { [weak self] speechStatus in
+            AVAudioSession.sharedInstance().requestRecordPermission { micGranted in
+                Task { @MainActor in
+                    guard let self else { return }
+                    guard speechStatus == .authorized, micGranted else {
+                        self.errorMessage = "Enable microphone and speech recognition to dictate messages."
+                        return
+                    }
+                    self.beginRecording()
+                }
+            }
+        }
+    }
+
+    func stop() {
+        guard isRecording || audioEngine.isRunning else { return }
+        audioEngine.stop()
+        recognitionRequest?.endAudio()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
+        isRecording = false
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func beginRecording() {
+        guard speechRecognizer?.isAvailable == true else {
+            errorMessage = "Dictation is not available right now."
+            return
+        }
+
+        recognitionTask?.cancel()
+        recognitionTask = nil
+
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.record, mode: .measurement, options: [.duckOthers])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+
+            let request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            recognitionRequest = request
+
+            let inputNode = audioEngine.inputNode
+            let recordingFormat = inputNode.outputFormat(forBus: 0)
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak request] buffer, _ in
+                request?.append(buffer)
+            }
+
+            audioEngine.prepare()
+            try audioEngine.start()
+            isRecording = true
+
+            recognitionTask = speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if let result {
+                        self.transcript = result.bestTranscription.formattedString
+                        if result.isFinal {
+                            self.stop()
+                        }
+                    } else if error != nil, self.isRecording {
+                        self.errorMessage = "Dictation stopped. Try again."
+                        self.stop()
+                    }
+                }
+            }
+        } catch {
+            errorMessage = "Dictation could not start."
+            stop()
         }
     }
 }
@@ -958,6 +1172,14 @@ private enum BlankedAgentPlanner {
         }?.0
     }
 
+    private static func requestedAppCategory(in prompt: String) -> String? {
+        let text = prompt.lowercased()
+        if contains(text, ["social media", "social apps", "social networks", "redes sociales"]) {
+            return "social apps"
+        }
+        return nil
+    }
+
     private static func sleepPlan(context: AgentContext) -> AgentPlan {
         if let bedtime = BlankedAgentMemory.rememberedBedtimeMinute() {
             return bedtimeBoundaryPlan(bedtime: bedtime, context: context)
@@ -1132,7 +1354,25 @@ private enum BlankedAgentPlanner {
 
     private static func socialPlan(prompt: String, context: AgentContext) -> AgentPlan {
         let promptApp = namedApp(in: prompt)
+        let appCategory = requestedAppCategory(in: prompt)
         let mainApp = promptApp ?? BlankedAgentMemory.rememberedMainApps().first ?? "the app"
+        if appCategory != nil && hasExplicitBlockRequest(prompt.lowercased()) && (!context.hasSelectedApps || !context.screenTimeAuthorized) {
+            return AgentPlan(
+                intent: .social,
+                title: "Choose Apps",
+                responseText: "Choose the social apps in Screen Time first, then I can apply the block.",
+                bullets: [
+                    "Read: this is a category of apps, not one exact app.",
+                    "Pattern: iOS needs you to choose the apps before Blanked can shield them.",
+                    "Move: choose the social apps now, then apply the boundary."
+                ],
+                primaryLabel: context.hasSelectedApps ? "Allow Screen Time" : "Choose apps",
+                secondaryLabel: "Not now",
+                actions: [context.hasSelectedApps ? .requestScreenTimePermission : .openAppPicker],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
         if promptApp != nil && hasExplicitBlockRequest(prompt.lowercased()) && (!context.hasSelectedApps || !context.screenTimeAuthorized) {
             return AgentPlan(
                 intent: .social,

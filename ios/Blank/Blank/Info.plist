@@ -49,6 +49,10 @@
 	<string>Blanked does not write data to Apple Health.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Blanked uses Face ID or your device passcode to protect advanced blocking settings when you enable PIN protection.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Blanked uses the microphone so you can dictate messages to Blanked AI.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Blanked uses speech recognition to turn your dictated messages into text for Blanked AI.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

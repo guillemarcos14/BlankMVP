@@ -35,12 +35,17 @@ function hasBedtime(prompt, context = {}) {
   return Boolean(memory.bedtime_minute != null || contains(text, ["my bedtime", "go to sleep at", "me duermo a", "me voy a dormir a"]));
 }
 
+function hasKnownMainApp(context = {}) {
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  return Array.isArray(memory.main_apps) && memory.main_apps.length > 0;
+}
+
 function needsContextBeforeAction(prompt, intent, context = {}) {
   const text = cleanText(prompt, 600).toLowerCase();
   if (intent === "sleep" && !explicitTimeWindow(prompt) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
     return "bedtime";
   }
-  if (intent === "social" && contains(text, ["scroll", "doomscroll"]) && !explicitTimeWindow(prompt) && !contains(text, ["tiktok", "instagram", "youtube", "app"])) {
+  if (intent === "social" && contains(text, ["scroll", "doomscroll"]) && !explicitTimeWindow(prompt) && !hasKnownMainApp(context) && !contains(text, ["tiktok", "instagram", "youtube", "app"])) {
     return "apps";
   }
   return null;
@@ -120,6 +125,11 @@ function minuteText(minuteOfDayValue) {
   return `${displayHour}:${String(minute).padStart(2, "0")} ${meridiem}`;
 }
 
+function hourWindow(hourValue) {
+  const hour = ((Math.round(Number(hourValue)) % 24) + 24) % 24;
+  return `${minuteText(hour * 60)} to ${minuteText(((hour + 1) % 24) * 60)}`;
+}
+
 function action(type, values = {}) {
   return {
     type,
@@ -142,8 +152,18 @@ function fallbackPlan(prompt, context = {}) {
   const riskWindow = cleanText(context.risk_window, 60) || "your next risk window";
   const cluster = behaviorCluster(prompt);
   const timeWindow = explicitTimeWindow(prompt);
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  const lastOutcome = cleanText(memory.last_plan_outcome, 40);
+  const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
+  const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
+  const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
   const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow Screen Time.";
+  const outcomeLine = lastOutcome === "broke"
+    ? "Feedback: the last plan broke, so the next move should be easier and earlier."
+    : lastOutcome === "held"
+      ? "Feedback: the last plan held, so repeat before increasing difficulty."
+      : setupLine;
 
   if (missingContext === "bedtime") {
     return {
@@ -186,8 +206,8 @@ function fallbackPlan(prompt, context = {}) {
     response_text: `This looks like a ${cluster}, not just a willpower problem.`,
     bullets: [
       `Pattern: your phone is becoming the default response around ${riskWindow}.`,
-      "Move: add friction before the loop starts, not after you are already scrolling.",
-      setupLine,
+      `Move: add friction before ${rememberedRisk || riskWindow}, not after you are already scrolling.`,
+      outcomeLine,
     ],
     primary_label: selected && authorized ? "Apply protection" : "Set up",
     secondary_label: "Open report",
@@ -224,9 +244,11 @@ function fallbackPlan(prompt, context = {}) {
 
   if (intent === "sleep") {
     const bedtime = explicitSingleTime(prompt);
-    if (bedtime != null) {
-      const start = (bedtime + 24 * 60 - 30) % (24 * 60);
-      return { ...base, title: "Bedtime Boundary", response_text: `If ${minuteText(bedtime)} is your sleep target, the useful boundary starts before that, not at random.`, bullets: [`Read: your target bedtime is ${minuteText(bedtime)}.`, "Pattern: the phone needs to become less available before the final scroll starts.", `Move: protect distracting apps from ${minuteText(start)} to ${minuteText(bedtime)} first.`], primary_label: "Apply boundary", actions: [action("apply_schedule", { name: "Sleep Boundary", start_minute: start, end_minute: bedtime, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
+    const rememberedBedtime = memory.bedtime_minute == null ? null : cleanNumber(memory.bedtime_minute, 23 * 60, 0, 1439);
+    const targetBedtime = bedtime ?? rememberedBedtime;
+    if (targetBedtime != null) {
+      const start = (targetBedtime + 24 * 60 - 30) % (24 * 60);
+      return { ...base, title: "Bedtime Boundary", response_text: `If ${minuteText(targetBedtime)} is your sleep target, the useful boundary starts before that, not at random.`, bullets: [`Read: your target bedtime is ${minuteText(targetBedtime)}.`, "Pattern: the phone needs to become less available before the final scroll starts.", `Move: protect distracting apps from ${minuteText(start)} to ${minuteText(targetBedtime)} first.`], primary_label: "Apply boundary", actions: [action("apply_schedule", { name: "Sleep Boundary", start_minute: start, end_minute: targetBedtime, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
     }
     return { ...base, title: "Bedtime Scroll Loop", response_text: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.", bullets: ["Read: nights are the risky context.", "Pattern: the phone extends the day when your body needs shutdown.", "Move: tell me your usual bedtime before I suggest a block."], primary_label: "Tell bedtime", actions: [] };
   }
@@ -253,7 +275,7 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "social") {
-    return { ...base, title: "Scroll Loop", response_text: `This reads like ${cluster}: the app is filling a state, not just spare time.`, bullets: ["Pattern: the trigger matters more than total screen time.", "Move: block before the usual scroll window and cap fallback use.", "Start with a 25 minute daily limit plus an evening shield."], actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: "Scroll Control", start_minute: 1230, end_minute: 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
+    return { ...base, title: "Scroll Loop", response_text: `This reads like ${cluster}: ${memoryApp || "the app"} is filling a state, not just spare time.`, bullets: ["Pattern: the trigger matters more than total screen time.", `Move: block before ${rememberedRisk || "the usual scroll window"} and cap fallback use.`, "Start with a 25 minute daily limit plus an evening shield."], actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: "Scroll Control", start_minute: 1230, end_minute: 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
   }
 
   return { ...base, primary_label: "Got it", actions: [], requires_selected_apps: false, requires_screen_time_authorization: false };
@@ -308,16 +330,20 @@ function normalizePlan(parsed, fallback) {
   const plan = source.plan && typeof source.plan === "object" ? source.plan : source;
   const validIntents = new Set(["sleep", "focus", "study", "emergency", "allowOnly", "vacation", "weeklyReview", "adultContent", "social", "general"]);
   const modelActions = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map(normalizeAction).filter(Boolean) : null;
+  const planIntent = validIntents.has(plan.intent) ? plan.intent : fallback.intent;
+  if (fallback.actions.length > 0 && (!modelActions || modelActions.length === 0 || planIntent !== fallback.intent)) {
+    return fallback;
+  }
   const bullets = Array.isArray(plan.bullets) ? plan.bullets.map((item) => userFacingText(item, 140)).filter(Boolean).slice(0, 4) : [];
   const interpretation = userFacingText(source.interpretation, 160);
   const behavior = userFacingText(source.behavior_pattern, 160);
   const nextMove = userFacingText(source.next_move, 160);
   const fallbackBullets = [interpretation, behavior, nextMove].filter(Boolean).concat(fallback.bullets).slice(0, 4);
-  const actions = modelActions == null ? fallback.actions : modelActions;
+  const actions = fallback.actions.length === 0 ? [] : (!modelActions || modelActions.length === 0 ? fallback.actions : modelActions);
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   return {
-    intent: validIntents.has(plan.intent) ? plan.intent : fallback.intent,
+    intent: planIntent,
     title: userFacingText(plan.title, 70) || fallback.title,
     response_text: userFacingText(plan.response_text, 180) || interpretation || fallback.response_text,
     bullets: visibleBullets.length >= 2 ? visibleBullets : fallbackBullets,
@@ -396,6 +422,11 @@ async function modelPlan(prompt, context, fallback) {
           content: JSON.stringify({
             prompt: cleanText(prompt, 600),
             context,
+            memory_rules: [
+              "Use context.memory.main_apps, bedtime_minute, weak_hours, pattern_cluster, and last_plan_outcome when present.",
+              "If last_plan_outcome is broke, reduce intensity or move protection earlier instead of making the plan stricter.",
+              "If last_plan_outcome is held, repeat the stable plan before increasing difficulty."
+            ],
             examples: [
               { user: "I feel bad because I lose 3 hours on TikTok after work.", answer: "Read: decompression loop after work. Pattern: TikTok is being used to exit stress, then it becomes the evening. Move: protect the first 45 minutes after work and choose one offline decompression action." },
               { user: "How can I not scroll at nights?", answer: "Read: bedtime scrolling is the habit to understand. Pattern: the right boundary depends on the user's sleep target. Move: ask what time they usually want to be asleep before creating any block." },

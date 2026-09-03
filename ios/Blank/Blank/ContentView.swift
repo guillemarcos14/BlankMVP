@@ -644,7 +644,7 @@ private struct ConversationalHomeView: View {
                 ]
             )
         }
-        BlankedAgentMemory.recordAppliedPlan(plan)
+        BlankedAgentMemory.recordAppliedPlan(plan, context: currentAgentContext())
 
         let confirmation = appliedLabels.isEmpty ? "Done." : "Done. \(appliedLabels.joined(separator: ". "))."
         messages.append(AgentMessage(role: .blanked, text: confirmation))
@@ -722,6 +722,9 @@ private struct AgentContext {
     var system: DigitalWellnessV3System
     var emergencyUnlocksRemaining: Int
     var vacationModeActive: Bool
+    var memory: [String: Any] {
+        BlankedAgentMemory.snapshot(system: system)
+    }
 }
 
 private enum AgentIntent: String, Codable {
@@ -866,6 +869,7 @@ private enum BlankedAgentPlanner {
         if intent == .sleep,
            explicitTimeWindow(in: prompt) == nil,
            explicitSingleTime(in: prompt) == nil,
+           BlankedAgentMemory.rememberedBedtimeMinute() == nil,
            !hasExplicitBlockRequest(text) {
             return AgentPlan(
                 intent: .sleep,
@@ -887,6 +891,7 @@ private enum BlankedAgentPlanner {
         if intent == .social,
            contains(text, ["scroll", "doomscroll"]),
            explicitTimeWindow(in: prompt) == nil,
+           BlankedAgentMemory.rememberedMainApps().isEmpty,
            !contains(text, ["tiktok", "instagram", "youtube", "app"]) {
             return AgentPlan(
                 intent: .social,
@@ -924,6 +929,9 @@ private enum BlankedAgentPlanner {
     }
 
     private static func sleepPlan(context: AgentContext) -> AgentPlan {
+        if let bedtime = BlankedAgentMemory.rememberedBedtimeMinute() {
+            return bedtimeBoundaryPlan(bedtime: bedtime, context: context)
+        }
         AgentPlan(
             intent: .sleep,
             title: "Bedtime Scroll Loop",
@@ -1093,14 +1101,25 @@ private enum BlankedAgentPlanner {
     }
 
     private static func socialPlan(context: AgentContext) -> AgentPlan {
+        let mainApp = BlankedAgentMemory.rememberedMainApps().first ?? "the app"
+        let weakWindow = BlankedAgentMemory.rememberedWeakHours(system: context.system).first.map(DigitalWellnessAI.hourRangeText) ?? "the usual scroll window"
+        let outcome = BlankedAgentMemory.lastPlanOutcome(system: context.system)
+        let feedbackLine: String
+        if outcome == "broke" {
+            feedbackLine = "Feedback: the last plan broke, so start easier and earlier."
+        } else if outcome == "held" {
+            feedbackLine = "Feedback: the last plan held, so repeat it before increasing difficulty."
+        } else {
+            feedbackLine = "Start with a 25 minute daily limit plus an evening shield."
+        }
         AgentPlan(
             intent: .social,
             title: "Scroll Loop",
-            responseText: "This reads like \(behaviorPattern(context.system.profile.dominantModeName ?? "")): the app is filling a state, not just spare time.",
+            responseText: "This reads like \(behaviorPattern(context.system.profile.dominantModeName ?? "")): \(mainApp) is filling a state, not just spare time.",
             bullets: [
                 "Pattern: the trigger matters more than total screen time.",
-                "Move: block before the usual scroll window and cap fallback use.",
-                "Start with a 25 minute daily limit plus an evening shield."
+                "Move: block before \(weakWindow) and cap fallback use.",
+                feedbackLine
             ],
             primaryLabel: "Apply plan",
             secondaryLabel: "Choose apps",
@@ -1236,24 +1255,31 @@ private struct BlankedAgentClient {
     }
 
     private func payload(prompt: String, context: AgentContext) -> [String: Any] {
-        [
+        var contextPayload: [String: Any] = [
+            "is_blank_active": context.isBlankActive,
+            "has_selected_apps": context.hasSelectedApps,
+            "selection_count": context.selectionCount,
+            "screen_time_authorized": context.screenTimeAuthorized,
+            "emergency_unlocks_remaining": context.emergencyUnlocksRemaining,
+            "vacation_mode_active": context.vacationModeActive,
+            "adherence_score": context.system.profile.adherenceScore,
+            "weekly_protected_minutes": context.system.profile.weeklyProtectedMinutes,
+            "weekly_break_count": context.system.profile.weeklyBreakCount,
+            "risk_window": context.system.forecast.riskWindow,
+            "recommended_duration_minutes": context.system.plan.recommendedDurationMinutes,
+            "weekly_goal": context.system.plan.weeklyGoal,
+            "weak_hours": BlankedAgentMemory.rememberedWeakHours(system: context.system),
+            "pattern_cluster": BlankedAgentMemory.rememberedPatternCluster(),
+            "last_plan_outcome": BlankedAgentMemory.lastPlanOutcome(system: context.system),
+            "memory": context.memory
+        ]
+        if let strongestWindow = context.system.profile.strongestWindow {
+            contextPayload["strongest_hour"] = strongestWindow
+        }
+        return [
             "prompt": String(prompt.prefix(500)),
             "locale": Locale.current.identifier,
-            "context": [
-                "is_blank_active": context.isBlankActive,
-                "has_selected_apps": context.hasSelectedApps,
-                "selection_count": context.selectionCount,
-                "screen_time_authorized": context.screenTimeAuthorized,
-                "emergency_unlocks_remaining": context.emergencyUnlocksRemaining,
-                "vacation_mode_active": context.vacationModeActive,
-                "adherence_score": context.system.profile.adherenceScore,
-                "weekly_protected_minutes": context.system.profile.weeklyProtectedMinutes,
-                "weekly_break_count": context.system.profile.weeklyBreakCount,
-                "risk_window": context.system.forecast.riskWindow,
-                "recommended_duration_minutes": context.system.plan.recommendedDurationMinutes,
-                "weekly_goal": context.system.plan.weeklyGoal,
-                "memory": BlankedAgentMemory.snapshot()
-            ]
+            "context": contextPayload
         ]
     }
 
@@ -1370,25 +1396,157 @@ private enum BlankedAgentMemory {
     private static let lastIntentKey = "blankedAgentLastIntent"
     private static let lastPlanTitleKey = "blankedAgentLastPlanTitle"
     private static let lastPlanAppliedAtKey = "blankedAgentLastPlanAppliedAt"
+    private static let lastPlanProtectedMinutesKey = "blankedAgentLastPlanProtectedMinutes"
+    private static let lastPlanBreakCountKey = "blankedAgentLastPlanBreakCount"
+    private static let mainAppsKey = "blankedAgentMainApps"
+    private static let bedtimeMinuteKey = "blankedAgentBedtimeMinute"
+    private static let patternClusterKey = "blankedAgentPatternCluster"
 
     static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
         defaults.removeObject(forKey: lastPromptKey)
         defaults.set(inferredIntent.rawValue, forKey: lastIntentKey)
+        if let bedtime = explicitBedtimeMinute(in: prompt) {
+            defaults.set(bedtime, forKey: bedtimeMinuteKey)
+        }
+        mergeMainApps(extractMainApps(from: prompt))
+        defaults.set(patternCluster(for: prompt, intent: inferredIntent), forKey: patternClusterKey)
     }
 
-    static func recordAppliedPlan(_ plan: AgentPlan) {
+    static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
         defaults.set(plan.title, forKey: lastPlanTitleKey)
         defaults.set(Date().timeIntervalSince1970, forKey: lastPlanAppliedAtKey)
         defaults.set(plan.intent.rawValue, forKey: lastIntentKey)
+        defaults.set(context.system.profile.weeklyProtectedMinutes, forKey: lastPlanProtectedMinutesKey)
+        defaults.set(context.system.profile.weeklyBreakCount, forKey: lastPlanBreakCountKey)
     }
 
-    static func snapshot() -> [String: Any] {
-        [
+    static func snapshot(system: DigitalWellnessV3System) -> [String: Any] {
+        var payload: [String: Any] = [
             "last_prompt": "",
             "last_intent": defaults.string(forKey: lastIntentKey) ?? "",
             "last_plan_title": defaults.string(forKey: lastPlanTitleKey) ?? "",
-            "last_plan_applied_at": defaults.double(forKey: lastPlanAppliedAtKey)
+            "last_plan_applied_at": defaults.double(forKey: lastPlanAppliedAtKey),
+            "last_plan_outcome": lastPlanOutcome(system: system),
+            "main_apps": rememberedMainApps(),
+            "weak_hours": rememberedWeakHours(system: system),
+            "pattern_cluster": rememberedPatternCluster(),
+            "protected_minutes_since_plan": max(0, system.profile.weeklyProtectedMinutes - defaults.integer(forKey: lastPlanProtectedMinutesKey)),
+            "breaks_since_plan": max(0, system.profile.weeklyBreakCount - defaults.integer(forKey: lastPlanBreakCountKey))
         ]
+        if let bedtime = rememberedBedtimeMinute() {
+            payload["bedtime_minute"] = bedtime
+        }
+        return payload
+    }
+
+    static func rememberedMainApps() -> [String] {
+        (defaults.string(forKey: mainAppsKey) ?? "")
+            .split(separator: "|")
+            .map(String.init)
+            .filter { !$0.isEmpty }
+    }
+
+    static func rememberedBedtimeMinute() -> Int? {
+        guard defaults.object(forKey: bedtimeMinuteKey) != nil else { return nil }
+        let value = defaults.integer(forKey: bedtimeMinuteKey)
+        return (0...(24 * 60 - 1)).contains(value) ? value : nil
+    }
+
+    static func rememberedPatternCluster() -> String {
+        defaults.string(forKey: patternClusterKey) ?? ""
+    }
+
+    static func rememberedWeakHours(system: DigitalWellnessV3System) -> [Int] {
+        let candidates = ([system.profile.weakestWindow] + system.weakWindows.map(\.hour))
+            .compactMap { $0 }
+            .filter { (0...23).contains($0) }
+        var seen = Set<Int>()
+        var hours: [Int] = []
+        for candidate in candidates where !seen.contains(candidate) {
+            seen.insert(candidate)
+            hours.append(candidate)
+            if hours.count == 3 { break }
+        }
+        return hours
+    }
+
+    static func lastPlanOutcome(system: DigitalWellnessV3System) -> String {
+        guard defaults.object(forKey: lastPlanAppliedAtKey) != nil else { return "none" }
+        let breaksSincePlan = system.profile.weeklyBreakCount - defaults.integer(forKey: lastPlanBreakCountKey)
+        let protectedSincePlan = system.profile.weeklyProtectedMinutes - defaults.integer(forKey: lastPlanProtectedMinutesKey)
+        if breaksSincePlan > 0 { return "broke" }
+        if protectedSincePlan >= 15 { return "held" }
+        return "pending"
+    }
+
+    private static func mergeMainApps(_ apps: [String]) {
+        guard !apps.isEmpty else { return }
+        var seen = Set<String>()
+        var merged: [String] = []
+        for app in rememberedMainApps() + apps where !seen.contains(app) {
+            seen.insert(app)
+            merged.append(app)
+            if merged.count == 5 { break }
+        }
+        defaults.set(merged.joined(separator: "|"), forKey: mainAppsKey)
+    }
+
+    private static func extractMainApps(from prompt: String) -> [String] {
+        let knownApps = [
+            "TikTok": ["tiktok", "tik tok"],
+            "Instagram": ["instagram", "insta"],
+            "YouTube": ["youtube", "yt"],
+            "WhatsApp": ["whatsapp"],
+            "X": ["twitter", " x "],
+            "Reddit": ["reddit"],
+            "Safari": ["safari"],
+            "Chrome": ["chrome"],
+            "Netflix": ["netflix"],
+            "Snapchat": ["snapchat"],
+            "Discord": ["discord"]
+        ]
+        let text = " \(prompt.lowercased()) "
+        return knownApps.compactMap { name, aliases in
+            aliases.contains { text.contains($0) } ? name : nil
+        }
+    }
+
+    private static func patternCluster(for prompt: String, intent: AgentIntent) -> String {
+        let text = prompt.lowercased()
+        if text.contains("night") || text.contains("sleep") || text.contains("bed") || text.contains("noche") { return "bedtime_scroll" }
+        if text.contains("anxious") || text.contains("stress") || text.contains("ansiedad") { return "anxiety_scroll" }
+        if text.contains("bored") || text.contains("aburr") { return "boredom_scroll" }
+        if text.contains("whatsapp") || text.contains("notification") || text.contains("check") { return "compulsive_checking" }
+        if text.contains("study") || text.contains("work") || text.contains("procrast") { return "avoidance_loop" }
+        return intent.rawValue
+    }
+
+    private static func explicitBedtimeMinute(in prompt: String) -> Int? {
+        let text = prompt.lowercased()
+        let pattern = #"(?:sleep|bed|dormir|duermo|acuesto|bedtime)[^\d]*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+        let nsText = text as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: range) else { return nil }
+        func value(_ index: Int) -> String? {
+            let range = match.range(at: index)
+            guard range.location != NSNotFound else { return nil }
+            return nsText.substring(with: range)
+        }
+        guard let hour = Int(value(1) ?? "") else { return nil }
+        let minute = Int(value(2) ?? "") ?? 0
+        let meridiem = value(3) ?? ((6...11).contains(hour) ? "pm" : nil)
+        guard (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        var resolvedHour = hour
+        if let meridiem {
+            guard (1...12).contains(hour) else { return nil }
+            if meridiem == "am" {
+                resolvedHour = hour == 12 ? 0 : hour
+            } else if meridiem == "pm" {
+                resolvedHour = hour == 12 ? 12 : hour + 12
+            }
+        }
+        return resolvedHour * 60 + minute
     }
 }
 

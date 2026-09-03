@@ -42,7 +42,9 @@ private struct ConversationalHomeView: View {
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var onboardingName = ""
+    @AppStorage("blankWhatsAppConsentGranted", store: BlankSharedState.defaults) private var whatsAppConsentGranted = false
 
     @State private var input = ""
     @State private var messages: [AgentMessage] = AgentMessage.openingThread
@@ -51,6 +53,7 @@ private struct ConversationalHomeView: View {
     @State private var showingPicker = false
     @State private var now = Date()
     @State private var dictationBaseInput = ""
+    @State private var showingWhatsAppConsent = false
     @StateObject private var dictation = SpeechDictationController()
     let onOpenOnboardingDemo: () -> Void
 
@@ -262,6 +265,15 @@ private struct ConversationalHomeView: View {
         .onChange(of: dictation.errorMessage) { message in
             guard let message else { return }
             messages.append(AgentMessage(role: .blanked, text: message))
+        }
+        .confirmationDialog("Connect WhatsApp", isPresented: $showingWhatsAppConsent, titleVisibility: .visible) {
+            Button("Connect WhatsApp") {
+                whatsAppConsentGranted = true
+                openWhatsApp()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("WhatsApp messages are handled by WhatsApp/Meta. Blanked uses this channel only for messages you send and replies from Blanked AI.")
         }
     }
 
@@ -544,6 +556,9 @@ private struct ConversationalHomeView: View {
                 AgentQuickAction(title: "Week", systemImage: "chart.xyaxis.line") {
                     runPrompt("Analyze my week.")
                 }
+                AgentQuickAction(title: "WhatsApp", systemImage: "message.fill") {
+                    connectWhatsApp()
+                }
             }
             .padding(.horizontal, 2)
         }
@@ -630,6 +645,28 @@ private struct ConversationalHomeView: View {
         let spokenText = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !spokenText.isEmpty else { return }
         input = dictationBaseInput.isEmpty ? spokenText : "\(dictationBaseInput) \(spokenText)"
+    }
+
+    private func connectWhatsApp() {
+        guard whatsAppConsentGranted else {
+            showingWhatsAppConsent = true
+            return
+        }
+        openWhatsApp()
+    }
+
+    private func openWhatsApp() {
+        guard let number = configuredWhatsAppNumber(), let url = URL(string: "https://wa.me/\(number)?text=Help%20me%20protect%20my%20phone") else {
+            messages.append(AgentMessage(role: .blanked, text: "WhatsApp is ready in the app, but the official Blanked number is not configured yet."))
+            return
+        }
+        openURL(url)
+    }
+
+    private func configuredWhatsAppNumber() -> String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankWhatsAppPhoneNumber") as? String else { return nil }
+        let digits = rawValue.filter(\.isNumber)
+        return digits.isEmpty ? nil : digits
     }
 
     private func runPrompt(_ text: String) {

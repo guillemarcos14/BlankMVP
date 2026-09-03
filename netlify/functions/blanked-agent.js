@@ -248,6 +248,8 @@ function fallbackPlan(prompt, context = {}) {
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const lastOutcome = cleanText(memory.last_plan_outcome, 40);
   const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
+  const promptApp = namedApp(prompt);
+  const activeApp = promptApp !== "the app" ? promptApp : memoryApp;
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
@@ -328,6 +330,25 @@ function fallbackPlan(prompt, context = {}) {
       primary_label: "Choose app",
       secondary_label: "Not now",
       actions: [action("open_app_picker")],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
+  if (intent === "social" && promptApp !== "the app" && hasExplicitBlockRequest(prompt) && (!selected || !authorized)) {
+    const setupAction = !selected ? "open_app_picker" : "request_screen_time_permission";
+    return {
+      intent: "social",
+      title: "Choose App",
+      response_text: `Choose ${promptApp} in Screen Time first, then I can apply the block.`,
+      bullets: [
+        `Read: ${promptApp} is the app you want to control.`,
+        "Pattern: iOS needs that app inside your authorized selection before Blanked can shield it.",
+        "Move: choose the app now, then apply the boundary."
+      ],
+      primary_label: !selected ? "Choose app" : "Allow Screen Time",
+      secondary_label: "Not now",
+      actions: [action(setupAction)],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
     };
@@ -421,9 +442,9 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Remembered Scroll Pattern",
-      response_text: `This sounds like the same ${memoryApp} loop returning, so the next move should use the pattern already known.`,
+      response_text: `This sounds like the same ${activeApp || "app"} loop returning, so the next move should use the pattern already known.`,
       bullets: [
-        `Pattern: ${memoryApp} has been risky around ${rememberedRisk || riskWindow}.`,
+        `Pattern: ${activeApp || "that app"} has been risky around ${rememberedRisk || riskWindow}.`,
         `Move: protect earlier than ${rememberedRisk || riskWindow}, especially because the last plan ${lastOutcome || "needs review"}.`,
         outcomeLine,
       ],
@@ -551,7 +572,7 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "social") {
-    return { ...base, title: "Scroll Loop", response_text: `This reads like ${cluster}: ${memoryApp || "the app"} is filling a state, not just spare time.`, bullets: ["Pattern: the trigger matters more than total screen time.", `Move: block before ${rememberedRisk || "the usual scroll window"} and cap fallback use.`, "Start with a 25 minute daily limit plus an evening shield."], actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: "Scroll Control", start_minute: 1230, end_minute: 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
+    return { ...base, title: "Scroll Loop", response_text: `This reads like ${cluster}: ${activeApp || "the app"} is filling a state, not just spare time.`, bullets: ["Pattern: the trigger matters more than total screen time.", `Move: block before ${rememberedRisk || "the usual scroll window"} and cap fallback use.`, "Start with a 25 minute daily limit plus an evening shield."], actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: "Scroll Control", start_minute: 1230, end_minute: 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
   }
 
   return { ...base, primary_label: "Got it", actions: [], requires_selected_apps: false, requires_screen_time_authorization: false };

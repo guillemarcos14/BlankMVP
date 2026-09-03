@@ -584,6 +584,27 @@
     }
   },
   {
+    "id": "block_instagram_setup_overrides_tiktok_memory",
+    "prompt": "Block Instagram",
+    "context": {
+      "has_selected_apps": false,
+      "selection_count": 0,
+      "memory": {
+        "main_apps": ["TikTok"],
+        "weak_hours": [13]
+      }
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": ["open_app_picker"],
+      "text_matches": ["Instagram|Screen Time|choose"],
+      "ui_text_matches": ["Choose Instagram in Screen Time first"],
+      "ui_text_not_matches": ["TikTok|spare time|Set up"],
+      "requires_selected_apps": false,
+      "requires_screen_time_authorization": false
+    }
+  },
+  {
     "id": "weak_hour_remembered_no_app",
     "prompt": "The evening is bad again.",
     "context": {

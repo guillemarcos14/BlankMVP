@@ -836,7 +836,7 @@ private enum BlankedAgentPlanner {
         case .adultContent:
             return adultContentPlan(context: context)
         case .social:
-            return socialPlan(context: context)
+            return socialPlan(prompt: prompt, context: context)
         case .general:
             return generalPlan(context: context)
         }
@@ -940,6 +940,22 @@ private enum BlankedAgentPlanner {
         if contains(text, ["avoid", "procrast", "work", "study", "exam"]) { return "an avoidance loop" }
         if contains(text, ["relapse", "reca", "broke", "failed"]) { return "a relapse pattern" }
         return "a screen habit loop"
+    }
+
+    private static func namedApp(in prompt: String) -> String? {
+        let text = " \(prompt.lowercased()) "
+        let apps = [
+            ("TikTok", ["tiktok", "tik tok"]),
+            ("Instagram", ["instagram", "insta"]),
+            ("YouTube", ["youtube", "yt"]),
+            ("Reddit", ["reddit"]),
+            ("Twitter", ["twitter", " x "]),
+            ("Facebook", ["facebook"]),
+            ("Snapchat", ["snapchat"])
+        ]
+        return apps.first { _, aliases in
+            aliases.contains { text.contains($0) }
+        }?.0
     }
 
     private static func sleepPlan(context: AgentContext) -> AgentPlan {
@@ -1114,8 +1130,26 @@ private enum BlankedAgentPlanner {
         )
     }
 
-    private static func socialPlan(context: AgentContext) -> AgentPlan {
-        let mainApp = BlankedAgentMemory.rememberedMainApps().first ?? "the app"
+    private static func socialPlan(prompt: String, context: AgentContext) -> AgentPlan {
+        let promptApp = namedApp(in: prompt)
+        let mainApp = promptApp ?? BlankedAgentMemory.rememberedMainApps().first ?? "the app"
+        if promptApp != nil && hasExplicitBlockRequest(prompt.lowercased()) && (!context.hasSelectedApps || !context.screenTimeAuthorized) {
+            return AgentPlan(
+                intent: .social,
+                title: "Choose App",
+                responseText: "Choose \(mainApp) in Screen Time first, then I can apply the block.",
+                bullets: [
+                    "Read: \(mainApp) is the app you want to control.",
+                    "Pattern: iOS needs that app inside your authorized selection before Blanked can shield it.",
+                    "Move: choose the app now, then apply the boundary."
+                ],
+                primaryLabel: context.hasSelectedApps ? "Allow Screen Time" : "Choose app",
+                secondaryLabel: "Not now",
+                actions: [context.hasSelectedApps ? .requestScreenTimePermission : .openAppPicker],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
         let weakWindow = BlankedAgentMemory.rememberedWeakHours(system: context.system).first.map(DigitalWellnessAI.hourRangeText) ?? "the usual scroll window"
         let outcome = BlankedAgentMemory.lastPlanOutcome(system: context.system)
         let feedbackLine: String

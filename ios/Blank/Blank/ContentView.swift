@@ -932,7 +932,7 @@ private enum BlankedAgentPlanner {
         if let bedtime = BlankedAgentMemory.rememberedBedtimeMinute() {
             return bedtimeBoundaryPlan(bedtime: bedtime, context: context)
         }
-        AgentPlan(
+        return AgentPlan(
             intent: .sleep,
             title: "Bedtime Scroll Loop",
             responseText: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.",
@@ -1112,7 +1112,7 @@ private enum BlankedAgentPlanner {
         } else {
             feedbackLine = "Start with a 25 minute daily limit plus an evening shield."
         }
-        AgentPlan(
+        return AgentPlan(
             intent: .social,
             title: "Scroll Loop",
             responseText: "This reads like \(behaviorPattern(context.system.profile.dominantModeName ?? "")): \(mainApp) is filling a state, not just spare time.",

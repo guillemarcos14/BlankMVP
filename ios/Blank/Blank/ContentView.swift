@@ -521,7 +521,9 @@ private struct ConversationalHomeView: View {
                 screenTimeAuthorized: screenTimeBlocker.authorizationStatus == .approved,
                 system: system,
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-                vacationModeActive: sessionStore.isVacationModeActive
+                vacationModeActive: sessionStore.isVacationModeActive,
+                modeName: sessionStore.currentMode.name,
+                availableModes: sessionStore.focusModes.map(\.name)
             )
         )
         BlankedAgentMemory.recordUserPrompt(text, inferredIntent: fallbackPlan.intent)
@@ -545,7 +547,7 @@ private struct ConversationalHomeView: View {
                 #endif
             }
             await MainActor.run {
-                activePlan = resolvedPlan
+                activePlan = resolvedPlan.hasExecutableActions ? resolvedPlan : nil
                 if let index = messages.firstIndex(where: { $0.id == thinkingMessage.id }) {
                     messages[index].text = resolvedPlan.responseText
                 }
@@ -561,7 +563,9 @@ private struct ConversationalHomeView: View {
             screenTimeAuthorized: screenTimeBlocker.authorizationStatus == .approved,
             system: system,
             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
-            vacationModeActive: sessionStore.isVacationModeActive
+            vacationModeActive: sessionStore.isVacationModeActive,
+            modeName: sessionStore.currentMode.name,
+            availableModes: sessionStore.focusModes.map(\.name)
         )
     }
 
@@ -617,6 +621,13 @@ private struct ConversationalHomeView: View {
             case .disablePause:
                 sessionStore.disableVacationMode()
                 appliedLabels.append("Rules resumed")
+            case .switchMode(let name):
+                if sessionStore.selectMode(named: name) {
+                    appliedLabels.append("\(name) mode selected")
+                } else {
+                    showingPicker = true
+                    appliedLabels.append("Choose apps for \(name)")
+                }
             case .openAppPicker:
                 showingPicker = true
                 appliedLabels.append("App picker opened")
@@ -722,6 +733,8 @@ private struct AgentContext {
     var system: DigitalWellnessV3System
     var emergencyUnlocksRemaining: Int
     var vacationModeActive: Bool
+    var modeName: String = "Routine"
+    var availableModes: [String] = []
     var memory: [String: Any] {
         BlankedAgentMemory.snapshot(system: system)
     }
@@ -748,6 +761,7 @@ private enum AgentAction: Equatable {
     case setDailyLimit(minutes: Int)
     case pauseRules(hours: Int)
     case disablePause
+    case switchMode(name: String)
     case openAppPicker
     case requestScreenTimePermission
     case applyAIPlan
@@ -1268,6 +1282,8 @@ private struct BlankedAgentClient {
             "risk_window": context.system.forecast.riskWindow,
             "recommended_duration_minutes": context.system.plan.recommendedDurationMinutes,
             "weekly_goal": context.system.plan.weeklyGoal,
+            "mode_name": context.modeName,
+            "available_modes": context.availableModes,
             "weak_hours": BlankedAgentMemory.rememberedWeakHours(system: context.system),
             "pattern_cluster": BlankedAgentMemory.rememberedPatternCluster(),
             "last_plan_outcome": BlankedAgentMemory.lastPlanOutcome(system: context.system),
@@ -1369,6 +1385,8 @@ private struct RemoteAgentAction: Decodable {
             return .pauseRules(hours: clamp(hours ?? 168, 1, 168))
         case "disable_pause":
             return .disablePause
+        case "switch_mode":
+            return .switchMode(name: String((name ?? "Routine").prefix(40)))
         case "open_app_picker":
             return .openAppPicker
         case "request_screen_time_permission":

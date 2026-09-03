@@ -40,12 +40,82 @@ function hasKnownMainApp(context = {}) {
   return Array.isArray(memory.main_apps) && memory.main_apps.length > 0;
 }
 
+function namedApp(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const apps = [
+    ["tiktok", "TikTok"],
+    ["instagram", "Instagram"],
+    ["youtube", "YouTube"],
+    ["reddit", "Reddit"],
+    ["twitter", "Twitter"],
+    ["facebook", "Facebook"],
+    ["snapchat", "Snapchat"],
+  ];
+  const match = apps.find(([key]) => text.includes(key));
+  return match ? match[1] : "the app";
+}
+
+function requestedUnknownApp(prompt) {
+  const text = cleanText(prompt, 600);
+  const match = text.match(/\b(?:block|limit|bloquea|bloquear)\s+([a-z][a-z0-9._+-]{1,30})\b/i);
+  if (!match) return "";
+  const raw = match[1];
+  const lowered = raw.toLowerCase();
+  const blockedWords = new Set(["everything", "all", "todos", "todas", "adult", "websites", "apps", "app", "my", "me", "now", "for", "from", "during", "strict", "hard"]);
+  if (blockedWords.has(lowered)) return "";
+  if (namedApp(raw) !== "the app") return "";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function availableModeNames(context = {}) {
+  const modes = Array.isArray(context.available_modes) ? context.available_modes : [];
+  return modes
+    .map((mode) => typeof mode === "string" ? mode : mode && mode.name)
+    .map((name) => cleanText(name, 40))
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function requestedModeName(prompt, context = {}) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const modes = availableModeNames(context);
+  const exact = modes.find((mode) => text.includes(mode.toLowerCase()));
+  if (exact) return exact;
+  const aliases = [
+    { keys: ["sleep", "night", "bedtime"], mode: ["Sleep", "Night"] },
+    { keys: ["study", "exam"], mode: ["Study"] },
+    { keys: ["work", "focus", "deep work"], mode: ["Work", "Focus"] },
+  ];
+  for (const alias of aliases) {
+    if (!contains(text, alias.keys)) continue;
+    const match = modes.find((mode) => alias.mode.some((name) => mode.toLowerCase() === name.toLowerCase()));
+    if (match) return match;
+  }
+  return "";
+}
+
+function hasWorkAppConflict(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, ["but i need", "but need", "need it", "need this app", "except i need", "for work", "work tutorials", "para trabajar"]) &&
+    contains(text, ["block", "limit", "tiktok", "instagram", "youtube", "reddit", "twitter", "x", "facebook", "snapchat"]);
+}
+
+function asksAboutExactAppList(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, ["exact app list", "my app list", "which apps", "see my apps", "selected apps"]) &&
+    contains(text, ["see", "know", "access", "visible", "can you"]);
+}
+
 function needsContextBeforeAction(prompt, intent, context = {}) {
   const text = cleanText(prompt, 600).toLowerCase();
   if (intent === "sleep" && !explicitTimeWindow(prompt) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
     return "bedtime";
   }
-  if (intent === "social" && contains(text, ["scroll", "doomscroll"]) && !explicitTimeWindow(prompt) && !hasKnownMainApp(context) && !contains(text, ["tiktok", "instagram", "youtube", "app"])) {
+  if (intent === "social" &&
+      contains(text, ["scroll", "doomscroll", "checking my phone", "check my phone", "opening my phone", "use my phone", "notification", "notifications"]) &&
+      !explicitTimeWindow(prompt) &&
+      !hasKnownMainApp(context) &&
+      !contains(text, ["tiktok", "instagram", "youtube", "app"])) {
     return "apps";
   }
   return null;
@@ -54,13 +124,14 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
 function classify(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
   if (contains(text, ["porn", "porno", "adult", "xxx"])) return "adultContent";
-  if (contains(text, ["losing control", "perdiendo el control", "urge", "emergency", "reca", "relapse", "can't stop", "no puedo parar"])) return "emergency";
-  if (contains(text, ["sleep", "night", "bed", "dormir", "noche", "tired", "cansado", "morning"])) return "sleep";
+  if (contains(text, ["losing control", "perdiendo el control", "urge", "emergency", "reca", "relapse", "broke the block", "break the block", "can't stop", "no puedo parar"])) return "emergency";
+  if (contains(text, ["sleep", "night", "bed", "dormir", "noche", "tired", "cansado"])) return "sleep";
   if (contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"])) return "study";
   if (contains(text, ["allow only", "whatsapp", "maps", "solo", "only"])) return "allowOnly";
-  if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa"])) return "vacation";
+  if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa", "resume my rules", "resume rules"])) return "vacation";
   if (contains(text, ["week", "semana", "analy", "diagn", "report", "review"])) return "weeklyReview";
-  if (contains(text, ["tiktok", "instagram", "youtube", "gaming", "game", "dopamine", "scroll", "doomscroll"])) return "social";
+  if (contains(text, ["tiktok", "instagram", "youtube", "reddit", "twitter", "facebook", "snapchat", "gaming", "game", "dopamine", "scroll", "doomscroll", "notification", "notifications"])) return "social";
+  if (requestedUnknownApp(prompt)) return "social";
   if (contains(text, ["anxious", "anxiety", "ansiedad", "bored", "boring", "aburr", "lonely", "stress", "guilt", "culpa"])) return "social";
   if (contains(text, ["focus", "work", "productiv", "foco", "trabaj", "deep work", "now"])) return "focus";
   return "general";
@@ -71,7 +142,7 @@ function behaviorCluster(prompt) {
   if (contains(text, ["anxious", "anxiety", "ansiedad", "stress", "stressed"])) return "anxiety scroll";
   if (contains(text, ["bored", "boring", "aburr"])) return "boredom scroll";
   if (contains(text, ["revenge", "late", "night", "bed", "sleep", "dormir", "noche"])) return "bedtime scroll";
-  if (contains(text, ["compare", "comparison", "instagram", "social"])) return "social comparison";
+  if (contains(text, ["compare", "comparison", "instagram", "social", "twitter", "facebook", "snapchat"])) return "social comparison";
   if (contains(text, ["avoid", "procrast", "work", "study", "exam"])) return "avoidance loop";
   if (contains(text, ["check", "whatsapp", "notification", "notif"])) return "compulsive checking";
   if (contains(text, ["relapse", "reca", "failed", "broke"])) return "relapse pattern";
@@ -99,7 +170,7 @@ function explicitTimeWindow(prompt) {
   const endHour = Number(match[4]);
   const looksNightly =
     contains(text, ["night", "sleep", "bed", "dormir", "noche"]) ||
-    (contains(text, ["block", "bloquea", "bloquear", "instagram", "tiktok", "youtube", "scroll"]) && startHour >= 7 && startHour <= 11 && endHour >= 1 && endHour <= 9);
+    (contains(text, ["block", "bloquea", "bloquear", "instagram", "tiktok", "youtube", "scroll"]) && startHour >= 9 && startHour <= 11 && endHour >= 1 && endHour <= 9);
   const endMeridiem = match[6] || (looksNightly && !match[3] ? "am" : null);
   const startMeridiem = match[3] || (looksNightly ? "pm" : endMeridiem);
   const start = minuteOfDay(startHour, Number(match[2] || 0), startMeridiem);
@@ -113,8 +184,29 @@ function explicitSingleTime(prompt) {
   const match = text.match(/(?:sleep|bed|dormir|duermo|acuesto|bedtime)[^\d]*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (!match) return null;
   const rawHour = Number(match[1]);
-  const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : null);
+  const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
   return minuteOfDay(rawHour, Number(match[2] || 0), meridiem);
+}
+
+function looseSingleTime(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const match = text.match(/\b(?:usually|normalmente|sobre|around|at|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  if (!match) return null;
+  const rawHour = Number(match[1]);
+  const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
+  return minuteOfDay(rawHour, Number(match[2] || 0), meridiem);
+}
+
+function explicitDurationMinutes(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const match = text.match(/(\d{1,3})\s*(?:min|mins|minute|minutes)/i);
+  if (!match) return null;
+  return cleanNumber(match[1], 30, 5, 240);
+}
+
+function wantsHardMode(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, ["hard mode", "strict", "hard block", "no exit", "no unlock", "intense"]);
 }
 
 function minuteText(minuteOfDayValue) {
@@ -146,6 +238,7 @@ function action(type, values = {}) {
 
 function fallbackPlan(prompt, context = {}) {
   const intent = classify(prompt);
+  const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
   const duration = cleanNumber(context.recommended_duration_minutes, 30, 5, 240);
@@ -158,6 +251,7 @@ function fallbackPlan(prompt, context = {}) {
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
+  const modeName = requestedModeName(prompt, context);
   const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow Screen Time.";
   const outcomeLine = lastOutcome === "broke"
     ? "Feedback: the last plan broke, so the next move should be easier and earlier."
@@ -200,6 +294,150 @@ function fallbackPlan(prompt, context = {}) {
       requires_screen_time_authorization: false,
     };
   }
+
+  if (intent === "social" && hasWorkAppConflict(prompt)) {
+    const app = namedApp(prompt);
+    return {
+      intent: "social",
+      title: "Work App Conflict",
+      response_text: `Tell me when ${app} becomes non-work use, then I can set the boundary.`,
+      bullets: [
+        "Read: the same app has useful and risky contexts.",
+        "Pattern: a full block could break work instead of improving control.",
+        `Move: tell me when ${app} becomes non-work use, then I can set the boundary.`
+      ],
+      primary_label: "Tell window",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
+  const unknownApp = requestedUnknownApp(prompt);
+  if (intent === "social" && unknownApp) {
+    return {
+      intent: "social",
+      title: "Choose App",
+      response_text: `I can help block ${unknownApp}, but first you need to choose it in Screen Time.`,
+      bullets: [
+        `Read: ${unknownApp} is the app you want to control.`,
+        "Pattern: iOS requires the exact app selection before Blanked can shield it.",
+        "Move: choose the app now, then apply the boundary."
+      ],
+      primary_label: "Choose app",
+      secondary_label: "Not now",
+      actions: [action("open_app_picker")],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
+  if (asksAboutExactAppList(prompt)) {
+    return {
+      intent: "general",
+      title: "App Privacy",
+      response_text: "I can use counts and context you choose to share, but I do not need your exact app list to reason about the pattern.",
+      bullets: [
+        "Read: app privacy matters for this feature.",
+        "Pattern: Blanked can work from selected counts, weak hours and your own description.",
+        "Move: tell me the app only when it helps create a better boundary."
+      ],
+      primary_label: "Got it",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
+  if (modeName && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode"])) {
+    const requestedDuration = explicitDurationMinutes(prompt) || duration;
+    const hardMode = wantsHardMode(prompt);
+    const modeAction = action("switch_mode", { name: modeName });
+    if (timeWindow) {
+      return {
+        intent: intent === "sleep" || intent === "study" || intent === "focus" ? intent : "focus",
+        title: `${modeName} Mode`,
+        response_text: `I can use ${modeName} mode for this plan because that selection already exists.`,
+        bullets: [
+          `Read: ${modeName} mode is already available.`,
+          `Move: switch to ${modeName} mode and protect from ${minuteText(timeWindow.start)} to ${minuteText(timeWindow.end)}.`,
+          "Protection: use the apps already authorized for that mode."
+        ],
+        primary_label: `Use ${modeName}`,
+        secondary_label: "Choose apps",
+        actions: [
+          modeAction,
+          action("apply_schedule", { name: `${modeName} Mode`, start_minute: timeWindow.start, end_minute: timeWindow.end, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })
+        ],
+        requires_selected_apps: false,
+        requires_screen_time_authorization: true,
+      };
+    }
+    return {
+      intent: intent === "sleep" || intent === "study" || intent === "focus" ? intent : "focus",
+      title: `${modeName} Mode`,
+      response_text: `I can switch to ${modeName} mode and start protection on its existing app selection.`,
+      bullets: [
+        `Read: ${modeName} mode is already available.`,
+        `Move: switch to ${modeName} mode for ${requestedDuration} minutes.`,
+        "Protection: use the apps already authorized for that mode."
+      ],
+      primary_label: `Start ${modeName}`,
+      secondary_label: "Choose apps",
+      actions: [
+        modeAction,
+        action("start_protection", { minutes: requestedDuration, hard_mode: hardMode })
+      ],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  if (intent === "general" && cleanText(memory.pattern_cluster, 80).includes("bedtime")) {
+    const followupBedtime = looseSingleTime(prompt);
+    if (followupBedtime != null) {
+      const start = (followupBedtime + 24 * 60 - 30) % (24 * 60);
+      return {
+        intent: "sleep",
+        title: "Bedtime Boundary",
+        response_text: `If ${minuteText(followupBedtime)} is your usual bedtime, the boundary should start before the final scroll begins.`,
+        bullets: [
+          `Read: your bedtime target is ${minuteText(followupBedtime)}.`,
+          "Pattern: this continues the bedtime scroll loop we were already discussing.",
+          `Move: protect distracting apps from ${minuteText(start)} to ${minuteText(followupBedtime)} first.`
+        ],
+        primary_label: "Apply boundary",
+        secondary_label: "Not now",
+        actions: [action("apply_schedule", { name: "Sleep Boundary", start_minute: start, end_minute: followupBedtime, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })],
+        requires_selected_apps: true,
+        requires_screen_time_authorization: true,
+      };
+    }
+  }
+
+  if (intent === "general" && memoryApp && weakHours.length > 0 && contains(promptText, ["again", "evening", "bad", "worse", "same"])) {
+    return {
+      intent: "social",
+      title: "Remembered Scroll Pattern",
+      response_text: `This sounds like the same ${memoryApp} loop returning, so the next move should use the pattern already known.`,
+      bullets: [
+        `Pattern: ${memoryApp} has been risky around ${rememberedRisk || riskWindow}.`,
+        `Move: protect earlier than ${rememberedRisk || riskWindow}, especially because the last plan ${lastOutcome || "needs review"}.`,
+        outcomeLine,
+      ],
+      primary_label: "Apply protection",
+      secondary_label: "Open report",
+      actions: selected && authorized ? [
+        action("set_daily_limit", { minutes: 25 }),
+        action("apply_schedule", { name: "Scroll Control", start_minute: weakHours[0] * 60, end_minute: ((weakHours[0] + 1) % 24) * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })
+      ] : [action(selected ? "request_screen_time_permission" : "open_app_picker")],
+      requires_selected_apps: !selected,
+      requires_screen_time_authorization: !authorized,
+    };
+  }
+
   const base = {
     intent,
     title: "Digital Wellness Read",
@@ -239,7 +477,30 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "focus") {
-    return { ...base, title: "Focus Protection", response_text: "This is an execution moment, so the useful move is immediate friction.", bullets: [`Move: start ${duration} minutes now.`, "Keep the protected app list unchanged.", `Signal: ${riskWindow}.`], primary_label: "Start now", actions: [action("start_protection", { minutes: duration, hard_mode: false })], requires_selected_apps: true, requires_screen_time_authorization: true };
+    const requestedDuration = explicitDurationMinutes(prompt) || duration;
+    const hardMode = wantsHardMode(prompt);
+    return { ...base, title: hardMode ? "Strict Focus Protection" : "Focus Protection", response_text: "This is an execution moment, so the useful move is immediate friction.", bullets: [`Move: start ${requestedDuration} minutes now.`, "Keep the protected app list unchanged.", `Signal: ${riskWindow}.`], primary_label: "Start now", actions: [action("start_protection", { minutes: requestedDuration, hard_mode: hardMode })], requires_selected_apps: true, requires_screen_time_authorization: true };
+  }
+
+  if (intent === "study") {
+    return {
+      ...base,
+      title: "24h Study Protection",
+      response_text: "I read this as a study window, so the useful move is a short plan with friction already in place.",
+      bullets: [
+        "Read: studying needs fewer escape routes, not more motivation.",
+        "Pattern: YouTube or social apps become fallback when effort rises.",
+        "Move: block distractions during the next key study window and cap fallback scrolling."
+      ],
+      primary_label: "Apply study plan",
+      secondary_label: "Choose apps",
+      actions: [
+        action("apply_schedule", { name: "Study Protection", start_minute: 9 * 60, end_minute: 12 * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 1 }),
+        action("set_daily_limit", { minutes: 30 })
+      ],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
   }
 
   if (intent === "sleep") {
@@ -254,7 +515,22 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "emergency") {
-    return { ...base, title: "Loss Of Control", response_text: context.is_blank_active ? "You are already protected; changing settings now would weaken the boundary." : "This is a high-risk moment. Reduce choice immediately.", bullets: [`Emergency unlocks left: ${cleanNumber(context.emergency_unlocks_remaining, 0, 0, 3)}.`, "Move: use a short hard block, then review what triggered it.", "Do not redesign the whole plan while the urge is active."], primary_label: context.is_blank_active ? "Stay protected" : "Start hard block", actions: context.is_blank_active ? [] : [action("start_protection", { minutes: 30, hard_mode: true })] };
+    return {
+      ...base,
+      title: "Loss Of Control",
+      response_text: context.is_blank_active ? "You are already protected; changing settings now would weaken the boundary." : "This is a high-risk moment. Reduce choice immediately.",
+      bullets: context.is_blank_active ? [
+        "Read: the urge is happening while protection is already on.",
+        "Pattern: changing settings now would make the boundary weaker.",
+        "Move: stay protected and review the trigger after the urge passes."
+      ] : [
+        `Read: emergency unlocks left today: ${cleanNumber(context.emergency_unlocks_remaining, 0, 0, 3)}.`,
+        "Pattern: this is the wrong moment to redesign the whole plan.",
+        "Move: use a short hard block, then review what triggered it."
+      ],
+      primary_label: context.is_blank_active ? "Stay protected" : "Start hard block",
+      actions: context.is_blank_active ? [] : [action("start_protection", { minutes: 30, hard_mode: true })]
+    };
   }
 
   if (intent === "allowOnly") {
@@ -263,15 +539,15 @@ function fallbackPlan(prompt, context = {}) {
 
   if (intent === "vacation") {
     const active = context.vacation_mode_active === true;
-    return { ...base, title: active ? "Resume Rules" : "Pause Rules", response_text: active ? "Your rules are paused; I can bring the structure back." : "Pausing is fine when the context changes, as long as it has an end.", bullets: active ? ["Resume schedules.", "Keep selected apps unchanged."] : ["Pause scheduled protection for 7 days.", "Keep manual blocks available.", "Resume automatically after the break."], primary_label: active ? "Resume rules" : "Pause 7 days", secondary_label: "Advanced", actions: active ? [action("disable_pause")] : [action("pause_rules", { hours: 168 })], requires_selected_apps: false, requires_screen_time_authorization: false };
+    return { ...base, title: active ? "Resume Rules" : "Pause Rules", response_text: active ? "Your rules are paused; I can bring the structure back." : "Pausing is fine when the context changes, as long as it has an end.", bullets: active ? ["Read: the break is over.", "Pattern: structure should return without changing your selected apps.", "Move: resume schedules now."] : ["Read: your context changed for a short period.", "Pattern: open-ended pauses become accidental relapse.", "Move: pause scheduled protection for 7 days and keep manual blocks available."], primary_label: active ? "Resume rules" : "Pause 7 days", secondary_label: "Advanced", actions: active ? [action("disable_pause")] : [action("pause_rules", { hours: 168 })], requires_selected_apps: false, requires_screen_time_authorization: false };
   }
 
   if (intent === "weeklyReview") {
-    return { ...base, title: "Weekly Read", response_text: "The useful question is whether the current protection is preventing breaks, not whether the plan sounds good.", bullets: [`${cleanNumber(context.weekly_protected_minutes, 0, 0, 10080)} protected minutes this week.`, `${cleanNumber(context.weekly_break_count, 0, 0, 100)} break signals detected.`, `Next risk window: ${riskWindow}.`], primary_label: "Apply adaptive plan", secondary_label: "Open report", actions: [action("apply_ai_plan")] };
+    return { ...base, title: "Weekly Read", response_text: "The useful question is whether the current protection is preventing breaks, not whether the plan sounds good.", bullets: [`Read: ${cleanNumber(context.weekly_protected_minutes, 0, 0, 10080)} protected minutes this week.`, `Pattern: ${cleanNumber(context.weekly_break_count, 0, 0, 100)} break signals detected.`, `Move: adapt the next plan around ${riskWindow}.`], primary_label: "Apply adaptive plan", secondary_label: "Open report", actions: [action("apply_ai_plan")] };
   }
 
   if (intent === "adultContent") {
-    return { ...base, title: "Urge Protection", response_text: "This is a cue-control problem: make access harder before the urge peaks.", bullets: ["Enable adult web filtering.", "Keep distracting apps protected.", "Use a 30 minute hard block when the urge is active."], primary_label: "Enable protection", actions: [action("enable_adult_filter")], requires_selected_apps: false };
+    return { ...base, title: "Urge Protection", response_text: "This is a cue-control problem: make access harder before the urge peaks.", bullets: ["Read: this is an urge pattern, not a moral failure.", "Pattern: easy access keeps the loop available at the worst moment.", "Move: enable adult web filtering and keep distracting apps protected."], primary_label: "Enable protection", actions: [action("enable_adult_filter")], requires_selected_apps: false };
   }
 
   if (intent === "social") {
@@ -286,7 +562,7 @@ const actionSchema = {
   additionalProperties: false,
   required: ["type", "minutes", "hard_mode", "name", "start_minute", "end_minute", "weekdays", "duration_days", "hours"],
   properties: {
-    type: { type: "string", enum: ["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
+    type: { type: "string", enum: ["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
     minutes: { type: ["integer", "null"], minimum: 5, maximum: 240 },
     hard_mode: { type: ["boolean", "null"] },
     name: { type: ["string", "null"], maxLength: 40 },
@@ -331,34 +607,40 @@ function normalizePlan(parsed, fallback) {
   const validIntents = new Set(["sleep", "focus", "study", "emergency", "allowOnly", "vacation", "weeklyReview", "adultContent", "social", "general"]);
   const modelActions = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map(normalizeAction).filter(Boolean) : null;
   const planIntent = validIntents.has(plan.intent) ? plan.intent : fallback.intent;
-  if (fallback.actions.length > 0 && (!modelActions || modelActions.length === 0 || planIntent !== fallback.intent)) {
+  if (planIntent !== fallback.intent) {
+    return fallback;
+  }
+  const fallbackActionTypes = fallback.actions.filter((item) => item && item.type !== "none").map((item) => item.type).join("|");
+  const modelActionTypes = (modelActions || []).filter((item) => item && item.type !== "none").map((item) => item.type).join("|");
+  if (fallbackActionTypes !== modelActionTypes) {
     return fallback;
   }
   const bullets = Array.isArray(plan.bullets) ? plan.bullets.map((item) => userFacingText(item, 140)).filter(Boolean).slice(0, 4) : [];
   const interpretation = userFacingText(source.interpretation, 160);
   const behavior = userFacingText(source.behavior_pattern, 160);
   const nextMove = userFacingText(source.next_move, 160);
-  const fallbackBullets = [interpretation, behavior, nextMove].filter(Boolean).concat(fallback.bullets).slice(0, 4);
-  const actions = fallback.actions.length === 0 ? [] : (!modelActions || modelActions.length === 0 ? fallback.actions : modelActions);
+  const fallbackBullets = fallback.bullets;
+  const actions = fallback.actions;
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
+  const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback):/i.test(item)).length >= 2;
   return {
     intent: planIntent,
     title: userFacingText(plan.title, 70) || fallback.title,
     response_text: userFacingText(plan.response_text, 180) || interpretation || fallback.response_text,
-    bullets: visibleBullets.length >= 2 ? visibleBullets : fallbackBullets,
+    bullets: visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
     primary_label: cleanText(plan.primary_label, 32) || fallback.primary_label,
     secondary_label: cleanText(plan.secondary_label, 32) || fallback.secondary_label,
     actions,
-    requires_selected_apps: hasExecutableActions && (typeof plan.requires_selected_apps === "boolean" ? plan.requires_selected_apps : fallback.requires_selected_apps),
-    requires_screen_time_authorization: hasExecutableActions && (typeof plan.requires_screen_time_authorization === "boolean" ? plan.requires_screen_time_authorization : fallback.requires_screen_time_authorization),
+    requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
+    requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
   };
 }
 
 function normalizeAction(candidate) {
   if (!candidate || typeof candidate !== "object") return null;
   const type = cleanText(candidate.type, 60);
-  const allowed = new Set(["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
+  const allowed = new Set(["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
   if (!allowed.has(type)) return null;
   if (type === "none") return action("none");
   const candidateStart = candidate.start_minute == null ? null : cleanNumber(candidate.start_minute, 1320, 0, 1439);
@@ -384,8 +666,18 @@ function normalizeAction(candidate) {
   });
   if (type === "set_daily_limit") return action(type, { minutes: normalized.minutes });
   if (type === "enable_allow_only" || type === "enable_adult_filter" || type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan" || type === "disable_pause") return action(type);
+  if (type === "switch_mode") return action(type, { name: normalized.name });
   if (type === "start_protection") return action(type, { minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "pause_rules") return action(type, { hours: normalized.hours });
+  if (type === "apply_schedule") {
+    return action(type, {
+      name: normalized.name,
+      start_minute: normalized.start_minute,
+      end_minute: normalized.end_minute,
+      weekdays: normalized.weekdays,
+      duration_days: normalized.duration_days,
+    });
+  }
   return normalized;
 }
 
@@ -415,7 +707,7 @@ async function modelPlan(prompt, context, fallback) {
         {
           role: "system",
           content:
-            "You are Blanked, a conversational digital wellness AI for changing phone behavior. Your first job is to understand the user's screen habit, not to force a blocking plan. Ask one context question when a critical detail is missing. For night scrolling, do not propose or execute a schedule until you know the user's bedtime or the user gives an explicit time window. For vague scrolling, ask which app or when it happens before creating limits. Use actions only when the user's intent is clear enough to execute. Stay inside phone behavior, app blocking, Screen Time, sleep, attention, urges, relapse prevention, and healthier screen habits. Do not claim medical diagnosis, therapy, or treatment. Do not use the word coach. English only. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-2 concrete sentences. Bullets should follow Read, Pattern, Move, Protection when relevant; omit Protection if no action should be taken yet. Action semantics: apply_schedule is the only action for recurring time windows; set_daily_limit is only a whole-day minute cap; start_protection is only an immediate timed block; enable_allow_only has no schedule; enable_adult_filter has no schedule; pause_rules uses hours only. Never describe an action as doing something its type cannot execute. Every action object must include all nullable action fields.",
+            "You are Blanked, a conversational digital wellness AI for changing phone behavior. Your first job is to understand the user's screen habit, not to force a blocking plan. Ask one context question when a critical detail is missing. For night scrolling, do not propose or execute a schedule until you know the user's bedtime or the user gives an explicit time window. For vague scrolling, ask which app or when it happens before creating limits. Use actions only when the user's intent is clear enough to execute. Stay inside phone behavior, app blocking, Screen Time, sleep, attention, urges, relapse prevention, and healthier screen habits. Do not claim medical diagnosis, therapy, or treatment. Do not use the word coach. English only. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-2 concrete sentences. Bullets should follow Read, Pattern, Move, Protection when relevant; omit Protection if no action should be taken yet. Action semantics: switch_mode selects one existing authorized mode by name; apply_schedule is the only action for recurring time windows; set_daily_limit is only a whole-day minute cap; start_protection is only an immediate timed block; enable_allow_only has no schedule; enable_adult_filter has no schedule; pause_rules uses hours only. Never describe an action as doing something its type cannot execute. Every action object must include all nullable action fields.",
         },
         {
           role: "user",

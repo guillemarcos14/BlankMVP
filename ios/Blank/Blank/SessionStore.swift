@@ -502,6 +502,14 @@ final class SessionStore: ObservableObject {
         selection = Self.selection(from: mode.selectionData) ?? FamilyActivitySelection()
     }
 
+    @discardableResult
+    func selectMode(named name: String) -> Bool {
+        let target = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard let mode = focusModes.first(where: { $0.name.lowercased() == target }) else { return false }
+        selectMode(mode.id)
+        return true
+    }
+
     func createMode(named name: String) {
         let mode = BlankFocusMode(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New mode" : name,

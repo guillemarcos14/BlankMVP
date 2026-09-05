@@ -261,7 +261,7 @@ struct HomeView: View {
                 topNavButton("Stats") {
                     openSection(.report)
                 }
-                topNavButton("Mode") {
+                topNavButton("Plan") {
                     openSection(.modes)
                 }
                 topNavButton("Habits") {
@@ -1156,8 +1156,8 @@ private struct ModesList: View {
     var body: some View {
         List {
             TopSheetHeader(
-                title: "Mode",
-                subtitle: "Choose the active block mode\nand edit the apps it protects.",
+                title: "Plan",
+                subtitle: "Choose the active protection plan\nand edit the apps it protects.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1186,7 +1186,7 @@ private struct ModesList: View {
             }
 
             VStack(spacing: 10) {
-                TextField("Create a custom mode", text: $newModeName)
+                TextField("Create a custom plan", text: $newModeName)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(textColor)
                     .padding(.horizontal, 18)
@@ -1197,7 +1197,7 @@ private struct ModesList: View {
                     sessionStore.createMode(named: newModeName)
                     newModeName = ""
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Create mode")
+                    TopSheetPrimaryButtonLabel(title: "Create plan")
                 }
                 .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
@@ -1215,7 +1215,7 @@ private struct ModesList: View {
                 onFinish()
             } label: {
                 HStack {
-                    Text("Edit current mode apps")
+                    Text("Edit current plan apps")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     Spacer()
                 }
@@ -1265,7 +1265,7 @@ private struct ModesList: View {
                     Text(mode.name)
                         .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
 
-                    Text(isSelected ? blockedAppsText : "Tap to activate this mode")
+                    Text(isSelected ? blockedAppsText : "Tap to activate this plan")
                         .font(.caption)
                         .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
                         .lineLimit(1)

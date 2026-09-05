@@ -779,7 +779,7 @@ private struct ConversationalHomeView: View {
             await MainActor.run {
                 activePlan = resolvedPlan.hasExecutableActions ? resolvedPlan : nil
                 if let index = messages.firstIndex(where: { $0.id == thinkingMessage.id }) {
-                    messages[index].text = resolvedPlan.responseText
+                    messages[index].text = resolvedPlan.displayMessageText
                 }
             }
         }
@@ -1104,6 +1104,7 @@ private struct AgentPlan: Identifiable, Equatable {
     var intent: AgentIntent
     var title: String
     var responseText: String
+    var messageText: String = ""
     var bullets: [String]
     var primaryLabel: String
     var secondaryLabel: String
@@ -1119,6 +1120,10 @@ private struct AgentPlan: Identifiable, Equatable {
 
     var hasExecutableActions: Bool {
         executableActionCount > 0
+    }
+
+    var displayMessageText: String {
+        messageText.isEmpty ? responseText : messageText
     }
 }
 
@@ -1910,6 +1915,7 @@ private struct RemoteAgentPlan: Decodable {
     var intent: String
     var title: String
     var response_text: String
+    var message_text: String?
     var bullets: [String]
     var primary_label: String
     var secondary_label: String
@@ -1924,6 +1930,7 @@ private struct RemoteAgentPlan: Decodable {
             intent: AgentIntent(rawValue: intent) ?? fallback.intent,
             title: clean(title, fallback.title),
             responseText: clean(response_text, fallback.responseText),
+            messageText: clean(message_text, clean(response_text, fallback.responseText)),
             bullets: cleanedBullets.isEmpty ? fallback.bullets : Array(cleanedBullets.prefix(4)),
             primaryLabel: clean(primary_label, fallback.primaryLabel),
             secondaryLabel: clean(secondary_label, fallback.secondaryLabel),
@@ -2348,21 +2355,12 @@ private struct AgentPlanCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(plan.bullets, id: \.self) { bullet in
-                    HStack(alignment: .top, spacing: 9) {
-                        Circle()
-                            .fill(BlankColors.ink.opacity(0.70))
-                            .frame(width: 5, height: 5)
-                            .padding(.top, 8)
-                        Text(bullet)
-                            .font(.blankInter(size: 15, relativeTo: .subheadline))
-                            .foregroundStyle(BlankColors.ink.opacity(0.84))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
+            Text(plan.displayMessageText)
+                .font(.blankInter(size: 15, relativeTo: .subheadline))
+                .foregroundStyle(BlankColors.ink.opacity(0.84))
+                .lineSpacing(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
 
             if plan.hasExecutableActions {
                 HStack(spacing: 8) {

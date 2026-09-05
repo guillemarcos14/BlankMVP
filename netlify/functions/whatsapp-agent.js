@@ -132,7 +132,7 @@ function actionableLink(plan, prompt = "") {
 }
 
 function whatsappReplyText(plan, prompt = "") {
-  const text = cleanText(plan.response_text, 280) || "I can help with that in Blanked.";
+  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
   const link = actionableLink(plan, prompt);
   if (!link) return text;
   return `${text}\n\nOpen Blanked to apply it:\n${link}`;

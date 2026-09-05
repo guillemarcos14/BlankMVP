@@ -5,7 +5,9 @@
     "expect": {
       "intent": "sleep",
       "action_types": [],
-      "text_matches": ["bedtime|sleep target"]
+      "text_matches": [
+        "bedtime|sleep target"
+      ]
     }
   },
   {
@@ -14,18 +16,26 @@
     "context": {
       "memory": {
         "bedtime_minute": 1380,
-        "weak_hours": [22],
-        "main_apps": ["TikTok"]
+        "weak_hours": [
+          22
+        ],
+        "main_apps": [
+          "TikTok"
+        ]
       }
     },
     "expect": {
       "intent": "sleep",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1350,
         "end_minute": 1380
       },
-      "text_matches": ["11:00 PM|bedtime|sleep"]
+      "text_matches": [
+        "11:00 PM|bedtime|sleep"
+      ]
     }
   },
   {
@@ -33,12 +43,16 @@
     "prompt": "I usually go to bed at 12:30",
     "expect": {
       "intent": "sleep",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 0,
         "end_minute": 30
       },
-      "text_matches": ["12:30 AM"]
+      "text_matches": [
+        "12:30 AM"
+      ]
     }
   },
   {
@@ -46,12 +60,16 @@
     "prompt": "Block Instagram from 10 to 7.",
     "expect": {
       "intent": "social",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1320,
         "end_minute": 420
       },
-      "text_matches": ["10:00 PM to 7:00 AM"]
+      "text_matches": [
+        "10:00 PM to 7:00 AM"
+      ]
     }
   },
   {
@@ -59,7 +77,9 @@
     "prompt": "Block TikTok from 9 pm to 11 pm.",
     "expect": {
       "intent": "social",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1260,
         "end_minute": 1380
@@ -72,7 +92,33 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["where|app|loop"]
+      "text_matches": [
+        "where|app|loop"
+      ]
+    }
+  },
+  {
+    "id": "vague_stop_scrolling_does_not_guess_memory_app",
+    "prompt": "Hi, I need help to stop scrolling",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok"
+        ],
+        "weak_hours": [
+          21
+        ]
+      }
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "which app|moment|real loop"
+      ],
+      "ui_text_not_matches": [
+        "TikTok"
+      ]
     }
   },
   {
@@ -81,7 +127,9 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["where|app|loop"]
+      "text_matches": [
+        "where|app|loop"
+      ]
     }
   },
   {
@@ -89,8 +137,13 @@
     "prompt": "I feel anxious and keep opening Instagram.",
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["anxiety|trigger|Pattern"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "anxiety|trigger|Pattern"
+      ]
     }
   },
   {
@@ -98,15 +151,24 @@
     "prompt": "I keep doomscrolling.",
     "context": {
       "memory": {
-        "main_apps": ["Instagram"],
-        "weak_hours": [21],
+        "main_apps": [
+          "Instagram"
+        ],
+        "weak_hours": [
+          21
+        ],
         "last_plan_outcome": "broke"
       }
     },
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["broke|earlier|9:00 PM|Instagram"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "broke|earlier|9:00 PM|Instagram"
+      ]
     }
   },
   {
@@ -114,7 +176,9 @@
     "prompt": "I need to focus for work now.",
     "expect": {
       "intent": "focus",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "first_action": {
         "minutes": 35,
         "hard_mode": false
@@ -128,10 +192,15 @@
     "prompt": "I need to study for my exam tomorrow.",
     "expect": {
       "intent": "study",
-      "action_types": ["apply_schedule", "set_daily_limit"],
+      "action_types": [
+        "apply_schedule",
+        "set_daily_limit"
+      ],
       "requires_selected_apps": true,
       "requires_screen_time_authorization": true,
-      "text_matches": ["study|exam|Block"]
+      "text_matches": [
+        "study|exam|Block"
+      ]
     }
   },
   {
@@ -139,7 +208,9 @@
     "prompt": "I can't stop. Help me now.",
     "expect": {
       "intent": "emergency",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "first_action": {
         "minutes": 30,
         "hard_mode": true
@@ -155,7 +226,9 @@
     "expect": {
       "intent": "emergency",
       "action_types": [],
-      "text_matches": ["already protected|Stay protected"]
+      "text_matches": [
+        "already protected|Stay protected"
+      ]
     }
   },
   {
@@ -163,8 +236,13 @@
     "prompt": "Only let me use WhatsApp and Maps.",
     "expect": {
       "intent": "allowOnly",
-      "action_types": ["enable_allow_only", "open_app_picker"],
-      "text_matches": ["essentials|WhatsApp|Maps"]
+      "action_types": [
+        "enable_allow_only",
+        "open_app_picker"
+      ],
+      "text_matches": [
+        "essentials|WhatsApp|Maps"
+      ]
     }
   },
   {
@@ -172,7 +250,9 @@
     "prompt": "Pause my rules this week.",
     "expect": {
       "intent": "vacation",
-      "action_types": ["pause_rules"],
+      "action_types": [
+        "pause_rules"
+      ],
       "first_action": {
         "hours": 168
       }
@@ -186,8 +266,12 @@
     },
     "expect": {
       "intent": "vacation",
-      "action_types": ["disable_pause"],
-      "text_matches": ["Resume|rules"]
+      "action_types": [
+        "disable_pause"
+      ],
+      "text_matches": [
+        "Resume|rules"
+      ]
     }
   },
   {
@@ -195,8 +279,12 @@
     "prompt": "Review my week.",
     "expect": {
       "intent": "weeklyReview",
-      "action_types": ["apply_ai_plan"],
-      "text_matches": ["80 protected minutes|0 break|9:00 PM"]
+      "action_types": [
+        "apply_ai_plan"
+      ],
+      "text_matches": [
+        "80 protected minutes|0 break|9:00 PM"
+      ]
     }
   },
   {
@@ -204,8 +292,12 @@
     "prompt": "Help me block adult websites.",
     "expect": {
       "intent": "adultContent",
-      "action_types": ["enable_adult_filter"],
-      "text_matches": ["adult|filter|urge"]
+      "action_types": [
+        "enable_adult_filter"
+      ],
+      "text_matches": [
+        "adult|filter|urge"
+      ]
     }
   },
   {
@@ -214,7 +306,9 @@
     "expect": {
       "intent": "general",
       "action_types": [],
-      "text_matches": ["phone|screen|habit|willpower"]
+      "text_matches": [
+        "phone|screen|habit|willpower"
+      ]
     }
   },
   {
@@ -222,7 +316,9 @@
     "prompt": "No puedo parar con Instagram.",
     "expect": {
       "intent": "emergency",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "first_action": {
         "hard_mode": true
       }
@@ -236,10 +332,13 @@
       "selection_count": 0
     },
     "expect": {
-      "intent": "focus",
-      "action_types": ["start_protection"],
-      "requires_selected_apps": true,
-      "requires_screen_time_authorization": true
+      "intent": "general",
+      "action_types": [],
+      "requires_selected_apps": false,
+      "requires_screen_time_authorization": false,
+      "text_matches": [
+        "real loop|Which app|moment|habit"
+      ]
     }
   },
   {
@@ -250,7 +349,9 @@
     },
     "expect": {
       "intent": "weeklyReview",
-      "action_types": ["apply_ai_plan"]
+      "action_types": [
+        "request_screen_time_permission"
+      ]
     }
   },
   {
@@ -259,7 +360,9 @@
     "expect": {
       "intent": "sleep",
       "action_types": [],
-      "text_matches": ["bedtime|sleep target|sleep"]
+      "text_matches": [
+        "bedtime|sleep target|sleep"
+      ]
     }
   },
   {
@@ -268,9 +371,15 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["work|need|app|when"],
-      "ui_text_matches": ["Tell me when TikTok becomes non-work use"],
-      "ui_text_not_matches": ["Read:|Pattern:|Move:|Work App Conflict"]
+      "text_matches": [
+        "work|need|app|when"
+      ],
+      "ui_text_matches": [
+        "Tell me when TikTok becomes non-work use"
+      ],
+      "ui_text_not_matches": [
+        "Read:|Pattern:|Move:|Work App Conflict"
+      ]
     }
   },
   {
@@ -279,9 +388,15 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["Instagram|work|need|when"],
-      "ui_text_matches": ["Tell me when Instagram becomes non-work use"],
-      "ui_text_not_matches": ["Read:|Pattern:|Move:|Work App Conflict"]
+      "text_matches": [
+        "Instagram|work|need|when"
+      ],
+      "ui_text_matches": [
+        "Tell me when Instagram becomes non-work use"
+      ],
+      "ui_text_not_matches": [
+        "Read:|Pattern:|Move:|Work App Conflict"
+      ]
     }
   },
   {
@@ -289,8 +404,13 @@
     "prompt": "Block everything except WhatsApp and Maps.",
     "expect": {
       "intent": "allowOnly",
-      "action_types": ["enable_allow_only", "open_app_picker"],
-      "text_matches": ["essential|WhatsApp|Maps"]
+      "action_types": [
+        "enable_allow_only",
+        "open_app_picker"
+      ],
+      "text_matches": [
+        "essential|WhatsApp|Maps"
+      ]
     }
   },
   {
@@ -298,8 +418,12 @@
     "prompt": "Block Duolingo.",
     "expect": {
       "intent": "social",
-      "action_types": ["open_app_picker"],
-      "text_matches": ["Duolingo|Screen Time|choose"],
+      "action_types": [
+        "open_app_picker"
+      ],
+      "text_matches": [
+        "Duolingo|Screen Time|choose"
+      ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
     }
@@ -309,8 +433,12 @@
     "prompt": "Limit Slack.",
     "expect": {
       "intent": "social",
-      "action_types": ["open_app_picker"],
-      "text_matches": ["Slack|Screen Time|choose"],
+      "action_types": [
+        "open_app_picker"
+      ],
+      "text_matches": [
+        "Slack|Screen Time|choose"
+      ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
     }
@@ -320,12 +448,16 @@
     "prompt": "Block YouTube from 7 to 8.",
     "expect": {
       "intent": "social",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 420,
         "end_minute": 480
       },
-      "text_matches": ["7:00 AM to 8:00 AM"]
+      "text_matches": [
+        "7:00 AM to 8:00 AM"
+      ]
     }
   },
   {
@@ -333,12 +465,16 @@
     "prompt": "Help me focus tomorrow morning from 8 to 10.",
     "expect": {
       "intent": "focus",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 480,
         "end_minute": 600
       },
-      "text_matches": ["8(:00)? to 10(:00)? AM|8:00 AM to 10:00 AM"]
+      "text_matches": [
+        "8\\s*(?::00)?\\s*(AM)?\\s*to\\s*10\\s*(?::00)?\\s*AM|8:00 AM to 10:00 AM"
+      ]
     }
   },
   {
@@ -346,8 +482,13 @@
     "prompt": "I feel guilty after scrolling Instagram for hours.",
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["guilt|trigger|Pattern"],
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "guilt|trigger|Pattern"
+      ],
       "min_quality_score": 3
     }
   },
@@ -356,15 +497,24 @@
     "prompt": "I keep opening Instagram after dinner.",
     "context": {
       "memory": {
-        "main_apps": ["Instagram"],
-        "weak_hours": [21],
+        "main_apps": [
+          "Instagram"
+        ],
+        "weak_hours": [
+          21
+        ],
         "last_plan_outcome": "held"
       }
     },
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["held|repeat|9:00 PM|Instagram"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "held|repeat|9:00 PM|Instagram"
+      ]
     }
   },
   {
@@ -375,7 +525,9 @@
     },
     "expect": {
       "intent": "focus",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "request_screen_time_permission"
+      ],
       "requires_screen_time_authorization": true
     }
   },
@@ -384,8 +536,12 @@
     "prompt": "Why do I keep losing control around 10pm?",
     "expect": {
       "intent": "emergency",
-      "action_types": ["start_protection"],
-      "text_matches": ["risk|Move|control"]
+      "action_types": [
+        "start_protection"
+      ],
+      "text_matches": [
+        "risk|Move|control"
+      ]
     }
   },
   {
@@ -394,7 +550,9 @@
     "expect": {
       "intent": "general",
       "action_types": [],
-      "text_matches": ["exact app|exact apps|not visible|selected"]
+      "text_matches": [
+        "exact app|exact apps|not visible|selected"
+      ]
     }
   },
   {
@@ -402,8 +560,16 @@
     "prompt": "I always open Instagram when I wake up.",
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["Instagram|trigger|Pattern"]
+      "action_types": [],
+      "text_matches": [
+        "wake|wake-up|usually wake up|real routine"
+      ],
+      "ui_text_matches": [
+        "What time do you usually wake up"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|Start with a 25 minute"
+      ]
     }
   },
   {
@@ -411,8 +577,43 @@
     "prompt": "I waste two hours on YouTube after lunch.",
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["YouTube|trigger|Pattern|fallback"]
+      "action_types": [],
+      "text_matches": [
+        "lunch|finish eating|10-15|real routine"
+      ],
+      "ui_text_matches": [
+        "What time do you usually finish eating"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|Start with a 25 minute"
+      ]
+    }
+  },
+  {
+    "id": "instagram_after_lunch_asks_real_lunch_time",
+    "prompt": "I usually scroll on Instagram after lunch",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok"
+        ],
+        "weak_hours": [
+          12
+        ]
+      }
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "lunch|finish eating|real routine|boundary"
+      ],
+      "ui_text_matches": [
+        "What time do you usually finish eating"
+      ],
+      "ui_text_not_matches": [
+        "12:00 PM to 1:00 PM|25 minute daily limit|TikTok"
+      ]
     }
   },
   {
@@ -421,7 +622,9 @@
     "expect": {
       "intent": "sleep",
       "action_types": [],
-      "text_matches": ["bedtime|sleep target|tonight"]
+      "text_matches": [
+        "bedtime|sleep target|tonight"
+      ]
     }
   },
   {
@@ -429,8 +632,13 @@
     "prompt": "Twitter makes me compare myself and lose time.",
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["comparison|trigger|Pattern|Twitter"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "comparison|trigger|Pattern|Twitter"
+      ]
     }
   },
   {
@@ -439,7 +647,9 @@
     "expect": {
       "intent": "sleep",
       "action_types": [],
-      "text_matches": ["bedtime|sleep target|sleep"]
+      "text_matches": [
+        "noche|dormir|hora objetivo|sueño|scroll"
+      ]
     }
   },
   {
@@ -447,12 +657,16 @@
     "prompt": "Bloquea Instagram de 22:30 a 23:30.",
     "expect": {
       "intent": "social",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1350,
         "end_minute": 1410
       },
-      "text_matches": ["10:30 PM to 11:30 PM"]
+      "text_matches": [
+        "10:30 PM to 11:30 PM"
+      ]
     }
   },
   {
@@ -460,8 +674,13 @@
     "prompt": "Quiero estudiar sin YouTube esta tarde.",
     "expect": {
       "intent": "study",
-      "action_types": ["apply_schedule", "set_daily_limit"],
-      "text_matches": ["study|Block|limit"]
+      "action_types": [
+        "apply_schedule",
+        "set_daily_limit"
+      ],
+      "text_matches": [
+        "study|Block|limit"
+      ]
     }
   },
   {
@@ -469,10 +688,14 @@
     "prompt": "I keep checking my phone during deep work.",
     "expect": {
       "intent": "focus",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "requires_selected_apps": true,
       "requires_screen_time_authorization": true,
-      "text_matches": ["start|minutes|now"]
+      "text_matches": [
+        "start|minutes|now"
+      ]
     }
   },
   {
@@ -480,12 +703,16 @@
     "prompt": "My bedtime is 10:30.",
     "expect": {
       "intent": "sleep",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1320,
         "end_minute": 1350
       },
-      "text_matches": ["10:30 PM"]
+      "text_matches": [
+        "10:30 PM"
+      ]
     }
   },
   {
@@ -494,17 +721,23 @@
     "context": {
       "memory": {
         "pattern_cluster": "bedtime scroll",
-        "main_apps": ["Instagram"]
+        "main_apps": [
+          "Instagram"
+        ]
       }
     },
     "expect": {
       "intent": "sleep",
-      "action_types": ["apply_schedule"],
+      "action_types": [
+        "apply_schedule"
+      ],
       "first_action": {
         "start_minute": 1410,
         "end_minute": 0
       },
-      "text_matches": ["12:00 AM|bedtime|11:30 PM"]
+      "text_matches": [
+        "12:00 AM|bedtime|11:30 PM"
+      ]
     }
   },
   {
@@ -512,11 +745,15 @@
     "prompt": "I broke the block yesterday after 15 minutes.",
     "expect": {
       "intent": "emergency",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "first_action": {
         "hard_mode": true
       },
-      "text_matches": ["trigger|urge|Move|hard"]
+      "text_matches": [
+        "trigger|urge|Move|hard"
+      ]
     }
   },
   {
@@ -525,7 +762,9 @@
     "expect": {
       "intent": "sleep",
       "action_types": [],
-      "text_matches": ["bedtime|sleep|rest|target"]
+      "text_matches": [
+        "bedtime|sleep|rest|target"
+      ]
     }
   },
   {
@@ -534,9 +773,15 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["YouTube|work|need|full block|when|boundary"],
-      "ui_text_matches": ["Tell me when YouTube becomes non-work use"],
-      "ui_text_not_matches": ["Read:|Pattern:|Move:|Work App Conflict"]
+      "text_matches": [
+        "YouTube|work|need|full block|when|boundary"
+      ],
+      "ui_text_matches": [
+        "Tell me when YouTube becomes non-work use"
+      ],
+      "ui_text_not_matches": [
+        "Read:|Pattern:|Move:|Work App Conflict"
+      ]
     }
   },
   {
@@ -544,8 +789,12 @@
     "prompt": "Ayudame a bloquear porno.",
     "expect": {
       "intent": "adultContent",
-      "action_types": ["enable_adult_filter"],
-      "text_matches": ["adult|filter|urge|protection"]
+      "action_types": [
+        "enable_adult_filter"
+      ],
+      "text_matches": [
+        "adult|filter|urge|protection"
+      ]
     }
   },
   {
@@ -553,7 +802,9 @@
     "prompt": "Estoy de vacaciones, pausa mis reglas.",
     "expect": {
       "intent": "vacation",
-      "action_types": ["pause_rules"],
+      "action_types": [
+        "pause_rules"
+      ],
       "first_action": {
         "hours": 168
       }
@@ -567,8 +818,12 @@
     },
     "expect": {
       "intent": "vacation",
-      "action_types": ["disable_pause"],
-      "text_matches": ["Resume|rules"]
+      "action_types": [
+        "disable_pause"
+      ],
+      "text_matches": [
+        "Resume|rules"
+      ]
     }
   },
   {
@@ -580,7 +835,9 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"]
+      "action_types": [
+        "open_app_picker"
+      ]
     }
   },
   {
@@ -592,10 +849,16 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": ["open_app_picker"],
-      "text_matches": ["social apps|Screen Time|choose"],
-      "ui_text_matches": ["Choose the social apps in Screen Time first"],
-      "ui_text_not_matches": ["block Social|Read: Social|Social is the app"],
+      "action_types": [],
+      "text_matches": [
+        "after lunch|lunch|finish eating|10-15"
+      ],
+      "ui_text_matches": [
+        "What time do you usually finish eating"
+      ],
+      "ui_text_not_matches": [
+        "Choose the social apps in Screen Time first|block Social|Read: Social|Social is the app|What time should the block start"
+      ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
     }
@@ -607,16 +870,28 @@
       "has_selected_apps": false,
       "selection_count": 0,
       "memory": {
-        "main_apps": ["TikTok"],
-        "weak_hours": [13]
+        "main_apps": [
+          "TikTok"
+        ],
+        "weak_hours": [
+          13
+        ]
       }
     },
     "expect": {
       "intent": "social",
-      "action_types": ["open_app_picker"],
-      "text_matches": ["Instagram|Screen Time|choose"],
-      "ui_text_matches": ["Choose Instagram in Screen Time first"],
-      "ui_text_not_matches": ["TikTok|spare time|Set up"],
+      "action_types": [
+        "open_app_picker"
+      ],
+      "text_matches": [
+        "Instagram|Screen Time|choose"
+      ],
+      "ui_text_matches": [
+        "Choose Instagram in Screen Time first"
+      ],
+      "ui_text_not_matches": [
+        "TikTok|spare time|Set up"
+      ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
     }
@@ -626,15 +901,24 @@
     "prompt": "The evening is bad again.",
     "context": {
       "memory": {
-        "main_apps": ["TikTok"],
-        "weak_hours": [20],
+        "main_apps": [
+          "TikTok"
+        ],
+        "weak_hours": [
+          20
+        ],
         "last_plan_outcome": "broke"
       }
     },
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["8:00 PM|broke|earlier"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "8:00 PM|broke|earlier"
+      ]
     }
   },
   {
@@ -643,7 +927,9 @@
     "expect": {
       "intent": "social",
       "action_types": [],
-      "text_matches": ["where|app|loop"]
+      "text_matches": [
+        "where|app|loop"
+      ]
     }
   },
   {
@@ -651,58 +937,534 @@
     "prompt": "Start a strict block for 45 minutes now.",
     "expect": {
       "intent": "focus",
-      "action_types": ["start_protection"],
+      "action_types": [
+        "start_protection"
+      ],
       "first_action": {
         "minutes": 45,
         "hard_mode": true
       },
-      "text_matches": ["45|minutes|now"]
+      "text_matches": [
+        "45|minutes|now"
+      ]
     }
   },
   {
     "id": "existing_work_mode_start",
     "prompt": "Start Work mode for 45 minutes.",
     "context": {
-      "available_modes": ["Routine", "Work", "Sleep"]
+      "available_modes": [
+        "Routine",
+        "Work",
+        "Sleep"
+      ]
     },
     "expect": {
       "intent": "focus",
-      "action_types": ["switch_mode", "start_protection"],
+      "action_types": [
+        "switch_mode",
+        "start_protection"
+      ],
       "first_action": {
         "name": "Work"
       },
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
-      "text_matches": ["Work mode|45|existing|authorized"]
+      "text_matches": [
+        "Work mode|45|existing|authorized"
+      ]
     }
   },
   {
     "id": "existing_sleep_mode_schedule",
     "prompt": "Use Sleep mode from 10 to 7.",
     "context": {
-      "available_modes": ["Routine", "Work", "Sleep"]
+      "available_modes": [
+        "Routine",
+        "Work",
+        "Sleep"
+      ]
     },
     "expect": {
       "intent": "sleep",
-      "action_types": ["switch_mode", "apply_schedule"],
+      "action_types": [
+        "switch_mode",
+        "apply_schedule"
+      ],
       "first_action": {
         "name": "Sleep"
       },
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
-      "text_matches": ["Sleep mode|10:00 PM|7:00 AM|authorized"]
+      "text_matches": [
+        "Sleep mode|10:00 PM|7:00 AM|authorized"
+      ]
     }
   },
   {
     "id": "missing_mode_does_not_switch",
     "prompt": "Start Gaming mode.",
     "context": {
-      "available_modes": ["Routine", "Work", "Sleep"]
+      "available_modes": [
+        "Routine",
+        "Work",
+        "Sleep"
+      ]
     },
     "expect": {
       "intent": "social",
-      "action_types": ["set_daily_limit", "apply_schedule"],
-      "text_matches": ["screen habit|Pattern|Move"]
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "screen habit|Pattern|Move"
+      ]
+    }
+  },
+  {
+    "id": "general_advice_only_when_asked",
+    "prompt": "What should I do to have a healthier relationship with my phone?",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "guidance|trigger|phone|automatic"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|Start now|Enable protection"
+      ]
+    }
+  },
+  {
+    "id": "general_observation_no_unsolicited_advice",
+    "prompt": "I used my phone a lot today.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "advice|diagnosis|protection plan"
+      ],
+      "ui_text_not_matches": [
+        "Start by|you should|Apply protection|Start now"
+      ]
+    }
+  },
+  {
+    "id": "block_instagram_after_dinner_context_question",
+    "prompt": "Block Instagram after dinner.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "after dinner|finish dinner|real routine"
+      ],
+      "ui_text_matches": [
+        "What time do you usually finish dinner"
+      ],
+      "ui_text_not_matches": [
+        "What time should the block start|Choose Instagram in Screen Time first"
+      ]
+    }
+  },
+  {
+    "id": "general_digital_wellness_ignores_app_memory",
+    "prompt": "How can I improve my digital wellness?",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok",
+          "Instagram"
+        ],
+        "weak_hours": [
+          22
+        ]
+      }
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "moment|automatic|guidance"
+      ],
+      "ui_text_not_matches": [
+        "TikTok|Instagram|urges to open|filling a state|Apply protection"
+      ]
+    }
+  },
+  {
+    "id": "user_rejects_wrong_app_context",
+    "prompt": "I dont use TikTok or ig. What do you mean?",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok",
+          "Instagram"
+        ],
+        "weak_hours": [
+          22
+        ]
+      }
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not use that app|real trigger|app, moment or habit"
+      ],
+      "ui_text_not_matches": [
+        "TikTok is filling|Instagram is filling|Scroll Loop|Apply protection"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_plan_too_broad_phone_less",
+    "prompt": "I want a plan to use my phone less.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "real loop|app, moment or habit|too broad"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|start protection|25 minute"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_make_me_a_plan_missing_loop",
+    "prompt": "Make me a plan.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "real loop|target is still too broad|repeated trigger"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|Start now|schedule"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_where_to_start_no_focus_block",
+    "prompt": "I want to improve digital wellness but I do not know where to start.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "moment|automatic|guidance|trigger"
+      ],
+      "ui_text_not_matches": [
+        "Start now|execution moment|Apply protection"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_scroll_in_bed_until_2am_missing_sleep_target",
+    "prompt": "I scroll in bed until 2am.",
+    "expect": {
+      "intent": "sleep",
+      "action_types": [],
+      "text_matches": [
+        "bedtime|sleep target|usual bedtime"
+      ],
+      "ui_text_not_matches": [
+        "2:00 AM is your sleep target|Apply boundary"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_reels_when_wake_up_context_question",
+    "prompt": "I spend 2 hours on reels when I wake up.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "wake|wake-up|usually wake up|real routine"
+      ],
+      "ui_text_matches": [
+        "What time do you usually wake up"
+      ],
+      "ui_text_not_matches": [
+        "Noted|Apply protection|25 minute"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_shorts_after_work_context_question",
+    "prompt": "YouTube Shorts eats my evening after work.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "after work|finish work|decompression"
+      ],
+      "ui_text_matches": [
+        "What time do you usually finish work"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|25 minute"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_bored_phone_check_missing_app",
+    "prompt": "I want to stop checking my phone when I feel bored.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "where|app|loop"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|25 minute"
+      ]
+    }
+  },
+  {
+    "id": "synthetic_sleep_target_midnight_creates_boundary",
+    "prompt": "I want to sleep at midnight but keep scrolling.",
+    "expect": {
+      "intent": "sleep",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1410,
+        "end_minute": 0
+      },
+      "text_matches": [
+        "12:00 AM|11:30 PM|sleep target"
+      ]
+    }
+  },
+  {
+    "id": "spanish_general_advice_stays_spanish",
+    "prompt": "¿Cómo puedo mejorar mi bienestar digital?",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok",
+          "Instagram"
+        ],
+        "weak_hours": [
+          22
+        ]
+      }
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "móvil|momento|automático|guía|patrón"
+      ],
+      "ui_text_not_matches": [
+        "Start by|What time|Tell me|TikTok|Instagram|Apply protection"
+      ]
+    }
+  },
+  {
+    "id": "spanish_observation_no_unsolicited_advice",
+    "prompt": "Estoy demasiado con el móvil hoy.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "consejo|lectura|plan|quieres|ir más allá"
+      ],
+      "ui_text_not_matches": [
+        "Start by|you should|Apply protection|Start now"
+      ]
+    }
+  },
+  {
+    "id": "spanish_after_lunch_context_question",
+    "prompt": "Quiero bloquear redes sociales después de comer.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "después de comer|terminar de comer|rutina|límite"
+      ],
+      "ui_text_matches": [
+        "A qué hora sueles terminar de comer"
+      ],
+      "ui_text_not_matches": [
+        "What time|Choose apps|Elegir apps"
+      ]
+    }
+  },
+  {
+    "id": "spanish_app_correction_stays_spanish",
+    "prompt": "No uso TikTok ni ig. ¿Qué quieres decir?",
+    "context": {
+      "memory": {
+        "main_apps": [
+          "TikTok",
+          "Instagram"
+        ],
+        "weak_hours": [
+          22
+        ]
+      }
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "No usaré esa app|app, momento o hábito|centrarnos"
+      ],
+      "ui_text_not_matches": [
+        "Got it|Which app|TikTok is filling|Apply protection"
+      ]
+    }
+  },
+  {
+    "id": "spanish_work_conflict_no_action",
+    "prompt": "Quiero bloquear Instagram pero lo necesito para trabajar.",
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "trabajo|uso no laboral|franja|límite"
+      ],
+      "ui_text_not_matches": [
+        "Choose Instagram|Apply protection|Start now"
+      ]
+    }
+  },
+  {
+    "id": "spanish_overreach_no_absolute_block",
+    "prompt": "Bloquea todo para siempre.",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "reglas limitadas|objetivo claro|salida|app|momento"
+      ],
+      "ui_text_not_matches": [
+        "forever|permanent|impossible|para siempre|Aplicar protección"
+      ]
+    }
+  },
+  {
+    "id": "assistant_capabilities_no_action",
+    "prompt": "What can you do for me?",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "patterns|blocks|schedules|limits|reports|setup"
+      ],
+      "ui_text_not_matches": [
+        "Start now|Apply protection|I'?ve set|I have set"
+      ]
+    }
+  },
+  {
+    "id": "emotional_low_state_can_offer_action",
+    "prompt": "I feel terrible today",
+    "expect": {
+      "intent": "emergency",
+      "action_types": [
+        "start_protection"
+      ],
+      "text_matches": [
+        "high-risk|moment|choice|Move|block"
+      ],
+      "ui_text_not_matches": [
+        "Tell me whether you want advice or a plan"
+      ]
+    }
+  },
+  {
+    "id": "future_focus_without_time_no_immediate_block",
+    "prompt": "I need you to help me stay focused tomorrow",
+    "expect": {
+      "intent": "focus",
+      "action_types": [],
+      "text_matches": [
+        "future|tomorrow|time window|franja|horario"
+      ],
+      "ui_text_not_matches": [
+        "Start now|start 35 minutes now"
+      ]
+    }
+  },
+  {
+    "id": "broad_automation_requires_pattern",
+    "prompt": "Can you manage my phone usage automatically?",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "automate|pattern|app|weak moment|risk window"
+      ],
+      "ui_text_not_matches": [
+        "I'?ve set|I have set|Start now"
+      ]
+    }
+  },
+  {
+    "id": "spanish_work_anchor_time_creates_window",
+    "prompt": "Bloquea Instagram cuando termine de trabajar a las 18",
+    "expect": {
+      "intent": "social",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1090,
+        "end_minute": 1150
+      },
+      "text_matches": [
+        "6:10|6:10 PM|18|trabajo|Instagram"
+      ]
+    }
+  },
+  {
+    "id": "unsupported_reminder_no_fake_schedule",
+    "prompt": "Recuérdame antes de que empiece a scrollear por la noche",
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "notificación|notification|franja|time|hora|protect"
+      ],
+      "ui_text_not_matches": [
+        "apply_schedule|I'?ll set|I have set|Puedo configurar un recordatorio"
+      ]
+    }
+  },
+  {
+    "id": "spanish_social_night_language",
+    "prompt": "Estoy perdiendo mucho tiempo en redes por la noche",
+    "expect": {
+      "intent": "sleep",
+      "action_types": [],
+      "text_matches": [
+        "noche|dormir|hora|sueño|redes|scroll"
+      ],
+      "ui_text_not_matches": [
+        "This sounds|Before I block|Read:|Pattern:|Move:"
+      ]
+    }
+  },
+  {
+    "id": "tonight_short_window_stays_pm",
+    "prompt": "Block Instagram from 10 to 11 tonight",
+    "expect": {
+      "intent": "sleep",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1320,
+        "end_minute": 1380
+      },
+      "text_matches": [
+        "10:00 PM|11:00 PM|Instagram"
+      ]
     }
   }
 ]

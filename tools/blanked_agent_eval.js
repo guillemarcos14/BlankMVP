@@ -80,6 +80,7 @@ async function callAgent(testCase) {
 function visibleText(plan) {
   return [
     plan.title,
+    plan.message_text,
     plan.response_text,
     plan.primary_label,
     plan.secondary_label,
@@ -88,7 +89,7 @@ function visibleText(plan) {
 }
 
 function userVisibleText(plan) {
-  return actionTypes(plan).length === 0 ? cleanText(plan.response_text, 240) : visibleText(plan);
+  return cleanText(plan.message_text || plan.response_text, 320);
 }
 
 function assertSubset(actual, expected, label) {
@@ -106,7 +107,7 @@ function qualityScore(plan) {
   const bullets = Array.isArray(plan.bullets) ? plan.bullets : [];
   let score = 0;
   if (plan.response_text && plan.response_text.length >= 30 && plan.response_text.length <= 220 && bullets.length >= 2 && bullets.length <= 4) score += 1;
-  if (/Read:|Pattern:|Move:|Signal:|Feedback:|Block|Pause|Resume|Enable|Start/i.test(text)) score += 1;
+  if (/Read:|Pattern:|Move:|Signal:|Feedback:|Lectura:|Patrón:|Movimiento:|Señal:|Bloque|Paus|Reactivar|Activar|Empezar|Block|Pause|Resume|Enable|Start/i.test(text)) score += 1;
   if (!BANNED_TEXT_PATTERN.test(text) && !DEBUG_TEXT_PATTERN.test(text) && !/\bthe user\b|\bask user\b/i.test(text)) score += 1;
   return score;
 }
@@ -118,8 +119,8 @@ function utilityScore(plan) {
   let score = 0;
   if (plan.response_text && plan.response_text.length >= 30 && plan.response_text.length <= 190) score += 1;
   if (bullets.length >= 2 && bullets.length <= 4) score += 1;
-  if (/Read:|Pattern:|Move:/i.test(text)) score += 1;
-  if (actions.length === 0 ? /tell me|which app|what time|bedtime|when|not visible|choose to share|stay protected/i.test(text) : /block|protect|start|apply|enable|pause|resume|limit|schedule/i.test(text)) score += 1;
+  if (/Read:|Pattern:|Move:|Lectura:|Patrón:|Movimiento:/i.test(text)) score += 1;
+  if (actions.length === 0 ? /tell me|which app|what time|bedtime|when|not visible|choose to share|stay protected|dime|qué app|que app|a qué hora|hora|dormir|cuándo|cuando|compartir|mantener protección/i.test(text) : /block|protect|start|apply|enable|pause|resume|limit|schedule|bloquear|proteger|empezar|aplicar|activar|pausar|reactivar|límite|limite|programad/i.test(text)) score += 1;
   if (!GENERIC_TEXT_PATTERN.test(text) && !BANNED_TEXT_PATTERN.test(text) && !DEBUG_TEXT_PATTERN.test(text)) score += 1;
   return score;
 }
@@ -156,6 +157,8 @@ function assertPlan(testCase, plan) {
   }
   assert.doesNotMatch(text, DEBUG_TEXT_PATTERN, `${testCase.id}.no_internal_text`);
   assert.doesNotMatch(text, BANNED_TEXT_PATTERN, `${testCase.id}.no_banned_text`);
+  assert.ok(cleanText(plan.message_text, 320).length >= 30, `${testCase.id}.message_text_present`);
+  assert.doesNotMatch(plan.message_text, /\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i, `${testCase.id}.message_text_no_bullet_prefixes`);
 
   const minQuality = expected.min_quality_score ?? 2;
   assert.ok(qualityScore(plan) >= minQuality, `${testCase.id}.quality_score`);

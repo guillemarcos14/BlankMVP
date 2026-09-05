@@ -1158,7 +1158,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Plan",
-                subtitle: "Review your active protection plan\nor adjust what it protects.",
+                subtitle: "BAI creates the plan.\nYou review and approve it here.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1169,22 +1169,12 @@ private struct ModesList: View {
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
 
-            ForEach(sessionStore.focusModes) { mode in
-                modeButton(mode)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 5)
-                    .listRowInsets(EdgeInsets())
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            sessionStore.deleteMode(mode.id)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .disabled(sessionStore.focusModes.count <= 1)
-                    }
-            }
+            baiPlanSummary
+                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
             Button {
                 showingPicker = true
@@ -1203,6 +1193,31 @@ private struct ModesList: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 24)
             .padding(.top, 16)
+            .padding(.bottom, 8)
+            .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Manual fallback")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .textCase(.uppercase)
+
+                ForEach(sessionStore.focusModes) { mode in
+                    modeButton(mode)
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                sessionStore.deleteMode(mode.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .disabled(sessionStore.focusModes.count <= 1)
+                        }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 10)
             .padding(.bottom, 8)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
@@ -1263,6 +1278,53 @@ private struct ModesList: View {
             .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
         }
         .buttonStyle(.plain)
+    }
+
+    private var baiPlanSummary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Active BAI plan")
+                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    Text(sessionStore.currentMode.name)
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(secondaryColor)
+                }
+
+                Spacer()
+            }
+
+            Divider()
+                .overlay(secondaryColor.opacity(0.20))
+
+            HStack(spacing: 10) {
+                planMetric(title: "Protected", value: "\(sessionStore.selectionCount)")
+                planMetric(title: "Mode", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block")
+                planMetric(title: "Intensity", value: sessionStore.hardBlankActive ? "Hard" : "Normal")
+            }
+        }
+        .foregroundStyle(textColor)
+        .padding(18)
+        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
+    }
+
+    private func planMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(secondaryColor)
+            Text(value)
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var manualPlanCreator: some View {
@@ -1494,10 +1556,19 @@ private struct ScheduleEditorContent: View {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Habits",
-                    subtitle: "Review recurring blocks\nor adjust them manually.",
+                    subtitle: "BAI schedules routines.\nYou review and override them here.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
+
+                baiHabitsSummary
+
+                Text("Manual overrides")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 2)
 
                 VStack(spacing: 12) {
                     ForEach($windows) { $window in
@@ -1593,6 +1664,65 @@ private struct ScheduleEditorContent: View {
     private func deleteWindow(_ id: UUID) {
         guard windows.count > 1 else { return }
         windows.removeAll { $0.id == id }
+    }
+
+    private var baiHabitsSummary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recurring BAI routines")
+                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    Text(habitSummaryText)
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(secondaryColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            Divider()
+                .overlay(secondaryColor.opacity(0.20))
+
+            HStack(spacing: 10) {
+                habitMetric(title: "Active", value: "\(enabledWindows.count)")
+                habitMetric(title: "Total", value: "\(windows.count)")
+                habitMetric(title: "Pause", value: sessionStore.isVacationModeActive ? "On" : "Off")
+            }
+        }
+        .foregroundStyle(textColor)
+        .padding(18)
+        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
+    }
+
+    private var enabledWindows: [BlankHabitWindow] {
+        windows.filter { $0.enabled }
+    }
+
+    private var habitSummaryText: String {
+        guard let first = enabledWindows.first else {
+            return "No active routine yet. Ask BAI to create one, then approve it here."
+        }
+        return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
+    }
+
+    private func habitMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(secondaryColor)
+            Text(value)
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

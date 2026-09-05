@@ -1931,25 +1931,26 @@ private struct EmergencyScreen: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        List {
-            VStack(alignment: .center, spacing: 18) {
-                TopSheetHeader(
-                    title: isConfirming ? "Are you sure?" : "Emergency",
-                    subtitle: isConfirming
-                        ? "This will use 1 emergency unlock."
-                        : "Use only when you need access now.",
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
+        VStack(spacing: 22) {
+            Spacer(minLength: 0)
 
+            VStack(spacing: 10) {
+                Text(isConfirming ? "Spend emergency?" : "Emergency")
+                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                    .foregroundStyle(textColor)
+                    .multilineTextAlignment(.center)
+
+                Text(bodyText)
+                    .font(.blankInter(size: 16, weight: .regular, relativeTo: .body))
+                    .foregroundStyle(secondaryColor)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+                    .frame(maxWidth: 300)
+            }
+
+            VStack(spacing: 12) {
                 if isConfirming {
-                    VStack(spacing: 10) {
-                        emergencyMetric(title: "Remaining after unlock", value: "\(max(0, emergencyUnlocksRemaining - 1))")
-                        emergencyMetric(title: "This week", value: "\(3 - emergencyUnlocksRemaining)/3 used")
-                    }
-                    .padding(.top, 4)
-
-                    Button("Use emergency") {
+                    Button("Confirm unlock") {
                         _ = onUnlock()
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
@@ -1958,57 +1959,38 @@ private struct EmergencyScreen: View {
                     Button("Keep blocking") {
                         isConfirming = false
                     }
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                     .buttonStyle(.plain)
                     .foregroundStyle(secondaryColor)
                 } else {
-                    VStack(spacing: 10) {
-                        emergencyMetric(title: "Unlocks left", value: "\(emergencyUnlocksRemaining)")
-                        emergencyMetric(title: "AI read", value: intervention.headline)
-                        emergencyMetric(title: "Better next step", value: intervention.alternative)
-                    }
-
                     Button("Spend emergency") {
                         isConfirming = true
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
                     .disabled(emergencyUnlocksRemaining <= 0 || !sessionStore.isBlankActive)
-
-                    Text(sessionStore.isBlankActive ? intervention.cost : "Emergency unlocks are available while a block is active.")
-                        .font(.footnote)
-                        .foregroundStyle(secondaryColor)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 300)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 34)
-            .listRowInsets(EdgeInsets())
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
+            .frame(maxWidth: 300)
+
+            Spacer(minLength: 0)
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
-    private func emergencyMetric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(secondaryColor)
-            Text(value)
-                .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                .foregroundStyle(textColor)
-                .lineLimit(2)
-                .minimumScaleFactor(0.76)
+    private var bodyText: String {
+        if isConfirming {
+            return "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left."
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18)
-        .frame(minHeight: 62)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+        guard sessionStore.isBlankActive else {
+            return "No active block right now."
+        }
+        guard emergencyUnlocksRemaining > 0 else {
+            return "No emergency unlocks left."
+        }
+        return "\(emergencyUnlocksRemaining) emergency unlocks left. Use one only if you need access now."
     }
 }
 

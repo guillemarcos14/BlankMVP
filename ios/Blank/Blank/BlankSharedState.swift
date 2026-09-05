@@ -136,8 +136,7 @@ enum BlankSharedState {
             entryMode: entryMode,
             now: now,
             selectionSnapshot: snapshot,
-            modeName: modeName,
-            plannedDurationMinutes: plannedDurationMinutes
+            modeName: modeName
         )
     }
 

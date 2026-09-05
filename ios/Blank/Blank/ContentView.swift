@@ -1940,8 +1940,8 @@ private struct RemoteAgentPlan: Decodable {
         )
     }
 
-    private func clean(_ value: String, _ fallback: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func clean(_ value: String?, _ fallback: String) -> String {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : String(trimmed.prefix(180))
     }
 }

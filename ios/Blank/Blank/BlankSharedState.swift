@@ -179,7 +179,7 @@ enum BlankSharedState {
         modeName: String? = nil
     ) {
         var events = loadUsageEvents(defaults: defaults)
-        events.append(BlankUsageEvent(
+        var event = BlankUsageEvent(
             kind: kind,
             sessionId: session.id,
             occurredAt: now,
@@ -187,9 +187,10 @@ enum BlankSharedState {
             endedReason: endedReason,
             duration: kind == .blockStarted ? nil : session.duration,
             selectionSnapshot: selectionSnapshot ?? session.selectionSnapshot ?? Self.selectionSnapshot(in: defaults),
-            modeName: modeName ?? session.modeName,
-            plannedDurationMinutes: session.plannedDurationMinutes
-        ))
+            modeName: modeName ?? session.modeName
+        )
+        event.plannedDurationMinutes = session.plannedDurationMinutes
+        events.append(event)
         if events.count > 500 {
             events.removeFirst(events.count - 500)
         }

@@ -229,7 +229,7 @@ struct HomeView: View {
             Button {
                 openSection(.emergency)
             } label: {
-                Image(systemName: "sparkle")
+                Image(systemName: "bolt.shield")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.white)
                     .foregroundColor(Color.white)
@@ -247,6 +247,7 @@ struct HomeView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Emergency")
 
             HStack(spacing: 0) {
                 topNavButton("Stats") {
@@ -551,7 +552,7 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Iniciar Blank") {
+            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Start Blanked") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
@@ -1156,7 +1157,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Plan",
-                subtitle: "BAI creates the plan.\nYou review and approve it here.",
+                subtitle: "Your approved block setup.\nBAI can adjust it outside the app.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1179,7 +1180,7 @@ private struct ModesList: View {
                 onFinish()
             } label: {
                 HStack {
-                    Text("Edit current plan apps")
+                    Text("Edit apps")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     Spacer()
                 }
@@ -1256,13 +1257,13 @@ private struct ModesList: View {
     private var baiPlanSummary: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "sparkle")
+                Image(systemName: "sparkles")
                     .font(.system(size: 17, weight: .semibold))
                     .frame(width: 34, height: 34)
                     .background(Circle().fill(textColor.opacity(0.10)))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Active BAI plan")
+                    Text("Active plan")
                         .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
                     Text(sessionStore.currentMode.name)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -1276,9 +1277,9 @@ private struct ModesList: View {
                 .overlay(secondaryColor.opacity(0.20))
 
             HStack(spacing: 10) {
-                planMetric(title: "Protected", value: "\(sessionStore.selectionCount)")
-                planMetric(title: "Mode", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block")
-                planMetric(title: "Intensity", value: sessionStore.hardBlankActive ? "Hard" : "Normal")
+                planMetric(title: "Apps", value: "\(sessionStore.selectionCount)")
+                planMetric(title: "Rule", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block")
+                planMetric(title: "Exit", value: sessionStore.hardBlankActive ? "Emergency" : "Hold")
             }
         }
         .foregroundStyle(textColor)
@@ -1396,10 +1397,10 @@ private struct ModesList: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("Advanced plan", systemImage: "slider.horizontal.3")
+                Label("Advanced", systemImage: "slider.horizontal.3")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("Manual controls")
+                Text("Manual")
                     .font(.caption)
                     .foregroundStyle(secondaryColor)
             }
@@ -1415,7 +1416,7 @@ private struct ModesList: View {
 
     private var routineSummaryText: String {
         guard let first = enabledWindows.first else {
-            return "No active routine yet. Ask BAI to create one, then approve it here."
+            return "No routine approved yet."
         }
         return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
     }
@@ -2231,20 +2232,22 @@ private struct EmergencyScreen: View {
                     .frame(maxWidth: 300)
             }
 
+            emergencyAllowance
+
             VStack(spacing: 12) {
                 if isConfirming {
-                    Button("Confirm unlock") {
-                        _ = onUnlock()
-                    }
-                    .buttonStyle(BlankPrimaryButtonStyle())
-                    .disabled(emergencyUnlocksRemaining <= 0)
-
                     Button("Keep blocking") {
                         isConfirming = false
+                    }
+                    .buttonStyle(BlankPrimaryButtonStyle())
+
+                    Button("Confirm unlock") {
+                        _ = onUnlock()
                     }
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                     .buttonStyle(.plain)
                     .foregroundStyle(secondaryColor)
+                    .disabled(emergencyUnlocksRemaining <= 0)
                 } else {
                     Button("Spend emergency") {
                         isConfirming = true
@@ -2265,7 +2268,7 @@ private struct EmergencyScreen: View {
 
     private var bodyText: String {
         if isConfirming {
-            return "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left."
+            return "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
         }
         guard sessionStore.isBlankActive else {
             return "No active block right now."
@@ -2273,7 +2276,26 @@ private struct EmergencyScreen: View {
         guard emergencyUnlocksRemaining > 0 else {
             return "No emergency unlocks left."
         }
-        return "\(emergencyUnlocksRemaining) emergency unlocks left. Use one only if you need access now."
+        return "Use one unlock only if access is necessary now."
+    }
+
+    private var emergencyAllowance: some View {
+        VStack(spacing: 8) {
+            Text("\(emergencyUnlocksRemaining)/3 left this week")
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(textColor)
+                .monospacedDigit()
+
+            HStack(spacing: 6) {
+                ForEach(0..<3, id: \.self) { index in
+                    Capsule()
+                        .fill(index < emergencyUnlocksRemaining ? textColor.opacity(0.82) : secondaryColor.opacity(0.20))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 7)
+                }
+            }
+        }
+        .frame(maxWidth: 260)
     }
 }
 
@@ -2386,6 +2408,7 @@ private struct TechnicalSheetActions<Content: View>: View {
 private struct TimerScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @State private var hardMode = false
+    @State private var selectedMinutes = 30
     let onStart: (Int, Bool) -> Void
     private let options = [15, 30, 45, 60, 90, 120]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
@@ -2402,21 +2425,54 @@ private struct TimerScreen: View {
                 subtitleColor: secondaryColor
             )
 
-            Toggle("Hard Blanked", isOn: $hardMode)
-                .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-                .foregroundStyle(textColor)
-                .padding(.horizontal, 18)
-                .frame(height: 56)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+            VStack(spacing: 16) {
+                Text(formatDuration(selectedMinutes))
+                    .font(.blankInter(size: 56, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(textColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                ForEach(options, id: \.self) { minutes in
-                    Button(formatDuration(minutes)) {
-                        onStart(minutes, hardMode)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(options, id: \.self) { minutes in
+                        Button {
+                            selectedMinutes = minutes
+                        } label: {
+                            Text(formatDuration(minutes))
+                                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                                .foregroundStyle(selectedMinutes == minutes ? BlankColors.ink : textColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background {
+                                    Capsule()
+                                        .fill(selectedMinutes == minutes ? Color.white.opacity(0.84) : Color.white.opacity(0.16))
+                                }
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(BlankSecondaryButtonStyle())
                 }
+
+                Toggle("Hard Blanked", isOn: $hardMode)
+                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
+                    .foregroundStyle(textColor)
+                    .padding(.horizontal, 18)
+                    .frame(height: 56)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: hardMode ? 0.36 : 0.22)
+
+                if hardMode {
+                    Text("Early exit will use Emergency.")
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                        .foregroundStyle(secondaryColor)
+                        .multilineTextAlignment(.center)
+                }
+
+                Button("Start \(formatDuration(selectedMinutes))") {
+                    onStart(selectedMinutes, hardMode)
+                }
+                .buttonStyle(BlankPrimaryButtonStyle())
             }
+            .padding(18)
+            .blankGlassCard(cornerRadius: 24, tintOpacity: 0.24)
 
             Spacer(minLength: 0)
         }

@@ -72,8 +72,6 @@ struct ReportView: View {
         let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
 
-            milestoneHeroCapsule(weekly: weekly, progress: progress)
-
             if purchaseStore.hasPremiumAccess {
                 controlDashboardCapsule(
                     forecast: controlForecast,
@@ -81,6 +79,8 @@ struct ReportView: View {
                     totalFocusTime: totalFocusTime,
                     context: healthContext
                 )
+
+                milestoneHeroCapsule(weekly: weekly, progress: progress)
 
                 if hasProgress {
                     statsDetailedReportCapsule(
@@ -105,6 +105,8 @@ struct ReportView: View {
                     )
                 }
             } else {
+                milestoneHeroCapsule(weekly: weekly, progress: progress)
+
                 freeProgressCapsule(
                     weekly: weekly,
                     totalFocusTime: totalFocusTime,
@@ -187,8 +189,8 @@ struct ReportView: View {
 
     private func reportHeader() -> some View {
         TopSheetHeader(
-            title: "Digital Wellness",
-            subtitle: "Understand your patterns\nand follow your next best block",
+            title: "Stats",
+            subtitle: "Today first.\nThen progress and signals.",
             titleColor: reportPrimary,
             subtitleColor: reportSecondary
         )
@@ -445,7 +447,7 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("Health context", systemImage: "heart.text.square.fill")
+                    Label("Optional Health context", systemImage: "heart.text.square.fill")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                     Text(healthSignalsSubtitle)
                         .font(.caption)
@@ -674,10 +676,10 @@ struct ReportView: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("Detailed report", systemImage: "chart.bar.doc.horizontal")
+                Label("Signals", systemImage: "chart.bar.doc.horizontal")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("AI, Health, history")
+                Text("AI / Health / History")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }

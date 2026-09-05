@@ -73,74 +73,107 @@ struct BlankApp: App {
             return
         }
 
-        switch action {
-        case "timer", "schedule-timer":
+        if action == "timer" || action == "schedule-timer" {
             sessionStore.requestWidgetTimerSelector()
-        case "configure-block", "open-picker", "choose-apps":
-            sessionStore.requestBlockConfiguration(appNames: components?.listQueryItem("apps") ?? [])
-        case "setup-plan":
-            let appNames = components?.listQueryItem("apps") ?? []
-            let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
-            let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
-            let durationDays = components?.intQueryItem("days") ?? 7
-            if let startMinute, let endMinute {
-                sessionStore.applyAdaptivePlan(
-                    startMinute: min(max(startMinute, 0), 1439),
-                    endMinute: min(max(endMinute, 0), 1439),
-                    durationDays: min(max(durationDays, 1), 14)
-                )
-                applyScreenTimeState()
-            }
-            sessionStore.requestBlockConfiguration(appNames: appNames)
-        case "start", "start-blank", "start-focus":
+            return
+        }
+
+        if action == "configure-block" || action == "open-picker" || action == "choose-apps" {
+            openBlockConfiguration(from: components)
+            return
+        }
+
+        if action == "setup-plan" {
+            setupPlan(from: components)
+            return
+        }
+
+        if action == "start" || action == "start-blank" || action == "start-focus" {
             let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
             let hardMode = components?.boolQueryItem("hard") ?? false
             _ = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode, entryMode: .app)
             applyScreenTimeState()
-        case "stop", "stop-blank":
+            return
+        }
+
+        if action == "stop" || action == "stop-blank" {
             _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual, broken: true)
             screenTimeBlocker.clear()
-        case "apply-plan":
-            let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
-            let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
-            let durationDays = components?.intQueryItem("days") ?? 7
-            if let startMinute, let endMinute {
-                sessionStore.applyAdaptivePlan(
-                    startMinute: min(max(startMinute, 0), 1439),
-                    endMinute: min(max(endMinute, 0), 1439),
-                    durationDays: min(max(durationDays, 1), 14)
-                )
-                applyScreenTimeState()
-            } else {
-                sessionStore.requestBlockConfiguration()
-            }
-        case "allow-only":
+            return
+        }
+
+        if action == "apply-plan" {
+            applyPlan(from: components)
+            return
+        }
+
+        if action == "allow-only" {
             sessionStore.allowOnlyModeEnabled = true
             sessionStore.requestBlockConfiguration()
             applyScreenTimeState()
-        case "adult-filter":
+            return
+        }
+
+        if action == "adult-filter" {
             sessionStore.adultContentBlockingEnabled = true
             applyScreenTimeState()
-        case "daily-limit":
+            return
+        }
+
+        if action == "daily-limit" {
             if let minutes = components?.intQueryItem("minutes") {
                 sessionStore.dailyLimitMinutes = min(max(minutes, 5), 240)
                 sessionStore.dailyLimitEnabled = true
                 sessionStore.refreshDailyLimitMonitoring()
             }
-        case "pause-rules", "vacation":
+            return
+        }
+
+        if action == "pause-rules" || action == "vacation" {
             let hours = min(max(components?.intQueryItem("hours") ?? 24, 1), 168)
             sessionStore.enableVacationMode(hours: hours)
             applyScreenTimeState()
-        case "resume-rules":
+            return
+        }
+
+        if action == "resume-rules" {
             sessionStore.disableVacationMode()
             applyScreenTimeState()
-        case "mode":
+            return
+        }
+
+        if action == "mode" {
             if let name = components?.stringQueryItem("name"), !sessionStore.selectMode(named: name) {
                 sessionStore.requestBlockConfiguration()
             }
             applyScreenTimeState()
-        default:
-            break
+        }
+    }
+
+    private func openBlockConfiguration(from components: URLComponents?) {
+        let appNames = components?.listQueryItem("apps") ?? []
+        sessionStore.requestBlockConfiguration(appNames: appNames)
+    }
+
+    private func setupPlan(from components: URLComponents?) {
+        applyPlan(from: components, shouldOpenPickerIfIncomplete: false)
+        openBlockConfiguration(from: components)
+    }
+
+    private func applyPlan(from components: URLComponents?, shouldOpenPickerIfIncomplete: Bool = true) {
+        let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
+        let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
+        let durationDays = components?.intQueryItem("days") ?? 7
+
+        if let startMinute, let endMinute {
+            sessionStore.applyAdaptivePlan(
+                startMinute: min(max(startMinute, 0), 1439),
+                endMinute: min(max(endMinute, 0), 1439),
+                durationDays: min(max(durationDays, 1), 14)
+            )
+            applyScreenTimeState()
+        } else if shouldOpenPickerIfIncomplete {
+            sessionStore.requestBlockConfiguration()
         }
     }
 

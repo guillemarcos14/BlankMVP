@@ -99,127 +99,7 @@ private struct ConversationalHomeView: View {
             AppBackground(isActive: sessionStore.isBlankActive)
 
             GeometryReader { proxy in
-                let viewportWidth = proxy.size.width
-                let viewportHeight = proxy.size.height
-                let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
-                let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
-                let horizontalPadding = min(max(viewportWidth * 0.075, 28), 36)
-                let contentWidth = viewportWidth - horizontalPadding * 2
-                let chatWidth = min(contentWidth, 342)
-                let topBarCenterY = topSafeArea + 26 + 47 / 2
-                let topBarBottom = topSafeArea + 26 + 47
-                let contentTopPadding = topSafeArea + 26 + 47 + 34
-                let composerWidth = min(contentWidth, 342)
-                let composerBottomPadding = max(bottomSafeArea + 18, 34)
-                let chatBottomClearance = composerBottomPadding + 150
-                let visualCenterCorrection: CGFloat = -24
-
-                ZStack(alignment: .top) {
-                    if activeSection == nil {
-                        VStack(spacing: 0) {
-                            topBar
-                                .offset(x: visualCenterCorrection)
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.top, topBarCenterY - 47 / 2)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .zIndex(2)
-
-                        if messages.isEmpty && activePlan == nil {
-                            VStack(spacing: 0) {
-                                Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
-                                VStack(spacing: 18) {
-                                    welcomeHero
-                                    demoButtons
-                                }
-                                .frame(width: min(contentWidth, 350))
-                                .offset(x: visualCenterCorrection)
-                                Spacer(minLength: 0)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        }
-
-                        if !messages.isEmpty || activePlan != nil {
-                            ScrollViewReader { scrollProxy in
-                                ScrollView {
-                                    LazyVStack(alignment: .leading, spacing: 12) {
-                                        ForEach(messages) { message in
-                                            AgentBubble(message: message, maxWidth: chatWidth)
-                                                .id(message.id)
-                                        }
-
-                                        if let activePlan {
-                                            AgentPlanCard(
-                                                plan: activePlan,
-                                                canApply: canApply(activePlan),
-                                                maxWidth: chatWidth,
-                                                onPrimary: { apply(activePlan) },
-                                                onSecondary: { handleSecondary(activePlan) }
-                                            )
-                                            .id(activePlan.id)
-                                        }
-                                    }
-                                    .frame(width: chatWidth, alignment: .leading)
-                                    .padding(.top, contentTopPadding)
-                                    .padding(.bottom, chatBottomClearance)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .offset(x: visualCenterCorrection)
-                                .mask(
-                                    chatVisibilityMask(
-                                        height: viewportHeight,
-                                        topFadeStart: topBarBottom - 6,
-                                        topFadeEnd: contentTopPadding,
-                                        bottomFadeStart: viewportHeight - chatBottomClearance - 18,
-                                        bottomFadeEnd: viewportHeight - composerBottomPadding + 8
-                                    )
-                                )
-                                .onChange(of: messages.count) { _ in
-                                    scrollToBottom(scrollProxy)
-                                }
-                                .onChange(of: activePlan?.id) { _ in
-                                    scrollToBottom(scrollProxy)
-                                }
-                            }
-                            .scrollIndicators(.hidden)
-                            .overlay {
-                                chatFadeOverlays(
-                                    topHeight: contentTopPadding,
-                                    bottomHeight: chatBottomClearance,
-                                    bottomPadding: composerBottomPadding
-                                )
-                            }
-                        }
-
-                        VStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            composer
-                                .frame(width: composerWidth)
-                                .offset(x: visualCenterCorrection)
-                        }
-                        .padding(.bottom, composerBottomPadding)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    }
-
-                    if let activeSection {
-                        HomeSectionScreen(
-                            showingPicker: $showingPicker,
-                            section: activeSection,
-                            screenWidth: viewportWidth,
-                            screenHeight: viewportHeight,
-                            horizontalOffset: visualCenterCorrection,
-                            intervention: system.relapseIntervention,
-                            onEmergencyUnlock: performEmergencyUnlock
-                        ) {
-                            closeSection()
-                        }
-                        .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                        .transition(.opacity)
-                        .zIndex(5)
-                    }
-                }
-                .frame(width: viewportWidth, height: viewportHeight, alignment: .top)
-                .animation(.easeInOut(duration: 0.35), value: activeSection)
+                homeLayout(proxy: proxy)
             }
         }
         .ignoresSafeArea()
@@ -289,6 +169,176 @@ private struct ConversationalHomeView: View {
                 }
             )
             .presentationDetents([.medium])
+        }
+    }
+
+    @ViewBuilder
+    private func homeLayout(proxy: GeometryProxy) -> some View {
+        let viewportWidth = proxy.size.width
+        let viewportHeight = proxy.size.height
+        let topSafeArea = proxy.safeAreaInsets.top > 0 ? proxy.safeAreaInsets.top : 44
+        let bottomSafeArea = proxy.safeAreaInsets.bottom > 0 ? proxy.safeAreaInsets.bottom : 18
+        let horizontalPadding = min(max(viewportWidth * 0.075, 28), 36)
+        let contentWidth = viewportWidth - horizontalPadding * 2
+        let chatWidth = min(contentWidth, 342)
+        let topBarCenterY = topSafeArea + 26 + 47 / 2
+        let topBarBottom = topSafeArea + 26 + 47
+        let contentTopPadding = topSafeArea + 26 + 47 + 34
+        let composerWidth = min(contentWidth, 342)
+        let composerBottomPadding = max(bottomSafeArea + 18, 34)
+        let chatBottomClearance = composerBottomPadding + 150
+        let visualCenterCorrection: CGFloat = -24
+
+        ZStack(alignment: .top) {
+            if activeSection == nil {
+                homeTopBar(topBarCenterY: topBarCenterY, horizontalOffset: visualCenterCorrection)
+                homeHero(
+                    viewportHeight: viewportHeight,
+                    contentWidth: contentWidth,
+                    horizontalOffset: visualCenterCorrection
+                )
+                messagesList(
+                    chatWidth: chatWidth,
+                    contentTopPadding: contentTopPadding,
+                    chatBottomClearance: chatBottomClearance,
+                    composerBottomPadding: composerBottomPadding,
+                    topBarBottom: topBarBottom,
+                    viewportHeight: viewportHeight,
+                    horizontalOffset: visualCenterCorrection
+                )
+                homeComposer(width: composerWidth, bottomPadding: composerBottomPadding, horizontalOffset: visualCenterCorrection)
+            }
+
+            sectionScreen(
+                viewportWidth: viewportWidth,
+                viewportHeight: viewportHeight,
+                horizontalOffset: visualCenterCorrection
+            )
+        }
+        .frame(width: viewportWidth, height: viewportHeight, alignment: .top)
+        .animation(.easeInOut(duration: 0.35), value: activeSection)
+    }
+
+    private func homeTopBar(topBarCenterY: CGFloat, horizontalOffset: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            topBar
+                .offset(x: horizontalOffset)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, topBarCenterY - 47 / 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .zIndex(2)
+    }
+
+    @ViewBuilder
+    private func homeHero(viewportHeight: CGFloat, contentWidth: CGFloat, horizontalOffset: CGFloat) -> some View {
+        if messages.isEmpty && activePlan == nil {
+            VStack(spacing: 0) {
+                Spacer(minLength: max(0, viewportHeight * 0.40 - 58))
+                VStack(spacing: 18) {
+                    welcomeHero
+                    demoButtons
+                }
+                .frame(width: min(contentWidth, 350))
+                .offset(x: horizontalOffset)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+
+    @ViewBuilder
+    private func messagesList(
+        chatWidth: CGFloat,
+        contentTopPadding: CGFloat,
+        chatBottomClearance: CGFloat,
+        composerBottomPadding: CGFloat,
+        topBarBottom: CGFloat,
+        viewportHeight: CGFloat,
+        horizontalOffset: CGFloat
+    ) -> some View {
+        if !messages.isEmpty || activePlan != nil {
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(messages) { message in
+                            AgentBubble(message: message, maxWidth: chatWidth)
+                                .id(message.id)
+                        }
+
+                        if let plan = activePlan {
+                            AgentPlanCard(
+                                plan: plan,
+                                canApply: canApply(plan),
+                                maxWidth: chatWidth,
+                                onPrimary: { apply(plan) },
+                                onSecondary: { handleSecondary(plan) }
+                            )
+                            .id(plan.id)
+                        }
+                    }
+                    .frame(width: chatWidth, alignment: .leading)
+                    .padding(.top, contentTopPadding)
+                    .padding(.bottom, chatBottomClearance)
+                }
+                .frame(maxWidth: .infinity)
+                .offset(x: horizontalOffset)
+                .mask(
+                    chatVisibilityMask(
+                        height: viewportHeight,
+                        topFadeStart: topBarBottom - 6,
+                        topFadeEnd: contentTopPadding,
+                        bottomFadeStart: viewportHeight - chatBottomClearance - 18,
+                        bottomFadeEnd: viewportHeight - composerBottomPadding + 8
+                    )
+                )
+                .onChange(of: messages.count) { _ in
+                    scrollToBottom(scrollProxy)
+                }
+                .onChange(of: activePlan?.id) { _ in
+                    scrollToBottom(scrollProxy)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .overlay {
+                chatFadeOverlays(
+                    topHeight: contentTopPadding,
+                    bottomHeight: chatBottomClearance,
+                    bottomPadding: composerBottomPadding
+                )
+            }
+        }
+    }
+
+    private func homeComposer(width: CGFloat, bottomPadding: CGFloat, horizontalOffset: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            composer
+                .frame(width: width)
+                .offset(x: horizontalOffset)
+        }
+        .padding(.bottom, bottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+    }
+
+    @ViewBuilder
+    private func sectionScreen(viewportWidth: CGFloat, viewportHeight: CGFloat, horizontalOffset: CGFloat) -> some View {
+        if let section = activeSection {
+            HomeSectionScreen(
+                showingPicker: $showingPicker,
+                section: section,
+                screenWidth: viewportWidth,
+                screenHeight: viewportHeight,
+                horizontalOffset: horizontalOffset,
+                intervention: system.relapseIntervention,
+                onEmergencyUnlock: performEmergencyUnlock,
+                onTimedBlank: startTimedBlank
+            ) {
+                closeSection()
+            }
+            .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+            .transition(.opacity)
+            .zIndex(5)
         }
     }
 
@@ -857,6 +907,15 @@ private struct ConversationalHomeView: View {
             return
         }
         activeSection = .schedule
+    }
+
+    private func startTimedBlank(minutes: Int, hardMode: Bool) {
+        let result = withAnimation(.easeInOut(duration: 0.65)) {
+            sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
+        }
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        messages.append(AgentMessage(role: .blanked, text: agentResultText(result)))
+        closeSection()
     }
 
     private func performEmergencyUnlock() -> Bool {

@@ -1150,6 +1150,7 @@ private struct ModesList: View {
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
     @State private var newModeName = ""
+    @State private var showsManualPlanCreator = false
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
@@ -1157,7 +1158,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Plan",
-                subtitle: "Choose the active protection plan\nand edit the apps it protects.",
+                subtitle: "Review your active protection plan\nor adjust what it protects.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1185,31 +1186,6 @@ private struct ModesList: View {
                     }
             }
 
-            VStack(spacing: 10) {
-                TextField("Create a custom plan", text: $newModeName)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(textColor)
-                    .padding(.horizontal, 18)
-                    .frame(height: 56)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
-
-                Button {
-                    sessionStore.createMode(named: newModeName)
-                    newModeName = ""
-                } label: {
-                    TopSheetPrimaryButtonLabel(title: "Create plan")
-                }
-                .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
-                .padding(.top, 2)
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 22)
-            .padding(.bottom, 16)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
             Button {
                 showingPicker = true
                 onFinish()
@@ -1231,6 +1207,14 @@ private struct ModesList: View {
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
+
+            manualPlanCreator
+                .padding(.horizontal, 24)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
 
             AdvancedModeControls(
                 showingPicker: $showingPicker,
@@ -1279,6 +1263,48 @@ private struct ModesList: View {
             .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
         }
         .buttonStyle(.plain)
+    }
+
+    private var manualPlanCreator: some View {
+        VStack(spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showsManualPlanCreator.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Add manual plan")
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    Spacer()
+                    Image(systemName: showsManualPlanCreator ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(secondaryColor)
+                .padding(.horizontal, 18)
+                .frame(height: 50)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.16)
+            }
+            .buttonStyle(.plain)
+
+            if showsManualPlanCreator {
+                TextField("Plan name", text: $newModeName)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(textColor)
+                    .padding(.horizontal, 18)
+                    .frame(height: 54)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
+
+                Button {
+                    sessionStore.createMode(named: newModeName)
+                    newModeName = ""
+                    showsManualPlanCreator = false
+                } label: {
+                    TopSheetPrimaryButtonLabel(title: "Save manual plan")
+                }
+                .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+            }
+        }
     }
 
     private var blockedAppsText: String {
@@ -1468,7 +1494,7 @@ private struct ScheduleEditorContent: View {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Habits",
-                    subtitle: "Run more than one automatic block\nduring your day.",
+                    subtitle: "Review recurring blocks\nor adjust them manually.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -1489,7 +1515,7 @@ private struct ScheduleEditorContent: View {
                 Button {
                     addWindow()
                 } label: {
-                    Label("Add habit", systemImage: "plus")
+                    Label("Add manually", systemImage: "plus")
                         .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                         .foregroundStyle(textColor)
                         .frame(maxWidth: .infinity)
@@ -1503,7 +1529,7 @@ private struct ScheduleEditorContent: View {
                     secondaryColor: secondaryColor
                 )
 
-                Text("Scheduled blocks end automatically. Manual exits pause only the current habit window.")
+                Text("Manual exits pause only the current habit window.")
                     .font(.footnote)
                     .foregroundStyle(secondaryColor)
                     .multilineTextAlignment(.center)
@@ -1513,7 +1539,7 @@ private struct ScheduleEditorContent: View {
                 Button {
                     saveSchedule()
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Save")
+                    TopSheetPrimaryButtonLabel(title: "Save habits")
                 }
                 .padding(.top, 6)
             }

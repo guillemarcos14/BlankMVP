@@ -9,6 +9,7 @@ enum HomeSection: Hashable {
     case schedule
     case report
     case emergency
+    case timer
 }
 
 struct HomeView: View {
@@ -23,7 +24,6 @@ struct HomeView: View {
     @State private var messageAction: ConfigIssue.Action?
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
-    @State private var showingTimer = false
     @State private var showingAssistantConnect = false
     @State private var showingContextualAppPicker = false
     @State private var showingRelink = false
@@ -84,7 +84,8 @@ struct HomeView: View {
                         screenWidth: viewportWidth,
                         screenHeight: viewportHeight,
                         intervention: relapseIntervention,
-                        onEmergencyUnlock: performEmergencyUnlock
+                        onEmergencyUnlock: performEmergencyUnlock,
+                        onTimedBlank: startTimedBlank
                     ) {
                         closeSection()
                     }
@@ -163,16 +164,6 @@ struct HomeView: View {
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
             guard shouldScan else { return }
             openWidgetScanIfNeeded()
-        }
-        .sheet(isPresented: $showingTimer) {
-            TimerStartSheet { minutes, hardMode in
-                let result = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
-                }
-                screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                setMessage(for: result)
-            }
-            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingAssistantConnect) {
             AssistantConnectSheet(
@@ -265,7 +256,7 @@ struct HomeView: View {
                     openSection(.modes)
                 }
                 topNavButton("Timer") {
-                    showingTimer = true
+                    openSection(.timer)
                 }
             }
             .padding(.horizontal, 22)
@@ -805,6 +796,15 @@ struct HomeView: View {
             aiSystem.forecast.minutesUntilRisk <= 90
     }
 
+    private func startTimedBlank(minutes: Int, hardMode: Bool) {
+        let result = withAnimation(.easeInOut(duration: 0.65)) {
+            sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
+        }
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        setMessage(for: result)
+        closeSection()
+    }
+
     private var contextualPickerHeaderText: String {
         "Vamos a implementar el plan. Selecciona \(formattedPendingPlanAppNames) en la lista."
     }
@@ -1204,51 +1204,13 @@ private struct ModesList: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Manual fallback")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
-                    .textCase(.uppercase)
-
-                ForEach(sessionStore.focusModes) { mode in
-                    modeButton(mode)
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                sessionStore.deleteMode(mode.id)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                            .disabled(sessionStore.focusModes.count <= 1)
-                        }
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
-            manualPlanCreator
+            planAdvancedControls
                 .padding(.horizontal, 24)
                 .padding(.top, 10)
-                .padding(.bottom, 8)
+                .padding(.bottom, 34)
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-
-            AdvancedModeControls(
-                showingPicker: $showingPicker,
-                onFinish: onFinish,
-                textColor: textColor,
-                secondaryColor: secondaryColor
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 8)
-            .padding(.bottom, 34)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
         }
         .tint(textColor)
         .listStyle(.plain)
@@ -1339,25 +1301,7 @@ private struct ModesList: View {
     }
 
     private var planRoutineEditor: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(textColor.opacity(0.10)))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Recurring routines")
-                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                    Text(routineSummaryText)
-                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                        .foregroundStyle(secondaryColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer()
-            }
-
+        DisclosureGroup {
             VStack(spacing: 12) {
                 ForEach($windows) { $window in
                     HabitWindowCard(
@@ -1394,10 +1338,75 @@ private struct ModesList: View {
                 TopSheetPrimaryButtonLabel(title: "Save plan")
             }
             .padding(.top, 2)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recurring routines")
+                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    Text(routineSummaryText)
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(secondaryColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
         }
         .foregroundStyle(textColor)
         .padding(18)
         .blankGlassCard(cornerRadius: 20, tintOpacity: 0.24)
+    }
+
+    private var planAdvancedControls: some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Manual fallback")
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(secondaryColor)
+                        .textCase(.uppercase)
+
+                    ForEach(sessionStore.focusModes) { mode in
+                        modeButton(mode)
+                            .swipeActions {
+                                Button(role: .destructive) {
+                                    sessionStore.deleteMode(mode.id)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .disabled(sessionStore.focusModes.count <= 1)
+                            }
+                    }
+                }
+
+                manualPlanCreator
+
+                AdvancedModeControls(
+                    showingPicker: $showingPicker,
+                    onFinish: onFinish,
+                    textColor: textColor,
+                    secondaryColor: secondaryColor
+                )
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack {
+                Label("Advanced plan", systemImage: "slider.horizontal.3")
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                Spacer()
+                Text("Manual controls")
+                    .font(.caption)
+                    .foregroundStyle(secondaryColor)
+            }
+        }
+        .foregroundStyle(textColor)
+        .padding(18)
+        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.20)
     }
 
     private var enabledWindows: [BlankHabitWindow] {
@@ -1605,6 +1614,7 @@ struct HomeSectionScreen: View {
     var horizontalOffset: CGFloat = 0
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
+    let onTimedBlank: (Int, Bool) -> Void
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -1654,6 +1664,8 @@ struct HomeSectionScreen: View {
                 intervention: intervention,
                 onUnlock: onEmergencyUnlock
             )
+        case .timer:
+            TimerScreen(onStart: onTimedBlank)
         }
     }
 }
@@ -2371,21 +2383,28 @@ private struct TechnicalSheetActions<Content: View>: View {
     }
 }
 
-private struct TimerStartSheet: View {
-    @Environment(\.dismiss) private var dismiss
+private struct TimerScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @State private var hardMode = false
     let onStart: (Int, Bool) -> Void
     private let options = [15, 30, 45, 60, 90, 120]
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Timer")
-                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
-            Text(hardMode ? "Hard Blanked ends when the timer finishes. Early exit spends an emergency." : "Blank turns off automatically when the timer ends.")
-                .foregroundStyle(.secondary)
+        VStack(spacing: 24) {
+            Spacer(minLength: 0)
+
+            TopSheetHeader(
+                title: "Timer",
+                subtitle: hardMode ? "Ends with the timer.\nEarly exit uses emergency." : "Start a one-off block.\nIt ends automatically.",
+                titleColor: textColor,
+                subtitleColor: secondaryColor
+            )
 
             Toggle("Hard Blanked", isOn: $hardMode)
                 .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
+                .foregroundStyle(textColor)
                 .padding(.horizontal, 18)
                 .frame(height: 56)
                 .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
@@ -2394,17 +2413,17 @@ private struct TimerStartSheet: View {
                 ForEach(options, id: \.self) { minutes in
                     Button(formatDuration(minutes)) {
                         onStart(minutes, hardMode)
-                        dismiss()
                     }
                     .buttonStyle(BlankSecondaryButtonStyle())
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(BlankAtmosphericBackground())
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.clear)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
     private func formatDuration(_ minutes: Int) -> String {

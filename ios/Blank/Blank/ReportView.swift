@@ -82,46 +82,27 @@ struct ReportView: View {
                     context: healthContext
                 )
 
-                v3SystemCapsule(system: v3System)
-
-                aiWellnessExpansionCapsule(
-                    expansion: aiWellnessExpansion(
-                        system: v3System,
-                        progress: progress,
-                        context: healthContext,
-                        forecast: controlForecast,
-                        diagnosis: diagnosis
-                    )
-                )
-
-                healthAccessCapsule()
-
                 if hasProgress {
-                    weeklyVisualCapsule(
-                        activityDays: progress.recentActivity,
-                        weekly: weekly
-                    )
-
-                    statsDetailsCapsule(
-                        summary: dailyAISummary(
-                            events: sessionStore.usageEvents,
-                            sessions: sessionStore.sessions,
-                            progress: progress
-                        ),
-                        report: weeklyAIReport(
-                            events: sessionStore.usageEvents,
-                            sessions: sessionStore.sessions,
-                            progress: progress,
-                            healthContext: healthContext
-                        ),
-                        forecast: controlForecast,
-                        healthInsights: healthInsights,
-                        weekly: weekly,
+                    statsDetailedReportCapsule(
+                        v3System: v3System,
                         progress: progress,
-                        emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                        weekly: weekly,
+                        diagnosis: diagnosis,
+                        healthContext: healthContext,
+                        healthInsights: healthInsights,
+                        controlForecast: controlForecast
                     )
                 } else {
                     emptyState()
+                    statsDetailedReportCapsule(
+                        v3System: v3System,
+                        progress: progress,
+                        weekly: weekly,
+                        diagnosis: diagnosis,
+                        healthContext: healthContext,
+                        healthInsights: healthInsights,
+                        controlForecast: controlForecast
+                    )
                 }
             } else {
                 freeProgressCapsule(
@@ -268,7 +249,9 @@ struct ReportView: View {
                 forecast: forecast
             )
 
-            controlDriverBars(forecast: forecast, context: context)
+            if !usesMainBackground {
+                controlDriverBars(forecast: forecast, context: context)
+            }
 
             todayMoveCard(forecast: forecast)
         }
@@ -631,6 +614,70 @@ struct ReportView: View {
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
                 Text("Signals and plan")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+            }
+        }
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func statsDetailedReportCapsule(
+        v3System: DigitalWellnessV3System,
+        progress: BlankProgressReport,
+        weekly: BlankWeeklyReport,
+        diagnosis: DigitalWellnessDiagnosis,
+        healthContext: HealthRecoveryContext,
+        healthInsights: [String],
+        controlForecast: ControlForecast
+    ) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 14) {
+                v3SystemCapsule(system: v3System)
+
+                aiWellnessExpansionCapsule(
+                    expansion: aiWellnessExpansion(
+                        system: v3System,
+                        progress: progress,
+                        context: healthContext,
+                        forecast: controlForecast,
+                        diagnosis: diagnosis
+                    )
+                )
+
+                healthAccessCapsule()
+
+                weeklyVisualCapsule(
+                    activityDays: progress.recentActivity,
+                    weekly: weekly
+                )
+
+                statsDetailsCapsule(
+                    summary: dailyAISummary(
+                        events: sessionStore.usageEvents,
+                        sessions: sessionStore.sessions,
+                        progress: progress
+                    ),
+                    report: weeklyAIReport(
+                        events: sessionStore.usageEvents,
+                        sessions: sessionStore.sessions,
+                        progress: progress,
+                        healthContext: healthContext
+                    ),
+                    forecast: controlForecast,
+                    healthInsights: healthInsights,
+                    weekly: weekly,
+                    progress: progress,
+                    emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                )
+            }
+            .padding(.top, 10)
+        } label: {
+            HStack {
+                Label("Detailed report", systemImage: "chart.bar.doc.horizontal")
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
+                Spacer()
+                Text("AI, Health, history")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }

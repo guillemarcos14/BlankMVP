@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { json, parseJsonBody } = require("./_membership");
+const { json, parseJsonBody, supabaseFetch } = require("./_membership");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 
 function cleanText(value, maxLength = 600) {
@@ -165,7 +165,56 @@ async function sendWhatsAppMessage(to, text) {
   return response.json();
 }
 
+function connectCodeFromText(text) {
+  const match = cleanText(text, 80).match(/^connect\s+([a-z0-9-]{4,24})$/i);
+  return match ? match[1].toUpperCase() : "";
+}
+
+async function recordAssistantConnection({ channel, connectCode, from }) {
+  try {
+    await supabaseFetch("digital_wellness_feature_payloads", {
+      method: "POST",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({
+        anonymous_user_id: `connect:${connectCode}`,
+        schema_version: 1,
+        payload: {
+          event: "assistant_channel_connected",
+          properties: {
+            channel,
+            connect_code: connectCode,
+            channel_user: from,
+          },
+        },
+        insight: { event: "assistant_channel_connected" },
+        platform: channel,
+        locale: "",
+        app_version: "",
+        build_number: "",
+        data_consent: true,
+        consent_text: "Assistant channel connection",
+        privacy_raw_health_samples_sent: false,
+        privacy_raw_sleep_stage_timestamps_sent: false,
+        privacy_exact_app_selection_sent: false,
+        privacy_exact_location_sent: false,
+        submitted_at: new Date().toISOString(),
+      }),
+    });
+  } catch (_) {
+    return;
+  }
+}
+
 async function processMessage(message) {
+  const connectCode = connectCodeFromText(message.text);
+  if (connectCode) {
+    await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
+    return sendWhatsAppMessage(
+      message.from,
+      "Connected. Blanked will use this WhatsApp thread for your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
+    );
+  }
+
   const command = message.text.toLowerCase();
   if (command === "stop" || command === "disconnect") {
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");

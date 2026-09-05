@@ -25,7 +25,7 @@ struct ContentView: View {
                 }
                 .transition(.opacity)
             } else {
-                ConversationalHomeView {
+                HomeView {
                     withAnimation(.easeInOut(duration: 0.35)) {
                         showingOnboardingDemo = true
                     }
@@ -1543,6 +1543,7 @@ private enum BlankedAgentPlanner {
         let promptApp = namedApp(in: prompt)
         let appCategory = requestedAppCategory(in: prompt)
         let mainApp = promptApp ?? BlankedAgentMemory.rememberedMainApps().first ?? "the app"
+        let outcome = BlankedAgentMemory.lastPlanOutcome(system: context.system)
         if appCategory != nil && hasExplicitBlockRequest(prompt.lowercased()) && (!context.hasSelectedApps || !context.screenTimeAuthorized) {
             return AgentPlan(
                 intent: .social,
@@ -1577,8 +1578,29 @@ private enum BlankedAgentPlanner {
                 requiresScreenTimeAuthorization: false
             )
         }
+        if promptApp == nil,
+           appCategory == nil,
+           explicitTimeWindow(in: prompt) == nil,
+           outcome != "broke",
+           outcome != "held",
+           contains(prompt.lowercased(), ["scroll", "doomscroll", "scrolling", "checking my phone", "check my phone"]) {
+            return AgentPlan(
+                intent: .social,
+                title: "Scroll Context",
+                responseText: "I can help, but I need the real loop before creating a block. Which app or moment does the scrolling usually start with?",
+                bullets: [
+                    "Read: you want to stop scrolling, but the target is still broad.",
+                    "Pattern: useful protection needs the app, trigger or time window.",
+                    "Move: tell me the app or moment, then I can set the right boundary."
+                ],
+                primaryLabel: "Tell pattern",
+                secondaryLabel: "Not now",
+                actions: [],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
         let weakWindow = BlankedAgentMemory.rememberedWeakHours(system: context.system).first.map(DigitalWellnessAI.hourRangeText) ?? "the usual scroll window"
-        let outcome = BlankedAgentMemory.lastPlanOutcome(system: context.system)
         let feedbackLine: String
         if outcome == "broke" {
             feedbackLine = "Feedback: the last plan broke, so start easier and earlier."

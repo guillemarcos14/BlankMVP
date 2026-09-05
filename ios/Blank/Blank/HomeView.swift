@@ -16,6 +16,7 @@ struct HomeView: View {
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @State private var now = Date()
     @State private var message: String?
@@ -23,6 +24,7 @@ struct HomeView: View {
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
     @State private var showingTimer = false
+    @State private var showingAssistantConnect = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
@@ -36,6 +38,11 @@ struct HomeView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     private let riskBlankMinutes = 30
+    let onOpenOnboardingDemo: () -> Void
+
+    init(_ onOpenOnboardingDemo: @escaping () -> Void = {}) {
+        self.onOpenOnboardingDemo = onOpenOnboardingDemo
+    }
 
     private var aiSystem: DigitalWellnessV3System {
         sessionStore.digitalWellnessV3
@@ -149,6 +156,14 @@ struct HomeView: View {
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 setMessage(for: result)
             }
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingAssistantConnect) {
+            AssistantConnectSheet(
+                whatsAppNumber: configuredWhatsAppNumber(),
+                smsNumber: configuredSMSNumber(),
+                openURL: openURL
+            )
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingRelink) {
@@ -328,7 +343,7 @@ struct HomeView: View {
                 .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                 .foregroundStyle(Color.white)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
+                .lineLimit(3)
                 .minimumScaleFactor(0.82)
 
             bottomAction(width: actionWidth)
@@ -515,6 +530,7 @@ struct HomeView: View {
                 screenTimeBlocker.clear()
                 message = nil
                 messageAction = nil
+                onOpenOnboardingDemo()
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
             .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.64) : BlankColors.mutedInk)
@@ -528,7 +544,7 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Start Blank") {
+            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Iniciar Blank") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
@@ -595,12 +611,15 @@ struct HomeView: View {
     }
 
     private func bottomShortcutBar(width: CGFloat) -> some View {
-        HStack {
+        HStack(spacing: 10) {
             footerShortcut(title: "Timer", icon: "timer") {
                 showingTimer = true
             }
+            footerShortcut(title: "Assistant", icon: "message") {
+                showingAssistantConnect = true
+            }
         }
-        .frame(width: min(width, 118), height: 44)
+        .frame(width: min(width, 238), height: 44)
     }
 
     private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -807,6 +826,18 @@ struct HomeView: View {
                 defaults.set(dayKey, forKey: scheduledKey)
             }
         }
+    }
+
+    private func configuredWhatsAppNumber() -> String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankWhatsAppPhoneNumber") as? String else { return nil }
+        let digits = rawValue.filter(\.isNumber)
+        return digits.isEmpty ? nil : digits
+    }
+
+    private func configuredSMSNumber() -> String? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankSMSPhoneNumber") as? String else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.contains("$(") ? nil : trimmed
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -2102,6 +2133,128 @@ private struct TimerStartSheet: View {
         let rest = minutes % 60
         return rest == 0 ? "\(hours) h" : "\(hours) h \(rest) min"
     }
+}
+
+private struct AssistantConnectSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
+    @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+
+    let whatsAppNumber: String?
+    let smsNumber: String?
+    let openURL: OpenURLAction
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Assistant")
+                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
+
+            Text("Connect WhatsApp or SMS to use Blanked outside the app. The app stays as your control center for blocks, Health, reports and settings.")
+                .foregroundStyle(.secondary)
+                .lineSpacing(2)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Phone")
+                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                    .foregroundStyle(.secondary)
+                TextField("+1 555 000 0000", text: $phoneNumber)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .padding(.horizontal, 16)
+                    .frame(height: 52)
+                    .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
+            }
+
+            VStack(spacing: 10) {
+                Button {
+                    openAssistantChannel(.whatsApp)
+                } label: {
+                    Label("Connect WhatsApp", systemImage: "message.fill")
+                }
+                .buttonStyle(BlankPrimaryButtonStyle())
+                .disabled(whatsAppNumber == nil)
+
+                Button {
+                    openAssistantChannel(.sms)
+                } label: {
+                    Label("Connect SMS", systemImage: "message")
+                }
+                .buttonStyle(BlankSecondaryButtonStyle())
+                .disabled(smsNumber == nil)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Code")
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
+                    .foregroundStyle(.secondary)
+                Text(connectMessage)
+                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
+                    .textSelection(.enabled)
+            }
+            .padding(.top, 2)
+
+            if !connectedAt.isEmpty {
+                Text("\(preferredChannel.capitalized) connection started \(connectedAt).")
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BlankAtmosphericBackground())
+        .onAppear {
+            ensureConnectCode()
+        }
+    }
+
+    private var connectMessage: String {
+        "CONNECT \(connectCode.isEmpty ? "BLANKED" : connectCode)"
+    }
+
+    private func ensureConnectCode() {
+        guard connectCode.isEmpty else { return }
+        connectCode = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6)).uppercased()
+    }
+
+    private func openAssistantChannel(_ channel: AssistantChannel) {
+        ensureConnectCode()
+        preferredChannel = channel.rawValue
+        connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
+        let cleanedUserPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let message = connectMessage
+        let encodedMessage = message.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? message
+
+        switch channel {
+        case .whatsApp:
+            guard let whatsAppNumber, let url = URL(string: "https://wa.me/\(whatsAppNumber)?text=\(encodedMessage)") else { return }
+            openURL(url)
+        case .sms:
+            guard let smsNumber, let url = URL(string: "sms:\(smsNumber)&body=\(encodedMessage)") else { return }
+            openURL(url)
+        }
+        Task {
+            await BlankFunnelAnalytics.track(
+                "assistant_channel_connect_started",
+                properties: [
+                    "channel": channel.rawValue,
+                    "has_user_phone": !cleanedUserPhone.isEmpty,
+                    "connect_code": connectCode
+                ]
+            )
+        }
+        dismiss()
+    }
+}
+
+private enum AssistantChannel: String {
+    case whatsApp
+    case sms
 }
 
 private func formatMinute(_ minuteOfDay: Int) -> String {

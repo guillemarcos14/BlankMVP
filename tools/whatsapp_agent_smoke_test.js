@@ -52,9 +52,42 @@ async function receiveMessage() {
   assert.strictEqual(body.results[0].reason, "missing_whatsapp_credentials");
 }
 
+async function connectMessage() {
+  const response = await handler({
+    httpMethod: "POST",
+    headers: {},
+    body: JSON.stringify({
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                messages: [
+                  {
+                    from: "34600000000",
+                    id: "wamid.connect",
+                    text: { body: "CONNECT ABC123" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  assert.strictEqual(response.statusCode, 200, response.body);
+  const body = JSON.parse(response.body);
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.received, 1);
+  assert.strictEqual(body.results[0].skipped, true);
+  assert.strictEqual(body.results[0].reason, "missing_whatsapp_credentials");
+}
+
 (async () => {
   await verifyWebhook();
   await receiveMessage();
+  await connectMessage();
   console.log("whatsapp-agent smoke tests passed");
 })().catch((error) => {
   console.error(error);

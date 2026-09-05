@@ -7,6 +7,7 @@ const {
 
 const EVENT_TABLE = "digital_wellness_feature_payloads";
 const ALLOWED_EVENTS = new Set([
+  "app_opened",
   "onboarding_started",
   "onboarding_step_viewed",
   "onboarding_personalization_submitted",
@@ -29,6 +30,19 @@ const ALLOWED_EVENTS = new Set([
   "ai_insight_received",
   "ai_plan_applied",
   "agent_plan_applied",
+  "assistant_channel_connect_started",
+  "assistant_channel_connected",
+  "setup_step_viewed",
+  "setup_completed",
+  "nfc_tag_registered",
+  "nfc_wrong_tag",
+  "nfc_no_apps_selected",
+  "blank_mode_activated",
+  "blank_mode_deactivated",
+  "blocked_apps_updated",
+  "block_screen_shown",
+  "nfc_scan_failed",
+  "tag_forgotten",
 ]);
 
 function cleanText(value, maxLength = 160) {

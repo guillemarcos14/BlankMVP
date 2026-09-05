@@ -54,6 +54,7 @@ private struct ConversationalHomeView: View {
     @State private var now = Date()
     @State private var dictationBaseInput = ""
     @State private var showingWhatsAppConsent = false
+    @State private var showingWidgetTimerSelector = false
     @StateObject private var dictation = SpeechDictationController()
     let onOpenOnboardingDemo: () -> Void
 
@@ -229,6 +230,7 @@ private struct ConversationalHomeView: View {
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onAppear {
             restoreRuntimeState()
+            openWidgetTimerSelectorIfNeeded()
             scheduleDailyInterventionIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
@@ -259,6 +261,10 @@ private struct ConversationalHomeView: View {
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             restoreRuntimeState()
         }
+        .onChange(of: sessionStore.shouldShowWidgetTimerSelector) { shouldShow in
+            guard shouldShow else { return }
+            openWidgetTimerSelectorIfNeeded()
+        }
         .onChange(of: dictation.transcript) { transcript in
             updateInputFromDictation(transcript)
         }
@@ -275,6 +281,21 @@ private struct ConversationalHomeView: View {
         } message: {
             Text("WhatsApp messages are handled by WhatsApp/Meta. Blanked uses this channel only for messages you send and replies from Blanked AI.")
         }
+        .sheet(isPresented: $showingWidgetTimerSelector) {
+            WidgetTimerSelectionSheet(
+                selectedMinutes: sessionStore.pendingWidgetTimerMinutes,
+                onSelect: { minutes in
+                    sessionStore.selectWidgetTimer(minutes: minutes)
+                }
+            )
+            .presentationDetents([.medium])
+        }
+    }
+
+    private func openWidgetTimerSelectorIfNeeded() {
+        guard sessionStore.shouldShowWidgetTimerSelector else { return }
+        showingWidgetTimerSelector = true
+        sessionStore.shouldShowWidgetTimerSelector = false
     }
 
     private var welcomeHero: some View {
@@ -1058,6 +1079,9 @@ private struct AgentMessage: Identifiable, Equatable {
 private enum BlankedAgentPlanner {
     static func plan(for prompt: String, context: AgentContext) -> AgentPlan {
         let intent = classify(prompt)
+        if appCorrection(in: prompt) {
+            return correctionPlan()
+        }
         if let missingContextPlan = missingContextPlan(for: prompt, intent: intent, context: context) {
             return missingContextPlan
         }
@@ -1089,7 +1113,7 @@ private enum BlankedAgentPlanner {
         case .social:
             return socialPlan(prompt: prompt, context: context)
         case .general:
-            return generalPlan(context: context)
+            return generalPlan(prompt: prompt, context: context)
         }
     }
 
@@ -1117,20 +1141,28 @@ private enum BlankedAgentPlanner {
 
     private static func classify(_ prompt: String) -> AgentIntent {
         let text = prompt.lowercased()
+        if asksWhereToStart(text) { return .general }
         if contains(text, ["porn", "porno", "adult", "xxx"]) { return .adultContent }
         if contains(text, ["losing control", "perdiendo el control", "reca", "relapse", "urge", "emergency", "can't stop", "no puedo parar"]) { return .emergency }
-        if contains(text, ["sleep", "night", "bed", "dormir", "noche", "scroll por la noche", "tired", "cansado", "morning"]) { return .sleep }
+        if contains(text, ["sleep", "night", "bed", "dormir", "noche", "scroll por la noche", "tired", "cansado"]) { return .sleep }
         if contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"]) { return .study }
         if contains(text, ["allow only", "whatsapp", "maps", "solo", "only"]) { return .allowOnly }
         if contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa"]) { return .vacation }
         if contains(text, ["week", "semana", "analy", "diagn"]) { return .weeklyReview }
-        if contains(text, ["social", "tiktok", "instagram", "youtube", "gaming", "game", "dopamine", "scroll", "doomscroll", "anxious", "anxiety", "ansiedad", "bored", "aburr", "guilt", "culpa"]) { return .social }
+        if contains(text, ["social", "tiktok", "instagram", "youtube", "gaming", "game", "dopamine", "scroll", "doomscroll", "reels", "shorts", "feed", "anxious", "anxiety", "ansiedad", "bored", "aburr", "guilt", "culpa"]) { return .social }
         if contains(text, ["focus", "work", "productiv", "foco", "trabaj"]) { return .focus }
         return .general
     }
 
     private static func missingContextPlan(for prompt: String, intent: AgentIntent, context: AgentContext) -> AgentPlan? {
         let text = prompt.lowercased()
+        if intent == .social,
+           explicitTimeWindow(in: prompt) == nil,
+           BlankedAgentMemory.rememberedWeakHours(system: context.system).isEmpty,
+           let momentPlan = relativeMomentPlan(for: prompt) {
+            return momentPlan
+        }
+
         if intent == .sleep,
            explicitTimeWindow(in: prompt) == nil,
            explicitSingleTime(in: prompt) == nil,
@@ -1182,6 +1214,124 @@ private enum BlankedAgentPlanner {
         contains(text, ["block", "bloquea", "bloquear", "shield", "protect", "schedule", "limit", "from"])
     }
 
+    private static func asksForPlan(_ text: String) -> Bool {
+        contains(text.lowercased(), [
+            " plan",
+            "plan ",
+            "make me a plan",
+            "create a plan",
+            "build a plan",
+            "give me a plan",
+            "focus plan",
+            "protection plan",
+            "quiero un plan",
+            "hazme un plan"
+        ])
+    }
+
+    private static func asksWhereToStart(_ text: String) -> Bool {
+        contains(text.lowercased(), [
+            "where to start",
+            "where should i start",
+            "how to start",
+            "don't know where to start",
+            "do not know where to start",
+            "no se por donde empezar",
+            "no sé por dónde empezar"
+        ])
+    }
+
+    private static func asksForAdvice(_ text: String) -> Bool {
+        contains(text.lowercased(), [
+            "how can i",
+            "what should i",
+            "help me understand",
+            "help me improve",
+            "recommend",
+            "advice",
+            "advise",
+            "tips",
+            "why do i",
+            "review",
+            "diagnose",
+            "analyze",
+            "analyse",
+            "como puedo",
+            "qué debería",
+            "que deberia",
+            "aconseja",
+            "consejo",
+            "ayudame",
+            "ayúdame"
+        ])
+    }
+
+    private static func appCorrection(in prompt: String) -> Bool {
+        let text = prompt.lowercased()
+        let negatesUse = contains(text, [
+            "i don't use",
+            "i dont use",
+            "i do not use",
+            "i never use",
+            "dont use",
+            "don't use",
+            "do not use",
+            "no uso",
+            "yo no uso"
+        ])
+        return negatesUse && contains(text, ["tiktok", "tik tok", "instagram", "ig", "youtube", "reddit", "twitter", "facebook", "snapchat"])
+    }
+
+    private static func correctionPlan() -> AgentPlan {
+        AgentPlan(
+            intent: .general,
+            title: "Context Corrected",
+            responseText: "Got it. I will not use that app as context. Which app, moment or habit should we focus on instead?",
+            bullets: [
+                "Read: the previous app context was wrong.",
+                "Pattern: a useful plan needs your real trigger, not a guessed app.",
+                "Move: tell me the app, moment or habit you actually want to improve."
+            ],
+            primaryLabel: "Tell pattern",
+            secondaryLabel: "Not now",
+            actions: [],
+            requiresSelectedApps: false,
+            requiresScreenTimeAuthorization: false
+        )
+    }
+
+    private static func relativeMomentPlan(for prompt: String) -> AgentPlan? {
+        let text = prompt.lowercased()
+        let values: (label: String, question: String, move: String)?
+        if contains(text, ["after lunch", "despues de comer", "después de comer"]) {
+            values = ("after lunch", "Most people do best starting 10-15 minutes after lunch. What time do you usually finish eating?", "tell me when you usually finish lunch, then I can place the boundary without guessing.")
+        } else if contains(text, ["after dinner", "despues de cenar", "después de cenar"]) {
+            values = ("after dinner", "What time do you usually finish dinner?", "tell me when dinner usually ends, then I can set the boundary around the real risk moment.")
+        } else if contains(text, ["when i wake up", "after waking", "wake up", "al despertar", "cuando me despierto"]) {
+            values = ("after waking up", "What time do you usually wake up?", "tell me your usual wake-up time, then I can protect the first phone check.")
+        } else if contains(text, ["after work", "despues de trabajar", "después de trabajar"]) {
+            values = ("after work", "What time do you usually finish work?", "tell me when work usually ends, then I can protect the decompression window.")
+        } else {
+            values = nil
+        }
+        guard let values else { return nil }
+        return AgentPlan(
+            intent: .social,
+            title: "Contextual Boundary",
+            responseText: values.question,
+            bullets: [
+                "Read: you want protection \(values.label).",
+                "Pattern: the useful boundary should match your real routine, not a generic clock time.",
+                "Move: \(values.move)"
+            ],
+            primaryLabel: "Tell time",
+            secondaryLabel: "Not now",
+            actions: [],
+            requiresSelectedApps: false,
+            requiresScreenTimeAuthorization: false
+        )
+    }
+
     private static func behaviorPattern(_ prompt: String) -> String {
         let text = prompt.lowercased()
         if contains(text, ["anxious", "anxiety", "ansiedad", "stress"]) { return "an anxiety scroll loop" }
@@ -1197,7 +1347,7 @@ private enum BlankedAgentPlanner {
         let text = " \(prompt.lowercased()) "
         let apps = [
             ("TikTok", ["tiktok", "tik tok"]),
-            ("Instagram", ["instagram", "insta"]),
+            ("Instagram", ["instagram", "insta", " ig "]),
             ("YouTube", ["youtube", "yt"]),
             ("Reddit", ["reddit"]),
             ("Twitter", ["twitter", " x "]),
@@ -1457,21 +1607,55 @@ private enum BlankedAgentPlanner {
         )
     }
 
-    private static func generalPlan(context: AgentContext) -> AgentPlan {
-        AgentPlan(
+    private static func generalPlan(prompt: String, context: AgentContext) -> AgentPlan {
+        if (asksForAdvice(prompt) || asksForPlan(prompt) || asksWhereToStart(prompt)) && !hasExplicitBlockRequest(prompt.lowercased()) {
+            if asksForPlan(prompt) {
+                return AgentPlan(
+                    intent: .general,
+                    title: "Plan Context",
+                    responseText: "I can build a plan, but first I need the real loop. Which app, moment or habit should we focus on?",
+                    bullets: [
+                        "Read: you want a plan, but the target is still too broad.",
+                        "Pattern: useful protection starts from one repeated trigger.",
+                        "Move: tell me the app, moment or habit that takes over most often."
+                    ],
+                    primaryLabel: "Tell pattern",
+                    secondaryLabel: "Open report",
+                    actions: [],
+                    requiresSelectedApps: false,
+                    requiresScreenTimeAuthorization: false
+                )
+            }
+            return AgentPlan(
+                intent: .general,
+                title: "Digital Wellness Read",
+                responseText: "Start by identifying the moment when the phone becomes automatic. Then make that moment slightly harder before adding strict blocks.",
+                bullets: [
+                    "Read: you are asking for guidance, not a blocking plan yet.",
+                    "Pattern: the trigger usually matters more than total screen time.",
+                    "Move: name the app and the moment it usually takes over."
+                ],
+                primaryLabel: "Tell pattern",
+                secondaryLabel: "Open report",
+                actions: [],
+                requiresSelectedApps: false,
+                requiresScreenTimeAuthorization: false
+            )
+        }
+        return AgentPlan(
             intent: .general,
-            title: "Digital Wellness Read",
-            responseText: "This looks like a screen habit loop, not just a willpower problem.",
+            title: "Noted",
+            responseText: "I can help with screen-habit advice, a diagnosis or a protection plan if you want to go further.",
             bullets: [
-                "Pattern: your phone is becoming the default response around \(context.system.forecast.riskWindow).",
-                "Move: add friction before the loop starts, not after you are already scrolling.",
-                context.hasSelectedApps ? "Protection can run with your current setup." : "Choose the apps Blanked can control first."
+                "Read: there is no clear action request yet.",
+                "Pattern: Blanked should not turn every message into a blocking plan.",
+                "Move: tell me whether you want advice or a plan."
             ],
-            primaryLabel: context.hasSelectedApps ? "Apply protection" : "Set up",
+            primaryLabel: "Tell goal",
             secondaryLabel: "Open report",
-            actions: context.hasSelectedApps ? [.applyAIPlan] : [.openAppPicker],
-            requiresSelectedApps: !context.hasSelectedApps,
-            requiresScreenTimeAuthorization: context.hasSelectedApps
+            actions: [],
+            requiresSelectedApps: false,
+            requiresScreenTimeAuthorization: false
         )
     }
 
@@ -1518,6 +1702,10 @@ private enum BlankedAgentPlanner {
 
     private static func explicitSingleTime(in prompt: String) -> Int? {
         let text = prompt.lowercased()
+        if scrollUntilSleepTime(prompt) { return nil }
+        if contains(text, ["sleep", "bed", "dormir", "duermo", "acuesto", "bedtime"]) && text.contains("midnight") {
+            return 0
+        }
         let pattern = #"(?:sleep|bed|dormir|duermo|acuesto|bedtime)[^\d]*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
         let nsText = text as NSString
@@ -1534,6 +1722,15 @@ private enum BlankedAgentPlanner {
         let minute = Int(value(2) ?? "") ?? 0
         let meridiem = value(3) ?? ((6...11).contains(hour) ? "pm" : nil)
         return minuteOfDay(hour: hour, minute: minute, meridiem: meridiem)
+    }
+
+    private static func scrollUntilSleepTime(_ prompt: String) -> Bool {
+        let text = prompt.lowercased()
+        guard contains(text, ["scroll", "doomscroll", "reels", "shorts", "feed"]),
+              contains(text, ["bed", "night", "noche"]) else {
+            return false
+        }
+        return text.range(of: #"\buntil\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b"#, options: .regularExpression) != nil
     }
 
     private static func minuteOfDay(hour: Int, minute: Int, meridiem: String?) -> Int? {
@@ -1737,7 +1934,9 @@ private enum BlankedAgentMemory {
         if let bedtime = explicitBedtimeMinute(in: prompt) {
             defaults.set(bedtime, forKey: bedtimeMinuteKey)
         }
-        mergeMainApps(extractMainApps(from: prompt))
+        let rejectedApps = negatedMainApps(from: prompt)
+        removeMainApps(rejectedApps)
+        mergeMainApps(extractMainApps(from: prompt).filter { !rejectedApps.contains($0) })
         defaults.set(patternCluster(for: prompt, intent: inferredIntent), forKey: patternClusterKey)
     }
 
@@ -1820,10 +2019,17 @@ private enum BlankedAgentMemory {
         defaults.set(merged.joined(separator: "|"), forKey: mainAppsKey)
     }
 
+    private static func removeMainApps(_ apps: [String]) {
+        guard !apps.isEmpty else { return }
+        let rejected = Set(apps)
+        let kept = rememberedMainApps().filter { !rejected.contains($0) }
+        defaults.set(kept.joined(separator: "|"), forKey: mainAppsKey)
+    }
+
     private static func extractMainApps(from prompt: String) -> [String] {
         let knownApps = [
             "TikTok": ["tiktok", "tik tok"],
-            "Instagram": ["instagram", "insta"],
+            "Instagram": ["instagram", "insta", " ig "],
             "YouTube": ["youtube", "yt"],
             "WhatsApp": ["whatsapp"],
             "X": ["twitter", " x "],
@@ -1838,6 +2044,20 @@ private enum BlankedAgentMemory {
         return knownApps.compactMap { name, aliases in
             aliases.contains { text.contains($0) } ? name : nil
         }
+    }
+
+    private static func negatedMainApps(from prompt: String) -> [String] {
+        let text = prompt.lowercased()
+        let negatesUse = text.contains("i don't use") ||
+            text.contains("i dont use") ||
+            text.contains("i do not use") ||
+            text.contains("i never use") ||
+            text.contains("dont use") ||
+            text.contains("don't use") ||
+            text.contains("do not use") ||
+            text.contains("no uso") ||
+            text.contains("yo no uso")
+        return negatesUse ? extractMainApps(from: prompt) : []
     }
 
     private static func patternCluster(for prompt: String, intent: AgentIntent) -> String {
@@ -1876,6 +2096,82 @@ private enum BlankedAgentMemory {
             }
         }
         return resolvedHour * 60 + minute
+    }
+}
+
+private struct WidgetTimerSelectionSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var customMinutes: Int
+    let selectedMinutes: Int?
+    let onSelect: (Int?) -> Void
+
+    private let options = [5, 15, 30, 60]
+
+    init(selectedMinutes: Int?, onSelect: @escaping (Int?) -> Void) {
+        self.selectedMinutes = selectedMinutes
+        self.onSelect = onSelect
+        _customMinutes = State(initialValue: selectedMinutes ?? 45)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Start timer")
+                .font(.blankInter(size: 34, weight: .semibold, relativeTo: .largeTitle))
+
+            Text("Choose a countdown. It will be used when you press Start Blank on the widget.")
+                .font(.blankInter(size: 15, relativeTo: .body))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(options, id: \.self) { minutes in
+                    Button(formatDuration(minutes)) {
+                        onSelect(minutes)
+                        dismiss()
+                    }
+                    .buttonStyle(BlankSecondaryButtonStyle())
+                }
+            }
+
+            Stepper(value: $customMinutes, in: 5...240, step: 5) {
+                Text(formatDuration(customMinutes))
+                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .body))
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 56)
+            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.28)
+
+            Button("Use custom timer") {
+                onSelect(customMinutes)
+                dismiss()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle())
+
+            if selectedMinutes != nil {
+                Button("Clear timer") {
+                    onSelect(nil)
+                    dismiss()
+                }
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .buttonStyle(.plain)
+            }
+
+            Spacer()
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(BlankAtmosphericBackground())
+    }
+
+    private func formatDuration(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes) min"
+        }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return rest == 0 ? "\(hours) h" : "\(hours) h \(rest) min"
     }
 }
 

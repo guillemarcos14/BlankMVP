@@ -126,8 +126,16 @@ final class SessionStore: ObservableObject {
         didSet { defaults.set(deviceActivityTimerScheduled, forKey: Keys.deviceActivityTimerScheduled) }
     }
 
+    @Published var pendingWidgetTimerMinutes: Int? {
+        didSet {
+            BlankSharedState.setPendingWidgetTimerMinutes(pendingWidgetTimerMinutes, defaults: defaults)
+            reloadBlankWidget()
+        }
+    }
+
     @Published var shouldOpenBlockConfiguration = false
     @Published var shouldScanBlankFromWidget = false
+    @Published var shouldShowWidgetTimerSelector = false
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -179,6 +187,7 @@ final class SessionStore: ObservableObject {
         currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
+        pendingWidgetTimerMinutes = BlankSharedState.pendingWidgetTimerMinutes(defaults: defaults)
         let currentWeekKey = Self.currentWeekKey()
         if defaults.string(forKey: Keys.emergencyUnlockWeekKey) == currentWeekKey {
             emergencyUnlocksThisWeek = defaults.integer(forKey: Keys.emergencyUnlocksThisWeek)
@@ -323,17 +332,19 @@ final class SessionStore: ObservableObject {
         isBlankActive = true
         hardBlankActive = hardMode
         blankActiveSince = Date()
-        if let durationMinutes, durationMinutes > 0 {
-            blankActiveUntil = Date().addingTimeInterval(TimeInterval(durationMinutes * 60))
+        let selectedDuration = (durationMinutes ?? pendingWidgetTimerMinutes).map { min(max($0, 5), 240) }
+        if let selectedDuration, selectedDuration > 0 {
+            blankActiveUntil = Date().addingTimeInterval(TimeInterval(selectedDuration * 60))
             deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
                 modeId: currentModeId,
-                durationMinutes: durationMinutes
+                durationMinutes: selectedDuration
             )
         } else {
             blankActiveUntil = nil
             deviceActivityTimerScheduled = false
         }
-        startSession(tag: nfcTagUid, forceStarted: forceStarted, entryMode: entryMode, plannedDurationMinutes: durationMinutes)
+        pendingWidgetTimerMinutes = nil
+        startSession(tag: nfcTagUid, forceStarted: forceStarted, entryMode: entryMode, plannedDurationMinutes: selectedDuration)
         return .blanked
     }
 
@@ -365,6 +376,7 @@ final class SessionStore: ObservableObject {
         hardBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
+        pendingWidgetTimerMinutes = nil
         if endedReason == .manual {
             lastManualUnblankedAt = endedAt
         }
@@ -450,6 +462,7 @@ final class SessionStore: ObservableObject {
         hardBlankActive = false
         blankActiveSince = nil
         blankActiveUntil = nil
+        pendingWidgetTimerMinutes = nil
         DeviceActivityTimerScheduler.stop(modeId: currentModeId)
         deviceActivityTimerScheduled = false
         schedulePausedUntil = nil
@@ -462,6 +475,14 @@ final class SessionStore: ObservableObject {
 
     func requestBlockConfiguration() {
         shouldOpenBlockConfiguration = true
+    }
+
+    func requestWidgetTimerSelector() {
+        shouldShowWidgetTimerSelector = true
+    }
+
+    func selectWidgetTimer(minutes: Int?) {
+        pendingWidgetTimerMinutes = minutes
     }
 
     func requestBlankScanFromWidget() {
@@ -480,6 +501,10 @@ final class SessionStore: ObservableObject {
         }
         if blankActiveUntil != activeState.endsAt {
             blankActiveUntil = activeState.endsAt
+        }
+        let sharedPendingTimer = BlankSharedState.pendingWidgetTimerMinutes(defaults: defaults)
+        if pendingWidgetTimerMinutes != sharedPendingTimer {
+            pendingWidgetTimerMinutes = sharedPendingTimer
         }
         if !activeState.isActive, hardBlankActive {
             hardBlankActive = false
@@ -931,6 +956,7 @@ final class SessionStore: ObservableObject {
             Keys.isBlankActive,
             Keys.blankActiveSince,
             Keys.blankActiveUntil,
+            BlankSharedState.Keys.pendingWidgetTimerMinutes,
             Keys.hardBlankActive,
             Keys.allowOnlyModeEnabled,
             Keys.adultContentBlockingEnabled,

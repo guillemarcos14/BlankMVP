@@ -30,6 +30,7 @@ struct BlankWidgetEntry: TimelineEntry {
     let date: Date
     let activeState: BlankSharedState.ActiveState
     let hasConfiguration: Bool
+    let pendingTimerMinutes: Int?
 }
 
 struct BlankWidgetProvider: TimelineProvider {
@@ -41,7 +42,8 @@ struct BlankWidgetProvider: TimelineProvider {
                 startedAt: nil,
                 endsAt: nil
             ),
-            hasConfiguration: true
+            hasConfiguration: true,
+            pendingTimerMinutes: nil
         )
     }
 
@@ -51,7 +53,7 @@ struct BlankWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BlankWidgetEntry>) -> Void) {
         let current = entry()
-        let nextRefresh = current.activeState.isActive ? Date().addingTimeInterval(60) : Date().addingTimeInterval(15 * 60)
+        let nextRefresh = current.activeState.endsAt ?? (current.activeState.isActive ? Date().addingTimeInterval(60) : Date().addingTimeInterval(15 * 60))
         completion(Timeline(entries: [current], policy: .after(nextRefresh)))
     }
 
@@ -63,7 +65,8 @@ struct BlankWidgetProvider: TimelineProvider {
         return BlankWidgetEntry(
             date: date,
             activeState: BlankSharedState.loadActiveState(now: date, defaults: defaults),
-            hasConfiguration: BlankSharedState.hasConfiguredBlock(in: defaults)
+            hasConfiguration: BlankSharedState.hasConfiguredBlock(in: defaults),
+            pendingTimerMinutes: BlankSharedState.pendingWidgetTimerMinutes(defaults: defaults)
         )
     }
 }
@@ -73,16 +76,21 @@ struct BlankWidgetView: View {
     @Environment(\.widgetFamily) private var widgetFamily
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
-    private var widgetURL: URL? {
-        URL(string: isActive ? "blank://open" : "blank://configure-block")
-    }
 
     var body: some View {
-        actionContent
-            .buttonStyle(.plain)
+        ZStack(alignment: .topLeading) {
+            actionContent
+                .buttonStyle(.plain)
+
+            if showsTimerBadge {
+                timerBadge
+                    .padding(.top, 15)
+                    .padding(.leading, 15)
+            }
+        }
             .blankWidgetBackground(isActive: entry.activeState.isActive, family: widgetFamily)
-            .widgetURL(widgetURL)
             .animation(.easeInOut(duration: 0.45), value: isActive)
+            .animation(.easeInOut(duration: 0.28), value: entry.pendingTimerMinutes)
     }
 
     @ViewBuilder
@@ -158,6 +166,68 @@ struct BlankWidgetView: View {
 
     private var title: String {
         entry.activeState.isActive ? "Blanked" : "Start Blank"
+    }
+
+    private var showsTimerBadge: Bool {
+        switch widgetFamily {
+        case .systemSmall:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private var timerBadge: some View {
+        Link(destination: URL(string: "blank://timer")!) {
+            Group {
+                if entry.activeState.isActive, let endsAt = entry.activeState.endsAt {
+                    Text(endsAt, style: .timer)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                } else if let pendingTimerMinutes = entry.pendingTimerMinutes {
+                    Text(formatTimerBadge(minutes: pendingTimerMinutes))
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                } else {
+                    Image(systemName: "clock")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            }
+            .foregroundStyle(Color.white)
+            .frame(width: badgeWidth, height: 34)
+            .background {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color(red: 0.78, green: 0.78, blue: 0.76).opacity(isActive ? 0.28 : 0.82))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(isActive ? 0.10 : 0.22), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+    }
+
+    private var badgeWidth: CGFloat {
+        if entry.activeState.isActive, entry.activeState.endsAt != nil {
+            return 58
+        }
+        if let pendingTimerMinutes = entry.pendingTimerMinutes, pendingTimerMinutes >= 60 {
+            return 46
+        }
+        return entry.pendingTimerMinutes == nil ? 34 : 42
+    }
+
+    private func formatTimerBadge(minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)m"
+        }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return rest == 0 ? "\(hours)h" : "\(hours)h\(rest)"
     }
 }
 

@@ -74,6 +74,8 @@ struct BlankApp: App {
         }
 
         switch action {
+        case "timer", "schedule-timer":
+            sessionStore.requestWidgetTimerSelector()
         case "configure-block", "open-picker", "choose-apps":
             sessionStore.requestBlockConfiguration()
         case "start", "start-blank", "start-focus":

@@ -47,12 +47,33 @@ enum BlankSharedState {
 
     static func startQuickBlock(defaults: UserDefaults = Self.defaults, now: Date = Date()) -> Bool {
         guard hasConfiguredBlock(in: defaults) else { return false }
+        let durationMinutes = pendingWidgetTimerMinutes(defaults: defaults)
         defaults.set(true, forKey: Keys.isBlankActive)
         defaults.set(now.timeIntervalSince1970, forKey: Keys.blankActiveSince)
-        defaults.removeObject(forKey: Keys.blankActiveUntil)
+        if let durationMinutes {
+            defaults.set(now.addingTimeInterval(TimeInterval(durationMinutes * 60)).timeIntervalSince1970, forKey: Keys.blankActiveUntil)
+        } else {
+            defaults.removeObject(forKey: Keys.blankActiveUntil)
+        }
+        defaults.removeObject(forKey: Keys.pendingWidgetTimerMinutes)
         defaults.removeObject(forKey: "blankQuickBlockDurationMinutes")
-        appendSession(defaults: defaults, now: now, entryMode: .widget)
+        appendSession(defaults: defaults, now: now, entryMode: .widget, plannedDurationMinutes: durationMinutes)
         return true
+    }
+
+    static func pendingWidgetTimerMinutes(defaults: UserDefaults = Self.defaults) -> Int? {
+        guard defaults.object(forKey: Keys.pendingWidgetTimerMinutes) != nil else { return nil }
+        let minutes = defaults.integer(forKey: Keys.pendingWidgetTimerMinutes)
+        guard minutes > 0 else { return nil }
+        return min(max(minutes, 5), 240)
+    }
+
+    static func setPendingWidgetTimerMinutes(_ minutes: Int?, defaults: UserDefaults = Self.defaults) {
+        if let minutes {
+            defaults.set(min(max(minutes, 5), 240), forKey: Keys.pendingWidgetTimerMinutes)
+        } else {
+            defaults.removeObject(forKey: Keys.pendingWidgetTimerMinutes)
+        }
     }
 
     @discardableResult
@@ -66,6 +87,7 @@ enum BlankSharedState {
         defaults.set(false, forKey: Keys.isBlankActive)
         defaults.removeObject(forKey: Keys.blankActiveSince)
         defaults.removeObject(forKey: Keys.blankActiveUntil)
+        defaults.removeObject(forKey: Keys.pendingWidgetTimerMinutes)
         endActiveSession(defaults: defaults, now: now, endedReason: activeExpiredReason(defaults: defaults))
         return true
     }
@@ -75,7 +97,12 @@ enum BlankSharedState {
         return activeSession?.plannedDurationMinutes == nil ? .expired : .timer
     }
 
-    private static func appendSession(defaults: UserDefaults, now: Date, entryMode: BlankEntryMode) {
+    private static func appendSession(
+        defaults: UserDefaults,
+        now: Date,
+        entryMode: BlankEntryMode,
+        plannedDurationMinutes: Int? = nil
+    ) {
         let modeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:)) ?? defaultModeId
         let modeName = currentModeName(defaults: defaults, modeId: modeId)
         let snapshot = selectionSnapshot(in: defaults)
@@ -85,7 +112,8 @@ enum BlankSharedState {
             startedAt: now,
             entryMode: entryMode,
             selectionSnapshot: snapshot,
-            modeName: modeName
+            modeName: modeName,
+            plannedDurationMinutes: plannedDurationMinutes
         )
         var sessions = loadSessions(defaults: defaults)
         if let index = sessions.lastIndex(where: { $0.isActive }) {
@@ -108,7 +136,8 @@ enum BlankSharedState {
             entryMode: entryMode,
             now: now,
             selectionSnapshot: snapshot,
-            modeName: modeName
+            modeName: modeName,
+            plannedDurationMinutes: plannedDurationMinutes
         )
     }
 
@@ -216,5 +245,6 @@ enum BlankSharedState {
         static let usageEvents = "blankUsageEvents"
         static let currentModeId = "blankCurrentModeId"
         static let focusModes = "blankFocusModes"
+        static let pendingWidgetTimerMinutes = "blankPendingWidgetTimerMinutes"
     }
 }

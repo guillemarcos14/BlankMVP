@@ -264,8 +264,8 @@ struct HomeView: View {
                 topNavButton("Plan") {
                     openSection(.modes)
                 }
-                topNavButton("Habits") {
-                    openSection(.schedule)
+                topNavButton("Timer") {
+                    showingTimer = true
                 }
             }
             .padding(.horizontal, 22)
@@ -408,7 +408,7 @@ struct HomeView: View {
             .buttonStyle(.plain)
 
             Menu {
-                Button("Apply to Habits") {
+                Button("Apply to Plan") {
                     sessionStore.applyAIPlan()
                     Task {
                         await BlankFunnelAnalytics.track(
@@ -416,11 +416,11 @@ struct HomeView: View {
                             properties: ["source": "home_ai_plan"]
                         )
                     }
-                    message = "Blanked AI applied to Habits."
+                    message = "Blanked AI applied to Plan."
                     messageAction = nil
                 }
-                Button("Edit in Habits") {
-                    openSection(.schedule)
+                Button("Edit in Plan") {
+                    openSection(.modes)
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -627,15 +627,12 @@ struct HomeView: View {
     }
 
     private func bottomShortcutBar(width: CGFloat) -> some View {
-        HStack(spacing: 10) {
-            footerShortcut(title: "Timer", icon: "timer") {
-                showingTimer = true
-            }
+        HStack {
             footerShortcut(title: "Assistant", icon: "message") {
                 showingAssistantConnect = true
             }
         }
-        .frame(width: min(width, 238), height: 44)
+        .frame(width: min(width, 150), height: 44)
     }
 
     private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -1151,6 +1148,7 @@ private struct ModesList: View {
     let onFinish: () -> Void
     @State private var newModeName = ""
     @State private var showsManualPlanCreator = false
+    @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
@@ -1195,6 +1193,14 @@ private struct ModesList: View {
             .padding(.top, 16)
             .padding(.bottom, 8)
             .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+
+            planRoutineEditor
+                .padding(.horizontal, 24)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+                .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
@@ -1250,6 +1256,11 @@ private struct ModesList: View {
         .scrollIndicators(.hidden)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .onAppear {
+            windows = sessionStore.schedule.windows.isEmpty
+                ? [BlankHabitWindow(name: "Routine 1", enabled: false)]
+                : sessionStore.schedule.windows
+        }
     }
 
     private func modeButton(_ mode: BlankFocusMode) -> some View {
@@ -1325,6 +1336,110 @@ private struct ModesList: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var planRoutineEditor: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recurring routines")
+                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    Text(routineSummaryText)
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(secondaryColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                ForEach($windows) { $window in
+                    HabitWindowCard(
+                        window: $window,
+                        canDelete: windows.count > 1,
+                        textColor: textColor,
+                        secondaryColor: secondaryColor
+                    ) {
+                        deleteWindow(window.id)
+                    }
+                }
+            }
+
+            Button {
+                addWindow()
+            } label: {
+                Label("Add manual routine", systemImage: "plus")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(textColor)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52)
+                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.22)
+            }
+            .buttonStyle(.plain)
+
+            VacationModeCard(
+                textColor: textColor,
+                secondaryColor: secondaryColor
+            )
+
+            Button {
+                saveSchedule()
+            } label: {
+                TopSheetPrimaryButtonLabel(title: "Save plan")
+            }
+            .padding(.top, 2)
+        }
+        .foregroundStyle(textColor)
+        .padding(18)
+        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.24)
+    }
+
+    private var enabledWindows: [BlankHabitWindow] {
+        windows.filter { $0.enabled }
+    }
+
+    private var routineSummaryText: String {
+        guard let first = enabledWindows.first else {
+            return "No active routine yet. Ask BAI to create one, then approve it here."
+        }
+        return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
+    }
+
+    private func saveSchedule() {
+        let normalized = windows.enumerated().map { index, window in
+            BlankHabitWindow(
+                id: window.id,
+                name: window.name.isEmpty ? "Routine \(index + 1)" : window.name,
+                enabled: window.enabled,
+                startMinute: window.startMinute,
+                endMinute: window.endMinute,
+                weekdays: window.weekdays
+            )
+        }
+        let first = normalized.first ?? BlankHabitWindow(enabled: false)
+        sessionStore.schedule = BlankFocusSchedule(
+            enabled: normalized.contains { $0.enabled },
+            startMinute: first.startMinute,
+            endMinute: first.endMinute,
+            windows: normalized
+        )
+        onFinish()
+    }
+
+    private func addWindow() {
+        let number = windows.count + 1
+        windows.append(BlankHabitWindow(name: "Routine \(number)", enabled: true, startMinute: 9 * 60, endMinute: 10 * 60))
+    }
+
+    private func deleteWindow(_ id: UUID) {
+        guard windows.count > 1 else { return }
+        windows.removeAll { $0.id == id }
     }
 
     private var manualPlanCreator: some View {
@@ -1547,7 +1662,7 @@ private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     let onSave: () -> Void
-    @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Habit 1", enabled: false)]
+    @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
@@ -1555,7 +1670,7 @@ private struct ScheduleEditorContent: View {
         List {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
-                    title: "Habits",
+                    title: "Routines",
                     subtitle: "BAI schedules routines.\nYou review and override them here.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
@@ -1629,7 +1744,7 @@ private struct ScheduleEditorContent: View {
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             windows = sessionStore.schedule.windows.isEmpty
-                ? [BlankHabitWindow(name: "Habit 1", enabled: false)]
+                ? [BlankHabitWindow(name: "Routine 1", enabled: false)]
                 : sessionStore.schedule.windows
         }
     }
@@ -1638,7 +1753,7 @@ private struct ScheduleEditorContent: View {
         let normalized = windows.enumerated().map { index, window in
             BlankHabitWindow(
                 id: window.id,
-                name: window.name.isEmpty ? "Habit \(index + 1)" : window.name,
+                name: window.name.isEmpty ? "Routine \(index + 1)" : window.name,
                 enabled: window.enabled,
                 startMinute: window.startMinute,
                 endMinute: window.endMinute,
@@ -1658,7 +1773,7 @@ private struct ScheduleEditorContent: View {
 
     private func addWindow() {
         let number = windows.count + 1
-        windows.append(BlankHabitWindow(name: "Habit \(number)", enabled: true, startMinute: 9 * 60, endMinute: 10 * 60))
+        windows.append(BlankHabitWindow(name: "Routine \(number)", enabled: true, startMinute: 9 * 60, endMinute: 10 * 60))
     }
 
     private func deleteWindow(_ id: UUID) {
@@ -1767,7 +1882,7 @@ private struct VacationModeCard: View {
 
     private var statusText: String {
         guard let until = sessionStore.vacationModeUntil, until > Date() else {
-            return "Pause Habits and daily limits temporarily."
+            return "Pause routines and daily limits temporarily."
         }
         return "Paused until \(formatMinute(minuteOfDay(from: until)))."
     }
@@ -1797,7 +1912,7 @@ private struct HabitWindowCard: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
-                TextField("Habit", text: $window.name)
+                TextField("Routine", text: $window.name)
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                     .foregroundStyle(textColor)
 

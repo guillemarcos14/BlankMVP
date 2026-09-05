@@ -205,13 +205,15 @@ private extension URLComponents {
 
     func listQueryItem(_ name: String) -> [String] {
         guard let value = stringQueryItem(name) else { return [] }
-        return value
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .map { String($0.prefix(30)) }
-            .prefix(8)
-            .map(String.init)
+
+        var items: [String] = []
+        for rawItem in value.split(separator: ",") {
+            let item = rawItem.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !item.isEmpty else { continue }
+            items.append(String(item.prefix(30)))
+            if items.count >= 8 { break }
+        }
+        return items
     }
 
     func minuteQueryItem(_ name: String) -> Int? {

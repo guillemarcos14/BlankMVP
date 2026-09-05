@@ -136,6 +136,7 @@ final class SessionStore: ObservableObject {
     @Published var shouldOpenBlockConfiguration = false
     @Published var shouldScanBlankFromWidget = false
     @Published var shouldShowWidgetTimerSelector = false
+    @Published var pendingPlanAppNames: [String] = []
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -473,8 +474,13 @@ final class SessionStore: ObservableObject {
         setupComplete = true
     }
 
-    func requestBlockConfiguration() {
+    func requestBlockConfiguration(appNames: [String] = []) {
+        pendingPlanAppNames = appNames
         shouldOpenBlockConfiguration = true
+    }
+
+    func clearPendingPlanAppNames() {
+        pendingPlanAppNames = []
     }
 
     func requestWidgetTimerSelector() {

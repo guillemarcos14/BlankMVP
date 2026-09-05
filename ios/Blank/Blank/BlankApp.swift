@@ -77,7 +77,21 @@ struct BlankApp: App {
         case "timer", "schedule-timer":
             sessionStore.requestWidgetTimerSelector()
         case "configure-block", "open-picker", "choose-apps":
-            sessionStore.requestBlockConfiguration()
+            sessionStore.requestBlockConfiguration(appNames: components?.listQueryItem("apps") ?? [])
+        case "setup-plan":
+            let appNames = components?.listQueryItem("apps") ?? []
+            let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
+            let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
+            let durationDays = components?.intQueryItem("days") ?? 7
+            if let startMinute, let endMinute {
+                sessionStore.applyAdaptivePlan(
+                    startMinute: min(max(startMinute, 0), 1439),
+                    endMinute: min(max(endMinute, 0), 1439),
+                    durationDays: min(max(durationDays, 1), 14)
+                )
+                applyScreenTimeState()
+            }
+            sessionStore.requestBlockConfiguration(appNames: appNames)
         case "start", "start-blank", "start-focus":
             let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
             let hardMode = components?.boolQueryItem("hard") ?? false
@@ -154,6 +168,17 @@ private extension URLComponents {
         if ["1", "true", "yes"].contains(value) { return true }
         if ["0", "false", "no"].contains(value) { return false }
         return nil
+    }
+
+    func listQueryItem(_ name: String) -> [String] {
+        guard let value = stringQueryItem(name) else { return [] }
+        return value
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { String($0.prefix(30)) }
+            .prefix(8)
+            .map(String.init)
     }
 
     func minuteQueryItem(_ name: String) -> Int? {

@@ -69,7 +69,33 @@ function incomingMessages(body) {
   return messages;
 }
 
-function appLink(action) {
+function requestedAppNames(text) {
+  const source = ` ${cleanText(text, 600).toLowerCase()} `;
+  const candidates = [
+    { keys: ["tiktok", "tik tok"], label: "TikTok" },
+    { keys: ["instagram", "insta", " ig "], label: "Instagram" },
+    { keys: [" x ", "twitter"], label: "X" },
+    { keys: ["youtube", "yt", "youtube shorts"], label: "YouTube" },
+    { keys: ["reddit"], label: "Reddit" },
+    { keys: ["facebook"], label: "Facebook" },
+    { keys: ["snapchat"], label: "Snapchat" },
+  ];
+  return candidates
+    .map((candidate) => ({
+      label: candidate.label,
+      index: Math.min(...candidate.keys.map((key) => source.indexOf(key)).filter((index) => index >= 0)),
+    }))
+    .filter((candidate) => Number.isFinite(candidate.index))
+    .sort((left, right) => left.index - right.index)
+    .map((candidate) => candidate.label);
+}
+
+function appsQuery(appNames) {
+  const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 8) : [];
+  return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
+}
+
+function appLink(action, appNames = []) {
   const scheme = process.env.BLANKED_APP_DEEP_LINK_SCHEME || "blank";
   const type = action && action.type;
   if (type === "start_protection") {
@@ -82,6 +108,7 @@ function appLink(action) {
     const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
     if (start == null || end == null) return "";
     const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
+    if (appNames.length) return `${scheme}://setup-plan?start_minute=${start}&end_minute=${end}&days=${days}${appsQuery(appNames)}`;
     return `${scheme}://apply-plan?start_minute=${start}&end_minute=${end}&days=${days}`;
   }
   if (type === "enable_allow_only") return `${scheme}://allow-only`;
@@ -90,22 +117,23 @@ function appLink(action) {
   if (type === "pause_rules") return `${scheme}://pause-rules?hours=${Number.isFinite(action.hours) ? action.hours : 168}`;
   if (type === "disable_pause") return `${scheme}://resume-rules`;
   if (type === "switch_mode" && action.name) return `${scheme}://mode?name=${encodeURIComponent(action.name)}`;
-  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") return `${scheme}://open-picker`;
+  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") return `${scheme}://open-picker?source=assistant${appsQuery(appNames)}`;
   return "";
 }
 
-function actionableLink(plan) {
+function actionableLink(plan, prompt = "") {
   const actions = Array.isArray(plan.actions) ? plan.actions : [];
+  const appNames = requestedAppNames(prompt);
   for (const action of actions) {
-    const link = appLink(action);
+    const link = appLink(action, appNames);
     if (link) return link;
   }
   return "";
 }
 
-function whatsappReplyText(plan) {
+function whatsappReplyText(plan, prompt = "") {
   const text = cleanText(plan.response_text, 280) || "I can help with that in Blanked.";
-  const link = actionableLink(plan);
+  const link = actionableLink(plan, prompt);
   if (!link) return text;
   return `${text}\n\nOpen Blanked to apply it:\n${link}`;
 }
@@ -220,7 +248,7 @@ async function processMessage(message) {
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
   }
   const plan = await callBlankedAgent(message.text);
-  return sendWhatsAppMessage(message.from, whatsappReplyText(plan));
+  return sendWhatsAppMessage(message.from, whatsappReplyText(plan, message.text));
 }
 
 exports.handler = async (event) => {

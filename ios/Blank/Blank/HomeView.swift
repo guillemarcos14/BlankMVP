@@ -25,6 +25,7 @@ struct HomeView: View {
     @State private var activeSection: HomeSection?
     @State private var showingTimer = false
     @State private var showingAssistantConnect = false
+    @State private var showingContextualAppPicker = false
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
@@ -129,6 +130,9 @@ struct HomeView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+            if sessionStore.hasSelectedApps {
+                sessionStore.clearPendingPlanAppNames()
+            }
         }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
@@ -141,7 +145,11 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
-            openSection(.modes)
+            if sessionStore.pendingPlanAppNames.isEmpty {
+                openSection(.modes)
+            } else {
+                showingContextualAppPicker = true
+            }
             sessionStore.shouldOpenBlockConfiguration = false
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
@@ -165,6 +173,15 @@ struct HomeView: View {
                 openURL: openURL
             )
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showingContextualAppPicker) {
+            ContextualAppPickerSheet(
+                appNames: sessionStore.pendingPlanAppNames,
+                selection: $sessionStore.selection
+            ) {
+                sessionStore.clearPendingPlanAppNames()
+                showingContextualAppPicker = false
+            }
         }
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
@@ -2255,6 +2272,54 @@ private struct AssistantConnectSheet: View {
 private enum AssistantChannel: String {
     case whatsApp
     case sms
+}
+
+private struct ContextualAppPickerSheet: View {
+    let appNames: [String]
+    @Binding var selection: FamilyActivitySelection
+    let onDone: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Vamos a implementar el plan")
+                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
+                    .foregroundStyle(BlankColors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Text("Selecciona \(formattedAppNames) en la lista.")
+                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(BlankColors.mutedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.96))
+
+            Divider()
+
+            FamilyActivityPicker(selection: $selection)
+
+            Button("Done") {
+                onDone()
+            }
+            .buttonStyle(BlankPrimaryButtonStyle())
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .background(Color.white.opacity(0.96))
+        }
+        .background(Color.white)
+    }
+
+    private var formattedAppNames: String {
+        let cleaned = appNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        guard !cleaned.isEmpty else { return "las apps recomendadas" }
+        guard cleaned.count > 1 else { return cleaned[0] }
+        return "\(cleaned.dropLast().joined(separator: ", ")) y \(cleaned.last ?? "")"
+    }
 }
 
 private func formatMinute(_ minuteOfDay: Int) -> String {

@@ -6,31 +6,43 @@ import UserNotifications
 
 private enum OnboardingStep: Int, CaseIterable {
     case awareness
-    case dailyUse
-    case result
+    case lifetime
+    case dopamine
     case name
     case goal
     case age
     case distractingApps
     case profile
+    case dailyUse
+    case result
     case diagnosis
+    case recovery
+    case commitment
+    case personalization
     case trial
     case permission
+    case notifications
     case apps
 
     var analyticsName: String {
         switch self {
         case .awareness: return "awareness"
-        case .dailyUse: return "daily_use"
-        case .result: return "result"
+        case .lifetime: return "lifetime"
+        case .dopamine: return "dopamine"
         case .name: return "name"
         case .goal: return "goal"
         case .age: return "age"
         case .distractingApps: return "distracting_apps"
         case .profile: return "profile"
+        case .dailyUse: return "daily_use"
+        case .result: return "result"
         case .diagnosis: return "diagnosis"
+        case .recovery: return "recovery"
+        case .commitment: return "commitment"
+        case .personalization: return "personalization"
         case .trial: return "trial"
         case .permission: return "screen_time_permission"
+        case .notifications: return "notifications"
         case .apps: return "apps_selection"
         }
     }
@@ -167,7 +179,6 @@ struct SetupView: View {
     @State private var presentedLegalDocument: BlankLegalDocument?
     @State private var recoveryRevealStep = 0
     @State private var personalizationShowsDetail = false
-    @State private var personalizePlanOnTrial = true
 
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var name = ""
     @AppStorage("blankOnboardingAnonymousUserId", store: BlankSharedState.defaults) private var onboardingAnonymousUserId = ""
@@ -274,6 +285,15 @@ struct SetupView: View {
             }
         }
         .onChange(of: currentStep) { step in
+            if step == .lifetime {
+                startLifetimeAnimation()
+            }
+            if step == .recovery {
+                recoveryRevealStep = 0
+            }
+            if step == .commitment {
+                resetCommitmentHold()
+            }
             if step == .trial {
                 Task {
                     await purchaseStore.refreshReferralStatus(for: currentOnboardingAnonymousUserId())
@@ -301,11 +321,17 @@ struct SetupView: View {
     private var content: some View {
         switch currentStep {
         case .awareness:
-            awarenessStep
-        case .dailyUse:
-            dailyUseStep
-        case .result:
-            resultStep
+            simpleStatement(
+                title: "Your phone is taking more of your life than you think",
+                body: "Let's see how much",
+                bodySize: 18,
+                bodyColor: Color.white.opacity(0.68),
+                button: "Continue"
+            )
+        case .lifetime:
+            lifetimeStep
+        case .dopamine:
+            dopamineStep
         case .name:
             nameStep
         case .goal:
@@ -316,26 +342,44 @@ struct SetupView: View {
             distractingAppsStep
         case .profile:
             profileStep
+        case .dailyUse:
+            dailyUseStep
+        case .result:
+            resultStep
         case .diagnosis:
             diagnosisStep
+        case .recovery:
+            recoveryStep
+        case .commitment:
+            commitmentStep
+        case .personalization:
+            personalizationStep
         case .trial:
             trialStep
         case .permission:
             permissionStep
+        case .notifications:
+            notificationsStep
         case .apps:
             appsStep
         }
     }
 
-    private var awarenessStep: some View {
+    private func simpleStatement(
+        title: String,
+        body: String?,
+        bodySize: CGFloat = 44,
+        bodyColor: Color = BlankColors.ink,
+        button: String
+    ) -> some View {
         referenceScene(
             lines: [
                 .text("Your phone is taking"),
                 .text("more of your life"),
                 .text("than you think", icon: "iphone")
             ],
-            body: "The average person loses 13 years to their phone. Let's calculate yours.",
-            primaryTitle: "Continue",
+            body: "Let's calculate it",
+            primaryTitle: button,
             primaryAction: goForward
         )
     }
@@ -427,8 +471,8 @@ struct SetupView: View {
                 .accent("\(animatedLostYears) years", icon: "clock.arrow.circlepath"),
                 .text("over a lifetime")
             ],
-            body: "That's too much time to lose to automatic scrolling",
-            primaryTitle: "See how Blanked helps",
+            body: "That's too much time",
+            primaryTitle: "See how I can recover",
             primaryAction: {
                 onboardingGoal = firstTargetText
                 weakMoment = weakMomentPreview
@@ -485,21 +529,6 @@ struct SetupView: View {
         ) { selectedAgeRange = $0 }
     }
 
-    private var profileStep: some View {
-        choiceStep(
-            title: "When do you usually lose control?",
-            options: [
-                ("moon.stars.fill", "Night scrolling"),
-                ("laptopcomputer", "Work distractions"),
-                ("graduationcap.fill", "Study focus"),
-                ("sparkles", "Boredom loop"),
-                ("person.2.fill", "Social relapse"),
-                ("sun.max.fill", "Morning checking")
-            ],
-            selection: selectedProfile
-        ) { selectedProfile = $0 }
-    }
-
     private var distractingAppsStep: some View {
         VStack(spacing: 22) {
             ReferenceOnboardingText(
@@ -508,7 +537,7 @@ struct SetupView: View {
                     .text("Which apps"),
                     .text("take over most often?", icon: "app.badge.fill")
                 ],
-                body: "Pick the apps you open automatically"
+                body: "Pick all that apply"
             )
 
             VStack(spacing: 11) {
@@ -532,18 +561,32 @@ struct SetupView: View {
             .disabled(selectedDistractingAppNames.isEmpty)
             .opacity(selectedDistractingAppNames.isEmpty ? 0.52 : 1)
         }
-        .frame(maxHeight: .infinity)
+    }
+
+    private var profileStep: some View {
+        choiceStep(
+            title: "When do you usually lose control?",
+            options: [
+                ("moon.stars.fill", "Night scrolling"),
+                ("laptopcomputer", "Work distractions"),
+                ("graduationcap.fill", "Study focus"),
+                ("sparkles", "Boredom loop"),
+                ("person.2.fill", "Social relapse"),
+                ("sun.max.fill", "Morning checking")
+            ],
+            selection: selectedProfile
+        ) { selectedProfile = $0 }
     }
 
     private var diagnosisStep: some View {
         referenceScene(
             lines: [
-                .text("Your first plan"),
-                .text("is ready", icon: "shield.fill"),
-                .text("for \(planTargetText)")
+                .text("Your first win is"),
+                .text("blocking your", icon: diagnosisIconName),
+                .text("weakest hour")
             ],
-            body: "Block your weakest apps before \(weakMomentPreview)",
-            primaryTitle: "Continue",
+            body: "You can recover\n\(recoveredWeeklyHoursNumberText) hours a week\n\(recoveredYearlyDaysText) days a year",
+            primaryTitle: "Build my plan",
             primaryAction: {
                 onboardingGoal = firstTargetText
                 weakMoment = weakMomentPreview
@@ -635,29 +678,18 @@ struct SetupView: View {
                 eyebrow: nil,
                 lines: [
                     .text("Don't lose \(lostLifetimeYears) years"),
-                    .text("to your phone", icon: "hourglass")
+                    .text("Start with Blanked")
                 ],
                 body: nil
             )
 
-            Text("Start with Blanked today. Pro makes your plan adaptive, stricter and proactive.")
+            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again")
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
                 .foregroundStyle(Color.white.opacity(0.50))
                 .multilineTextAlignment(.leading)
                 .lineSpacing(3)
                 .frame(maxWidth: 318, alignment: .leading)
                 .padding(.top, 15)
-
-            VStack(alignment: .leading, spacing: 7) {
-                paywallFeature("AI Focus Plans")
-                paywallFeature("Locked routines")
-                paywallFeature("Early Risk Prediction")
-                paywallFeature("Digital Wellness Report")
-                paywallFeature("Health insights")
-                paywallFeature("WhatsApp/SMS nudges")
-            }
-            .frame(maxWidth: 318, alignment: .leading)
-            .padding(.top, 17)
 
             VStack(spacing: 9) {
                 PlanButton(
@@ -683,25 +715,7 @@ struct SetupView: View {
                 referralTrialCard
             }
             .frame(maxWidth: 318)
-            .padding(.top, 20)
-
-            Toggle(isOn: $personalizePlanOnTrial) {
-                Text("Personalize my plan")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.86))
-            }
-            .toggleStyle(.switch)
-            .tint(Color.white.opacity(0.72))
-            .frame(maxWidth: 318)
-            .padding(.top, 14)
-
-            Text("Use my onboarding answers to improve recommendations. We do not share the exact app list or Screen Time data.")
-                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption2))
-                .foregroundStyle(Color.white.opacity(0.42))
-                .multilineTextAlignment(.leading)
-                .lineSpacing(2)
-                .frame(maxWidth: 318, alignment: .leading)
-                .padding(.top, 5)
+            .padding(.top, 25)
 
             Button {
                 purchaseSelectedPlan()
@@ -955,20 +969,6 @@ struct SetupView: View {
         return "3 days free · Then \(price)/\(period) · Cancel anytime in App Store settings"
     }
 
-    private func paywallFeature(_ title: String) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.82))
-                .frame(width: 18, height: 18)
-                .background(Circle().fill(Color.white.opacity(0.12)))
-
-            Text(title)
-                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(Color.white.opacity(0.72))
-        }
-    }
-
     private var referralTrialCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
@@ -1082,7 +1082,7 @@ struct SetupView: View {
         switch currentStep {
         case .trial:
             return false
-        case .awareness, .name, .dailyUse, .result, .diagnosis, .goal, .age, .distractingApps, .profile, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .distractingApps, .profile, .commitment, .personalization, .notifications, .permission, .apps:
             return true
         }
     }
@@ -1093,41 +1093,27 @@ struct SetupView: View {
             ("music.note", "TikTok"),
             ("play.rectangle.fill", "YouTube"),
             ("xmark", "X"),
-            ("text.bubble.fill", "Reddit"),
+            ("bubble.left.and.bubble.right.fill", "Reddit"),
             ("safari.fill", "Safari"),
-            ("ellipsis", "Other")
+            ("ellipsis.circle.fill", "Other")
         ]
     }
 
     private var selectedDistractingAppNames: [String] {
         selectedDistractingApps
             .split(separator: "|")
-            .map { String($0) }
+            .map(String.init)
             .filter { !$0.isEmpty }
-    }
-
-    private var planTargetText: String {
-        let apps = selectedDistractingAppNames.prefix(2)
-        guard !apps.isEmpty else { return onboardingNameText }
-        return apps.joined(separator: " + ")
-    }
-
-    private var enrichedProfileText: String {
-        let profile = selectedProfile.isEmpty ? "Not selected" : selectedProfile
-        let apps = selectedDistractingAppNames.prefix(3).joined(separator: "/")
-        guard !apps.isEmpty else { return profile }
-        return "\(profile) · \(apps)"
     }
 
     private func toggleDistractingApp(_ app: String) {
         var apps = selectedDistractingAppNames
-        if apps.contains(app) {
-            apps.removeAll { $0 == app }
+        if let index = apps.firstIndex(of: app) {
+            apps.remove(at: index)
         } else {
             apps.append(app)
         }
         selectedDistractingApps = apps.joined(separator: "|")
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private var diagnosisIconName: String {
@@ -1445,7 +1431,6 @@ struct SetupView: View {
             )
             if await purchaseStore.purchase(productId: productId) {
                 trialStarted = true
-                recordOnboardingPersonalizationIfAllowed()
                 await BlankFunnelAnalytics.track(
                     "trial_started",
                     step: currentStep.analyticsName,
@@ -1471,7 +1456,7 @@ struct SetupView: View {
             name: onboardingNameText,
             age_range: selectedAgeRange,
             goal: selectedOnboardingGoal,
-            profile: enrichedProfileText,
+            profile: selectedProfile,
             daily_hours: storedDailyHours,
             ai_goal: firstTargetText,
             weak_moment: weakMomentPreview,
@@ -1521,48 +1506,6 @@ struct SetupView: View {
         }
 
         submitOnboardingPersonalization()
-    }
-
-    private func recordOnboardingPersonalizationIfAllowed() {
-        guard personalizePlanOnTrial else {
-            wellnessFeatureConsent = false
-            return
-        }
-
-        wellnessFeatureConsent = true
-        let payload = OnboardingResponsePayload(
-            anonymous_user_id: currentOnboardingAnonymousUserId(),
-            name: onboardingNameText,
-            age_range: selectedAgeRange,
-            goal: selectedOnboardingGoal,
-            profile: enrichedProfileText,
-            daily_hours: storedDailyHours,
-            ai_goal: firstTargetText,
-            weak_moment: weakMomentPreview,
-            selected_plan: selectedPlan.rawValue,
-            locale: Locale.current.identifier,
-            app_version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
-            build_number: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
-            data_consent: true,
-            consent_text: "Personalize my plan"
-        )
-
-        Task {
-            do {
-                try await OnboardingResponsesClient().submit(payload)
-                await BlankFunnelAnalytics.track(
-                    "onboarding_personalization_submitted",
-                    step: currentStep.analyticsName,
-                    properties: onboardingAnalyticsProperties
-                )
-            } catch {
-                await BlankFunnelAnalytics.track(
-                    "onboarding_personalization_failed",
-                    step: currentStep.analyticsName,
-                    properties: ["error": error.localizedDescription]
-                )
-            }
-        }
     }
 
     private func currentOnboardingAnonymousUserId() -> String {
@@ -1698,7 +1641,7 @@ struct SetupView: View {
                 step: currentStep.analyticsName,
                 properties: ["status": screenTimeBlocker.authorizationStatusLabel, "granted": true, "source": "refresh"]
             )
-            currentStep = .apps
+            currentStep = .notifications
             message = nil
         }
     }
@@ -1734,7 +1677,6 @@ struct SetupView: View {
 
     private func continueFree() {
         trialStarted = false
-        recordOnboardingPersonalizationIfAllowed()
         Task {
             await BlankFunnelAnalytics.track(
                 "free_plan_selected",
@@ -1763,7 +1705,6 @@ struct SetupView: View {
         [
             "selection_count": sessionStore.selectionCount,
             "has_selected_apps": sessionStore.hasSelectedApps,
-            "declared_distracting_apps": selectedDistractingAppNames.joined(separator: "|"),
             "screen_time_status": screenTimeBlocker.authorizationStatusLabel
         ]
     }
@@ -1791,6 +1732,12 @@ struct SetupView: View {
 
     private func goBack() {
         guard let previous = OnboardingStep(rawValue: max(currentStep.rawValue - 1, 0)) else { return }
+        if currentStep == .commitment {
+            resetCommitmentHold()
+        }
+        if currentStep == .personalization || previous == .personalization {
+            personalizationShowsDetail = false
+        }
         withAnimation(.easeInOut(duration: 0.38)) {
             currentStep = previous
         }

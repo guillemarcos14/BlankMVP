@@ -73,14 +73,29 @@ struct ReportView: View {
             reportHeader()
 
             if purchaseStore.hasPremiumAccess {
-                controlDashboardCapsule(
+                proControlTodayCapsule(
                     forecast: controlForecast,
                     savedTime: savedTime,
                     totalFocusTime: totalFocusTime,
                     context: healthContext
                 )
 
-                milestoneHeroCapsule(weekly: weekly, progress: progress)
+                proWeekCapsule(
+                    activityDays: progress.recentActivity,
+                    weekly: weekly,
+                    progress: progress,
+                    savedTime: savedTime,
+                    emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
+                )
+
+                proPatternsCapsule(
+                    forecast: controlForecast,
+                    healthContext: healthContext,
+                    healthInsights: healthInsights,
+                    progress: progress
+                )
+
+                proAIPlanCapsule(system: v3System)
 
                 if hasProgress {
                     statsDetailedReportCapsule(
@@ -190,7 +205,7 @@ struct ReportView: View {
     private func reportHeader() -> some View {
         TopSheetHeader(
             title: "Stats",
-            subtitle: "Today first.\nThen progress and signals.",
+            subtitle: "Your control radar.",
             titleColor: reportPrimary,
             subtitleColor: reportSecondary
         )
@@ -260,6 +275,148 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(usesMainBackground ? 14 : 20)
         .liquidGlass(cornerRadius: usesMainBackground ? 24 : 28)
+    }
+
+    private func proControlTodayCapsule(
+        forecast: ControlForecast,
+        savedTime: TimeInterval,
+        totalFocusTime: TimeInterval,
+        context: HealthRecoveryContext
+    ) -> some View {
+        VStack(alignment: .leading, spacing: usesMainBackground ? 14 : 18) {
+            HStack(alignment: .center, spacing: usesMainBackground ? 12 : 16) {
+                controlRiskRing(forecast: forecast)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Control today")
+                        .font(.blankInter(size: usesMainBackground ? 24 : 30, weight: .semibold, relativeTo: .title))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                    Text(forecast.riskLabel)
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(forecastColor(forecast.level))
+                        .lineLimit(1)
+
+                    Text(forecast.windowText)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            controlTimeline(forecast: forecast)
+
+            HStack(spacing: 8) {
+                proSignalPill(title: "Recovered", value: formatDuration(savedTime), symbol: "arrow.counterclockwise", tint: recoveryGreen)
+                proSignalPill(title: "Blanked", value: formatDuration(totalFocusTime), symbol: "shield.fill", tint: accentBlue)
+                proSignalPill(title: "Recovery", value: recoveryValue(context.recoveryScore), symbol: "heart.fill", tint: recoveryGreen)
+            }
+
+            todayPrimaryAction(forecast: forecast)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(usesMainBackground ? 15 : 18)
+        .liquidGlass(cornerRadius: usesMainBackground ? 24 : 28)
+    }
+
+    private func controlTimeline(forecast: ControlForecast) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Now")
+                Spacer()
+                Text("Weak window")
+                Spacer()
+                Text("Tonight")
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(reportSecondary.opacity(0.82))
+
+            HStack(spacing: 3) {
+                ForEach(0..<24, id: \.self) { hour in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(timelineColor(hour: hour, forecast: forecast))
+                        .frame(height: hour == forecast.weakHour ? 18 : 10)
+                }
+            }
+            .frame(height: 22)
+            .accessibilityLabel("Weak window \(forecast.windowText)")
+        }
+    }
+
+    private func timelineColor(hour: Int, forecast: ControlForecast) -> Color {
+        let currentHour = Calendar.current.component(.hour, from: Date())
+        if hour == forecast.weakHour {
+            return forecastColor(forecast.level)
+        }
+        if hour == currentHour {
+            return reportPrimary.opacity(0.42)
+        }
+        return reportPrimary.opacity(0.10)
+    }
+
+    private func todayPrimaryAction(forecast: ControlForecast) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(forecast.actionText)
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary.opacity(0.90))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if sessionStore.isBlankActive {
+                Text("Blanked is active")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background { Capsule().fill(Color.white.opacity(0.16)) }
+            } else {
+                Button {
+                    startBlank(durationMinutes: forecast.durationMinutes)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "shield.fill")
+                        Text("Start \(forecast.durationMinutes) min block")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(reportPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background { Capsule().fill(forecastColor(forecast.level).opacity(0.26)) }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(forecastColor(forecast.level).opacity(0.10))
+        }
+    }
+
+    private func proSignalPill(title: String, value: String, symbol: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 74, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tint.opacity(0.09))
+        }
     }
 
     private func controlRiskRing(forecast: ControlForecast) -> some View {
@@ -577,6 +734,283 @@ struct ReportView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private func proWeekCapsule(
+        activityDays: [BlankActivityDay],
+        weekly: BlankWeeklyReport,
+        progress: BlankProgressReport,
+        savedTime: TimeInterval,
+        emergencyUnlocksRemaining: Int
+    ) -> some View {
+        let days = Array(activityDays.suffix(7))
+        let maxValue = max(days.map(\.totalFocusTime).max() ?? 0, 30 * 60)
+
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("This week")
+                    .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
+                Spacer()
+                Text("\(weekly.completedSessionCount)/5 rhythm")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accentBlue)
+            }
+
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(days) { day in
+                    weekBar(day: day, maxValue: maxValue)
+                }
+            }
+            .frame(height: 112)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                proMetricTile(title: "Streak", value: "\(progress.currentStreakDays)d", symbol: "flame.fill", tint: recoveryGreen)
+                proMetricTile(title: "Recovered", value: formatDuration(savedTime), symbol: "arrow.counterclockwise", tint: recoveryGreen)
+                proMetricTile(title: "Average", value: formatDuration(weekly.averageSessionDuration), symbol: "timer", tint: accentBlue)
+                proMetricTile(title: "Rescues", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", symbol: "exclamationmark.shield.fill", tint: activityOrange)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func proPatternsCapsule(
+        forecast: ControlForecast,
+        healthContext: HealthRecoveryContext,
+        healthInsights: [String],
+        progress: BlankProgressReport
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Patterns")
+                    .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
+                Spacer()
+                Text(weakBandTitle(forecast.weakHour))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(forecastColor(forecast.level))
+            }
+
+            patternHeatmap(forecast: forecast)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                proMetricTile(title: "Best day", value: bestDayText(report: progress.weeklyReport), symbol: "calendar", tint: accentBlue)
+                proMetricTile(title: "Weak window", value: compactWindowText(forecast.windowText), symbol: "waveform.path.ecg", tint: forecastColor(forecast.level))
+                proMetricTile(title: "Sleep", value: sleepValue(healthContext.averageSleepMinutes), symbol: "moon.fill", tint: sleepBlue)
+                proMetricTile(title: "Activity", value: stepsValue(healthContext.averageSteps), symbol: "figure.walk", tint: activityOrange)
+            }
+
+            if let insight = healthInsights.first {
+                Text(insight)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func patternHeatmap(forecast: ControlForecast) -> some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let days = (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset - 6, to: today)
+        }
+
+        return VStack(spacing: 8) {
+            ForEach(0..<4, id: \.self) { band in
+                HStack(spacing: 7) {
+                    Text(heatmapBandTitle(band))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(width: 28, alignment: .leading)
+
+                    ForEach(days, id: \.self) { day in
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(heatmapColor(day: day, band: band, forecast: forecast))
+                            .frame(height: 26)
+                    }
+                }
+            }
+
+            HStack(spacing: 7) {
+                Color.clear.frame(width: 28, height: 1)
+                ForEach(days, id: \.self) { day in
+                    Text(shortWeekdayName(for: day))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(reportSecondary.opacity(0.86))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private func heatmapColor(day: Date, band: Int, forecast: ControlForecast) -> Color {
+        let count = sessionStore.sessions.filter { session in
+            guard Calendar.current.isDate(session.startedAt, inSameDayAs: day) else { return false }
+            let hour = session.localStartHour ?? Calendar.current.component(.hour, from: session.startedAt)
+            return heatmapBand(for: hour) == band
+        }.count
+        let weakBand = heatmapBand(for: forecast.weakHour)
+
+        if band == weakBand && count == 0 {
+            return forecastColor(forecast.level).opacity(0.18)
+        }
+        if count >= 2 {
+            return accentBlue.opacity(0.88)
+        }
+        if count == 1 {
+            return accentBlue.opacity(0.46)
+        }
+        return reportPrimary.opacity(0.08)
+    }
+
+    private func heatmapBand(for hour: Int) -> Int {
+        if hour < 6 { return 0 }
+        if hour < 12 { return 1 }
+        if hour < 18 { return 2 }
+        return 3
+    }
+
+    private func heatmapBandTitle(_ band: Int) -> String {
+        switch band {
+        case 0: return "N"
+        case 1: return "AM"
+        case 2: return "PM"
+        default: return "E"
+        }
+    }
+
+    private func weakBandTitle(_ hour: Int) -> String {
+        switch heatmapBand(for: hour) {
+        case 0: return "Night"
+        case 1: return "Morning"
+        case 2: return "Afternoon"
+        default: return "Evening"
+        }
+    }
+
+    private func compactWindowText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: ":00", with: "")
+            .replacingOccurrences(of: " to ", with: "-")
+    }
+
+    private func proAIPlanCapsule(system: DigitalWellnessV3System) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("AI plan")
+                    .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
+                Spacer()
+                Text("\(system.profile.adherenceScore)/100")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accentBlue)
+            }
+
+            HStack(spacing: 10) {
+                proSignalPill(title: "Duration", value: "\(system.plan.recommendedDurationMinutes)m", symbol: "timer", tint: accentBlue)
+                proSignalPill(title: "Risk", value: "\(system.forecast.riskScore)/100", symbol: "waveform.path.ecg", tint: activityOrange)
+                proSignalPill(title: "Window", value: compactWindowText(system.forecast.riskWindow), symbol: "clock.fill", tint: sleepBlue)
+            }
+
+            Text(system.forecast.recommendedAction)
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(reportPrimary.opacity(0.90))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button {
+                    sessionStore.applyAIPlan(durationMinutes: system.plan.recommendedDurationMinutes)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_visual_ai_plan"]
+                        )
+                    }
+                } label: {
+                    Text("Apply")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(accentBlue.opacity(0.24)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    let easierDuration = max(15, system.plan.recommendedDurationMinutes - 15)
+                    sessionStore.applyAIPlan(durationMinutes: easierDuration)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_visual_easier", "duration_minutes": easierDuration]
+                        )
+                    }
+                } label: {
+                    Text("Easier")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(Color.white.opacity(0.12)) }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    let harderDuration = min(120, system.plan.recommendedDurationMinutes + 15)
+                    sessionStore.applyAIPlan(durationMinutes: harderDuration)
+                    Task {
+                        await BlankFunnelAnalytics.track(
+                            "ai_plan_applied",
+                            properties: ["source": "report_visual_harder", "duration_minutes": harderDuration]
+                        )
+                    }
+                } label: {
+                    Text("Harder")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(Color.white.opacity(0.12)) }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 28)
+    }
+
+    private func proMetricTile(title: String, value: String, symbol: String, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(value)
+                    .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                    .foregroundStyle(reportPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(tint.opacity(0.08))
+        }
+    }
+
     private func statsDetailsCapsule(
         summary: DailyAISummary,
         report: WeeklyAIReport,
@@ -676,10 +1110,10 @@ struct ReportView: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("Signals", systemImage: "chart.bar.doc.horizontal")
+                Label("More", systemImage: "ellipsis.circle")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("AI / Health / History")
+                Text("AI / Health / Details")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }
@@ -2406,6 +2840,7 @@ struct ReportView: View {
             riskLabel: riskLabel,
             headline: headline,
             windowText: DigitalWellnessAI.hourRangeText(weakHour),
+            weakHour: weakHour,
             actionText: actionText,
             durationMinutes: duration,
             reasons: Array(reasons.prefix(3)),
@@ -3245,6 +3680,7 @@ private struct ControlForecast {
     let riskLabel: String
     let headline: String
     let windowText: String
+    let weakHour: Int
     let actionText: String
     let durationMinutes: Int
     let reasons: [String]

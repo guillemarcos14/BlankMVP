@@ -528,30 +528,6 @@ struct HomeView: View {
                 }
             }
 
-            #if targetEnvironment(simulator)
-            HStack(spacing: 18) {
-                Button("Onboarding") {
-                    withAnimation(.easeInOut(duration: 0.45)) {
-                        _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
-                        sessionStore.setupComplete = false
-                    }
-                    screenTimeBlocker.clear()
-                    message = nil
-                    messageAction = nil
-                    onOpenOnboardingDemo()
-                }
-
-                Button("Pro") {
-                    purchaseStore.enableDemoProAccess()
-                    message = "Demo Pro enabled."
-                    messageAction = nil
-                }
-            }
-            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.64) : BlankColors.mutedInk)
-            .padding(.top, 8)
-            .buttonStyle(.plain)
-            #endif
         }
     }
 
@@ -626,11 +602,21 @@ struct HomeView: View {
 
     private func bottomShortcutBar(width: CGFloat) -> some View {
         HStack {
+            #if targetEnvironment(simulator)
+            footerShortcut(title: "Onboarding", icon: "rectangle.on.rectangle") {
+                openOnboardingDemo()
+            }
+
+            footerShortcut(title: "Pro", icon: "sparkles") {
+                enableDemoPro()
+            }
+            #endif
+
             footerShortcut(title: "Assistant", icon: "message") {
                 showingAssistantConnect = true
             }
         }
-        .frame(width: min(width, 150), height: 44)
+        .frame(width: min(width, isSimulatorBuild ? 318 : 150), height: 44)
     }
 
     private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -658,6 +644,31 @@ struct HomeView: View {
         )
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         sessionStore.refreshDailyLimitMonitoring()
+    }
+
+    private var isSimulatorBuild: Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    private func openOnboardingDemo() {
+        withAnimation(.easeInOut(duration: 0.45)) {
+            _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+            sessionStore.setupComplete = false
+        }
+        screenTimeBlocker.clear()
+        message = nil
+        messageAction = nil
+        onOpenOnboardingDemo()
+    }
+
+    private func enableDemoPro() {
+        purchaseStore.enableDemoProAccess()
+        message = "Demo Pro enabled."
+        messageAction = nil
     }
 
     private func performEmergencyUnlock() -> Bool {

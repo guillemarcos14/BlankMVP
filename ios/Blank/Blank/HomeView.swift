@@ -528,23 +528,29 @@ struct HomeView: View {
                 }
             }
 
-            #if DEBUG
             #if targetEnvironment(simulator)
-            Button("Onboarding") {
-                withAnimation(.easeInOut(duration: 0.45)) {
-                    _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
-                    sessionStore.setupComplete = false
+            HStack(spacing: 18) {
+                Button("Onboarding") {
+                    withAnimation(.easeInOut(duration: 0.45)) {
+                        _ = sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
+                        sessionStore.setupComplete = false
+                    }
+                    screenTimeBlocker.clear()
+                    message = nil
+                    messageAction = nil
+                    onOpenOnboardingDemo()
                 }
-                screenTimeBlocker.clear()
-                message = nil
-                messageAction = nil
-                onOpenOnboardingDemo()
+
+                Button("Pro") {
+                    purchaseStore.enableDemoProAccess()
+                    message = "Demo Pro enabled."
+                    messageAction = nil
+                }
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
             .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.64) : BlankColors.mutedInk)
             .padding(.top, 8)
             .buttonStyle(.plain)
-            #endif
             #endif
         }
     }

@@ -29,10 +29,10 @@ struct ReportView: View {
 
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
-    private var accentBlue: Color { Color(red: 0.25, green: 0.55, blue: 0.95) }
-    private var recoveryGreen: Color { Color(red: 0.18, green: 0.78, blue: 0.38) }
-    private var sleepBlue: Color { Color(red: 0.18, green: 0.48, blue: 0.95) }
-    private var activityOrange: Color { Color(red: 0.92, green: 0.50, blue: 0.16) }
+    private var accentBlue: Color { BlankColors.premiumBlue }
+    private var recoveryGreen: Color { Color(red: 0.18, green: 0.62, blue: 0.34) }
+    private var sleepBlue: Color { Color(red: 0.24, green: 0.42, blue: 0.78) }
+    private var activityOrange: Color { Color(red: 0.72, green: 0.42, blue: 0.18) }
 
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
@@ -205,7 +205,7 @@ struct ReportView: View {
     private func reportHeader() -> some View {
         TopSheetHeader(
             title: "Stats",
-            subtitle: "Your control radar.",
+            subtitle: "Today, week, patterns.",
             titleColor: reportPrimary,
             subtitleColor: reportSecondary
         )
@@ -243,7 +243,7 @@ struct ReportView: View {
                 controlRiskRing(forecast: forecast)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("Control today", systemImage: "sparkle.magnifyingglass")
+                    Label("Today", systemImage: "sparkle.magnifyingglass")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportSecondary)
                         .lineLimit(1)
@@ -288,13 +288,13 @@ struct ReportView: View {
                 controlRiskRing(forecast: forecast)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Control today")
+                    Text("Today")
                         .font(.blankInter(size: usesMainBackground ? 24 : 30, weight: .semibold, relativeTo: .title))
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
 
                     Text(forecast.riskLabel)
-                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                        .font(.blankInter(size: 16, weight: .semibold, relativeTo: .subheadline))
                         .foregroundStyle(forecastColor(forecast.level))
                         .lineLimit(1)
 
@@ -310,8 +310,8 @@ struct ReportView: View {
             controlTimeline(forecast: forecast)
 
             HStack(spacing: 8) {
-                proSignalPill(title: "Recovered", value: formatDuration(savedTime), symbol: "arrow.counterclockwise", tint: recoveryGreen)
-                proSignalPill(title: "Blanked", value: formatDuration(totalFocusTime), symbol: "shield.fill", tint: accentBlue)
+                proSignalPill(title: "Recovered", value: formatDuration(savedTime), symbol: "arrow.counterclockwise", tint: reportPrimary)
+                proSignalPill(title: "Protected", value: formatDuration(totalFocusTime), symbol: "shield.fill", tint: accentBlue)
                 proSignalPill(title: "Recovery", value: recoveryValue(context.recoveryScore), symbol: "heart.fill", tint: recoveryGreen)
             }
 
@@ -319,7 +319,7 @@ struct ReportView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(usesMainBackground ? 15 : 18)
-        .liquidGlass(cornerRadius: usesMainBackground ? 24 : 28)
+        .liquidGlass(cornerRadius: usesMainBackground ? 22 : 24)
     }
 
     private func controlTimeline(forecast: ControlForecast) -> some View {
@@ -383,7 +383,7 @@ struct ReportView: View {
                     .foregroundStyle(reportPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background { Capsule().fill(forecastColor(forecast.level).opacity(0.26)) }
+                    .background { Capsule().fill(forecastColor(forecast.level).opacity(0.20)) }
                 }
                 .buttonStyle(.plain)
             }
@@ -391,7 +391,7 @@ struct ReportView: View {
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(forecastColor(forecast.level).opacity(0.10))
+                .fill(forecastColor(forecast.level).opacity(0.07))
         }
     }
 
@@ -399,7 +399,7 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: symbol)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(tint)
+                .foregroundStyle(tint.opacity(0.86))
             Text(value)
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(reportPrimary)
@@ -415,7 +415,7 @@ struct ReportView: View {
         .padding(.vertical, 10)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(tint.opacity(0.09))
+                .fill(tint.opacity(0.055))
         }
     }
 
@@ -749,7 +749,7 @@ struct ReportView: View {
                 Text("This week")
                     .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
                 Spacer()
-                Text("\(weekly.completedSessionCount)/5 rhythm")
+                Text("\(weekly.completedSessionCount)/5 days")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(accentBlue)
             }
@@ -764,13 +764,13 @@ struct ReportView: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                 proMetricTile(title: "Streak", value: "\(progress.currentStreakDays)d", symbol: "flame.fill", tint: recoveryGreen)
                 proMetricTile(title: "Recovered", value: formatDuration(savedTime), symbol: "arrow.counterclockwise", tint: recoveryGreen)
-                proMetricTile(title: "Average", value: formatDuration(weekly.averageSessionDuration), symbol: "timer", tint: accentBlue)
-                proMetricTile(title: "Rescues", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", symbol: "exclamationmark.shield.fill", tint: activityOrange)
+                proMetricTile(title: "Average", value: formatDuration(weekly.averageSessionDuration), symbol: "timer", tint: reportPrimary)
+                proMetricTile(title: "Emergency", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", symbol: "exclamationmark.shield.fill", tint: activityOrange)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
-        .liquidGlass(cornerRadius: 28)
+        .liquidGlass(cornerRadius: 24)
     }
 
     private func proPatternsCapsule(
@@ -792,7 +792,7 @@ struct ReportView: View {
             patternHeatmap(forecast: forecast)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                proMetricTile(title: "Best day", value: bestDayText(report: progress.weeklyReport), symbol: "calendar", tint: accentBlue)
+                proMetricTile(title: "Best day", value: bestDayText(report: progress.weeklyReport), symbol: "calendar", tint: reportPrimary)
                 proMetricTile(title: "Weak window", value: compactWindowText(forecast.windowText), symbol: "waveform.path.ecg", tint: forecastColor(forecast.level))
                 proMetricTile(title: "Sleep", value: sleepValue(healthContext.averageSleepMinutes), symbol: "moon.fill", tint: sleepBlue)
                 proMetricTile(title: "Activity", value: stepsValue(healthContext.averageSteps), symbol: "figure.walk", tint: activityOrange)
@@ -807,7 +807,7 @@ struct ReportView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
-        .liquidGlass(cornerRadius: 28)
+        .liquidGlass(cornerRadius: 24)
     }
 
     private func patternHeatmap(forecast: ControlForecast) -> some View {
@@ -899,7 +899,7 @@ struct ReportView: View {
     private func proAIPlanCapsule(system: DigitalWellnessV3System) -> some View {
         VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .firstTextBaseline) {
-                Text("AI plan")
+                Text("Protection plan")
                     .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
                 Spacer()
                 Text("\(system.profile.adherenceScore)/100")
@@ -908,7 +908,7 @@ struct ReportView: View {
             }
 
             HStack(spacing: 10) {
-                proSignalPill(title: "Duration", value: "\(system.plan.recommendedDurationMinutes)m", symbol: "timer", tint: accentBlue)
+                proSignalPill(title: "Duration", value: "\(system.plan.recommendedDurationMinutes)m", symbol: "timer", tint: reportPrimary)
                 proSignalPill(title: "Risk", value: "\(system.forecast.riskScore)/100", symbol: "waveform.path.ecg", tint: activityOrange)
                 proSignalPill(title: "Window", value: compactWindowText(system.forecast.riskWindow), symbol: "clock.fill", tint: sleepBlue)
             }
@@ -978,7 +978,7 @@ struct ReportView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
-        .liquidGlass(cornerRadius: 28)
+        .liquidGlass(cornerRadius: 24)
     }
 
     private func proMetricTile(title: String, value: String, symbol: String, tint: Color) -> some View {
@@ -1049,13 +1049,13 @@ struct ReportView: View {
                 Label("Details", systemImage: "slider.horizontal.3")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("Signals and plan")
+                Text("AI / Health")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }
         }
         .padding(17)
-        .liquidGlass(cornerRadius: 28)
+        .liquidGlass(cornerRadius: 24)
     }
 
     private func statsDetailedReportCapsule(
@@ -1958,7 +1958,7 @@ struct ReportView: View {
             subtleDivider()
             metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
             subtleDivider()
-            metricRow(title: "Rescues used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+            metricRow(title: "Emergency used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
 
             if !progress.modeActivity.isEmpty {
                 subtleDivider()
@@ -2032,7 +2032,7 @@ struct ReportView: View {
                 subtleDivider()
                 metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
                 subtleDivider()
-                metricRow(title: "Rescues used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
+                metricRow(title: "Emergency used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
 
                 if !progress.modeActivity.isEmpty {
                     subtleDivider()
@@ -3716,18 +3716,18 @@ private extension View {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.18))
+                        .fill(Color.white.opacity(0.12))
                     BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
                         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .opacity(0.58)
+                        .opacity(0.34)
                 }
                 .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 0.8)
+                    .stroke(Color.white.opacity(0.20), lineWidth: 0.7)
             }
-            .shadow(color: BlankColors.ink.opacity(0.038), radius: 18, x: 0, y: 10)
+            .shadow(color: BlankColors.ink.opacity(0.026), radius: 14, x: 0, y: 8)
     }
 }
 

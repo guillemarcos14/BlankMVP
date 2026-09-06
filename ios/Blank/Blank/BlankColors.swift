@@ -17,6 +17,9 @@ enum BlankColors {
     static let airMist = Color(red: 0.784, green: 0.814, blue: 0.846)
     static let airStone = Color(red: 0.769, green: 0.765, blue: 0.757)
     static let glassTint = Color(red: 0.722, green: 0.725, blue: 0.733)
+    static let premiumBlue = Color(red: 0.20, green: 0.47, blue: 0.92)
+    static let controlSurface = Color.white.opacity(0.16)
+    static let activeControlSurface = Color.white.opacity(0.09)
     static let glassBorder = LinearGradient(
         colors: [
             Color.white.opacity(0.48),
@@ -164,6 +167,23 @@ private struct BlankGlassCardModifier: ViewModifier {
 extension View {
     func blankGlassCard(cornerRadius: CGFloat = 22, tintOpacity: Double = 0.34) -> some View {
         modifier(BlankGlassCardModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity))
+    }
+
+    func blankControlSurface(cornerRadius: CGFloat = 18, tintOpacity: Double = 0.12, emphasized: Bool = false) -> some View {
+        self
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(tintOpacity))
+                    }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(emphasized ? 0.34 : 0.18), lineWidth: 0.8)
+            }
+            .shadow(color: BlankColors.ink.opacity(emphasized ? 0.05 : 0.025), radius: emphasized ? 18 : 10, x: 0, y: emphasized ? 10 : 5)
     }
 }
 

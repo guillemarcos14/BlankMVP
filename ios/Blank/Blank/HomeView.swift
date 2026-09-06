@@ -1174,7 +1174,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Plan",
-                subtitle: "Your block control center.",
+                subtitle: "Protection, routines, safeguards.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1261,7 +1261,7 @@ private struct ModesList: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Active plan")
+                    Text("Current protection")
                         .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
                     Text(sessionStore.currentMode.name)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -1273,7 +1273,7 @@ private struct ModesList: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.caption.weight(.semibold))
-                    Text("AI managed")
+                    Text("Automatic")
                         .font(.caption.weight(.semibold))
                 }
                 .foregroundStyle(textColor)
@@ -1290,7 +1290,7 @@ private struct ModesList: View {
         }
         .foregroundStyle(textColor)
         .padding(18)
-        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
+        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.14, emphasized: true)
     }
 
     private var protectedAppsCapsule: some View {
@@ -1331,7 +1331,7 @@ private struct ModesList: View {
             }
             .foregroundStyle(textColor)
             .padding(18)
-            .blankGlassCard(cornerRadius: 20, tintOpacity: 0.26)
+            .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
         }
         .buttonStyle(.plain)
     }
@@ -1422,7 +1422,7 @@ private struct ModesList: View {
         }
         .foregroundStyle(textColor)
         .padding(18)
-        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.24)
+        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
     }
 
     private var routineTimeline: some View {
@@ -1447,7 +1447,7 @@ private struct ModesList: View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Manual fallback")
+                    Text("Manual plans")
                         .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                         .foregroundStyle(secondaryColor)
                         .textCase(.uppercase)
@@ -1477,17 +1477,17 @@ private struct ModesList: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("More controls", systemImage: "ellipsis.circle")
+                Label("Safeguards", systemImage: "ellipsis.circle")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("Manual")
+                Text("Advanced")
                     .font(.caption)
                     .foregroundStyle(secondaryColor)
             }
         }
         .foregroundStyle(textColor)
         .padding(18)
-        .blankGlassCard(cornerRadius: 20, tintOpacity: 0.20)
+        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.08)
     }
 
     private var enabledWindows: [BlankHabitWindow] {
@@ -2303,6 +2303,14 @@ private struct EmergencyScreen: View {
             Spacer(minLength: 0)
 
             VStack(spacing: 10) {
+                Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(textColor)
+                    .frame(width: 52, height: 52)
+                    .background {
+                        Circle().fill(textColor.opacity(0.08))
+                    }
+
                 Text(isConfirming ? "Spend emergency?" : "Emergency")
                     .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
                     .foregroundStyle(textColor)
@@ -2379,7 +2387,9 @@ private struct EmergencyScreen: View {
                 }
             }
         }
+        .padding(16)
         .frame(maxWidth: 260)
+        .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
     }
 }
 
@@ -2505,7 +2515,7 @@ private struct TimerScreen: View {
 
             TopSheetHeader(
                 title: "Timer",
-                subtitle: "One-off block launcher.",
+                subtitle: "Choose a focused block.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -2556,7 +2566,7 @@ private struct TimerScreen: View {
                 .foregroundStyle(textColor)
                 .padding(.horizontal, 16)
                 .frame(height: 58)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: hardMode ? 0.32 : 0.18)
+                .blankControlSurface(cornerRadius: 18, tintOpacity: hardMode ? 0.16 : 0.08)
 
                 Button {
                     if !sessionStore.isBlankActive {
@@ -2573,7 +2583,7 @@ private struct TimerScreen: View {
                 .opacity(sessionStore.isBlankActive ? 0.62 : 1)
             }
             .padding(18)
-            .blankGlassCard(cornerRadius: 24, tintOpacity: 0.24)
+            .blankControlSurface(cornerRadius: 24, tintOpacity: 0.08, emphasized: true)
 
             Spacer(minLength: 0)
         }
@@ -2586,25 +2596,25 @@ private struct TimerScreen: View {
     private var timerDurationRing: some View {
         ZStack {
             Circle()
-                .stroke(textColor.opacity(0.10), lineWidth: 11)
+                .stroke(textColor.opacity(0.08), lineWidth: 10)
             Circle()
                 .trim(from: 0, to: CGFloat(min(selectedMinutes, 120)) / 120)
                 .stroke(
                     AngularGradient(
                         colors: [
-                            textColor.opacity(0.34),
-                            textColor.opacity(0.84),
-                            textColor.opacity(0.54)
+                            BlankColors.premiumBlue.opacity(0.34),
+                            textColor.opacity(0.92),
+                            BlankColors.premiumBlue.opacity(0.62)
                         ],
                         center: .center
                     ),
-                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 2) {
                 Text(durationNumber(selectedMinutes))
-                    .font(.blankInter(size: 46, weight: .semibold, relativeTo: .largeTitle))
+                    .font(.blankInter(size: 56, weight: .semibold, relativeTo: .largeTitle))
                     .foregroundStyle(textColor)
                     .monospacedDigit()
                     .lineLimit(1)
@@ -2614,7 +2624,7 @@ private struct TimerScreen: View {
                     .foregroundStyle(secondaryColor)
             }
         }
-        .frame(width: 168, height: 168)
+        .frame(width: 188, height: 188)
         .accessibilityLabel("Timer \(formatDuration(selectedMinutes))")
     }
 
@@ -2624,12 +2634,12 @@ private struct TimerScreen: View {
         } label: {
             Text(formatDuration(minutes))
                 .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(selectedMinutes == minutes ? BlankColors.ink : textColor)
+                .foregroundStyle(textColor)
                 .frame(maxWidth: .infinity)
                 .frame(height: 42)
                 .background {
                     Capsule()
-                        .fill(selectedMinutes == minutes ? Color.white.opacity(0.84) : textColor.opacity(0.10))
+                        .fill(selectedMinutes == minutes ? BlankColors.premiumBlue.opacity(0.24) : textColor.opacity(0.08))
                 }
         }
         .buttonStyle(.plain)

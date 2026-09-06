@@ -1174,7 +1174,7 @@ private struct ModesList: View {
         List {
             TopSheetHeader(
                 title: "Plan",
-                subtitle: "Your approved block setup.\nBAI can adjust it outside the app.",
+                subtitle: "Your block control center.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -1192,24 +1192,10 @@ private struct ModesList: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
 
-            Button {
-                showingPicker = true
-                onFinish()
-            } label: {
-                HStack {
-                    Text("Edit apps")
-                        .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    Spacer()
-                }
-                .foregroundStyle(textColor)
-                .padding(.horizontal, 18)
-                .frame(height: 56)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 24)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
+            protectedAppsCapsule
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
@@ -1273,30 +1259,33 @@ private struct ModesList: View {
 
     private var baiPlanSummary: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(textColor.opacity(0.10)))
-
+            HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Active plan")
-                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                        .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
                     Text(sessionStore.currentMode.name)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(secondaryColor)
                 }
 
                 Spacer()
+
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.caption.weight(.semibold))
+                    Text("AI managed")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(textColor)
+                .padding(.horizontal, 11)
+                .frame(height: 30)
+                .background { Capsule().fill(textColor.opacity(0.10)) }
             }
 
-            Divider()
-                .overlay(secondaryColor.opacity(0.20))
-
             HStack(spacing: 10) {
-                planMetric(title: "Apps", value: "\(sessionStore.selectionCount)")
-                planMetric(title: "Rule", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block")
-                planMetric(title: "Exit", value: sessionStore.hardBlankActive ? "Emergency" : "Hold")
+                planVisualTile(title: "Apps", value: "\(sessionStore.selectionCount)", symbol: "square.grid.2x2.fill")
+                planVisualTile(title: "Rule", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block", symbol: "shield.fill")
+                planVisualTile(title: "Exit", value: sessionStore.hardBlankActive ? "Emergency" : "Hold", symbol: "hand.raised.fill")
             }
         }
         .foregroundStyle(textColor)
@@ -1304,8 +1293,54 @@ private struct ModesList: View {
         .blankGlassCard(cornerRadius: 20, tintOpacity: 0.30)
     }
 
-    private func planMetric(title: String, value: String) -> some View {
+    private var protectedAppsCapsule: some View {
+        Button {
+            showingPicker = true
+            onFinish()
+        } label: {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "app.badge.fill")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(textColor.opacity(0.10)))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Protected apps")
+                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                        Text(blockedAppsText)
+                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                            .foregroundStyle(secondaryColor)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(secondaryColor)
+                }
+
+                HStack(spacing: 5) {
+                    ForEach(0..<12, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(index < min(12, max(1, sessionStore.selectionCount)) ? textColor.opacity(0.42) : textColor.opacity(0.10))
+                            .frame(height: 12)
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+            .foregroundStyle(textColor)
+            .padding(18)
+            .blankGlassCard(cornerRadius: 20, tintOpacity: 0.26)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func planVisualTile(title: String, value: String, symbol: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
+            Image(systemName: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(textColor.opacity(0.84))
             Text(title)
                 .font(.caption2)
                 .foregroundStyle(secondaryColor)
@@ -1316,6 +1351,12 @@ private struct ModesList: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(textColor.opacity(0.075))
+        }
     }
 
     private var planRoutineEditor: some View {
@@ -1357,7 +1398,8 @@ private struct ModesList: View {
             }
             .padding(.top, 2)
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "calendar.badge.clock")
                     .font(.system(size: 17, weight: .semibold))
                     .frame(width: 34, height: 34)
@@ -1373,11 +1415,32 @@ private struct ModesList: View {
                 }
 
                 Spacer()
+                }
+
+                routineTimeline
             }
         }
         .foregroundStyle(textColor)
         .padding(18)
         .blankGlassCard(cornerRadius: 20, tintOpacity: 0.24)
+    }
+
+    private var routineTimeline: some View {
+        HStack(spacing: 5) {
+            ForEach(0..<7, id: \.self) { index in
+                VStack(spacing: 6) {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(enabledWindows.isEmpty ? textColor.opacity(0.10) : textColor.opacity(index < enabledWindows.count ? 0.46 : 0.18))
+                        .frame(height: index < enabledWindows.count ? 28 : 15)
+                    Text(shortWeekday(index))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(secondaryColor.opacity(0.84))
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: 50)
+        .accessibilityLabel(routineSummaryText)
     }
 
     private var planAdvancedControls: some View {
@@ -1414,7 +1477,7 @@ private struct ModesList: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("Advanced", systemImage: "slider.horizontal.3")
+                Label("More controls", systemImage: "ellipsis.circle")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
                 Text("Manual")
@@ -1436,6 +1499,10 @@ private struct ModesList: View {
             return "No routine approved yet."
         }
         return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
+    }
+
+    private func shortWeekday(_ index: Int) -> String {
+        ["M", "T", "W", "T", "F", "S", "S"][index]
     }
 
     private func saveSchedule() {
@@ -2430,63 +2497,80 @@ private struct TimerScreen: View {
     private let options = [15, 30, 45, 60, 90, 120]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var recommendedMinutes: Int { sessionStore.digitalWellnessV3.plan.recommendedDurationMinutes }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 22) {
             Spacer(minLength: 0)
 
             TopSheetHeader(
                 title: "Timer",
-                subtitle: hardMode ? "Ends with the timer.\nEarly exit uses emergency." : "Start a one-off block.\nIt ends automatically.",
+                subtitle: "One-off block launcher.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
 
-            VStack(spacing: 16) {
-                Text(formatDuration(selectedMinutes))
-                    .font(.blankInter(size: 56, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(textColor)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
+            VStack(spacing: 18) {
+                timerDurationRing
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                Button {
+                    selectedMinutes = recommendedMinutes
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.caption.weight(.semibold))
+                        Text("Recommended: \(formatDuration(recommendedMinutes)) now")
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                    .foregroundStyle(textColor)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 38)
+                    .background { Capsule().fill(textColor.opacity(0.10)) }
+                }
+                .buttonStyle(.plain)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
                     ForEach(options, id: \.self) { minutes in
-                        Button {
-                            selectedMinutes = minutes
-                        } label: {
-                            Text(formatDuration(minutes))
-                                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                                .foregroundStyle(selectedMinutes == minutes ? BlankColors.ink : textColor)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background {
-                                    Capsule()
-                                        .fill(selectedMinutes == minutes ? Color.white.opacity(0.84) : Color.white.opacity(0.16))
-                                }
-                        }
-                        .buttonStyle(.plain)
+                        timerOptionButton(minutes)
                     }
                 }
 
-                Toggle("Hard Blanked", isOn: $hardMode)
-                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-                    .foregroundStyle(textColor)
-                    .padding(.horizontal, 18)
-                    .frame(height: 56)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: hardMode ? 0.36 : 0.22)
-
-                if hardMode {
-                    Text("Early exit will use Emergency.")
-                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                        .foregroundStyle(secondaryColor)
-                        .multilineTextAlignment(.center)
+                Toggle(isOn: $hardMode) {
+                    HStack(spacing: 10) {
+                        Image(systemName: hardMode ? "lock.shield.fill" : "shield")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(textColor.opacity(0.86))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Hard mode")
+                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                            Text("Early exit uses Emergency")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(secondaryColor)
+                        }
+                    }
                 }
+                .toggleStyle(.switch)
+                .tint(textColor.opacity(0.72))
+                .foregroundStyle(textColor)
+                .padding(.horizontal, 16)
+                .frame(height: 58)
+                .blankGlassCard(cornerRadius: 18, tintOpacity: hardMode ? 0.32 : 0.18)
 
-                Button("Start \(formatDuration(selectedMinutes))") {
-                    onStart(selectedMinutes, hardMode)
+                Button {
+                    if !sessionStore.isBlankActive {
+                        onStart(selectedMinutes, hardMode)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: sessionStore.isBlankActive ? "shield.fill" : "timer")
+                        Text(sessionStore.isBlankActive ? "Blanked is active" : "Start block")
+                    }
                 }
                 .buttonStyle(BlankPrimaryButtonStyle())
+                .disabled(sessionStore.isBlankActive)
+                .opacity(sessionStore.isBlankActive ? 0.62 : 1)
             }
             .padding(18)
             .blankGlassCard(cornerRadius: 24, tintOpacity: 0.24)
@@ -2497,6 +2581,70 @@ private struct TimerScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private var timerDurationRing: some View {
+        ZStack {
+            Circle()
+                .stroke(textColor.opacity(0.10), lineWidth: 11)
+            Circle()
+                .trim(from: 0, to: CGFloat(min(selectedMinutes, 120)) / 120)
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            textColor.opacity(0.34),
+                            textColor.opacity(0.84),
+                            textColor.opacity(0.54)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 2) {
+                Text(durationNumber(selectedMinutes))
+                    .font(.blankInter(size: 46, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(textColor)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(durationUnit(selectedMinutes))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(secondaryColor)
+            }
+        }
+        .frame(width: 168, height: 168)
+        .accessibilityLabel("Timer \(formatDuration(selectedMinutes))")
+    }
+
+    private func timerOptionButton(_ minutes: Int) -> some View {
+        Button {
+            selectedMinutes = minutes
+        } label: {
+            Text(formatDuration(minutes))
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(selectedMinutes == minutes ? BlankColors.ink : textColor)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background {
+                    Capsule()
+                        .fill(selectedMinutes == minutes ? Color.white.opacity(0.84) : textColor.opacity(0.10))
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func durationNumber(_ minutes: Int) -> String {
+        if minutes == 60 { return "1" }
+        if minutes == 120 { return "2" }
+        return "\(minutes)"
+    }
+
+    private func durationUnit(_ minutes: Int) -> String {
+        if minutes == 60 { return "hour" }
+        if minutes == 120 { return "hours" }
+        return "minutes"
     }
 
     private func formatDuration(_ minutes: Int) -> String {

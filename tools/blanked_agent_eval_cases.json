@@ -1466,5 +1466,74 @@
         "10:00 PM|11:00 PM|Instagram"
       ]
     }
+  },
+  {
+    "id": "proactive_social_spike_creates_short_window",
+    "prompt": "proactive signal: social use is 42% above baseline after lunch",
+    "context": {
+      "trigger": "proactive",
+      "signals": {
+        "social_use_delta_percent": 42,
+        "dominant_category": "social apps",
+        "weak_hour": 13
+      }
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 790,
+        "end_minute": 840,
+        "duration_days": 3
+      },
+      "text_matches": [
+        "interrupting|42%|above|1:00 PM|risk window|3-day"
+      ]
+    }
+  },
+  {
+    "id": "proactive_repeated_breaks_starts_hard_block",
+    "prompt": "proactive signal: repeated breaks today",
+    "context": {
+      "trigger": "proactive",
+      "signals": {
+        "break_count_today": 3
+      }
+    },
+    "expect": {
+      "intent": "emergency",
+      "action_types": [
+        "start_protection"
+      ],
+      "first_action": {
+        "minutes": 25,
+        "hard_mode": true
+      },
+      "text_matches": [
+        "interrupting|3 break|hard block|trigger"
+      ]
+    }
+  },
+  {
+    "id": "proactive_weak_signal_no_action",
+    "prompt": "proactive signal: small variation",
+    "context": {
+      "trigger": "proactive",
+      "signals": {
+        "social_use_delta_percent": 8
+      }
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not clear enough|weak|actionable"
+      ],
+      "ui_text_not_matches": [
+        "Apply protection|Start hard block"
+      ]
+    }
   }
 ]

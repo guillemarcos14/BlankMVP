@@ -708,9 +708,143 @@ function action(type, values = {}) {
   };
 }
 
+function proactiveTrigger(prompt, context = {}) {
+  const marker = cleanText(context.trigger || context.mode || "", 40).toLowerCase();
+  if (marker === "proactive" || marker === "signal") return true;
+  return cleanText(prompt, 600).toLowerCase().startsWith("proactive signal:");
+}
+
+function proactiveSignals(context = {}, prompt = "") {
+  const source = context.signals && typeof context.signals === "object" ? context.signals : context;
+  const text = cleanText(prompt, 600).toLowerCase();
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours : [];
+  const textDelta = text.match(/(\d{1,3})\s*%\s*(?:above|over|higher|more|por encima|mas|más)/i);
+  const socialDelta = cleanNumber(source.social_use_delta_percent ?? source.app_use_delta_percent ?? source.screen_time_delta_percent ?? (textDelta ? textDelta[1] : null), 0, -100, 500);
+  const breakCount = cleanNumber(source.break_count_today ?? source.relapse_count_today ?? source.unlock_count_today, 0, 0, 50);
+  const selectedHour = source.weak_hour ?? source.risk_hour ?? weakHours[0];
+  const riskHour = Number.isFinite(Number(selectedHour)) ? cleanNumber(selectedHour, 21, 0, 23) : null;
+  const riskWindow = riskHour == null ? cleanText(source.risk_window || context.risk_window, 60) : hourWindow(riskHour);
+  const category = cleanText(source.category || source.dominant_category || namedApp(prompt), 40);
+  const healthSleepDelta = cleanNumber(source.sleep_delta_minutes ?? source.sleep_deficit_minutes, 0, -720, 720);
+  return { socialDelta, breakCount, riskHour, riskWindow, category, healthSleepDelta };
+}
+
+function proactivePlan(prompt, context = {}, language = "en") {
+  if (!proactiveTrigger(prompt, context)) return null;
+  const signal = proactiveSignals(context, prompt);
+  const selected = context.has_selected_apps === true;
+  const authorized = context.screen_time_authorized === true;
+  const base = {
+    intent: "general",
+    title: "Proactive Signal",
+    response_text: "I am only interrupting because today's pattern changed enough to justify a small protection move.",
+    bullets: [
+      "Read: today's phone pattern is above your usual baseline.",
+      "Pattern: a short boundary works better before the loop becomes automatic.",
+      "Move: apply one limited protection window, then review whether it helped."
+    ],
+    primary_label: "Apply protection",
+    secondary_label: "Not now",
+    actions: [],
+    requires_selected_apps: true,
+    requires_screen_time_authorization: true,
+  };
+  if (language === "es") {
+    base.title = "Señal proactiva";
+    base.response_text = "Solo interrumpo porque el patrón de hoy ha cambiado lo suficiente como para justificar una protección pequeña.";
+    base.bullets = [
+      "Lectura: el uso de hoy está por encima de tu patrón habitual.",
+      "Patrón: una franja corta funciona mejor antes de que el bucle se vuelva automático.",
+      "Movimiento: aplica una protección limitada y revisa después si ayudó."
+    ];
+    base.primary_label = "Aplicar protección";
+    base.secondary_label = "Ahora no";
+  }
+  if (!selected || !authorized) return { ...base, actions: [action("apply_schedule", { name: "Proactive Protection", start_minute: 21 * 60, end_minute: 22 * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 3 })] };
+
+  if (signal.breakCount >= 2) {
+    return {
+      ...base,
+      intent: "emergency",
+      title: language === "es" ? "Señal de recaída" : "Break Signal",
+      response_text: language === "es" ? "Interrumpo porque hoy ya hay varias rupturas; ahora conviene reducir elección, no rehacer todo el plan." : "I am interrupting because there are multiple break signals today; the useful move is less choice, not a full redesign.",
+      bullets: language === "es" ? [
+        `Lectura: ${signal.breakCount} rupturas detectadas hoy.`,
+        "Patrón: después de varias rupturas, una franja dura corta protege mejor que más ajustes.",
+        "Movimiento: empieza un bloqueo fuerte de 25 minutos y revisa el disparador después."
+      ] : [
+        `Read: ${signal.breakCount} break signals detected today.`,
+        "Pattern: after repeated breaks, a short hard block protects better than more settings.",
+        "Move: start 25 minutes of hard protection and review the trigger later."
+      ],
+      primary_label: language === "es" ? "Bloqueo fuerte" : "Start hard block",
+      actions: [action("start_protection", { minutes: 25, hard_mode: true })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  if (signal.riskHour != null && (signal.socialDelta >= 25 || /above baseline|por encima|changed/i.test(prompt))) {
+    const start = (signal.riskHour * 60 + 10) % (24 * 60);
+    const end = (start + 50) % (24 * 60);
+    const categoryText = signal.category && signal.category !== "the app" ? signal.category : "social apps";
+    return {
+      ...base,
+      intent: signal.riskHour >= 20 || signal.riskHour <= 2 ? "sleep" : "social",
+      title: language === "es" ? "Señal de uso" : "Use Spike",
+      response_text: language === "es" ? `Interrumpo porque el uso está ${signal.socialDelta}% por encima de tu patrón habitual cerca de ${localizeMinuteText(minuteText(signal.riskHour * 60), language)}.` : `I am interrupting because ${categoryText} use is ${signal.socialDelta}% above your usual pattern around ${minuteText(signal.riskHour * 60)}.`,
+      bullets: language === "es" ? [
+        `Lectura: el uso está ${signal.socialDelta}% por encima de tu baseline.`,
+        `Patrón: la franja de riesgo apunta a ${localizeMinuteText(hourWindow(signal.riskHour), language)}.`,
+        "Movimiento: aplica una protección corta durante 3 días y mide si baja la ruptura."
+      ] : [
+        `Read: use is ${signal.socialDelta}% above baseline.`,
+        `Pattern: the risk window points to ${hourWindow(signal.riskHour)}.`,
+        "Move: apply a short 3-day protection window and check whether breaks drop."
+      ],
+      actions: [action("apply_schedule", { name: "Proactive Protection", start_minute: start, end_minute: end, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 3 })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  if (signal.healthSleepDelta <= -45) {
+    return {
+      ...base,
+      intent: "sleep",
+      title: language === "es" ? "Señal de descanso" : "Recovery Signal",
+      response_text: language === "es" ? "Interrumpo porque el descanso parece más bajo de lo habitual y una noche con menos móvil puede proteger la recuperación." : "I am interrupting because recovery looks lower than usual, and a lighter phone night can protect sleep.",
+      actions: [action("apply_schedule", { name: "Recovery Boundary", start_minute: 21 * 60 + 30, end_minute: 23 * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 1 })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  return {
+    ...base,
+    response_text: language === "es" ? "He visto una señal, pero no es lo bastante clara para interrumpirte con un cambio automático." : "I see a signal, but it is not clear enough to interrupt you with an automatic change.",
+    bullets: language === "es" ? [
+      "Lectura: la señal todavía es débil.",
+      "Patrón: Blanked debe interrumpir solo cuando el cambio sea accionable.",
+      "Movimiento: espera más datos o pide una revisión cuando quieras."
+    ] : [
+      "Read: the signal is still weak.",
+      "Pattern: Blanked should interrupt only when the change is actionable.",
+      "Move: wait for more data or ask for a review when you want it."
+    ],
+    primary_label: language === "es" ? "Abrir informe" : "Open report",
+    actions: [],
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+  };
+}
+
 function fallbackPlan(prompt, context = {}) {
   const intent = classify(prompt);
   const language = responseLanguage(prompt, context);
+  const proactive = proactivePlan(prompt, context, language);
+  if (proactive) return proactive;
   const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
@@ -1406,6 +1540,8 @@ function deterministicNoActionTitle(title) {
     "Reminder Context",
     "Noted",
     "Loss Of Control",
+    "Proactive Signal",
+    "Señal proactiva",
   ]).has(title);
 }
 
@@ -1427,6 +1563,12 @@ function deterministicActionTitle(title) {
     "Pause Rules",
     "Resume Rules",
     "Weekly Read",
+    "Use Spike",
+    "Señal de uso",
+    "Break Signal",
+    "Señal de recaída",
+    "Recovery Signal",
+    "Señal de descanso",
   ]).has(title);
 }
 

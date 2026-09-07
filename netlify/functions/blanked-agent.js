@@ -1628,6 +1628,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map(normalizeAction).filter(Boolean) : [];
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
+  if (proactiveTrigger(prompt, context)) return fallbackActions.slice(0, 4);
   if (fallbackActions.length === 0 && deterministicNoActionTitle(fallback.title)) return [];
   const fallbackNeedsSetup = fallbackActions.some((item) => (actionNeedsSelection(item.type) && !selected) || (actionNeedsScreenTime(item.type) && !authorized));
   if (fallbackActions.some((item) => item.type === "switch_mode") && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);

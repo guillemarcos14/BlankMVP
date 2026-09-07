@@ -1,5 +1,30 @@
 [
   {
+    "id": "social_lunch_whatsapp_feels_natural",
+    "prompt": "I use social media too much during lunch",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [
+        "set_daily_limit",
+        "apply_schedule"
+      ],
+      "ui_text_matches": [
+        "lunch|energy|reset|friction|rule|apply"
+      ],
+      "ui_text_not_matches": [
+        "This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:"
+      ],
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
     "id": "night_scroll_missing_bedtime",
     "prompt": "How can I not scroll at night?",
     "expect": {

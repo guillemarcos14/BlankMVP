@@ -45,6 +45,10 @@ function parseSmsBody(event) {
   };
 }
 
+function channelFromSender(from) {
+  return cleanText(from, 90).toLowerCase().startsWith("whatsapp:") ? "whatsapp" : "sms";
+}
+
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().slice(0, maxLength);
 }
@@ -62,16 +66,33 @@ function escapeXml(value) {
     .replace(/'/g, "&apos;");
 }
 
-function connectReply(from) {
-  return `Connected. BAI will use SMS for this number${from ? ` (${from})` : ""}.`;
+function connectReply(from, channel) {
+  const label = channel === "whatsapp" ? "WhatsApp" : "SMS";
+  return `Connected. BAI will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
-async function recordSmsConnection(connectCode, from) {
+function actionIntro(actions) {
+  const first = primaryAction(actions);
+  if (!first) return "";
+  if (first.type === "set_daily_limit") return "Open Blanked to apply the daily limit:";
+  if (first.type === "apply_schedule") return "Open Blanked to apply the protection window:";
+  if (first.type === "start_protection") return "Open Blanked to start it:";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup:";
+  return "Open Blanked to apply it:";
+}
+
+function chatMessage(message, hasAction) {
+  const text = cleanText(message, 1400);
+  if (!hasAction || /^[\u{1F300}-\u{1FAFF}]/u.test(text)) return text;
+  return `👍 ${text}`;
+}
+
+async function recordMessageConnection(connectCode, from, channel) {
   try {
     await recordAssistantChannel({
       event: "assistant_channel_connected",
-      channel: "sms",
-      preferredChannel: "sms",
+      channel,
+      preferredChannel: channel,
       connectCode,
       channelUser: from,
     });
@@ -80,7 +101,7 @@ async function recordSmsConnection(connectCode, from) {
   }
 }
 
-async function askBAI(prompt, from) {
+async function askBAI(prompt, from, channel) {
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -88,8 +109,8 @@ async function askBAI(prompt, from) {
       prompt,
       locale: "en-US",
       context: {
-        channel: "sms",
-        assistant_channel: "sms",
+        channel,
+        assistant_channel: channel,
         has_selected_apps: true,
         screen_time_authorized: true,
         memory: {
@@ -106,11 +127,12 @@ async function askBAI(prompt, from) {
   const plan = parsed.plan || {};
   const message = cleanText(plan.message_text || plan.response_text, 1400);
   const actionLink = actionDeepLink(plan.actions || []);
-  return actionLink ? `${message}\n${actionLink}` : message;
+  const reply = chatMessage(message, Boolean(actionLink));
+  return actionLink ? `${reply}\n\n${actionIntro(plan.actions || [])}\n${actionLink}` : reply;
 }
 
 function actionDeepLink(actions) {
-  const first = Array.isArray(actions) ? actions.find((item) => item && item.type && item.type !== "none") : null;
+  const first = primaryAction(actions);
   if (!first) return "";
 
   if (first.type === "start_protection") {
@@ -143,6 +165,11 @@ function actionDeepLink(actions) {
   return "";
 }
 
+function primaryAction(actions) {
+  const executable = Array.isArray(actions) ? actions.filter((item) => item && item.type && item.type !== "none") : [];
+  return executable.find((item) => item.type === "apply_schedule") || executable[0] || null;
+}
+
 function clamp(value, lower, upper) {
   const number = Number(value);
   if (!Number.isFinite(number)) return lower;
@@ -159,9 +186,10 @@ exports.handler = async (event) => {
   }
 
   const connectCode = connectCodeFromText(body);
+  const channel = channelFromSender(from);
   const reply = connectCode
-    ? (await recordSmsConnection(connectCode, from), connectReply(from))
-    : await askBAI(body, from);
+    ? (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel))
+    : await askBAI(body, from, channel);
 
   return text(200, twiml(reply), "application/xml; charset=utf-8");
 };

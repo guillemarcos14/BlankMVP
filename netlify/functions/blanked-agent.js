@@ -282,8 +282,8 @@ function conversationalMessage(plan, language = "en") {
 
   if (actions.length) {
     const actionLine = language === "es"
-      ? "Puedo prepararlo en Blanked si lo confirmas."
-      : "I can prepare it in Blanked if you confirm.";
+      ? "Te dejo una acción concreta para aplicarlo en Blanked."
+      : "I’ll give you one concrete Blanked action for it.";
     return `${response} ${actionLine}`.slice(0, 320);
   }
 
@@ -1447,7 +1447,21 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "social") {
-    return { ...base, title: "Scroll Loop", response_text: `This reads like ${cluster}: ${activeApp || "the app"} is filling a state, not just spare time.`, bullets: ["Pattern: the trigger matters more than total screen time.", `Move: block before ${rememberedRisk || "the usual scroll window"} and cap fallback use.`, "Start with a 25 minute daily limit plus an evening shield."], actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: "Scroll Control", start_minute: 1230, end_minute: 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
+    const lunch = contains(promptText, ["lunch", "comida", "comer", "almuerzo"]);
+    const momentText = lunch ? "around lunch" : rememberedRisk || "before the usual scroll window";
+    return {
+      ...base,
+      title: "Scroll Loop",
+      response_text: lunch
+        ? "Lunch is a common weak spot: you stop working, your energy dips, and the phone becomes the easiest reset."
+        : `This sounds less like free time and more like an automatic ${cluster}.`,
+      bullets: [
+        "Pattern: the trigger matters more than total screen time.",
+        `Move: add friction ${momentText}, before the scroll has momentum.`,
+        "Start with a 25 minute daily limit plus a short protective window."
+      ],
+      actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: lunch ? "Lunch Protection" : "Scroll Control", start_minute: lunch ? 13 * 60 : 1230, end_minute: lunch ? 14 * 60 : 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
+    };
   }
 
   if (intent === "general" && (asksForAdvice(prompt) || asksForPlan(prompt) || asksWhereToStart(prompt)) && !hasExplicitBlockRequest(prompt)) {
@@ -1617,7 +1631,6 @@ function deterministicActionTitle(title) {
     "Remembered Scroll Pattern",
     "Choose App",
     "Choose Apps",
-    "Scroll Loop",
     "24h Study Protection",
     "Loss Of Control",
     "Urge Protection",
@@ -1646,6 +1659,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   if (fallbackActions.length === 0 && deterministicNoActionTitle(fallback.title)) return [];
   const fallbackNeedsSetup = fallbackActions.some((item) => (actionNeedsSelection(item.type) && !selected) || (actionNeedsScreenTime(item.type) && !authorized));
   if (fallbackActions.some((item) => item.type === "switch_mode") && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
+  if (fallback.title === "Scroll Loop" && fallbackActions.length > 0 && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
   if (fallbackActions.length > 0 && deterministicActionTitle(fallback.title) && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
   if (hasClearFutureWindow && fallbackActions.some((item) => item.type === "apply_schedule")) return fallbackActions.slice(0, 4);
   if (asksForPermanentLockout(prompt) || asksAboutAssistantCapabilities(prompt) || asksForUnsupportedReminder(prompt) || asksForBroadAutomation(prompt)) return [];
@@ -1693,6 +1707,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
   const actions = actionGate(plan, fallback, context, prompt);
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const modelProposedAction = Array.isArray(plan.actions) && plan.actions.some((item) => item && item.type && item.type !== "none");
+  const preservesScrollLoopActions = fallback.title === "Scroll Loop" && actions.length > 0;
   const shouldUseFallbackPresentation =
     proactiveTrigger(prompt, context) ||
     deterministicNoActionTitle(fallback.title) ||
@@ -1717,7 +1732,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
   const title = shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.title : userFacingText(plan.title, 70) || fallback.title;
   const responseText = shouldUseFallbackPresentation || shouldUseLanguageFallback || preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text;
   const normalizedPlan = {
-    intent: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.intent : planIntent,
+    intent: shouldUseFallbackPresentation || shouldUseLanguageFallback || preservesScrollLoopActions ? fallback.intent : planIntent,
     title,
     response_text: responseText,
     bullets: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallbackBullets : visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
@@ -1803,7 +1818,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-            "You are BAI, Blanked's personal assistant for healthier screen habits. Act as one assistant with two internal modes: reactive when the person messages you, proactive when product signals say something important changed. Lead with useful interpretation and context, not with rigid templates. Use the person's context, memory, recent plan outcomes, risk windows, app setup, Health aggregates if present, and app capabilities. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend actions when they are useful and executable: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Do not use apply_schedule as a reminder or notification. Never say you already set, created, scheduled, blocked, or changed something; say you can do it or propose it, because the app executes after confirmation. For proactive mode, explain why you are interrupting and propose one concrete solution; avoid generic motivation. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, respond like a practical assistant: acknowledge the state and offer a small concrete move inside Blanked when relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-2 concrete sentences. Bullets should use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+            "You are BAI, Blanked's personal assistant for healthier screen habits. The visible reply must feel like a sharp WhatsApp assistant, not a product template or a report. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move Blanked can actually execute. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Use light emoji only when it feels natural in chat, especially for confirmations, corrections or small wins; do not decorate every message. Recommend actions when they are useful and executable: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action: if the person describes a recurring risk moment, prefer apply_schedule over a vague immediate block. Do not use apply_schedule as a reminder or notification. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked when relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-3 natural sentences. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",

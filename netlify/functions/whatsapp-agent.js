@@ -2,7 +2,9 @@ const crypto = require("crypto");
 const { json, parseJsonBody } = require("./_membership");
 const {
   connectCodeFromText,
+  getAssistantMemory,
   recordAssistantChannel,
+  recordAssistantMemory,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
@@ -100,30 +102,36 @@ function appsQuery(appNames) {
   return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
 }
 
+function publicOpenLink(deepLink) {
+  return `https://getblank.netlify.app/open.html?to=${encodeURIComponent(deepLink)}`;
+}
+
 function appLink(action, appNames = []) {
   const scheme = process.env.BLANKED_APP_DEEP_LINK_SCHEME || "blank";
   const type = action && action.type;
+  let deepLink = "";
   if (type === "start_protection") {
     const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
     const hard = action.hard_mode ? "&hard=1" : "";
-    return `${scheme}://start-focus?minutes=${minutes}${hard}`;
+    deepLink = `${scheme}://start-focus?minutes=${minutes}${hard}`;
   }
-  if (type === "apply_schedule") {
+  else if (type === "apply_schedule") {
     const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
     const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
     if (start == null || end == null) return "";
     const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
-    if (appNames.length) return `${scheme}://setup-plan?start_minute=${start}&end_minute=${end}&days=${days}${appsQuery(appNames)}`;
-    return `${scheme}://apply-plan?start_minute=${start}&end_minute=${end}&days=${days}`;
+    deepLink = appNames.length
+      ? `${scheme}://setup-plan?start_minute=${start}&end_minute=${end}&days=${days}${appsQuery(appNames)}`
+      : `${scheme}://apply-plan?start=${start}&end=${end}&days=${days}`;
   }
-  if (type === "enable_allow_only") return `${scheme}://allow-only`;
-  if (type === "enable_adult_filter") return `${scheme}://adult-filter`;
-  if (type === "set_daily_limit") return `${scheme}://daily-limit?minutes=${Number.isFinite(action.minutes) ? action.minutes : 25}`;
-  if (type === "pause_rules") return `${scheme}://pause-rules?hours=${Number.isFinite(action.hours) ? action.hours : 168}`;
-  if (type === "disable_pause") return `${scheme}://resume-rules`;
-  if (type === "switch_mode" && action.name) return `${scheme}://mode?name=${encodeURIComponent(action.name)}`;
-  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") return `${scheme}://open-picker?source=assistant${appsQuery(appNames)}`;
-  return "";
+  else if (type === "enable_allow_only") deepLink = `${scheme}://allow-only`;
+  else if (type === "enable_adult_filter") deepLink = `${scheme}://adult-filter`;
+  else if (type === "set_daily_limit") deepLink = `${scheme}://daily-limit?minutes=${Number.isFinite(action.minutes) ? action.minutes : 25}`;
+  else if (type === "pause_rules") deepLink = `${scheme}://pause-rules?hours=${Number.isFinite(action.hours) ? action.hours : 168}`;
+  else if (type === "disable_pause") deepLink = `${scheme}://resume-rules`;
+  else if (type === "switch_mode" && action.name) deepLink = `${scheme}://mode?name=${encodeURIComponent(action.name)}`;
+  else if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") deepLink = `${scheme}://open-picker?source=assistant${appsQuery(appNames)}`;
+  return deepLink ? publicOpenLink(deepLink) : "";
 }
 
 function actionableLink(plan, prompt = "") {
@@ -143,7 +151,56 @@ function whatsappReplyText(plan, prompt = "") {
   return `${text}\n\nOpen Blanked to apply it:\n${link}`;
 }
 
-function agentContext() {
+function minuteOfDay(hour, minute, meridiem) {
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12 || !Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+  const normalized = meridiem === "pm" && hour !== 12 ? hour + 12 : meridiem === "am" && hour === 12 ? 0 : hour;
+  return normalized * 60 + minute;
+}
+
+function lunchEndMinute(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  if (!/(lunch|comida|comer|almuerzo)/i.test(value)) return null;
+  const matches = [...value.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi)];
+  if (!matches.length) return null;
+  const match = matches[matches.length - 1];
+  const hour = Number(match[1]);
+  const meridiem = match[3] || (hour >= 8 && hour <= 11 ? "am" : "pm");
+  return minuteOfDay(hour, Number(match[2] || 0), meridiem);
+}
+
+function memoryFactsFromText(text) {
+  const apps = requestedAppNames(text);
+  const lunchMinute = lunchEndMinute(text);
+  const facts = {};
+  if (apps.length) facts.main_apps = apps;
+  if (lunchMinute != null) {
+    facts.lunch_end_minute = lunchMinute;
+    facts.weak_hours = [Math.floor(lunchMinute / 60)];
+  }
+  return facts;
+}
+
+async function agentContext(from, prompt) {
+  let savedMemory = {};
+  try {
+    savedMemory = await getAssistantMemory("whatsapp", from);
+  } catch (_) {
+    savedMemory = {};
+  }
+  const newFacts = memoryFactsFromText(prompt);
+  const memory = {
+    ...savedMemory,
+    ...newFacts,
+    main_apps: newFacts.main_apps || savedMemory.main_apps,
+    weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+  };
+  if (Object.keys(newFacts).length) {
+    try {
+      await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: newFacts, source: prompt });
+    } catch (_) {
+      // Memory must never block a reply.
+    }
+  }
   return {
     channel: "whatsapp",
     is_blank_active: false,
@@ -154,14 +211,14 @@ function agentContext() {
     vacation_mode_active: false,
     risk_window: "the usual risk window",
     recommended_duration_minutes: 30,
-    memory: {},
+    memory,
   };
 }
 
-async function callBlankedAgent(prompt) {
+async function callBlankedAgent(prompt, from) {
   const response = await blankedAgentHandler({
     httpMethod: "POST",
-    body: JSON.stringify({ prompt, context: agentContext() }),
+    body: JSON.stringify({ prompt, context: await agentContext(from, prompt) }),
   });
   const body = JSON.parse(response.body || "{}");
   if (response.statusCode < 200 || response.statusCode >= 300 || !body.ok) {
@@ -197,7 +254,7 @@ async function processMessage(message) {
   if (command === "stop" || command === "disconnect") {
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
   }
-  const plan = await callBlankedAgent(message.text);
+  const plan = await callBlankedAgent(message.text, message.from);
   return sendWhatsAppMessage(message.from, whatsappReplyText(plan, message.text));
 }
 

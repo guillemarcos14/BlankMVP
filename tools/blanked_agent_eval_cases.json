@@ -10,15 +10,47 @@
     },
     "expect": {
       "intent": "social",
+      "action_types": [],
+      "ui_text_matches": [
+        "which apps|what time|finish eating|apps and"
+      ],
+      "ui_text_not_matches": [
+        "those apps|This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:|blank://"
+      ],
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "social_lunch_with_memory_creates_specific_window",
+    "prompt": "I use social media too much during lunch",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true,
+      "memory": {
+        "main_apps": [
+          "Instagram",
+          "TikTok"
+        ],
+        "lunch_end_minute": 810
+      }
+    },
+    "expect": {
+      "intent": "social",
       "action_types": [
         "set_daily_limit",
         "apply_schedule"
       ],
-      "ui_text_matches": [
-        "lunch|energy|reset|friction|rule|apply"
+      "first_action": {
+        "minutes": 25
+      },
+      "text_matches": [
+        "lunch|1:30 PM|2:30 PM|rule|protect|friction"
       ],
       "ui_text_not_matches": [
-        "This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:"
+        "those apps|This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:"
       ],
       "min_quality_score": 2,
       "min_utility_score": 3

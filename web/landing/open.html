@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Open Blanked</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafc;
+        color: #111827;
+      }
+
+      main {
+        width: min(420px, calc(100vw - 32px));
+        text-align: center;
+      }
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 8px;
+        background: #111827;
+        color: white;
+        font-weight: 650;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Opening Blanked...</h1>
+      <p>If it does not open automatically, tap below.</p>
+      <a id="openLink" href="/">Open Blanked</a>
+    </main>
+    <script>
+      const allowedActions = new Set([
+        "apply-plan",
+        "daily-limit",
+        "start-focus",
+        "open-picker",
+        "choose-apps",
+        "setup-plan",
+        "allow-only",
+        "adult-filter",
+        "pause-rules",
+        "resume-rules",
+        "mode"
+      ]);
+
+      function validBlankLink(value) {
+        try {
+          const url = new URL(value);
+          const action = url.hostname || url.pathname.replace(/^\/+/, "");
+          return url.protocol === "blank:" && allowedActions.has(action);
+        } catch (_) {
+          return false;
+        }
+      }
+
+      const target = new URLSearchParams(window.location.search).get("to") || "";
+      const link = document.getElementById("openLink");
+      if (validBlankLink(target)) {
+        link.href = target;
+        window.setTimeout(() => {
+          window.location.href = target;
+        }, 150);
+      } else {
+        document.querySelector("h1").textContent = "Invalid Blanked link";
+        document.querySelector("p").textContent = "Open Blanked from the app instead.";
+        link.style.display = "none";
+      }
+    </script>
+  </body>
+</html>

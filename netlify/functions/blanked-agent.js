@@ -95,6 +95,7 @@ function localizeText(value, language) {
     "Weekly Read": "Lectura semanal",
     "Urge Protection": "Protección ante impulso",
     "Scroll Loop": "Bucle de scroll",
+    "Lunch Context": "Contexto de comida",
     "Plan Context": "Contexto del plan",
     "Noted": "Anotado",
     "Tell pattern": "Contar patrón",
@@ -127,6 +128,7 @@ function localizeText(value, language) {
     "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.": "Esto suena a bucle de scroll de noche. Antes de bloquear nada, necesito tu hora objetivo para dormir.",
     "I can help with that, but first I need to know where the loop happens.": "Puedo ayudarte con eso, pero primero necesito saber dónde ocurre el bucle.",
     "Most people do best starting 10-15 minutes after lunch. What time do you usually finish eating?": "Suele funcionar mejor empezar 10-15 minutos después de comer. ¿A qué hora sueles terminar de comer?",
+    "Lunch is probably the right moment to protect, but I need two details before setting anything: which apps count as social media for you, and what time do you usually finish eating?": "Comer probablemente es el momento a proteger, pero necesito dos datos antes de configurar nada: ¿qué apps cuentan como redes sociales para ti y a qué hora sueles terminar de comer?",
     "What time do you usually finish dinner?": "¿A qué hora sueles terminar de cenar?",
     "What time do you usually wake up?": "¿A qué hora sueles despertarte?",
     "What time do you usually finish work?": "¿A qué hora sueles terminar de trabajar?",
@@ -388,12 +390,12 @@ function asksForBroadAutomation(prompt) {
 
 function relativeMoment(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
-  if (contains(text, ["after lunch", "right after lunch", "despues de comer", "después de comer", "despues de lunch", "después de lunch"])) {
+  if (contains(text, ["lunch", "comida", "comer", "almuerzo", "after lunch", "right after lunch", "despues de comer", "después de comer", "despues de lunch", "después de lunch"])) {
     return {
       key: "lunch",
-      label: "after lunch",
-      question: "Most people do best starting 10-15 minutes after lunch. What time do you usually finish eating?",
-      move: "tell me when you usually finish lunch, then I can place the boundary without guessing.",
+      label: "around lunch",
+      question: "Lunch is probably the right moment to protect, but I need two details before setting anything: which apps count as social media for you, and what time do you usually finish eating?",
+      move: "tell me the apps and when you usually finish lunch, then I can place the boundary without guessing.",
     };
   }
   if (contains(text, ["after dinner", "right after dinner", "despues de cenar", "después de cenar", "despues de dinner", "después de dinner"])) {
@@ -558,7 +560,14 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
   const rememberedApps = Array.isArray(memory.main_apps) ? memory.main_apps.map((app) => cleanText(app, 40).toLowerCase()) : [];
   const promptApp = namedApp(prompt).toLowerCase();
   const sameRememberedApp = promptApp !== "the app" && rememberedApps.includes(promptApp);
-  if (moment && !explicitTimeWindow(prompt) && (!hasKnownWeakHour(context) || !sameRememberedApp) && (hasExplicitBlockRequest(prompt) || intent === "social")) {
+  const appCategory = requestedAppCategory(prompt);
+  const hasApps = promptApp !== "the app" || rememberedApps.length > 0;
+  const hasLunchTime = Number.isFinite(Number(memory.lunch_end_minute)) || Boolean(explicitTimeWindow(prompt) || anchorWindow(prompt));
+  if (intent === "social" && appCategory && moment?.key === "lunch" && (!hasApps || !hasLunchTime)) {
+    return "apps_and_lunch_time";
+  }
+  const momentContextSatisfied = moment?.key === "lunch" && hasApps && hasLunchTime;
+  if (moment && !momentContextSatisfied && !explicitTimeWindow(prompt) && (!hasKnownWeakHour(context) || !sameRememberedApp) && (hasExplicitBlockRequest(prompt) || intent === "social")) {
     return moment.key;
   }
   if (intent === "sleep" && !explicitTimeWindow(prompt) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
@@ -646,7 +655,8 @@ function anchorWindow(prompt) {
   if (contains(text, ["sleep", "bed", "bedtime", "dormir", "duermo", "acuesto"])) return null;
   const minute = routineAnchorMinute(prompt);
   if (minute == null) return null;
-  const offset = contains(text, ["after", "despues", "después", "termine", "termino", "finish"]) ? 10 : 0;
+  const lunchContext = contains(text, ["lunch", "comer", "comida", "almuerzo"]);
+  const offset = contains(text, ["after", "despues", "después"]) || (!lunchContext && contains(text, ["termine", "termino", "finish"])) ? 10 : 0;
   const start = (minute + offset) % (24 * 60);
   const duration = contains(text, ["lunch", "comer", "dinner", "cenar", "work", "trabaj"]) ? 60 : 45;
   return { start, end: (start + duration) % (24 * 60) };
@@ -1079,6 +1089,24 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   const moment = relativeMoment(prompt);
+  if (missingContext === "apps_and_lunch_time") {
+    return {
+      intent: "social",
+      title: "Lunch Context",
+      response_text: moment?.question || "I can help with lunch scrolling, but I need the apps and your usual lunch time before setting anything.",
+      bullets: [
+        "Read: lunch is the risk moment, but the target is still incomplete.",
+        "Pattern: Blanked should not assume which apps or clock time you mean.",
+        "Move: tell me the apps and when lunch usually ends."
+      ],
+      primary_label: "Tell details",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
   if (missingContext && moment && missingContext === moment.key) {
     return {
       intent: "social",
@@ -1448,19 +1476,23 @@ function fallbackPlan(prompt, context = {}) {
 
   if (intent === "social") {
     const lunch = contains(promptText, ["lunch", "comida", "comer", "almuerzo"]);
+    const lunchEnd = memory.lunch_end_minute == null ? null : cleanNumber(memory.lunch_end_minute, 13 * 60, 0, 1439);
     const momentText = lunch ? "around lunch" : rememberedRisk || "before the usual scroll window";
+    const startMinute = lunch && lunchEnd != null ? lunchEnd : lunch ? 13 * 60 : 1230;
     return {
       ...base,
       title: "Scroll Loop",
       response_text: lunch
-        ? "Lunch is a common weak spot: you stop working, your energy dips, and the phone becomes the easiest reset."
+        ? lunchEnd != null
+          ? `I’d protect the lunch reset window from ${minuteText(startMinute)} to ${minuteText((startMinute + 60) % (24 * 60))}, when social apps are most likely to become automatic.`
+          : "Lunch is a common weak spot: you stop working, your energy dips, and the phone becomes the easiest reset."
         : `This sounds less like free time and more like an automatic ${cluster}.`,
       bullets: [
         "Pattern: the trigger matters more than total screen time.",
         `Move: add friction ${momentText}, before the scroll has momentum.`,
         "Start with a 25 minute daily limit plus a short protective window."
       ],
-      actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: lunch ? "Lunch Protection" : "Scroll Control", start_minute: lunch ? 13 * 60 : 1230, end_minute: lunch ? 14 * 60 : 1380, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
+      actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: lunch ? "Lunch Protection" : "Scroll Control", start_minute: startMinute, end_minute: (startMinute + (lunch ? 60 : 150)) % (24 * 60), weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
     };
   }
 
@@ -1608,6 +1640,7 @@ function deterministicNoActionTitle(title) {
     "Conflicto con app de trabajo",
     "Scroll Pattern",
     "Scroll Context",
+    "Lunch Context",
     "Context Corrected",
     "App Privacy",
     "Digital Wellness Read",

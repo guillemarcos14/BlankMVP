@@ -2,7 +2,9 @@ const { json, requireMethod } = require("./_membership");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const {
   connectCodeFromText,
+  getAssistantMemory,
   recordAssistantChannel,
+  recordAssistantMemory,
 } = require("./_assistant_channel");
 
 function text(statusCode, body, contentType = "text/plain; charset=utf-8") {
@@ -32,9 +34,10 @@ function parseSmsBody(event) {
       return {
         from: cleanText(parsed.from || parsed.From, 80),
         body: cleanText(parsed.body || parsed.Body || parsed.text, 800),
+        messageSid: cleanText(parsed.messageSid || parsed.MessageSid || parsed.SmsMessageSid, 80),
       };
     } catch {
-      return { from: "", body: "" };
+      return { from: "", body: "", messageSid: "" };
     }
   }
 
@@ -42,6 +45,7 @@ function parseSmsBody(event) {
   return {
     from: cleanText(params.get("From") || params.get("from"), 80),
     body: cleanText(params.get("Body") || params.get("body"), 800),
+    messageSid: cleanText(params.get("MessageSid") || params.get("SmsMessageSid") || params.get("MessageID"), 80),
   };
 }
 
@@ -81,12 +85,6 @@ function actionIntro(actions) {
   return "Open Blanked to apply it:";
 }
 
-function chatMessage(message, hasAction) {
-  const text = cleanText(message, 1400);
-  if (!hasAction || /^[\u{1F300}-\u{1FAFF}]/u.test(text)) return text;
-  return `👍 ${text}`;
-}
-
 async function recordMessageConnection(connectCode, from, channel) {
   try {
     await recordAssistantChannel({
@@ -101,7 +99,66 @@ async function recordMessageConnection(connectCode, from, channel) {
   }
 }
 
+function namedApps(text) {
+  const value = ` ${cleanText(text, 800).toLowerCase()} `;
+  const apps = [
+    ["tiktok", "TikTok"],
+    ["tik tok", "TikTok"],
+    ["instagram", "Instagram"],
+    ["insta", "Instagram"],
+    ["youtube", "YouTube"],
+    ["yt", "YouTube"],
+    ["reddit", "Reddit"],
+    ["twitter", "Twitter"],
+    ["facebook", "Facebook"],
+    ["snapchat", "Snapchat"],
+  ];
+  return Array.from(new Set(apps.filter(([key]) => value.includes(` ${key} `) || value.includes(key)).map(([, app]) => app)));
+}
+
+function minuteOfDay(hour, minute, meridiem) {
+  if (!Number.isFinite(hour) || hour < 1 || hour > 12 || !Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+  const normalized = meridiem === "pm" && hour !== 12 ? hour + 12 : meridiem === "am" && hour === 12 ? 0 : hour;
+  return normalized * 60 + minute;
+}
+
+function lunchEndMinute(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  if (!/(lunch|comida|comer|almuerzo)/i.test(value)) return null;
+  const matches = [...value.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi)];
+  if (!matches.length) return null;
+  const match = matches[matches.length - 1];
+  const hour = Number(match[1]);
+  const meridiem = match[3] || (hour >= 8 && hour <= 11 ? "am" : "pm");
+  return minuteOfDay(hour, Number(match[2] || 0), meridiem);
+}
+
+function memoryFactsFromText(text) {
+  const apps = namedApps(text);
+  const lunchMinute = lunchEndMinute(text);
+  const facts = {};
+  if (apps.length) facts.main_apps = apps;
+  if (lunchMinute != null) {
+    facts.lunch_end_minute = lunchMinute;
+    facts.weak_hours = [Math.floor(lunchMinute / 60)];
+  }
+  return facts;
+}
+
 async function askBAI(prompt, from, channel) {
+  let savedMemory = {};
+  try {
+    savedMemory = await getAssistantMemory(channel, from);
+  } catch (_) {
+    savedMemory = {};
+  }
+  const newFacts = memoryFactsFromText(prompt);
+  const memory = {
+    ...savedMemory,
+    ...newFacts,
+    main_apps: newFacts.main_apps || savedMemory.main_apps,
+    weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+  };
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -113,12 +170,18 @@ async function askBAI(prompt, from, channel) {
         assistant_channel: channel,
         has_selected_apps: true,
         screen_time_authorized: true,
-        memory: {
-          phone_number_hash_hint: from ? "sms-linked" : "",
-        },
+        memory,
       },
     }),
   });
+
+  if (Object.keys(newFacts).length) {
+    try {
+      await recordAssistantMemory({ channel, channelUser: from, memory: newFacts, source: prompt });
+    } catch (_) {
+      // Memory must never block a reply.
+    }
+  }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     return "BAI could not read that yet. Try again in a moment.";
@@ -126,41 +189,53 @@ async function askBAI(prompt, from, channel) {
   const parsed = JSON.parse(response.body || "{}");
   const plan = parsed.plan || {};
   const message = cleanText(plan.message_text || plan.response_text, 1400);
-  const actionLink = actionDeepLink(plan.actions || []);
-  const reply = chatMessage(message, Boolean(actionLink));
-  return actionLink ? `${reply}\n\n${actionIntro(plan.actions || [])}\n${actionLink}` : reply;
+  const actionLink = actionDeepLink(plan.actions || [], memory.main_apps);
+  return actionLink ? `${message}\n\n${actionIntro(plan.actions || [])}\n${actionLink}` : message;
 }
 
-function actionDeepLink(actions) {
+function publicOpenLink(deepLink) {
+  return `https://getblank.netlify.app/open.html?to=${encodeURIComponent(deepLink)}`;
+}
+
+function appsQuery(appNames) {
+  const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 8) : [];
+  return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
+}
+
+function actionDeepLink(actions, appNames = []) {
   const first = primaryAction(actions);
   if (!first) return "";
 
   if (first.type === "start_protection") {
-    return `blank://start-focus?minutes=${clamp(first.minutes || 25, 5, 240)}${first.hard_mode ? "&hard=true" : ""}`;
+    return publicOpenLink(`blank://start-focus?minutes=${clamp(first.minutes || 25, 5, 240)}${first.hard_mode ? "&hard=true" : ""}`);
   }
   if (first.type === "apply_schedule") {
-    return `blank://apply-plan?start=${clamp(first.start_minute || 1260, 0, 1439)}&end=${clamp(first.end_minute || 1380, 0, 1439)}&days=${clamp(first.duration_days || 7, 1, 14)}`;
+    const start = clamp(first.start_minute || 1260, 0, 1439);
+    const end = clamp(first.end_minute || 1380, 0, 1439);
+    const days = clamp(first.duration_days || 7, 1, 14);
+    const route = Array.isArray(appNames) && appNames.length ? "setup-plan" : "apply-plan";
+    return publicOpenLink(`blank://${route}?start=${start}&end=${end}&days=${days}${appsQuery(appNames)}`);
   }
   if (first.type === "set_daily_limit") {
-    return `blank://daily-limit?minutes=${clamp(first.minutes || 25, 5, 240)}`;
+    return publicOpenLink(`blank://daily-limit?minutes=${clamp(first.minutes || 25, 5, 240)}`);
   }
   if (first.type === "open_app_picker") {
-    return "blank://open-picker";
+    return publicOpenLink("blank://open-picker");
   }
   if (first.type === "request_screen_time_permission") {
-    return "blank://choose-apps";
+    return publicOpenLink("blank://choose-apps");
   }
   if (first.type === "enable_allow_only") {
-    return "blank://allow-only";
+    return publicOpenLink("blank://allow-only");
   }
   if (first.type === "enable_adult_filter") {
-    return "blank://adult-filter";
+    return publicOpenLink("blank://adult-filter");
   }
   if (first.type === "pause_rules") {
-    return `blank://pause-rules?hours=${clamp(first.hours || 24, 1, 168)}`;
+    return publicOpenLink(`blank://pause-rules?hours=${clamp(first.hours || 24, 1, 168)}`);
   }
   if (first.type === "disable_pause") {
-    return "blank://resume-rules";
+    return publicOpenLink("blank://resume-rules");
   }
   return "";
 }

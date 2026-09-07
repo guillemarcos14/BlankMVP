@@ -63,7 +63,10 @@
       "intent": "sleep",
       "action_types": [],
       "text_matches": [
-        "bedtime|sleep target"
+        "bed|phone|tired|asleep|offline"
+      ],
+      "ui_text_not_matches": [
+        "Open Blanked|apply|protection window|https://|blank://"
       ]
     }
   },
@@ -83,16 +86,35 @@
     },
     "expect": {
       "intent": "sleep",
-      "action_types": [
-        "apply_schedule"
-      ],
-      "first_action": {
-        "start_minute": 1350,
-        "end_minute": 1380
-      },
+      "action_types": [],
       "text_matches": [
-        "11:00 PM|bedtime|sleep"
+        "bed|phone|tired|asleep|offline"
+      ],
+      "ui_text_not_matches": [
+        "Open Blanked|apply|protection window|https://|blank://"
       ]
+    }
+  },
+  {
+    "id": "night_scroll_advice_question_no_action_link",
+    "prompt": "What can I do if I scroll too much at night?",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "sleep",
+      "action_types": [],
+      "ui_text_matches": [
+        "phone|bed|tired|offline|asleep"
+      ],
+      "ui_text_not_matches": [
+        "Open Blanked|apply the protection window|https://|blank://|only create|trigger"
+      ],
+      "min_quality_score": 2,
+      "min_utility_score": 3
     }
   },
   {

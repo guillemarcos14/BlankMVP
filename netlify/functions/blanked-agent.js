@@ -277,6 +277,7 @@ function conversationalMessage(plan, language = "en") {
 
   if (!actions.length && hasQuestion) return response;
   if (!actions.length && /\bsleep target\b|hora objetivo para dormir/i.test(response)) return response;
+  if (!actions.length && /turn it into a Blanked plan|want a Blanked plan|quieres un plan de Blanked|convertirlo en un plan de Blanked/i.test(response)) return response.slice(0, 320);
   if (!actions.length && move && !response.toLowerCase().includes(move.toLowerCase())) {
     const normalizedMove = move.charAt(0).toUpperCase() + move.slice(1);
     return `${response} ${normalizedMove.endsWith("?") || normalizedMove.endsWith("¿") ? normalizedMove : normalizedMove + "."}`.slice(0, 320);
@@ -1038,7 +1039,9 @@ function fallbackPlan(prompt, context = {}) {
       return {
         intent: "sleep",
         title: "Lectura de noche",
-        response_text: "Esto suena a bucle de scroll de noche. Antes de bloquear nada, necesito tu hora objetivo para dormir.",
+        response_text: asksForAdvice(prompt)
+          ? "Empieza antes de meterte en la cama: carga el móvil lejos, deja una alternativa corta preparada y evita decidir cuando ya estás cansado. Si quieres un plan de Blanked, dime a qué hora quieres dormir."
+          : "Esto suena a bucle de scroll de noche. Antes de bloquear nada, necesito tu hora objetivo para dormir.",
         bullets: [
           "Lectura: quieres que las noches se sientan menos automáticas.",
           "Patrón: la franja de riesgo depende de cuándo quieres dormir realmente.",
@@ -1055,7 +1058,7 @@ function fallbackPlan(prompt, context = {}) {
       intent: "sleep",
       title: "Bedtime Scroll Read",
       response_text: asksForAdvice(prompt)
-        ? "The useful move is to make scrolling harder before your usual sleep target, not when you are already in bed. What time do you normally want to be asleep?"
+        ? "Start before you get into bed: charge the phone away, have one short offline replacement ready, and avoid deciding when you are tired. If you want a Blanked plan, tell me your sleep target."
         : "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.",
       bullets: [
         "Read: you want nights to feel less automatic.",
@@ -1688,7 +1691,10 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map(normalizeAction).filter(Boolean) : [];
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
+  const promptIntent = classify(prompt);
+  const adviceOnly = asksForAdvice(prompt) && ["sleep", "social", "general"].includes(promptIntent) && !hasExplicitBlockRequest(prompt) && !proactiveTrigger(prompt, context);
   if (proactiveTrigger(prompt, context)) return fallbackActions.slice(0, 4);
+  if (adviceOnly) return [];
   if (fallbackActions.length === 0 && deterministicNoActionTitle(fallback.title)) return [];
   const fallbackNeedsSetup = fallbackActions.some((item) => (actionNeedsSelection(item.type) && !selected) || (actionNeedsScreenTime(item.type) && !authorized));
   if (fallbackActions.some((item) => item.type === "switch_mode") && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
@@ -1723,7 +1729,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
 
   if (gated.length > 0) return gated;
 
-  if (fallbackActions.length > 0 && !promptHasFutureTiming(prompt)) return fallbackActions.slice(0, 4).map(normalizeAction).filter(Boolean);
+  if (fallbackActions.length > 0 && !adviceOnly && !promptHasFutureTiming(prompt)) return fallbackActions.slice(0, 4).map(normalizeAction).filter(Boolean);
   return [];
 }
 
@@ -1851,7 +1857,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-            "You are BAI, Blanked's personal assistant for healthier screen habits. The visible reply must feel like a sharp WhatsApp assistant, not a product template or a report. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move Blanked can actually execute. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Use light emoji only when it feels natural in chat, especially for confirmations, corrections or small wins; do not decorate every message. Recommend actions when they are useful and executable: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action: if the person describes a recurring risk moment, prefer apply_schedule over a vague immediate block. Do not use apply_schedule as a reminder or notification. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked when relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-3 natural sentences. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+            "You are BAI, Blanked's personal assistant for healthier screen habits. The visible reply must feel like a sharp WhatsApp assistant, not a product template or a report. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move. BAI is conversational first: if the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Use light emoji only when it feels natural in chat, especially for confirmations, corrections or small wins; do not decorate every message. Recommend executable actions only when they are clearly useful or explicitly requested: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Do not use apply_schedule as a reminder or notification. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked when relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-3 natural sentences. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",

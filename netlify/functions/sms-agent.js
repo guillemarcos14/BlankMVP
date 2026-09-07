@@ -180,7 +180,7 @@ function escapeXml(value) {
 
 function connectReply(from, channel) {
   const label = channel === "whatsapp" ? "WhatsApp" : "SMS";
-  return `Connected. BAI will use ${label} for this number${from ? ` (${from})` : ""}.`;
+  return `Hey! Blanked here 👋 Connected. BAI will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
 function actionIntro(actions) {

@@ -2734,6 +2734,8 @@ private struct AssistantConnectSheet: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let contentWidth = min(max(0, proxy.size.width - 48), 360)
+
             ZStack {
                 AppBackground(isActive: sessionStore.isBlankActive)
                     .ignoresSafeArea()
@@ -2787,6 +2789,7 @@ private struct AssistantConnectSheet: View {
                                 title: "Connect WhatsApp",
                                 subtitle: "Recommended",
                                 systemImage: "message.fill",
+                                usesWhatsAppLogo: true,
                                 enabled: whatsAppNumber != nil,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
@@ -2798,6 +2801,7 @@ private struct AssistantConnectSheet: View {
                                 title: "Connect SMS",
                                 subtitle: "Same code, same assistant",
                                 systemImage: "message",
+                                usesWhatsAppLogo: false,
                                 enabled: smsNumber != nil,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
@@ -2838,9 +2842,10 @@ private struct AssistantConnectSheet: View {
 
                         Spacer(minLength: 0)
                     }
-                    .padding(24)
-                    .padding(.top, 12)
-                    .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .topLeading)
+                    .padding(.top, 36)
+                    .padding(.bottom, 24)
+                    .frame(width: contentWidth, minHeight: proxy.size.height, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
@@ -2858,9 +2863,9 @@ private struct AssistantConnectSheet: View {
 
     private var statusText: String {
         guard !connectedAt.isEmpty else {
-            return "Open a channel and send this code to verify Assistant."
+            return "Send this code once to verify Assistant."
         }
-        return "Waiting for \(preferredChannelName) to confirm CONNECT."
+        return "Finish in \(preferredChannelName) by sending the CONNECT code."
     }
 
     private var preferredChannelName: String {
@@ -2943,6 +2948,7 @@ private struct AssistantChannelButton: View {
     let title: String
     let subtitle: String
     let systemImage: String
+    let usesWhatsAppLogo: Bool
     let enabled: Bool
     let textColor: Color
     let secondaryColor: Color
@@ -2951,10 +2957,18 @@ private struct AssistantChannelButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .background { Circle().fill(textColor.opacity(0.10)) }
+                ZStack {
+                    Circle().fill(textColor.opacity(0.10))
+                    if usesWhatsAppLogo {
+                        WhatsAppMark()
+                            .stroke(textColor, style: StrokeStyle(lineWidth: 1.8, lineCap: .round, lineJoin: .round))
+                            .frame(width: 17, height: 17)
+                    } else {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                }
+                .frame(width: 34, height: 34)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -2983,6 +2997,34 @@ private struct AssistantChannelButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
+    }
+}
+
+private struct WhatsAppMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let bubble = CGRect(
+            x: rect.minX + rect.width * 0.05,
+            y: rect.minY + rect.height * 0.05,
+            width: rect.width * 0.90,
+            height: rect.height * 0.82
+        )
+        path.addEllipse(in: bubble)
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.30, y: rect.minY + rect.height * 0.78))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.18, y: rect.minY + rect.height * 0.96))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.minY + rect.height * 0.84))
+
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.36, y: rect.minY + rect.height * 0.32))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + rect.width * 0.68, y: rect.minY + rect.height * 0.62),
+            control1: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.minY + rect.height * 0.52),
+            control2: CGPoint(x: rect.minX + rect.width * 0.54, y: rect.minY + rect.height * 0.62)
+        )
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.35, y: rect.minY + rect.height * 0.32))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.42, y: rect.minY + rect.height * 0.42))
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.68, y: rect.minY + rect.height * 0.62))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.57, y: rect.minY + rect.height * 0.54))
+        return path
     }
 }
 

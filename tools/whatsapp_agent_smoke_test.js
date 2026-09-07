@@ -84,6 +84,53 @@ async function connectMessage() {
   assert.strictEqual(body.results[0].reason, "missing_whatsapp_credentials");
 }
 
+async function connectGreeting() {
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  let outboundText = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    outboundText = JSON.parse(options.body).text.body;
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      from: "34600000000",
+                      id: "wamid.connect.greeting",
+                      text: { body: "CONNECT ABC123" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.match(outboundText, /Hey! Blanked here/);
+    assert.match(outboundText, /Connected/);
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
 async function linkIncludesRequestedApps() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
@@ -122,7 +169,7 @@ async function linkIncludesRequestedApps() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /blank:\/\/setup-plan\?/);
+    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=setup-plan/);
     assert.match(outboundText, /apps=Instagram%2CTikTok%2CX/);
   } finally {
     global.fetch = originalFetch;
@@ -135,6 +182,7 @@ async function linkIncludesRequestedApps() {
   await verifyWebhook();
   await receiveMessage();
   await connectMessage();
+  await connectGreeting();
   await linkIncludesRequestedApps();
   console.log("whatsapp-agent smoke tests passed");
 })().catch((error) => {

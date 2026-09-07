@@ -254,7 +254,7 @@ async function processMessage(message) {
     await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
     return sendWhatsAppMessage(
       message.from,
-      "Connected. Blanked will use this WhatsApp thread for your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
+      "Hey! Blanked here 👋 Connected. This WhatsApp thread is now linked to your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
     );
   }
 

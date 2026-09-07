@@ -358,15 +358,6 @@ struct BlankQuickBlockWidget: Widget {
     let kind = "BlankQuickBlockWidget"
 
     var body: some WidgetConfiguration {
-        if #available(iOSApplicationExtension 17.0, *) {
-            baseConfiguration
-                .contentMarginsDisabled()
-        } else {
-            baseConfiguration
-        }
-    }
-
-    private var baseConfiguration: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: BlankWidgetProvider()) { entry in
             BlankWidgetView(entry: entry)
         }

@@ -215,6 +215,16 @@ function localizeText(value, language) {
     .replace(/\bnon-work use\b/gi, "uso no laboral")
     .replace(/\bnot a generic focus issue\b/gi, "no es un problema genérico de foco");
   translated = translated
+    .replace(/\bscreen-hábito\b/gi, "hábitos digitales")
+    .replace(/\bprotección plan\b/gi, "plan de protección")
+    .replace(/\bif you want a go further\b/gi, "si quieres ir más allá")
+    .replace(/\bif you want to go further\b/gi, "si quieres ir más allá")
+    .replace(/\bI can help with hábitos digitales advice, a diagnosis or a plan de protección si quieres ir más allá\./gi, "Puedo ayudarte con consejo sobre hábitos digitales, una lectura del patrón o un plan de protección si quieres ir más allá.")
+    .replace(/\bhábitos digitales advice\b/gi, "consejo sobre hábitos digitales")
+    .replace(/\ba diagnosis\b/gi, "una lectura del patrón")
+    .replace(/\bdime whether\b/gi, "dime si")
+    .replace(/\bdime si you want advice or a plan\b/gi, "Dime si quieres consejo o un plan")
+    .replace(/\bconsejo or a plan\b/gi, "consejo o un plan")
     .replace(/^Lectura: you want protection after lunch\.$/i, "Lectura: quieres protección después de comer.")
     .replace(/^Lectura: you want protection after dinner\.$/i, "Lectura: quieres protección después de cenar.")
     .replace(/^Lectura: you want protection after waking up\.$/i, "Lectura: quieres proteger la primera revisión del móvil.")
@@ -715,7 +725,11 @@ function proactiveTrigger(prompt, context = {}) {
 }
 
 function proactiveSignals(context = {}, prompt = "") {
-  const source = context.signals && typeof context.signals === "object" ? context.signals : context;
+  const source = {
+    ...context,
+    ...((context.metrics && typeof context.metrics === "object") ? context.metrics : {}),
+    ...((context.signals && typeof context.signals === "object") ? context.signals : {}),
+  };
   const text = cleanText(prompt, 600).toLowerCase();
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours : [];

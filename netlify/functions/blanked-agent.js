@@ -721,13 +721,17 @@ function proactiveSignals(context = {}, prompt = "") {
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours : [];
   const textDelta = text.match(/(\d{1,3})\s*%\s*(?:above|over|higher|more|por encima|mas|más)/i);
   const socialDelta = cleanNumber(source.social_use_delta_percent ?? source.app_use_delta_percent ?? source.screen_time_delta_percent ?? (textDelta ? textDelta[1] : null), 0, -100, 500);
-  const breakCount = cleanNumber(source.break_count_today ?? source.relapse_count_today ?? source.unlock_count_today, 0, 0, 50);
+  const breakCount = cleanNumber(source.break_count_today ?? source.relapse_count_today ?? source.unlock_count_today ?? source.weekly_break_count, 0, 0, 50);
   const selectedHour = source.weak_hour ?? source.risk_hour ?? weakHours[0];
   const riskHour = Number.isFinite(Number(selectedHour)) ? cleanNumber(selectedHour, 21, 0, 23) : null;
   const riskWindow = riskHour == null ? cleanText(source.risk_window || context.risk_window, 60) : hourWindow(riskHour);
   const category = cleanText(source.category || source.dominant_category || namedApp(prompt), 40);
   const healthSleepDelta = cleanNumber(source.sleep_delta_minutes ?? source.sleep_deficit_minutes, 0, -720, 720);
-  return { socialDelta, breakCount, riskHour, riskWindow, category, healthSleepDelta };
+  const signalType = cleanText(source.signal_type, 60);
+  const thresholdMinutes = cleanNumber(source.threshold_minutes, 0, 0, 1440);
+  const sleepMinutes = cleanNumber(source.sleep_minutes, 0, -1, 1440);
+  const relapseRiskScore = cleanNumber(source.relapse_risk_score, 0, 0, 100);
+  return { socialDelta, breakCount, riskHour, riskWindow, category, healthSleepDelta, signalType, thresholdMinutes, sleepMinutes, relapseRiskScore };
 }
 
 function proactivePlan(prompt, context = {}, language = "en") {
@@ -763,7 +767,30 @@ function proactivePlan(prompt, context = {}, language = "en") {
   }
   if (!selected || !authorized) return { ...base, actions: [action("apply_schedule", { name: "Proactive Protection", start_minute: 21 * 60, end_minute: 22 * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 3 })] };
 
-  if (signal.breakCount >= 2) {
+  if (signal.signalType === "daily_limit_reached") {
+    const minutes = signal.thresholdMinutes > 0 ? signal.thresholdMinutes : 25;
+    return {
+      ...base,
+      intent: "social",
+      title: language === "es" ? "Límite alcanzado" : "Limit Reached",
+      response_text: language === "es" ? `Interrumpo porque tus apps de distracción ya han llegado a ${minutes} minutos hoy; ahora conviene mantener el bloqueo y cerrar el bucle.` : `I am interrupting because your distracting apps reached ${minutes} minutes today; the useful move is to keep protection on and close the loop.`,
+      bullets: language === "es" ? [
+        `Lectura: el límite de ${minutes} minutos se ha alcanzado.`,
+        "Patrón: cuando el límite salta, añadir más elección suele empeorar el impulso.",
+        "Movimiento: mantén la protección activa y revisa esta franja después."
+      ] : [
+        `Read: the ${minutes} minute limit was reached.`,
+        "Pattern: once the limit fires, more choice usually feeds the urge.",
+        "Move: keep protection active and review this window later."
+      ],
+      primary_label: language === "es" ? "Mantener bloqueo" : "Keep blocking",
+      actions: [],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  if (signal.breakCount >= 2 || signal.signalType === "repeated_relapses") {
     return {
       ...base,
       intent: "emergency",
@@ -780,6 +807,29 @@ function proactivePlan(prompt, context = {}, language = "en") {
       ],
       primary_label: language === "es" ? "Bloqueo fuerte" : "Start hard block",
       actions: [action("start_protection", { minutes: 25, hard_mode: true })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  if (signal.signalType === "weak_window_near") {
+    const start = signal.riskHour != null ? (signal.riskHour * 60 + 10) % (24 * 60) : 21 * 60;
+    const end = (start + 50) % (24 * 60);
+    return {
+      ...base,
+      intent: "social",
+      title: language === "es" ? "Franja débil cerca" : "Weak Window Near",
+      response_text: language === "es" ? `Interrumpo porque ${signal.riskWindow || "tu franja débil"} está cerca y el riesgo ya es alto.` : `I am interrupting because ${signal.riskWindow || "your weak window"} is close and the risk is already high.`,
+      bullets: language === "es" ? [
+        `Lectura: riesgo ${signal.relapseRiskScore || "alto"} antes de la franja débil.`,
+        "Patrón: bloquear antes funciona mejor que resistir cuando el scroll ya empezó.",
+        "Movimiento: aplica una protección corta ahora."
+      ] : [
+        `Read: risk is ${signal.relapseRiskScore || "high"} before the weak window.`,
+        "Pattern: blocking before works better than resisting after scrolling starts.",
+        "Move: apply a short protection window now."
+      ],
+      actions: [action("apply_schedule", { name: "Weak Window", start_minute: start, end_minute: end, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 3 })],
       requires_selected_apps: true,
       requires_screen_time_authorization: true,
     };
@@ -809,7 +859,7 @@ function proactivePlan(prompt, context = {}, language = "en") {
     };
   }
 
-  if (signal.healthSleepDelta <= -45) {
+  if (signal.healthSleepDelta <= -45 || signal.signalType === "low_recovery" || (signal.sleepMinutes > 0 && signal.sleepMinutes < 360)) {
     return {
       ...base,
       intent: "sleep",
@@ -1629,6 +1679,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const modelProposedAction = Array.isArray(plan.actions) && plan.actions.some((item) => item && item.type && item.type !== "none");
   const shouldUseFallbackPresentation =
+    proactiveTrigger(prompt, context) ||
     deterministicNoActionTitle(fallback.title) ||
     deterministicActionTitle(fallback.title) ||
     (hasExecutableActions && actions.some((item) => item.type === "apply_schedule") && Boolean(explicitTimeWindow(prompt) || anchorWindow(prompt))) ||

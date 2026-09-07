@@ -26,26 +26,31 @@ function rawBody(event) {
 }
 
 function parseSmsBody(event) {
-  const contentType = event.headers["content-type"] || event.headers["Content-Type"] || "";
+  const headers = event.headers || {};
+  const contentType = headers["content-type"] || headers["Content-Type"] || "";
   const raw = rawBody(event);
   if (contentType.includes("application/json")) {
     try {
       const parsed = JSON.parse(raw || "{}");
+      const media = mediaItemsFromObject(parsed);
       return {
         from: cleanText(parsed.from || parsed.From, 80),
         body: cleanText(parsed.body || parsed.Body || parsed.text, 800),
         messageSid: cleanText(parsed.messageSid || parsed.MessageSid || parsed.SmsMessageSid, 80),
+        media,
       };
     } catch {
-      return { from: "", body: "", messageSid: "" };
+      return { from: "", body: "", messageSid: "", media: [] };
     }
   }
 
   const params = new URLSearchParams(raw);
+  const media = mediaItemsFromParams(params);
   return {
     from: cleanText(params.get("From") || params.get("from"), 80),
     body: cleanText(params.get("Body") || params.get("body"), 800),
     messageSid: cleanText(params.get("MessageSid") || params.get("SmsMessageSid") || params.get("MessageID"), 80),
+    media,
   };
 }
 
@@ -55,6 +60,109 @@ function channelFromSender(from) {
 
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().slice(0, maxLength);
+}
+
+function mediaItemsFromObject(parsed) {
+  const items = [];
+  const count = Number(parsed.NumMedia || parsed.numMedia || 0);
+  for (let index = 0; index < Math.min(Math.max(count || 0, 0), 10); index += 1) {
+    const url = cleanText(parsed[`MediaUrl${index}`] || parsed[`mediaUrl${index}`], 1200);
+    const contentType = cleanText(parsed[`MediaContentType${index}`] || parsed[`mediaContentType${index}`], 120);
+    if (url) items.push({ url, contentType });
+  }
+  if (Array.isArray(parsed.media)) {
+    for (const item of parsed.media.slice(0, 10)) {
+      const url = cleanText(item?.url || item?.mediaUrl, 1200);
+      const contentType = cleanText(item?.contentType || item?.mediaContentType, 120);
+      if (url) items.push({ url, contentType });
+    }
+  }
+  return items;
+}
+
+function mediaItemsFromParams(params) {
+  const items = [];
+  const count = Number(params.get("NumMedia") || params.get("numMedia") || 0);
+  for (let index = 0; index < Math.min(Math.max(count || 0, 0), 10); index += 1) {
+    const url = cleanText(params.get(`MediaUrl${index}`) || params.get(`mediaUrl${index}`), 1200);
+    const contentType = cleanText(params.get(`MediaContentType${index}`) || params.get(`mediaContentType${index}`), 120);
+    if (url) items.push({ url, contentType });
+  }
+  return items;
+}
+
+function audioMedia(media) {
+  return (Array.isArray(media) ? media : []).find((item) => /^audio\//i.test(item.contentType || ""));
+}
+
+function audioExtension(contentType) {
+  const type = cleanText(contentType, 120).toLowerCase();
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+  if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+  if (type.includes("wav")) return "wav";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("amr")) return "amr";
+  return "audio";
+}
+
+function twilioAuthHeader() {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!sid || !token) return "";
+  return `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`;
+}
+
+async function downloadTwilioMedia(item) {
+  const headers = {};
+  const authorization = twilioAuthHeader();
+  if (authorization) headers.authorization = authorization;
+  const response = await fetch(item.url, { headers });
+  if (!response.ok) {
+    throw new Error(`twilio_media_download_failed_${response.status}`);
+  }
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > 24 * 1024 * 1024) {
+    throw new Error("twilio_audio_too_large");
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
+async function transcribeAudio(item) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const audio = await downloadTwilioMedia(item);
+  if (audio.length > 24 * 1024 * 1024) {
+    throw new Error("twilio_audio_too_large");
+  }
+
+  const contentType = item.contentType || "application/octet-stream";
+  const extension = audioExtension(contentType);
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_TRANSCRIPTION_MODEL || "whisper-1");
+  form.append("file", new Blob([audio], { type: contentType }), `whatsapp-audio.${extension}`);
+
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: form,
+  });
+  const raw = await response.text();
+  let parsed = {};
+  try {
+    parsed = raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    parsed = {};
+  }
+  if (!response.ok) {
+    throw new Error(`openai_transcription_failed_${response.status}:${cleanText(parsed.error?.message || raw, 180)}`);
+  }
+  return cleanText(parsed.text, 800);
 }
 
 function twiml(message) {
@@ -255,16 +363,26 @@ exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
 
-  const { from, body } = parseSmsBody(event);
-  if (!body) {
+  const { from, body, media } = parseSmsBody(event);
+  const audio = audioMedia(media);
+  let prompt = body;
+  if (!prompt && audio) {
+    try {
+      prompt = await transcribeAudio(audio);
+    } catch (error) {
+      return text(200, twiml("I could not understand that voice note yet. Send it as text or try another audio."), "application/xml; charset=utf-8");
+    }
+  }
+
+  if (!prompt) {
     return json(400, { error: "missing_sms_body" });
   }
 
-  const connectCode = connectCodeFromText(body);
+  const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
   const reply = connectCode
     ? (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel))
-    : await askBAI(body, from, channel);
+    : await askBAI(prompt, from, channel);
 
   return text(200, twiml(reply), "application/xml; charset=utf-8");
 };

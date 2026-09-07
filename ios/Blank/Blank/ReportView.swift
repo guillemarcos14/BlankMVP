@@ -202,6 +202,28 @@ struct ReportView: View {
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
     }
 
+    private func scheduleForecastBlock(_ forecast: ControlForecast, source: String) {
+        let startMinute = forecast.activationStartMinute
+        let endMinute = forecast.activationEndMinute
+        sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: 1)
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        Task {
+            await BlankFunnelAnalytics.track(
+                "ai_plan_applied",
+                properties: [
+                    "source": source,
+                    "start_minute": startMinute,
+                    "end_minute": endMinute,
+                    "duration_days": 1
+                ]
+            )
+        }
+    }
+
+    private func forecastActivationButtonTitle(_ forecast: ControlForecast) -> String {
+        "Activate at \(minuteText(forecast.activationStartMinute))"
+    }
+
     private func reportHeader() -> some View {
         TopSheetHeader(
             title: "Stats",
@@ -566,9 +588,9 @@ struct ReportView: View {
                     .background { Capsule().fill(Color.white.opacity(0.16)) }
             } else {
                 Button {
-                    startBlank()
+                    scheduleForecastBlock(forecast, source: "stats_next_best_block")
                 } label: {
-                    Text("Activate Blanked")
+                    Text(forecastActivationButtonTitle(forecast))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
@@ -936,44 +958,6 @@ struct ReportView: View {
                         .background { Capsule().fill(accentBlue.opacity(0.24)) }
                 }
                 .buttonStyle(.plain)
-
-                Button {
-                    let easierDuration = max(15, system.plan.recommendedDurationMinutes - 15)
-                    sessionStore.applyAIPlan(durationMinutes: easierDuration)
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "report_visual_easier", "duration_minutes": easierDuration]
-                        )
-                    }
-                } label: {
-                    Text("Easier")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background { Capsule().fill(Color.white.opacity(0.12)) }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    let harderDuration = min(120, system.plan.recommendedDurationMinutes + 15)
-                    sessionStore.applyAIPlan(durationMinutes: harderDuration)
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "report_visual_harder", "duration_minutes": harderDuration]
-                        )
-                    }
-                } label: {
-                    Text("Harder")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background { Capsule().fill(Color.white.opacity(0.12)) }
-                }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1181,46 +1165,6 @@ struct ReportView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background { Capsule().fill(accentBlue.opacity(0.22)) }
-                }
-                .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 8) {
-                Button {
-                    let easierDuration = max(15, system.plan.recommendedDurationMinutes - 15)
-                    sessionStore.applyAIPlan(durationMinutes: easierDuration)
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "report_make_easier", "duration_minutes": easierDuration]
-                        )
-                    }
-                } label: {
-                    Text("Easier")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background { Capsule().fill(Color.white.opacity(0.12)) }
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    let harderDuration = min(120, system.plan.recommendedDurationMinutes + 15)
-                    sessionStore.applyAIPlan(durationMinutes: harderDuration)
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "report_make_harder", "duration_minutes": harderDuration]
-                        )
-                    }
-                } label: {
-                    Text("Harder")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
-                        .background { Capsule().fill(Color.white.opacity(0.12)) }
                 }
                 .buttonStyle(.plain)
             }
@@ -1673,9 +1617,9 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
             } else {
                 Button {
-                    startBlank()
+                    scheduleForecastBlock(forecast, source: "stats_control_forecast")
                 } label: {
-                    Text("Activate Blanked")
+                    Text(forecastActivationButtonTitle(forecast))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
@@ -2657,7 +2601,7 @@ struct ReportView: View {
         if let averageManualMinutes {
             relapseReview.append("Average protection before a hold exit is \(averageManualMinutes) min.")
         } else {
-            relapseReview.append("After a hold exit, Blanked waits 60s before unlocking and records the signal.")
+            relapseReview.append("After a hold exit, Blanked waits \(sessionStore.manualUnblankCooldownSeconds)s before unlocking and records the signal.")
         }
         relapseReview.append(recentSessions.count >= 3 ? "Review result: keep the same mode for the next 3 starts." : "Review result: collect 3 starts before changing the plan.")
 
@@ -3685,6 +3629,14 @@ private struct ControlForecast {
     let durationMinutes: Int
     let reasons: [String]
     let plan: [String]
+
+    var activationStartMinute: Int {
+        ((max(0, min(23, weakHour)) * 60) + (24 * 60 - 10)) % (24 * 60)
+    }
+
+    var activationEndMinute: Int {
+        ((max(0, min(23, weakHour)) + 1) * 60) % (24 * 60)
+    }
 }
 
 private struct ReportLiquidBackground: View {

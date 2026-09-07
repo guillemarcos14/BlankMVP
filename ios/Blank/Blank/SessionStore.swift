@@ -5,7 +5,6 @@ import WidgetKit
 @MainActor
 final class SessionStore: ObservableObject {
     static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
-    private static let manualUnblankCooldown: TimeInterval = 3
 
     @Published var isBlankActive: Bool {
         didSet {
@@ -72,6 +71,17 @@ final class SessionStore: ObservableObject {
 
     @Published var focusSoundscapeEnabled: Bool {
         didSet { defaults.set(focusSoundscapeEnabled, forKey: Keys.focusSoundscapeEnabled) }
+    }
+
+    @Published var manualUnblankCooldownSeconds: Int {
+        didSet {
+            let clamped = min(max(manualUnblankCooldownSeconds, 0), 300)
+            if manualUnblankCooldownSeconds != clamped {
+                manualUnblankCooldownSeconds = clamped
+                return
+            }
+            defaults.set(manualUnblankCooldownSeconds, forKey: Keys.manualUnblankCooldownSeconds)
+        }
     }
 
     @Published var nfcTagUid: String? {
@@ -172,6 +182,8 @@ final class SessionStore: ObservableObject {
         }
         pinProtectionEnabled = defaults.bool(forKey: Keys.pinProtectionEnabled)
         focusSoundscapeEnabled = defaults.bool(forKey: Keys.focusSoundscapeEnabled)
+        let storedManualCooldown = defaults.object(forKey: Keys.manualUnblankCooldownSeconds) as? Int
+        manualUnblankCooldownSeconds = min(max(storedManualCooldown ?? 60, 0), 300)
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
         let loadedSelection = Self.loadSelection(from: defaults)
@@ -326,7 +338,7 @@ final class SessionStore: ObservableObject {
             return .blanked
         }
         if let lastManualUnblankedAt,
-           Date().timeIntervalSince(lastManualUnblankedAt) < Self.manualUnblankCooldown {
+           Date().timeIntervalSince(lastManualUnblankedAt) < TimeInterval(manualUnblankCooldownSeconds) {
             return .unblanked
         }
 
@@ -971,6 +983,7 @@ final class SessionStore: ObservableObject {
             Keys.vacationModeUntil,
             Keys.pinProtectionEnabled,
             Keys.focusSoundscapeEnabled,
+            Keys.manualUnblankCooldownSeconds,
             Keys.nfcTagUid,
             Keys.setupComplete,
             Keys.selection,
@@ -1013,6 +1026,7 @@ final class SessionStore: ObservableObject {
         static let vacationModeUntil = "blankVacationModeUntil"
         static let pinProtectionEnabled = "blankPinProtectionEnabled"
         static let focusSoundscapeEnabled = "blankFocusSoundscapeEnabled"
+        static let manualUnblankCooldownSeconds = "blankManualUnblankCooldownSeconds"
         static let nfcTagUid = "nfcTagUid"
         static let setupComplete = "setupComplete"
         static let selection = BlankSharedState.Keys.selection

@@ -169,13 +169,12 @@ struct HomeView: View {
             guard shouldScan else { return }
             openWidgetScanIfNeeded()
         }
-        .sheet(isPresented: $showingAssistantConnect) {
+        .fullScreenCover(isPresented: $showingAssistantConnect) {
             AssistantConnectSheet(
                 whatsAppNumber: configuredWhatsAppNumber(),
                 smsNumber: configuredSMSNumber(),
                 openURL: openURL
             )
-            .presentationDetents([.medium])
         }
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
@@ -188,7 +187,7 @@ struct HomeView: View {
             }
             .presentationDetents([.medium])
         }
-        .sheet(isPresented: $showingRelapseReview) {
+        .fullScreenCover(isPresented: $showingRelapseReview) {
             RelapseReviewSheet(
                 intervention: relapseIntervention,
                 onSelect: { reason in
@@ -202,7 +201,7 @@ struct HomeView: View {
                     }
                 }
             )
-            .presentationDetents([.medium])
+            .preferredColorScheme(.light)
         }
     }
 
@@ -601,6 +600,13 @@ struct HomeView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            if let cooldownText {
+                Text(cooldownText)
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .monospacedDigit()
+                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.62) : BlankColors.mutedInk)
+            }
         }
     }
 
@@ -719,17 +725,18 @@ struct HomeView: View {
 
     private func scheduleDelayedManualUnlock() {
         guard delayedManualUnlockTask == nil else { return }
-        let unlockAt = Date().addingTimeInterval(60)
+        let cooldownSeconds = sessionStore.manualUnblankCooldownSeconds
+        let unlockAt = Date().addingTimeInterval(TimeInterval(cooldownSeconds))
         delayedManualUnlockAt = unlockAt
         updateDelayedUnlockMessage(now: Date())
         Task {
             await BlankFunnelAnalytics.track(
                 "relapse_attempt",
-                properties: ["source": "hold_to_unblank", "delay_seconds": 60]
+                properties: ["source": "hold_to_unblank", "delay_seconds": cooldownSeconds]
             )
         }
         delayedManualUnlockTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(max(0, cooldownSeconds)) * 1_000_000_000)
             guard !Task.isCancelled else { return }
             let result = withAnimation(.easeInOut(duration: 0.65)) {
                 sessionStore.deactivateBlank(entryMode: .app, endedReason: .manual)
@@ -751,8 +758,20 @@ struct HomeView: View {
     private func updateDelayedUnlockMessage(now: Date) {
         guard let delayedManualUnlockAt else { return }
         let seconds = max(0, Int(ceil(delayedManualUnlockAt.timeIntervalSince(now))))
-        message = seconds > 0 ? "Unlocking in \(seconds)s" : "Unlocking..."
+        message = seconds > 0 ? "Cooldown active" : "Unlocking..."
         messageAction = nil
+    }
+
+    private var cooldownText: String? {
+        guard let delayedManualUnlockAt else { return nil }
+        let seconds = max(0, Int(ceil(delayedManualUnlockAt.timeIntervalSince(now))))
+        return "Cooldown: \(formatCooldown(seconds))"
+    }
+
+    private func formatCooldown(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        return "\(String(format: "%02d", minutes)):\(String(format: "%02d", remainingSeconds))"
     }
 
     private var aiRiskNotification: some View {
@@ -1631,6 +1650,15 @@ private struct AdvancedModeControls: View {
     let textColor: Color
     let secondaryColor: Color
 
+    private var cooldownSettingText: String {
+        let seconds = sessionStore.manualUnblankCooldownSeconds
+        if seconds == 0 { return "Off" }
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        if minutes == 0 { return "\(remainingSeconds)s" }
+        return remainingSeconds == 0 ? "\(minutes)m" : "\(minutes)m \(remainingSeconds)s"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Advanced")
@@ -1645,6 +1673,21 @@ private struct AdvancedModeControls: View {
 
             Toggle("PIN protection", isOn: $sessionStore.pinProtectionEnabled)
                 .advancedControlStyle(textColor: textColor)
+
+            Stepper(value: $sessionStore.manualUnblankCooldownSeconds, in: 0...300, step: 15) {
+                HStack {
+                    Text("Unblank cooldown")
+                    Spacer()
+                    Text(cooldownSettingText)
+                        .monospacedDigit()
+                        .foregroundStyle(secondaryColor)
+                }
+            }
+            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 18)
+            .frame(height: 52)
+            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.16)
 
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Daily time limit", isOn: $sessionStore.dailyLimitEnabled)
@@ -1667,19 +1710,6 @@ private struct AdvancedModeControls: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(shortcutsText)
-                    .font(.caption)
-                    .foregroundStyle(secondaryColor)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    shortcutPill("Start URL", value: "blank://start")
-                    shortcutPill("Stop URL", value: "blank://stop")
-                }
-            }
-            .padding(.top, 2)
-
             if sessionStore.allowOnlyModeEnabled && sessionStore.selection.applicationTokens.isEmpty && sessionStore.selection.webDomainTokens.isEmpty {
                 Button {
                     showingPicker = true
@@ -1695,27 +1725,6 @@ private struct AdvancedModeControls: View {
                 .buttonStyle(.plain)
             }
         }
-    }
-
-    private var shortcutsText: String {
-        "iOS Shortcuts can open these links automatically. Use Start to turn Blanked on and Stop to turn it off from time, location, Focus, or app automations."
-    }
-
-    private func shortcutPill(_ title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(secondaryColor)
-            Text(value)
-                .font(.caption.monospaced())
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .frame(height: 52)
-        .blankGlassCard(cornerRadius: 16, tintOpacity: 0.18)
     }
 }
 
@@ -2272,6 +2281,7 @@ private struct ForgetBlankConfirmSheet: View {
             }
         }
     }
+
 }
 
 private struct RelapseReviewSheet: View {
@@ -2325,7 +2335,9 @@ private struct RelapseReviewSheet: View {
             .buttonStyle(.plain)
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(BlankColors.background.ignoresSafeArea())
+        .preferredColorScheme(.light)
     }
 }
 
@@ -2708,80 +2720,151 @@ private struct TimerScreen: View {
 }
 
 private struct AssistantConnectSheet: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
     @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @State private var copiedCode = false
 
     let whatsAppNumber: String?
     let smsNumber: String?
     let openURL: OpenURLAction
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Assistant")
-                .font(.blankInter(size: 38, weight: .medium, relativeTo: .largeTitle))
+        GeometryReader { proxy in
+            ZStack {
+                AppBackground(isActive: sessionStore.isBlankActive)
+                    .ignoresSafeArea()
 
-            Text("Connect WhatsApp or SMS to use Blanked outside the app. The app stays as your control center for blocks, Health, reports and settings.")
-                .foregroundStyle(.secondary)
-                .lineSpacing(2)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 22) {
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("Assistant")
+                                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                                    .lineLimit(1)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Phone")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(.secondary)
-                TextField("+1 555 000 0000", text: $phoneNumber)
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .padding(.horizontal, 16)
-                    .frame(height: 52)
-                    .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
-            }
+                                Text("Use Blanked from WhatsApp or SMS.")
+                                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                                    .foregroundStyle(secondaryColor)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
 
-            VStack(spacing: 10) {
-                Button {
-                    openAssistantChannel(.whatsApp)
-                } label: {
-                    Label("Connect WhatsApp", systemImage: "message.fill")
+                            Spacer(minLength: 16)
+
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .frame(width: 44, height: 44)
+                                    .background { Circle().fill(textColor.opacity(0.10)) }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Close Assistant")
+                        }
+
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Your phone")
+                                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                                .foregroundStyle(secondaryColor)
+                            TextField("+1 555 000 0000", text: $phoneNumber)
+                                .keyboardType(.phonePad)
+                                .textContentType(.telephoneNumber)
+                                .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                                .padding(.horizontal, 16)
+                                .frame(height: 52)
+                                .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
+                            Text("Used to match your CONNECT message.")
+                                .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                                .foregroundStyle(secondaryColor.opacity(0.82))
+                        }
+
+                        VStack(spacing: 10) {
+                            AssistantChannelButton(
+                                title: "Connect WhatsApp",
+                                subtitle: "Recommended",
+                                systemImage: "message.fill",
+                                enabled: whatsAppNumber != nil,
+                                textColor: textColor,
+                                secondaryColor: secondaryColor
+                            ) {
+                                openAssistantChannel(.whatsApp)
+                            }
+
+                            AssistantChannelButton(
+                                title: "Connect SMS",
+                                subtitle: "Same code, same assistant",
+                                systemImage: "message",
+                                enabled: smsNumber != nil,
+                                textColor: textColor,
+                                secondaryColor: secondaryColor
+                            ) {
+                                openAssistantChannel(.sms)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Code")
+                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
+                                    .foregroundStyle(secondaryColor)
+                                Spacer()
+                                Button(copiedCode ? "Copied" : "Copy") {
+                                    UIPasteboard.general.string = connectMessage
+                                    copiedCode = true
+                                }
+                                .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
+                                .foregroundStyle(secondaryColor)
+                                .buttonStyle(.plain)
+                            }
+
+                            Text(connectMessage)
+                                .font(.blankInter(size: 17, weight: .semibold, relativeTo: .body))
+                                .monospacedDigit()
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .frame(height: 54)
+                                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.22)
+
+                            Text(statusText)
+                                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+                                .foregroundStyle(secondaryColor)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+                    .padding(24)
+                    .padding(.top, 12)
+                    .frame(maxWidth: .infinity, minHeight: proxy.size.height, alignment: .topLeading)
                 }
-                .buttonStyle(BlankPrimaryButtonStyle())
-                .disabled(whatsAppNumber == nil)
-
-                Button {
-                    openAssistantChannel(.sms)
-                } label: {
-                    Label("Connect SMS", systemImage: "message")
-                }
-                .buttonStyle(BlankSecondaryButtonStyle())
-                .disabled(smsNumber == nil)
+                .scrollDismissesKeyboard(.interactively)
             }
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Code")
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
-                    .foregroundStyle(.secondary)
-                Text(connectMessage)
-                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
-                    .textSelection(.enabled)
-            }
-            .padding(.top, 2)
-
-            if !connectedAt.isEmpty {
-                Text("\(preferredChannel.capitalized) connection started \(connectedAt).")
-                    .font(.blankInter(size: 13, relativeTo: .footnote))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(BlankAtmosphericBackground())
+        .foregroundStyle(textColor)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             ensureConnectCode()
         }
+    }
+
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+
+    private var statusText: String {
+        guard !connectedAt.isEmpty else {
+            return "Open a channel and send this code to verify Assistant."
+        }
+        return "Waiting for \(preferredChannelName) to confirm CONNECT."
+    }
+
+    private var preferredChannelName: String {
+        preferredChannel == AssistantChannel.whatsApp.rawValue ? "WhatsApp" : "SMS"
     }
 
     private var connectMessage: String {
@@ -2853,6 +2936,53 @@ private struct AssistantConnectSheet: View {
             return nil
         }
         return URL(string: trimmed)
+    }
+}
+
+private struct AssistantChannelButton: View {
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let enabled: Bool
+    let textColor: Color
+    let secondaryColor: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background { Circle().fill(textColor.opacity(0.10)) }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                    Text(subtitle)
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(secondaryColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "arrow.up.forward")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(secondaryColor)
+            }
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .blankControlSurface(cornerRadius: 18, tintOpacity: enabled ? 0.12 : 0.06)
+            .opacity(enabled ? 1 : 0.46)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 }
 

@@ -76,6 +76,8 @@ struct BlankWidgetView: View {
     @Environment(\.widgetFamily) private var widgetFamily
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
+    private let textColumnInset: CGFloat = 7
+    private let timerTopInset: CGFloat = 15
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -84,8 +86,8 @@ struct BlankWidgetView: View {
 
             if showsTimerBadge {
                 timerBadge
-                    .padding(.top, 15)
-                    .padding(.leading, 15)
+                    .padding(.top, timerTopInset)
+                    .padding(.leading, textColumnInset)
             }
         }
             .blankWidgetBackground(isActive: entry.activeState.isActive, family: widgetFamily)
@@ -159,7 +161,7 @@ struct BlankWidgetView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .contentTransition(.opacity)
-            .padding(.leading, 7)
+            .padding(.leading, textColumnInset)
             .padding(.bottom, 7)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
@@ -179,46 +181,56 @@ struct BlankWidgetView: View {
 
     private var timerBadge: some View {
         Link(destination: URL(string: "blank://timer")!) {
-            Group {
-                if entry.activeState.isActive, let endsAt = entry.activeState.endsAt {
-                    Text(endsAt, style: .timer)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                } else if let pendingTimerMinutes = entry.pendingTimerMinutes {
-                    Text(formatTimerBadge(minutes: pendingTimerMinutes))
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                } else {
-                    Image(systemName: "clock")
-                        .font(.system(size: 15, weight: .semibold))
-                }
-            }
-            .foregroundStyle(Color.white)
-            .frame(width: badgeWidth, height: 34)
+            timerBadgeContent
+            .foregroundStyle(timerBadgeForeground)
+            .padding(.horizontal, timerBadgeHorizontalPadding)
+            .frame(minWidth: timerBadgeMinWidth, maxWidth: 76, minHeight: 30)
             .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .fill(Color(red: 0.78, green: 0.78, blue: 0.76).opacity(isActive ? 0.28 : 0.82))
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .stroke(Color.white.opacity(isActive ? 0.10 : 0.22), lineWidth: 1)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         }
     }
 
-    private var badgeWidth: CGFloat {
-        if entry.activeState.isActive, entry.activeState.endsAt != nil {
-            return 58
+    @ViewBuilder
+    private var timerBadgeContent: some View {
+        if entry.activeState.isActive, let endsAt = entry.activeState.endsAt {
+            ViewThatFits(in: .horizontal) {
+                Text(endsAt, style: .timer)
+                    .timerBadgeTextStyle()
+                Text(compactRemainingText(until: endsAt))
+                    .timerBadgeTextStyle()
+            }
+        } else if let pendingTimerMinutes = entry.pendingTimerMinutes {
+            Text(formatTimerBadge(minutes: pendingTimerMinutes))
+                .timerBadgeTextStyle()
+        } else {
+            Image(systemName: "clock")
+                .font(.system(size: 14, weight: .semibold))
         }
-        if let pendingTimerMinutes = entry.pendingTimerMinutes, pendingTimerMinutes >= 60 {
-            return 46
-        }
-        return entry.pendingTimerMinutes == nil ? 34 : 42
+    }
+
+    private var timerBadgeForeground: Color {
+        isActive ? Color.white : Color(red: 0.13, green: 0.13, blue: 0.12).opacity(0.86)
+    }
+
+    private var timerBadgeHorizontalPadding: CGFloat {
+        entry.pendingTimerMinutes == nil && !isActive ? 7 : 10
+    }
+
+    private var timerBadgeMinWidth: CGFloat {
+        entry.pendingTimerMinutes == nil && !isActive ? 30 : 42
+    }
+
+    private func compactRemainingText(until endsAt: Date) -> String {
+        let seconds = max(0, endsAt.timeIntervalSince(entry.date))
+        let minutes = max(1, Int(ceil(seconds / 60)))
+        return formatTimerBadge(minutes: minutes)
     }
 
     private func formatTimerBadge(minutes: Int) -> String {
@@ -228,6 +240,15 @@ struct BlankWidgetView: View {
         let hours = minutes / 60
         let rest = minutes % 60
         return rest == 0 ? "\(hours)h" : "\(hours)h\(rest)"
+    }
+}
+
+private extension View {
+    func timerBadgeTextStyle() -> some View {
+        font(.custom("Inter", size: 11.5, relativeTo: .caption2).weight(.semibold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.62)
     }
 }
 
@@ -343,6 +364,18 @@ struct BlankQuickBlockWidget: Widget {
         .configurationDisplayName("Blanked")
         .description("Start a quick block.")
         .supportedFamilies([.systemSmall, .accessoryInline, .accessoryCircular, .accessoryRectangular])
+        .blankWidgetContentMarginsDisabled()
+    }
+}
+
+private extension WidgetConfiguration {
+    @ViewBuilder
+    func blankWidgetContentMarginsDisabled() -> some WidgetConfiguration {
+        if #available(iOSApplicationExtension 17.0, *) {
+            contentMarginsDisabled()
+        } else {
+            self
+        }
     }
 }
 

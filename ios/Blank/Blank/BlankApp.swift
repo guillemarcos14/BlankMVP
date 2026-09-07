@@ -60,9 +60,15 @@ struct BlankApp: App {
     }
 
     private func handleDeepLink(_ url: URL) {
-        guard url.scheme == "blank" else { return }
-        let action = url.host ?? ""
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let action: String
+        if url.scheme == "blank" {
+            action = url.host ?? ""
+        } else if isBlankedUniversalLink(url) {
+            action = components?.stringQueryItem("action") ?? ""
+        } else {
+            return
+        }
 
         if action == "referral" {
             purchaseStore.captureReferral(from: url)
@@ -183,6 +189,11 @@ struct BlankApp: App {
             adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
         )
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+    }
+
+    private func isBlankedUniversalLink(_ url: URL) -> Bool {
+        guard url.scheme == "https", url.host == "blanked.app" else { return false }
+        return url.path == "/open" || url.path == "/open.html"
     }
 }
 

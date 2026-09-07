@@ -36,9 +36,9 @@
   </head>
   <body>
     <main>
-      <h1>Opening Blanked...</h1>
-      <p>If it does not open automatically, tap below.</p>
-      <a id="openLink" href="/">Open Blanked</a>
+      <h1>Open Blanked</h1>
+      <p>Install Blanked to use BAI and apply this action.</p>
+      <a id="openLink" href="https://apps.apple.com/">Open Blanked</a>
     </main>
     <script>
       const allowedActions = new Set([
@@ -55,26 +55,39 @@
         "mode"
       ]);
 
-      function validBlankLink(value) {
+      function validAction(value) {
+        return allowedActions.has(value || "");
+      }
+
+      function legacyTarget(value) {
         try {
           const url = new URL(value);
           const action = url.hostname || url.pathname.replace(/^\/+/, "");
-          return url.protocol === "blank:" && allowedActions.has(action);
+          return url.protocol === "blank:" && validAction(action) ? value : "";
         } catch (_) {
-          return false;
+          return "";
         }
       }
 
-      const target = new URLSearchParams(window.location.search).get("to") || "";
+      function targetFromQuery(params) {
+        const action = params.get("action") || "";
+        if (!validAction(action)) return legacyTarget(params.get("to") || "");
+        const target = new URL(`blank://${action}`);
+        for (const [key, value] of params.entries()) {
+          if (key === "action" || key === "to") continue;
+          target.searchParams.set(key, value);
+        }
+        return target.toString();
+      }
+
+      const target = targetFromQuery(new URLSearchParams(window.location.search));
       const link = document.getElementById("openLink");
-      if (validBlankLink(target)) {
+      if (target) {
         link.href = target;
         window.setTimeout(() => {
           window.location.href = target;
         }, 150);
       } else {
-        document.querySelector("h1").textContent = "Invalid Blanked link";
-        document.querySelector("p").textContent = "Open Blanked from the app instead.";
         link.style.display = "none";
       }
     </script>

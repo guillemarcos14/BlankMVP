@@ -1,0 +1,25 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "GS54UV79RG.com.blanknfc.app.ios",
+        "paths": [
+          "/open",
+          "/open/*",
+          "/open.html"
+        ],
+        "components": [
+          {
+            "/": "/open",
+            "comment": "Open Blanked action links"
+          },
+          {
+            "/": "/open.html",
+            "comment": "Legacy Blanked action bridge"
+          }
+        ]
+      }
+    ]
+  }
+}

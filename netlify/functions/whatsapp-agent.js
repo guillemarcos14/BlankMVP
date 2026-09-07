@@ -102,36 +102,44 @@ function appsQuery(appNames) {
   return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
 }
 
-function publicOpenLink(deepLink) {
-  return `https://getblank.netlify.app/open.html?to=${encodeURIComponent(deepLink)}`;
+function publicOpenLink(actionName, params = {}) {
+  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://blanked.app").replace(/\/$/, "");
+  const query = new URLSearchParams({ action: actionName });
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") continue;
+    query.set(key, String(value));
+  }
+  return `${base}/open?${query.toString()}`;
 }
 
 function appLink(action, appNames = []) {
-  const scheme = process.env.BLANKED_APP_DEEP_LINK_SCHEME || "blank";
   const type = action && action.type;
-  let deepLink = "";
   if (type === "start_protection") {
     const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
-    const hard = action.hard_mode ? "&hard=1" : "";
-    deepLink = `${scheme}://start-focus?minutes=${minutes}${hard}`;
+    return publicOpenLink("start-focus", { minutes, hard: action.hard_mode ? "true" : "" });
   }
-  else if (type === "apply_schedule") {
+  if (type === "apply_schedule") {
     const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
     const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
     if (start == null || end == null) return "";
     const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
-    deepLink = appNames.length
-      ? `${scheme}://setup-plan?start_minute=${start}&end_minute=${end}&days=${days}${appsQuery(appNames)}`
-      : `${scheme}://apply-plan?start=${start}&end=${end}&days=${days}`;
+    return publicOpenLink(appNames.length ? "setup-plan" : "apply-plan", {
+      start,
+      end,
+      days,
+      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
+    });
   }
-  else if (type === "enable_allow_only") deepLink = `${scheme}://allow-only`;
-  else if (type === "enable_adult_filter") deepLink = `${scheme}://adult-filter`;
-  else if (type === "set_daily_limit") deepLink = `${scheme}://daily-limit?minutes=${Number.isFinite(action.minutes) ? action.minutes : 25}`;
-  else if (type === "pause_rules") deepLink = `${scheme}://pause-rules?hours=${Number.isFinite(action.hours) ? action.hours : 168}`;
-  else if (type === "disable_pause") deepLink = `${scheme}://resume-rules`;
-  else if (type === "switch_mode" && action.name) deepLink = `${scheme}://mode?name=${encodeURIComponent(action.name)}`;
-  else if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") deepLink = `${scheme}://open-picker?source=assistant${appsQuery(appNames)}`;
-  return deepLink ? publicOpenLink(deepLink) : "";
+  if (type === "enable_allow_only") return publicOpenLink("allow-only");
+  if (type === "enable_adult_filter") return publicOpenLink("adult-filter");
+  if (type === "set_daily_limit") return publicOpenLink("daily-limit", { minutes: Number.isFinite(action.minutes) ? action.minutes : 25 });
+  if (type === "pause_rules") return publicOpenLink("pause-rules", { hours: Number.isFinite(action.hours) ? action.hours : 168 });
+  if (type === "disable_pause") return publicOpenLink("resume-rules");
+  if (type === "switch_mode" && action.name) return publicOpenLink("mode", { name: action.name });
+  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") {
+    return publicOpenLink("open-picker", { source: "assistant", apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
+  }
+  return "";
 }
 
 function actionableLink(plan, prompt = "") {

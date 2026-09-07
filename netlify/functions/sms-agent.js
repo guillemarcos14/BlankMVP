@@ -301,8 +301,14 @@ async function askBAI(prompt, from, channel) {
   return actionLink ? `${message}\n\n${actionIntro(plan.actions || [])}\n${actionLink}` : message;
 }
 
-function publicOpenLink(deepLink) {
-  return `https://getblank.netlify.app/open.html?to=${encodeURIComponent(deepLink)}`;
+function publicOpenLink(actionName, params = {}) {
+  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://blanked.app").replace(/\/$/, "");
+  const query = new URLSearchParams({ action: actionName });
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") continue;
+    query.set(key, String(value));
+  }
+  return `${base}/open?${query.toString()}`;
 }
 
 function appsQuery(appNames) {
@@ -315,35 +321,43 @@ function actionDeepLink(actions, appNames = []) {
   if (!first) return "";
 
   if (first.type === "start_protection") {
-    return publicOpenLink(`blank://start-focus?minutes=${clamp(first.minutes || 25, 5, 240)}${first.hard_mode ? "&hard=true" : ""}`);
+    return publicOpenLink("start-focus", {
+      minutes: clamp(first.minutes || 25, 5, 240),
+      hard: first.hard_mode ? "true" : "",
+    });
   }
   if (first.type === "apply_schedule") {
     const start = clamp(first.start_minute || 1260, 0, 1439);
     const end = clamp(first.end_minute || 1380, 0, 1439);
     const days = clamp(first.duration_days || 7, 1, 14);
     const route = Array.isArray(appNames) && appNames.length ? "setup-plan" : "apply-plan";
-    return publicOpenLink(`blank://${route}?start=${start}&end=${end}&days=${days}${appsQuery(appNames)}`);
+    return publicOpenLink(route, {
+      start,
+      end,
+      days,
+      apps: Array.isArray(appNames) && appNames.length ? appNames.slice(0, 8).join(",") : "",
+    });
   }
   if (first.type === "set_daily_limit") {
-    return publicOpenLink(`blank://daily-limit?minutes=${clamp(first.minutes || 25, 5, 240)}`);
+    return publicOpenLink("daily-limit", { minutes: clamp(first.minutes || 25, 5, 240) });
   }
   if (first.type === "open_app_picker") {
-    return publicOpenLink("blank://open-picker");
+    return publicOpenLink("open-picker");
   }
   if (first.type === "request_screen_time_permission") {
-    return publicOpenLink("blank://choose-apps");
+    return publicOpenLink("choose-apps");
   }
   if (first.type === "enable_allow_only") {
-    return publicOpenLink("blank://allow-only");
+    return publicOpenLink("allow-only");
   }
   if (first.type === "enable_adult_filter") {
-    return publicOpenLink("blank://adult-filter");
+    return publicOpenLink("adult-filter");
   }
   if (first.type === "pause_rules") {
-    return publicOpenLink(`blank://pause-rules?hours=${clamp(first.hours || 24, 1, 168)}`);
+    return publicOpenLink("pause-rules", { hours: clamp(first.hours || 24, 1, 168) });
   }
   if (first.type === "disable_pause") {
-    return publicOpenLink("blank://resume-rules");
+    return publicOpenLink("resume-rules");
   }
   return "";
 }

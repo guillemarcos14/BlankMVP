@@ -2844,7 +2844,8 @@ private struct AssistantConnectSheet: View {
                     }
                     .padding(.top, 36)
                     .padding(.bottom, 24)
-                    .frame(width: contentWidth, minHeight: proxy.size.height, alignment: .topLeading)
+                    .frame(width: contentWidth, alignment: .topLeading)
+                    .frame(minHeight: proxy.size.height, alignment: .topLeading)
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
                 .scrollDismissesKeyboard(.interactively)

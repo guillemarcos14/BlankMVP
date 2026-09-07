@@ -192,7 +192,7 @@ struct BlankApp: App {
     }
 
     private func isBlankedUniversalLink(_ url: URL) -> Bool {
-        guard url.scheme == "https", url.host == "blanked.app" else { return false }
+        guard url.scheme == "https", ["blanked.app", "getblank.netlify.app"].contains(url.host ?? "") else { return false }
         return url.path == "/open" || url.path == "/open.html"
     }
 }

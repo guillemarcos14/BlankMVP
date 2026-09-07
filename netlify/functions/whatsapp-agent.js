@@ -103,7 +103,7 @@ function appsQuery(appNames) {
 }
 
 function publicOpenLink(actionName, params = {}) {
-  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://blanked.app").replace(/\/$/, "");
+  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://getblank.netlify.app").replace(/\/$/, "");
   const query = new URLSearchParams({ action: actionName });
   for (const [key, value] of Object.entries(params)) {
     if (value == null || value === "") continue;

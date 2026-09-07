@@ -358,24 +358,21 @@ struct BlankQuickBlockWidget: Widget {
     let kind = "BlankQuickBlockWidget"
 
     var body: some WidgetConfiguration {
+        if #available(iOSApplicationExtension 17.0, *) {
+            baseConfiguration
+                .contentMarginsDisabled()
+        } else {
+            baseConfiguration
+        }
+    }
+
+    private var baseConfiguration: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: BlankWidgetProvider()) { entry in
             BlankWidgetView(entry: entry)
         }
         .configurationDisplayName("Blanked")
         .description("Start a quick block.")
         .supportedFamilies([.systemSmall, .accessoryInline, .accessoryCircular, .accessoryRectangular])
-        .blankWidgetContentMarginsDisabled()
-    }
-}
-
-private extension WidgetConfiguration {
-    @ViewBuilder
-    func blankWidgetContentMarginsDisabled() -> some WidgetConfiguration {
-        if #available(iOSApplicationExtension 17.0, *) {
-            contentMarginsDisabled()
-        } else {
-            self
-        }
     }
 }
 

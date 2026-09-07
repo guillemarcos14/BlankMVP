@@ -1,5 +1,10 @@
 const crypto = require("crypto");
-const { json, parseJsonBody, supabaseFetch } = require("./_membership");
+const { json, parseJsonBody } = require("./_membership");
+const {
+  connectCodeFromText,
+  recordAssistantChannel,
+  sendWhatsAppMessage,
+} = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 
 function cleanText(value, maxLength = 600) {
@@ -165,68 +170,13 @@ async function callBlankedAgent(prompt) {
   return body.plan;
 }
 
-async function sendWhatsAppMessage(to, text) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN;
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  if (!token || !phoneNumberId) {
-    return { skipped: true, reason: "missing_whatsapp_credentials" };
-  }
-
-  const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || "v26.0";
-  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { preview_url: false, body: text },
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`whatsapp_send_failed_${response.status}:${detail.slice(0, 240)}`);
-  }
-  return response.json();
-}
-
-function connectCodeFromText(text) {
-  const match = cleanText(text, 80).match(/^connect\s+([a-z0-9-]{4,24})$/i);
-  return match ? match[1].toUpperCase() : "";
-}
-
 async function recordAssistantConnection({ channel, connectCode, from }) {
   try {
-    await supabaseFetch("digital_wellness_feature_payloads", {
-      method: "POST",
-      headers: { prefer: "return=minimal" },
-      body: JSON.stringify({
-        anonymous_user_id: `connect:${connectCode}`,
-        schema_version: 1,
-        payload: {
-          event: "assistant_channel_connected",
-          properties: {
-            channel,
-            connect_code: connectCode,
-            channel_user: from,
-          },
-        },
-        insight: { event: "assistant_channel_connected" },
-        platform: channel,
-        locale: "",
-        app_version: "",
-        build_number: "",
-        data_consent: true,
-        consent_text: "Assistant channel connection",
-        privacy_raw_health_samples_sent: false,
-        privacy_raw_sleep_stage_timestamps_sent: false,
-        privacy_exact_app_selection_sent: false,
-        privacy_exact_location_sent: false,
-        submitted_at: new Date().toISOString(),
-      }),
+    await recordAssistantChannel({
+      event: "assistant_channel_connected",
+      channel,
+      connectCode,
+      channelUser: from,
     });
   } catch (_) {
     return;

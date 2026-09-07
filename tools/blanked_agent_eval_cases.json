@@ -1535,5 +1535,79 @@
         "Apply protection|Start hard block"
       ]
     }
+  },
+  {
+    "id": "proactive_daily_limit_reached_no_extra_action",
+    "prompt": "proactive signal: selected distracting apps reached 25 minutes today",
+    "context": {
+      "trigger": "proactive",
+      "signal_type": "daily_limit_reached",
+      "threshold_minutes": 25,
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "text_matches": [
+        "25|limit|reached|keep|protection|blocking"
+      ],
+      "ui_text_not_matches": [
+        "apply_schedule|start_protection|already set"
+      ]
+    }
+  },
+  {
+    "id": "proactive_weak_window_near_creates_boundary",
+    "prompt": "proactive signal: weak window is approaching",
+    "context": {
+      "trigger": "proactive",
+      "signal_type": "weak_window_near",
+      "risk_hour": 21,
+      "risk_window": "9:00 PM-10:00 PM",
+      "risk_score": 74,
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1270,
+        "end_minute": 1320,
+        "duration_days": 3
+      },
+      "text_matches": [
+        "weak window|risk|close|short"
+      ]
+    }
+  },
+  {
+    "id": "proactive_low_recovery_creates_sleep_boundary",
+    "prompt": "proactive signal: low recovery increases phone risk today",
+    "context": {
+      "trigger": "proactive",
+      "signal_type": "low_recovery",
+      "sleep_minutes": 320,
+      "health_signal_reasons": "short_sleep|low_hrv",
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "sleep",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1290,
+        "end_minute": 1380,
+        "duration_days": 1
+      },
+      "text_matches": [
+        "recovery|sleep|phone|lighter"
+      ]
+    }
   }
 ]

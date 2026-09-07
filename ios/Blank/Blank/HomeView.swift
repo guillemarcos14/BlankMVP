@@ -116,7 +116,9 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
+            showPendingBAIProactiveAlertIfNeeded()
             scheduleDailyInterventionIfNeeded()
+            evaluateBAIProactiveSignals()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -125,7 +127,9 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
+            showPendingBAIProactiveAlertIfNeeded()
             scheduleDailyInterventionIfNeeded()
+            evaluateBAIProactiveSignals()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
@@ -646,6 +650,24 @@ struct HomeView: View {
         sessionStore.refreshDailyLimitMonitoring()
     }
 
+    private func evaluateBAIProactiveSignals() {
+        let system = aiSystem
+        let summaries = healthKitStore.summaries
+        let selectionCount = sessionStore.selectionCount
+        let screenTimeAuthorized = screenTimeBlocker.authorizationStatus == .approved
+        let isBlankActive = sessionStore.isBlankActive
+
+        Task {
+            await BAIProactiveSignalEngine.evaluate(
+                system: system,
+                healthSummaries: summaries,
+                selectionCount: selectionCount,
+                screenTimeAuthorized: screenTimeAuthorized,
+                isBlankActive: isBlankActive
+            )
+        }
+    }
+
     private var isSimulatorBuild: Bool {
         #if targetEnvironment(simulator)
         return true
@@ -980,6 +1002,24 @@ struct HomeView: View {
         DispatchQueue.main.async {
             scanTag()
         }
+    }
+
+    private func showPendingBAIProactiveAlertIfNeeded() {
+        let defaults = BlankSharedState.defaults
+        guard let id = defaults.string(forKey: "blankBAIProactiveAlertId"),
+              id != defaults.string(forKey: "blankBAIProactiveAlertConsumedId"),
+              let body = defaults.string(forKey: "blankBAIProactiveAlertBody"),
+              !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        let createdAt = defaults.double(forKey: "blankBAIProactiveAlertCreatedAt")
+        guard createdAt <= 0 || Date().timeIntervalSince1970 - createdAt < 24 * 60 * 60 else {
+            defaults.set(id, forKey: "blankBAIProactiveAlertConsumedId")
+            return
+        }
+        message = body
+        messageAction = nil
+        defaults.set(id, forKey: "blankBAIProactiveAlertConsumedId")
     }
 
     private func setMessage(for result: SessionStore.NfcResult) {
@@ -2771,6 +2811,11 @@ private struct AssistantConnectSheet: View {
             openURL(url)
         }
         Task {
+            await registerAssistantPreference(
+                channel: channel,
+                connectCode: connectCode,
+                userPhone: cleanedUserPhone
+            )
             await BlankFunnelAnalytics.track(
                 "assistant_channel_connect_started",
                 properties: [
@@ -2781,6 +2826,33 @@ private struct AssistantConnectSheet: View {
             )
         }
         dismiss()
+    }
+
+    private func registerAssistantPreference(channel: AssistantChannel, connectCode: String, userPhone: String) async {
+        guard let baseURL = configuredBaseURL() else { return }
+        var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 8
+        let payload: [String: Any] = [
+            "action": "register_preference",
+            "connect_code": connectCode,
+            "preferred_channel": channel == .whatsApp ? "whatsapp" : "sms",
+            "user_phone": userPhone
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
+    private func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
     }
 }
 

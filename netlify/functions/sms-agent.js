@@ -332,9 +332,13 @@ function lunchEndMinute(text) {
 }
 
 function memoryFactsFromText(text) {
+  const value = cleanText(text, 800).toLowerCase();
   const apps = namedApps(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
+  if (/(sleep|bed|night|dormir|duermo|cama|noche)/i.test(value)) facts.last_topic = "sleep";
+  else if (/(scroll|social|instagram|tiktok|youtube|reddit|reels|shorts|redes)/i.test(value)) facts.last_topic = "social";
+  else if (/(focus|work|study|foco|trabaj|estudi)/i.test(value)) facts.last_topic = "focus";
   if (apps.length) facts.main_apps = apps;
   if (lunchMinute != null) {
     facts.lunch_end_minute = lunchMinute;

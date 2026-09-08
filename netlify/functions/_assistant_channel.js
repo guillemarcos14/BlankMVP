@@ -187,7 +187,12 @@ async function sendWhatsAppMessage(to, body, options = {}) {
     const normalizedFrom = String(twilioFrom).startsWith("whatsapp:") ? twilioFrom : `whatsapp:${twilioFrom}`;
     params.set("To", normalizedTo);
     params.set("From", normalizedFrom);
-    params.set("Body", body);
+    if (options.contentSid) {
+      params.set("ContentSid", options.contentSid);
+      if (options.contentVariables) params.set("ContentVariables", JSON.stringify(options.contentVariables));
+    } else {
+      params.set("Body", body);
+    }
     if (options.mediaUrl) params.set("MediaUrl", options.mediaUrl);
 
     const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(twilioSid)}/Messages.json`, {

@@ -4,9 +4,14 @@ const {
   requireMethod,
   supabaseFetch,
 } = require("./_membership");
-const { decryptToken } = require("./_wearable_oauth");
+const {
+  decryptToken,
+  encryptToken,
+  refreshAccessToken,
+} = require("./_wearable_oauth");
 
 const DIRECT_PROVIDERS = new Set(["oura", "whoop", "fitbit_google_health", "withings"]);
+const SYNCABLE_STATUSES = "connected,partial,no_data,stale,error";
 
 function cleanText(value, maxLength = 160) {
   return String(value || "").trim().slice(0, maxLength);
@@ -33,64 +38,144 @@ exports.handler = async (event) => {
     if (!anonymousUserId || body.data_consent !== true) {
       return json(400, { error: "missing_consent_or_user_id" });
     }
+    if (provider === "all") {
+      const results = await syncAllProviders(anonymousUserId, syncKind);
+      const hasFailure = results.some((result) => !result.ok);
+      return json(hasFailure ? 207 : 200, { ok: !hasFailure, results });
+    }
     if (provider === "garmin") return json(409, { error: "provider_requires_partner_access" });
     if (!DIRECT_PROVIDERS.has(provider)) return json(400, { error: "unsupported_provider" });
 
     const rows = await supabaseFetch(
-      `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}&status=eq.connected&select=*&limit=1`,
+      `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}&status=in.(${SYNCABLE_STATUSES})&select=*&limit=1`,
       { method: "GET" }
     );
     const connection = rows?.[0];
-    if (!connection?.encrypted_access_token) return json(404, { error: "wearable_connection_not_found" });
-
-    const accessToken = decryptToken(connection.encrypted_access_token);
-    const days = syncKind === "initial_30d" ? 30 : 7;
-    const end = new Date();
-    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const raw = await fetchProvider(provider, accessToken, start, end);
-    const snapshot = normalizeProvider(provider, raw, start, end);
-
-    await supabaseFetch("wearable_feature_snapshots", {
-      method: "POST",
-      headers: { prefer: "return=minimal" },
-      body: JSON.stringify({
-        anonymous_user_id: anonymousUserId,
-        connection_id: connection.id,
-        provider,
-        period_start: start.toISOString(),
-        period_end: end.toISOString(),
-        common_features: snapshot.common_features,
-        provider_features: snapshot.provider_features,
-        source_confidence: snapshot.source_confidence,
-        freshness: snapshot.freshness,
-        raw_samples_sent: false,
-        sync_kind: syncKind === "initial_30d" ? "initial_30d" : "incremental",
-      }),
-    });
-    await patchConnection(connection.id, { status: snapshot.status, last_sync_at: new Date().toISOString(), last_error: null });
-    await recordSyncEvent(anonymousUserId, "wearable_sync_success", provider, {
-      sync_kind: syncKind,
-      status: snapshot.status,
-      coverage: snapshot.common_features.coverage || "",
-      confidence: snapshot.common_features.confidence || "",
-    });
-    return json(200, { ok: true, provider, status: snapshot.status, common_features: snapshot.common_features, freshness: snapshot.freshness });
+    const result = await syncConnection(anonymousUserId, connection, syncKind);
+    if (!result.ok && result.statusCode) return json(result.statusCode, { error: result.error });
+    if (!result.ok) return json(500, result);
+    return json(200, result);
   } catch (error) {
     await markErrorSafely(event, error);
     return json(500, { error: "wearable_sync_failed", detail: error.message });
   }
 };
 
+async function syncAllProviders(anonymousUserId, syncKind) {
+  const rows = await supabaseFetch(
+    `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&status=in.(${SYNCABLE_STATUSES})&provider=in.(${Array.from(DIRECT_PROVIDERS).join(",")})&select=*`,
+    { method: "GET" }
+  );
+  const results = [];
+  for (const connection of rows || []) {
+    results.push(await syncConnection(anonymousUserId, connection, syncKind).catch(async (error) => {
+      await markConnectionError(anonymousUserId, connection.provider, error);
+      return { ok: false, provider: connection.provider, error: cleanText(error.message, 180) };
+    }));
+  }
+  return results;
+}
+
+async function syncConnection(anonymousUserId, connection, syncKind) {
+  if (!connection?.encrypted_access_token) {
+    return { ok: false, statusCode: 404, error: "wearable_connection_not_found" };
+  }
+  const provider = cleanText(connection.provider, 64);
+  if (!DIRECT_PROVIDERS.has(provider)) {
+    return { ok: false, statusCode: 400, provider, error: "unsupported_provider" };
+  }
+
+  const tokenState = await accessTokenForSync(connection);
+  const accessToken = tokenState.accessToken;
+  const days = syncKind === "initial_30d" ? 30 : 7;
+  const end = new Date();
+  const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const raw = await fetchProvider(provider, accessToken, start, end);
+  const snapshot = normalizeProvider(provider, raw, start, end);
+
+  await supabaseFetch("wearable_feature_snapshots", {
+    method: "POST",
+    headers: { prefer: "return=minimal" },
+    body: JSON.stringify({
+      anonymous_user_id: anonymousUserId,
+      connection_id: connection.id,
+      provider,
+      period_start: start.toISOString(),
+      period_end: end.toISOString(),
+      common_features: snapshot.common_features,
+      provider_features: snapshot.provider_features,
+      source_confidence: snapshot.source_confidence,
+      freshness: snapshot.freshness,
+      raw_samples_sent: false,
+      sync_kind: syncKind === "initial_30d" ? "initial_30d" : "incremental",
+    }),
+  });
+  await patchConnection(connection.id, {
+    status: snapshot.status,
+    last_sync_at: new Date().toISOString(),
+    last_error: null,
+    ...tokenState.updates,
+  });
+  await recordSyncEvent(anonymousUserId, "wearable_sync_success", provider, {
+    sync_kind: syncKind,
+    status: snapshot.status,
+    coverage: snapshot.common_features.coverage || "",
+    confidence: snapshot.common_features.confidence || "",
+  });
+  return {
+    ok: true,
+    provider,
+    status: snapshot.status,
+    token_refreshed: tokenState.refreshed,
+    common_features: snapshot.common_features,
+    freshness: snapshot.freshness,
+  };
+}
+
+async function accessTokenForSync(connection) {
+  const tokenExpiresAt = connection.token_expires_at ? new Date(connection.token_expires_at).getTime() : 0;
+  const shouldRefresh = tokenExpiresAt && tokenExpiresAt - Date.now() < 5 * 60 * 1000 && connection.encrypted_refresh_token;
+  if (!shouldRefresh) {
+    return { accessToken: decryptToken(connection.encrypted_access_token), refreshed: false, updates: {} };
+  }
+
+  const refreshToken = decryptToken(connection.encrypted_refresh_token);
+  const token = await refreshAccessToken(connection.provider, refreshToken);
+  const expiresIn = Number(token.expires_in || 0);
+  const tokenExpiresAtNext = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
+  return {
+    accessToken: token.access_token,
+    refreshed: true,
+    updates: {
+      encrypted_access_token: encryptToken(token.access_token),
+      encrypted_refresh_token: token.refresh_token ? encryptToken(token.refresh_token) : connection.encrypted_refresh_token,
+      token_expires_at: tokenExpiresAtNext,
+    },
+  };
+}
+
 async function fetchProvider(provider, accessToken, start, end) {
   if (provider === "oura") return fetchOura(accessToken, start, end);
   if (provider === "whoop") return fetchWhoop(accessToken, start, end);
-  if (provider === "fitbit_google_health") return fetchFitbit(accessToken, start, end);
+  if (provider === "fitbit_google_health") return fetchGoogleHealth(accessToken, start, end);
   if (provider === "withings") return fetchWithings(accessToken, start, end);
   throw new Error("unsupported_provider");
 }
 
 async function providerGet(url, accessToken) {
   const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw new Error(`provider_fetch_failed_${response.status}:${text.slice(0, 180)}`);
+  return data;
+}
+
+async function providerPost(url, accessToken, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
   if (!response.ok) throw new Error(`provider_fetch_failed_${response.status}:${text.slice(0, 180)}`);
@@ -117,13 +202,26 @@ async function fetchWhoop(accessToken, start, end) {
   };
 }
 
-async function fetchFitbit(accessToken, start, end) {
-  const startDate = dateOnly(start);
-  const endDate = dateOnly(end);
+async function fetchGoogleHealth(accessToken, start, end) {
+  const rollup = (dataType) => providerPost(
+    `https://health.googleapis.com/v4/users/me/dataTypes/${dataType}/dataPoints:dailyRollUp`,
+    accessToken,
+    {
+      range: { start: civilDateTime(start), end: civilDateTime(end) },
+      windowSizeDays: 1,
+      dataSourceFamily: "users/me/dataSourceFamilies/all-sources",
+    }
+  ).catch((error) => ({ error: error.message }));
   return {
-    sleep: await providerGet(`https://api.fitbit.com/1.2/user/-/sleep/date/${startDate}/${endDate}.json`, accessToken),
-    activity: await providerGet(`https://api.fitbit.com/1/user/-/activities/date/${endDate}.json`, accessToken),
-    hrv: await providerGet(`https://api.fitbit.com/1/user/-/hrv/date/${startDate}/${endDate}.json`, accessToken),
+    profile: await providerGet("https://health.googleapis.com/v4/users/me/profile", accessToken).catch((error) => ({ error: error.message })),
+    steps: await rollup("steps"),
+    sleep: await rollup("sleep"),
+    activeZoneMinutes: await rollup("active-zone-minutes"),
+    heartRate: await rollup("heart-rate"),
+    restingHeartRate: await rollup("daily-resting-heart-rate"),
+    hrv: await rollup("daily-heart-rate-variability"),
+    oxygenSaturation: await rollup("daily-oxygen-saturation"),
+    vo2Max: await rollup("vo2-max"),
   };
 }
 
@@ -140,7 +238,7 @@ async function fetchWithings(accessToken, start, end) {
 function normalizeProvider(provider, raw, start, end) {
   if (provider === "oura") return normalizeOura(raw, start, end);
   if (provider === "whoop") return normalizeWhoop(raw, start, end);
-  if (provider === "fitbit_google_health") return normalizeFitbit(raw, start, end);
+  if (provider === "fitbit_google_health") return normalizeGoogleHealth(raw, start, end);
   if (provider === "withings") return normalizeWithings(raw, start, end);
   throw new Error("unsupported_provider");
 }
@@ -198,29 +296,64 @@ function normalizeWhoop(raw, start, end) {
   };
 }
 
-function normalizeFitbit(raw, start, end) {
-  const sleep = raw.sleep?.sleep || [];
-  const hrv = raw.hrv?.hrv || [];
-  const summary = raw.activity?.summary || {};
+function normalizeGoogleHealth(raw, start, end) {
+  const steps = dailyValues(raw.steps, "steps").map((value) => cleanNumber(value.countSum));
+  const sleep = dailyValues(raw.sleep, "sleep").map((value) => cleanNumber(value.durationMillisSum) || cleanNumber(value.durationSecondsSum) * 1000);
+  const activeZoneMinutes = dailyValues(raw.activeZoneMinutes, "activeZoneMinutes").map((value) =>
+    cleanNumber(value.minutesSum) || cleanNumber(value.totalMinutesSum) || cleanNumber(value.durationMinutesSum)
+  );
+  const hrv = dailyValues(raw.hrv, "heartRateVariabilityPersonalRange").map((value) =>
+    average([value.averageHeartRateVariabilityMillisecondsMin, value.averageHeartRateVariabilityMillisecondsMax])
+  );
+  const restingHr = dailyValues(raw.restingHeartRate, "restingHeartRatePersonalRange").map((value) =>
+    average([value.beatsPerMinuteMin, value.beatsPerMinuteMax])
+  );
+  const heartRate = dailyValues(raw.heartRate, "heartRate").map((value) =>
+    cleanNumber(value.beatsPerMinuteAvg) || cleanNumber(value.bpmAvg) || average([value.beatsPerMinuteMin, value.beatsPerMinuteMax])
+  );
+  const oxygen = dailyValues(raw.oxygenSaturation, "dailyOxygenSaturation").map((value) =>
+    cleanNumber(value.percentageAvg) || cleanNumber(value.saturationPercentageAvg)
+  );
+  const vo2Max = dailyValues(raw.vo2Max, "runVo2Max").map((value) =>
+    cleanNumber(value.millilitersPerMinuteKilogramAvg) || cleanNumber(value.vo2MillilitersPerMinuteKilogramAvg)
+  );
   const common = makeCommon({
-    sleepMinutes: average(sleep.map((item) => cleanNumber(item.minutesAsleep)).filter(Number.isFinite)),
+    sleepMinutes: average(sleep.filter(Number.isFinite).map((value) => Math.round(value / 60000))),
     recovery: null,
-    steps: cleanNumber(summary.steps),
-    strain: cleanNumber(summary.activeZoneMinutes?.totalMinutes),
-    stress: average(hrv.map((item) => cleanNumber(item.value?.dailyRmssd)).filter(Number.isFinite)),
+    steps: average(steps.filter(Number.isFinite)),
+    strain: average(activeZoneMinutes.filter(Number.isFinite)),
+    stress: average(hrv.filter(Number.isFinite)),
   }, "fitbit_google_health", start, end);
   return {
     status: statusFromCommon(common),
     common_features: common,
     provider_features: compactObject({
-      sleep_efficiency: average(sleep.map((item) => cleanNumber(item.efficiency)).filter(Number.isFinite)),
+      google_health_profile_available: raw.profile && !raw.profile.error ? true : null,
       active_zone_minutes: common.strain_load,
-      hrv_daily_rmssd: common.stress_proxy,
-      calories_out: cleanNumber(summary.caloriesOut),
+      hrv_ms: common.stress_proxy,
+      resting_heart_rate: average(restingHr.filter(Number.isFinite)),
+      heart_rate: average(heartRate.filter(Number.isFinite)),
+      oxygen_saturation: average(oxygen.filter(Number.isFinite)),
+      vo2_max: average(vo2Max.filter(Number.isFinite)),
     }),
     source_confidence: confidence(common, "fitbit_google_health"),
     freshness: freshness(raw, "fitbit_google_health"),
   };
+}
+
+function civilDateTime(date) {
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  };
+}
+
+function dailyValues(raw, field) {
+  return (raw?.rollupDataPoints || []).map((point) => point?.[field]).filter(Boolean);
 }
 
 function normalizeWithings(raw, start, end) {
@@ -315,18 +448,22 @@ async function markErrorSafely(event, error) {
     const anonymousUserId = cleanText(body.anonymous_user_id, 80);
     const provider = cleanText(body.provider, 64);
     if (!anonymousUserId || !provider) return;
-    await supabaseFetch(
-      `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}`,
-      {
-        method: "PATCH",
-        headers: { prefer: "return=minimal" },
-        body: JSON.stringify({ status: "error", last_error: cleanText(error.message, 240), updated_at: new Date().toISOString() }),
-      }
-    );
-    await recordSyncEvent(anonymousUserId, "wearable_sync_failed", provider, {
-      error: cleanText(error.message, 180),
-    });
+    await markConnectionError(anonymousUserId, provider, error);
   } catch (_) {}
+}
+
+async function markConnectionError(anonymousUserId, provider, error) {
+  await supabaseFetch(
+    `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}`,
+    {
+      method: "PATCH",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({ status: "error", last_error: cleanText(error.message, 240), updated_at: new Date().toISOString() }),
+    }
+  );
+  await recordSyncEvent(anonymousUserId, "wearable_sync_failed", provider, {
+    error: cleanText(error.message, 180),
+  });
 }
 
 async function recordSyncEvent(anonymousUserId, eventName, provider, properties) {
@@ -349,3 +486,9 @@ async function recordSyncEvent(anonymousUserId, eventName, provider, properties)
     }),
   });
 }
+
+module.exports = {
+  handler: exports.handler,
+  normalizeProvider,
+  syncConnection,
+};

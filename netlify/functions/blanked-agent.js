@@ -80,7 +80,7 @@ function localizeText(value, language) {
   const text = cleanText(value, 220);
   if (language !== "es" || !text) return text;
   const scheduleMatch = text.match(/^I read this as a specific protection window: (.+) to (.+)\.$/i);
-  if (scheduleMatch) return localizeMinuteText(`Lo leo como una franja concreta de protección entre ${scheduleMatch[1]} y ${scheduleMatch[2]}.`, language);
+  if (scheduleMatch) return localizeMinuteText(`Vale. Protegería esa franja de ${scheduleMatch[1]} a ${scheduleMatch[2]}.`, language);
   const exact = {
     "Context Corrected": "Contexto corregido",
     "Bounded Protection": "Protección limitada",
@@ -165,6 +165,11 @@ function localizeText(value, language) {
     "Read: there is no clear action request yet.": "Lectura: todavía no hay una petición de acción clara.",
     "Pattern: Blanked should not turn every message into a blocking plan.": "Patrón: Blanked no debe convertir cada mensaje en un plan de bloqueo.",
     "Move: tell me whether you want advice or a plan.": "Movimiento: dime si quieres consejo o un plan.",
+    "Greeting": "Saludo",
+    "Hey, what's up?": "Hey, ¿qué tal?",
+    "Read: this is just a greeting.": "Lectura: esto es solo un saludo.",
+    "Pattern: answer naturally before offering help.": "Patrón: responder natural antes de ofrecer ayuda.",
+    "Move: ask whether they need anything.": "Movimiento: preguntar si necesita algo.",
     "Personal Assistant": "Asistente personal",
     "Reminder Context": "Contexto de recordatorio",
     "Plan Timing": "Horario del plan",
@@ -380,6 +385,11 @@ function asksForPlan(prompt) {
   ]);
 }
 
+function isSimpleGreeting(prompt) {
+  const text = cleanText(prompt, 120).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
+  return /^(hey|hi|hello|yo|hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai)?$/.test(text);
+}
+
 function asksWhereToStart(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
   return contains(text, [
@@ -391,6 +401,15 @@ function asksWhereToStart(prompt) {
     "no se por donde empezar",
     "no sé por dónde empezar",
   ]);
+}
+
+function lastConversationTopic(context = {}) {
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  return cleanText(memory.last_topic || memory.last_intent || memory.last_bai_topic, 40).toLowerCase();
+}
+
+function hasSleepConversationContext(context = {}) {
+  return ["sleep", "bedtime", "night"].includes(lastConversationTopic(context)) || Number.isFinite(Number(context.memory?.bedtime_minute));
 }
 
 function asksForPermanentLockout(prompt) {
@@ -599,15 +618,15 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
   const sameRememberedApp = promptApp !== "the app" && rememberedApps.includes(promptApp);
   const appCategory = requestedAppCategory(prompt);
   const hasApps = promptApp !== "the app" || rememberedApps.length > 0;
-  const hasLunchTime = Number.isFinite(Number(memory.lunch_end_minute)) || Boolean(explicitTimeWindow(prompt) || anchorWindow(prompt));
+  const hasLunchTime = Number.isFinite(Number(memory.lunch_end_minute)) || Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
   if (intent === "social" && appCategory && moment?.key === "lunch" && (!hasApps || !hasLunchTime)) {
     return "apps_and_lunch_time";
   }
   const momentContextSatisfied = moment?.key === "lunch" && hasApps && hasLunchTime;
-  if (moment && !momentContextSatisfied && !explicitTimeWindow(prompt) && (!hasKnownWeakHour(context) || !sameRememberedApp) && (hasExplicitBlockRequest(prompt) || intent === "social")) {
+  if (moment && !momentContextSatisfied && !explicitTimeWindow(prompt, context) && (!hasKnownWeakHour(context) || !sameRememberedApp) && (hasExplicitBlockRequest(prompt) || intent === "social")) {
     return moment.key;
   }
-  if (intent === "sleep" && !explicitTimeWindow(prompt) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
+  if (intent === "sleep" && !explicitTimeWindow(prompt, context) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
     return "bedtime";
   }
   if (intent === "sleep" && scrollUntilSleepTime(prompt) && !hasBedtime(prompt, context)) {
@@ -615,7 +634,7 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
   }
   if (intent === "social" &&
       contains(text, ["scroll", "doomscroll", "checking my phone", "check my phone", "opening my phone", "use my phone", "notification", "notifications"]) &&
-      !explicitTimeWindow(prompt) &&
+      !explicitTimeWindow(prompt, context) &&
       !hasKnownMainApp(context) &&
       !contains(text, ["tiktok", "instagram", "youtube", "app"])) {
     return "apps";
@@ -623,8 +642,9 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
   return null;
 }
 
-function classify(prompt) {
+function classify(prompt, context = {}) {
   const text = paddedText(prompt, 600);
+  if (hasSleepConversationContext(context) && explicitTimeWindow(prompt, context)) return "sleep";
   if (asksWhereToStart(prompt)) return "general";
   if (asksForPlan(prompt) && !hasExplicitBlockRequest(prompt) && !contains(text, ["after", "when", "from", "at ", "tonight", "now", "ahora"])) return "general";
   if (contains(text, ["screen time is bad", "use my phone too much", "too much with my phone", "demasiado con el movil", "demasiado con el móvil", "phone is killing my focus"])) return "general";
@@ -669,13 +689,14 @@ function minuteOfDay(hour, minute, meridiem) {
   return hour * 60 + minute;
 }
 
-function explicitTimeWindow(prompt) {
+function explicitTimeWindow(prompt, context = {}) {
   const text = cleanText(prompt, 600).toLowerCase();
   const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (!match) return null;
   const startHour = Number(match[1]);
   const endHour = Number(match[4]);
   const looksNightly =
+    hasSleepConversationContext(context) ||
     contains(text, ["night", "sleep", "bed", "dormir", "noche"]) ||
     (contains(text, ["block", "bloquea", "bloquear", "instagram", "tiktok", "youtube", "scroll"]) && startHour >= 9 && startHour <= 11 && endHour >= 1 && endHour <= 9);
   const crossesMidnight = looksNightly && !match[3] && !match[6] && endHour <= startHour;
@@ -960,7 +981,7 @@ function proactivePlan(prompt, context = {}, language = "en") {
 }
 
 function fallbackPlan(prompt, context = {}) {
-  const intent = classify(prompt);
+  const intent = classify(prompt, context);
   const language = responseLanguage(prompt, context);
   const proactive = proactivePlan(prompt, context, language);
   if (proactive) return proactive;
@@ -971,7 +992,7 @@ function fallbackPlan(prompt, context = {}) {
   const riskWindow = cleanText(context.risk_window, 60) || "your next risk window";
   const cluster = behaviorCluster(prompt);
   const targetSleepWindow = sleepGoalWindow(prompt);
-  const timeWindow = targetSleepWindow ? null : explicitTimeWindow(prompt) || anchorWindow(prompt);
+  const timeWindow = targetSleepWindow ? null : explicitTimeWindow(prompt, context) || anchorWindow(prompt);
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const lastOutcome = cleanText(memory.last_plan_outcome, 40);
   const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
@@ -988,6 +1009,24 @@ function fallbackPlan(prompt, context = {}) {
     : lastOutcome === "held"
       ? "Feedback: the last plan held, so repeat before increasing difficulty."
       : setupLine;
+
+  if (isSimpleGreeting(prompt)) {
+    return {
+      intent: "general",
+      title: "Greeting",
+      response_text: language === "es" ? "Hey, ¿qué tal?" : "Hey, what's up?",
+      bullets: [
+        "Read: this is just a greeting.",
+        "Pattern: answer naturally before offering help.",
+        "Move: ask whether they need anything."
+      ],
+      primary_label: "Tell me",
+      secondary_label: "Open Blanked",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
 
   if (asksAboutAssistantCapabilities(prompt)) {
     return {
@@ -1085,7 +1124,7 @@ function fallbackPlan(prompt, context = {}) {
         intent: "sleep",
         title: "Lectura de noche",
         response_text: asksForAdvice(prompt)
-          ? "Empieza antes de meterte en la cama: carga el móvil lejos, deja una alternativa corta preparada y evita decidir cuando ya estás cansado. Si quieres un plan de Blanked, dime a qué hora quieres dormir."
+          ? "Yo empezaría un poco antes de meterte en la cama, no cuando ya estás cansado: deja el móvil cargando lejos y ten una alternativa fácil preparada. Si quieres, dime a qué hora quieres dormir y lo ajusto a eso."
           : "Esto suena a bucle de scroll de noche. Antes de bloquear nada, necesito tu hora objetivo para dormir.",
         bullets: [
           "Lectura: quieres que las noches se sientan menos automáticas.",
@@ -1103,7 +1142,7 @@ function fallbackPlan(prompt, context = {}) {
       intent: "sleep",
       title: "Bedtime Scroll Read",
       response_text: asksForAdvice(prompt)
-        ? "Start before you get into bed: charge the phone away, have one short offline replacement ready, and avoid deciding when you are tired. If you want a Blanked plan, tell me your sleep target."
+        ? "I’d start a bit before you get into bed, not when you’re already tired: charge the phone away and have one easy offline option ready. If you want, tell me your sleep target and I’ll shape it around that."
         : "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.",
       bullets: [
         "Read: you want nights to feel less automatic.",
@@ -1440,7 +1479,9 @@ function fallbackPlan(prompt, context = {}) {
       ...base,
       intent: planIntent,
       title: planIntent === "sleep" ? "Sleep Protection" : "Scheduled Protection",
-      response_text: `I read this as a specific protection window: ${start} to ${end}.`,
+      response_text: planIntent === "sleep"
+        ? `Got it. For sleep, I’d treat that as ${start} to ${end}.`
+        : `Got it. I’d protect that window from ${start} to ${end}.`,
       bullets: [
         "Pattern: the risky moment is already clear, so guessing is unnecessary.",
         `Move: shield distracting apps from ${start} to ${end}.`,
@@ -1723,6 +1764,7 @@ function deterministicNoActionTitle(title) {
     "Automation Setup",
     "Reminder Context",
     "Noted",
+    "Greeting",
     "Loss Of Control",
     "Proactive Signal",
     "Señal proactiva",
@@ -1758,11 +1800,11 @@ function deterministicActionTitle(title) {
 
 function actionGate(plan, fallback, context = {}, prompt = "") {
   const proposed = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map(normalizeAction).filter(Boolean) : [];
-  const hasClearFutureWindow = Boolean(explicitTimeWindow(prompt) || anchorWindow(prompt));
+  const hasClearFutureWindow = Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
   const fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map(normalizeAction).filter(Boolean) : [];
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
-  const promptIntent = classify(prompt);
+  const promptIntent = classify(prompt, context);
   const adviceOnly = asksForAdvice(prompt) && ["sleep", "social", "general"].includes(promptIntent) && !hasExplicitBlockRequest(prompt) && !proactiveTrigger(prompt, context);
   if (proactiveTrigger(prompt, context)) return fallbackActions.slice(0, 4);
   if (adviceOnly) return [];
@@ -1822,14 +1864,14 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     proactiveTrigger(prompt, context) ||
     deterministicNoActionTitle(fallback.title) ||
     deterministicActionTitle(fallback.title) ||
-    (hasExecutableActions && actions.some((item) => item.type === "apply_schedule") && Boolean(explicitTimeWindow(prompt) || anchorWindow(prompt))) ||
+    (hasExecutableActions && actions.some((item) => item.type === "apply_schedule") && Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt))) ||
     (!hasExecutableActions &&
       modelProposedAction &&
       (asksAboutAssistantCapabilities(prompt) ||
         asksForUnsupportedReminder(prompt) ||
         asksForBroadAutomation(prompt) ||
         asksForPermanentLockout(prompt) ||
-        (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt) && !anchorWindow(prompt))));
+        (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt, context) && !anchorWindow(prompt))));
   const shouldUseLanguageFallback = language === "es" && hasSpanishLanguageLeak(plan);
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i.test(item)).length >= 2;

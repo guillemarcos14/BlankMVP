@@ -4,6 +4,10 @@ const {
   requireMethod,
   supabaseFetch,
 } = require("./_membership");
+const {
+  decryptToken,
+  revokeToken,
+} = require("./_wearable_oauth");
 
 const PROVIDERS = new Set(["apple_health", "health_connect", "oura", "whoop", "garmin", "fitbit_google_health", "withings"]);
 const STATUSES = new Set(["connected", "partial", "no_data", "stale", "error", "disconnected"]);
@@ -46,6 +50,19 @@ exports.handler = async (event) => {
 
     if (action === "disconnect") {
       const provider = cleanProvider(body.provider);
+      const rows = await supabaseFetch(
+        `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}&select=id,encrypted_access_token,encrypted_refresh_token&limit=1`,
+        { method: "GET" }
+      );
+      const connection = rows?.[0];
+      let revoke = { attempted: false, supported: false };
+      if (body.revoke !== false && connection) {
+        revoke = await revokeConnectionTokens(provider, connection).catch((error) => ({
+          attempted: true,
+          supported: true,
+          error: cleanText(error.message, 180),
+        }));
+      }
       await supabaseFetch(
         `wearable_connections?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&provider=eq.${encodeURIComponent(provider)}`,
         {
@@ -61,7 +78,7 @@ exports.handler = async (event) => {
           }),
         }
       );
-      return json(200, { ok: true });
+      return json(200, { ok: true, revoke });
     }
 
     if (action === "upsert_aggregator") {
@@ -92,3 +109,10 @@ exports.handler = async (event) => {
     return json(status, { error: "wearable_connections_failed", detail: error.message });
   }
 };
+
+async function revokeConnectionTokens(provider, connection) {
+  const encrypted = connection.encrypted_refresh_token || connection.encrypted_access_token;
+  if (!encrypted) return { attempted: false, supported: false };
+  const token = decryptToken(encrypted);
+  return revokeToken(provider, token);
+}

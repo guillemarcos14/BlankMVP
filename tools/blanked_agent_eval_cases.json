@@ -1,5 +1,26 @@
 [
   {
+    "id": "simple_whatsapp_greeting_feels_natural",
+    "prompt": "hey blanked",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp"
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "hey|what.?s up"
+      ],
+      "ui_text_not_matches": [
+        "need anything|screen-habit advice|diagnosis|protection plan|diagnose|Blanked\\?|Read:|Pattern:|Move:|blank://|https://"
+      ],
+      "min_message_length": 10,
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
     "id": "social_lunch_whatsapp_feels_natural",
     "prompt": "I use social media too much during lunch",
     "context": {
@@ -115,6 +136,55 @@
       ],
       "min_quality_score": 2,
       "min_utility_score": 3
+    }
+  },
+  {
+    "id": "sleep_advice_sounds_conversational",
+    "prompt": "How can I improve my sleep?",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp"
+    },
+    "expect": {
+      "intent": "sleep",
+      "action_types": [],
+      "ui_text_matches": [
+        "I'd|I’d|before you get into bed|If you want"
+      ],
+      "ui_text_not_matches": [
+        "^Start before|avoid deciding|instruction|Wikipedia|Read:|Pattern:|Move:|https://|blank://"
+      ],
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "bare_time_window_after_sleep_context_crosses_midnight",
+    "prompt": "10 to 6",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "memory": {
+        "last_topic": "sleep"
+      },
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "sleep",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1320,
+        "end_minute": 360
+      },
+      "ui_text_matches": [
+        "10:00 PM|6:00 AM"
+      ],
+      "ui_text_not_matches": [
+        "I read this|specific protection window|10:00 AM to 6:00 AM|10:00 AM|Read:|Pattern:|Move:"
+      ]
     }
   },
   {

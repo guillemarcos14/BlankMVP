@@ -178,12 +178,67 @@ async function linkIncludesRequestedApps() {
   }
 }
 
+async function twilioButtonTemplateHidesRawUrlFromMainReply() {
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+  process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID = "HXbutton";
+  const requests = [];
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    const params = new URLSearchParams(options.body);
+    requests.push(Object.fromEntries(params.entries()));
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      from: "34600000000",
+                      id: "wamid.button",
+                      text: { body: "Block Instagram from 10 to 7" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.strictEqual(requests.length, 2);
+    assert.doesNotMatch(requests[0].Body, /https?:\/\//);
+    assert.strictEqual(requests[1].ContentSid, "HXbutton");
+    assert.match(requests[1].ContentVariables, /getblank\.netlify\.app\/open/);
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.TWILIO_ACCOUNT_SID;
+    delete process.env.TWILIO_AUTH_TOKEN;
+    delete process.env.TWILIO_WHATSAPP_FROM_NUMBER;
+    delete process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID;
+  }
+}
+
 (async () => {
   await verifyWebhook();
   await receiveMessage();
   await connectMessage();
   await connectGreeting();
   await linkIncludesRequestedApps();
+  await twilioButtonTemplateHidesRawUrlFromMainReply();
   console.log("whatsapp-agent smoke tests passed");
 })().catch((error) => {
   console.error(error);

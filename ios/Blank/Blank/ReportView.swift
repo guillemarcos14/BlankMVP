@@ -1432,7 +1432,7 @@ struct ReportView: View {
                 wearableProviderRow(name: "Oura", provider: "oura", status: "Connect", detail: "Readiness, sleep contributors and recovery signals.", canConnect: true)
                 wearableProviderRow(name: "WHOOP", provider: "whoop", status: "Connect", detail: "Recovery, strain, sleep debt and cycle signals.", canConnect: true)
                 wearableProviderRow(name: "Garmin", status: "Partner gated", detail: "Body Battery, stress, training readiness and HRV status.")
-                wearableProviderRow(name: "Fitbit / Google", provider: "fitbit_google_health", status: "Connect", detail: "Daily Readiness, sleep score and active zone minutes.", canConnect: true)
+                wearableProviderRow(name: "Google Health / Fitbit", provider: "fitbit_google_health", status: "Connect", detail: "Fitbit, Pixel Watch and Google Health metrics.", canConnect: true)
                 wearableProviderRow(name: "Withings", provider: "withings", status: "Connect", detail: "Weight, body composition, blood pressure and temperature context.", canConnect: true)
             }
 

@@ -38,6 +38,10 @@ exports.handler = async (event) => {
     url.searchParams.set("redirect_uri", redirectUri(provider));
     url.searchParams.set("scope", config.scopes.join(" "));
     url.searchParams.set("state", state);
+    if (provider === "fitbit_google_health") {
+      url.searchParams.set("access_type", "offline");
+      url.searchParams.set("prompt", "consent");
+    }
 
     return json(200, { ok: true, provider, authorization_url: url.toString() });
   } catch (error) {

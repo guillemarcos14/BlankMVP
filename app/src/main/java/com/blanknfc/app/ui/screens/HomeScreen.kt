@@ -1194,7 +1194,7 @@ private fun WearableProviderList(
         WearableProvider("Oura", "oura", "Connect", "Readiness, sleep contributors and recovery signals.", true),
         WearableProvider("WHOOP", "whoop", "Connect", "Recovery, strain, sleep debt and cycle signals.", true),
         WearableProvider("Garmin", "garmin", "Partner gated", "Body Battery, stress, training readiness and HRV status.", false),
-        WearableProvider("Fitbit / Google", "fitbit_google_health", "Connect", "Daily Readiness, sleep score and active zone minutes.", true),
+        WearableProvider("Google Health / Fitbit", "fitbit_google_health", "Connect", "Fitbit, Pixel Watch and Google Health metrics.", true),
         WearableProvider("Withings", "withings", "Connect", "Weight, body composition, blood pressure and temperature context.", true)
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

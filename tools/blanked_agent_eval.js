@@ -157,7 +157,8 @@ function assertPlan(testCase, plan) {
   }
   assert.doesNotMatch(text, DEBUG_TEXT_PATTERN, `${testCase.id}.no_internal_text`);
   assert.doesNotMatch(text, BANNED_TEXT_PATTERN, `${testCase.id}.no_banned_text`);
-  assert.ok(cleanText(plan.message_text, 320).length >= 30, `${testCase.id}.message_text_present`);
+  const minMessageLength = expected.min_message_length ?? 30;
+  assert.ok(cleanText(plan.message_text, 320).length >= minMessageLength, `${testCase.id}.message_text_present`);
   assert.doesNotMatch(plan.message_text, /\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i, `${testCase.id}.message_text_no_bullet_prefixes`);
 
   const minQuality = expected.min_quality_score ?? 2;

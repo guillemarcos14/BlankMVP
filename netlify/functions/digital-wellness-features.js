@@ -4,6 +4,16 @@ const {
   requireMethod,
   supabaseFetch,
 } = require("./_membership");
+const {
+  decide: decidePlanIntelligence,
+  patternKey: intelligencePatternKey,
+  recommendationKind,
+  segmentKey,
+} = require("./bai-intelligence");
+const {
+  resolveWearableSources,
+  wearableDecisionContext,
+} = require("./_wearable_intelligence");
 
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().slice(0, maxLength);
@@ -90,6 +100,9 @@ function buildInsight(payload, memory = {}) {
   const correlations = payload.correlations || {};
   const profile = payload.profile || {};
   const common = payload.common_features || {};
+  const resolvedWearable = payload.resolved_wearable || {};
+  const resolvedCommon = resolvedWearable.common_features || common;
+  const wearableDecision = payload.wearable_decision_context || {};
   const freshness = payload.freshness || {};
   const sourceConfidence = payload.source_confidence || {};
   const recommendations = [];
@@ -119,7 +132,9 @@ function buildInsight(payload, memory = {}) {
     recommendations.push("Sync your wearable daily so Blanked can separate recovery dips from normal screen urges.");
   }
 
-  if (common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) {
+  if (resolvedWearable.data_quality?.status) {
+    patterns.push(`Best wearable context is ${resolvedWearable.data_quality.status} with ${resolvedWearable.data_quality.confidence || 0}/100 confidence.`);
+  } else if (common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) {
     patterns.push(`Wearable confidence is ${common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect}/100 with ${freshness.status || "unknown"} freshness.`);
   }
 
@@ -137,9 +152,19 @@ function buildInsight(payload, memory = {}) {
   if (
     correlations.relapses_after_short_sleep > 0 ||
     correlations.screen_risk_after_bad_sleep === "high" ||
-    (weekly.avg_recovery_score && weekly.avg_recovery_score < 45)
+    (weekly.avg_recovery_score && weekly.avg_recovery_score < 45) ||
+    wearableDecision.flags?.includes("low_recovery") ||
+    wearableDecision.flags?.includes("short_sleep")
   ) {
     recommendations.push("Use a lighter block after short sleep instead of relying on willpower.");
+  }
+
+  if (wearableDecision.flags?.includes("high_strain")) {
+    recommendations.push("Avoid adding friction everywhere today; protect only the highest-risk window.");
+  }
+
+  if (wearableDecision.flags?.includes("stale_signals")) {
+    recommendations.push("Sync your wearable before changing the plan intensity.");
   }
 
   if (memory.acceptedActions?.includes("sleep_boundary")) {
@@ -155,7 +180,7 @@ function buildInsight(payload, memory = {}) {
   }
 
   const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
-  const wearableConfidence = cleanNumber(common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) || 0;
+  const wearableConfidence = cleanNumber(resolvedCommon.confidence || common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) || 0;
   const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 5 + (weekly.active_days_7d || 0) * 7 + Math.round((weekly.health_signal_coverage_percent || 0) / 4) + Math.round(wearableConfidence / 8)));
   const motivation = profile.motivation_cluster || "general_control";
 
@@ -176,14 +201,16 @@ function buildInsight(payload, memory = {}) {
 function buildPlanUpdate(payload, weakWindow) {
   const weekly = payload.weekly || {};
   const correlations = payload.correlations || {};
+  const wearableDecision = payload.wearable_decision_context || {};
   const startHour = Number.isFinite(Number(weekly.weakest_hour)) ? Number(weekly.weakest_hour) : 22;
   const startMinute = Math.max(0, Math.min(1439, startHour * 60 - 30));
-  const endMinute = (startMinute + 9 * 60) % (24 * 60);
-  const lowRecovery = weekly.avg_recovery_score && weekly.avg_recovery_score < 45;
+  const gentle = wearableDecision.recommended_intensity === "gentle";
+  const endMinute = (startMinute + (gentle ? 90 : 9 * 60)) % (24 * 60);
+  const lowRecovery = (weekly.avg_recovery_score && weekly.avg_recovery_score < 45) || wearableDecision.flags?.includes("low_recovery");
   const sleepPattern = correlations.night_scroll_after_late_bedtime || correlations.screen_risk_after_bad_sleep === "high" || lowRecovery;
   const evidence = sleepPattern
     ? lowRecovery
-      ? "Recovery context is low, so the next protection window should start before the usual urge."
+      ? "Recovery context is low, so the next protection window should be earlier and lighter."
       : "Night scroll signals are overlapping with weaker sleep and recovery."
     : `Your riskiest window is ${weakWindow || hourWindow(startHour) || "later in the day"}.`;
 
@@ -192,7 +219,7 @@ function buildPlanUpdate(payload, weakWindow) {
     evidence,
     proposed_start_minute: startMinute,
     proposed_end_minute: endMinute,
-    duration_days: 5,
+    duration_days: gentle ? 3 : 5,
     action_label: "Apply preventive block",
   };
 }
@@ -275,6 +302,68 @@ function normalizePlanUpdate(candidate, fallback) {
     duration_days: Math.min(14, Math.max(1, Math.round(cleanNumber(source.duration_days) ?? fallback.duration_days))),
     action_label: cleanText(source.action_label, 60) || fallback.action_label,
   };
+}
+
+function planUpdateCandidate(planUpdate = {}) {
+  return {
+    kind: /sleep|night|recovery/i.test(`${planUpdate.title || ""} ${planUpdate.evidence || ""}`) ? "sleep_boundary" : "preventive_block",
+    start_minute: cleanNumber(planUpdate.proposed_start_minute),
+    end_minute: cleanNumber(planUpdate.proposed_end_minute),
+    duration_days: cleanNumber(planUpdate.duration_days),
+  };
+}
+
+async function applyPlanIntelligence(anonymousUserId, payload, insight) {
+  const planUpdate = insight.plan_update;
+  if (!planUpdate) return insight;
+  try {
+    const candidate = planUpdateCandidate(planUpdate);
+    const segment = segmentKey(payload.profile || {});
+    const pattern = intelligencePatternKey({ key: candidate.kind }, `${planUpdate.title || ""} ${planUpdate.evidence || ""}`);
+    const kind = recommendationKind(candidate);
+    const [macroRows, microRows] = await Promise.all([
+      supabaseFetch(`bai_global_plan_patterns?segment_key=eq.${encodeURIComponent(segment)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&order=positive_rate.desc,sample_size.desc&limit=5`, { method: "GET" }),
+      supabaseFetch(`bai_user_plan_preferences?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&limit=5`, { method: "GET" }),
+    ]);
+    const macro = macroRows?.[0] ? {
+      value: macroRows[0].proposed_value || {},
+      positive_rate: Number(macroRows[0].positive_rate || 0),
+      sample_size: Number(macroRows[0].sample_size || 0),
+    } : null;
+    const micro = microRows?.[0] ? {
+      value: microRows[0].proposed_value || {},
+      outcome: microRows[0].outcome,
+      outcome_score: microRows[0].outcome_score,
+      last_seen_at: microRows[0].created_at,
+    } : null;
+    const decision = decidePlanIntelligence({ macro, micro, fallback: candidate });
+    const value = decision.final_recommendation || {};
+    return {
+      ...insight,
+      plan_update: {
+        ...planUpdate,
+        proposed_start_minute: cleanNumber(value.start_minute) ?? planUpdate.proposed_start_minute,
+        proposed_end_minute: cleanNumber(value.end_minute) ?? planUpdate.proposed_end_minute,
+        duration_days: cleanNumber(value.duration_days) ?? planUpdate.duration_days,
+      },
+      plan_intelligence: {
+        segment_key: segment,
+        pattern_key: pattern,
+        recommendation_kind: kind,
+        decision_source: decision.decision_source,
+        reason: decision.reason,
+        confidence: decision.confidence,
+      },
+    };
+  } catch (error) {
+    return {
+      ...insight,
+      plan_intelligence: {
+        unavailable: true,
+        reason: error.message,
+      },
+    };
+  }
 }
 
 function cleanInsightText(value, maxLength) {
@@ -404,6 +493,17 @@ async function loadWearableMemory(anonymousUserId) {
   }
 }
 
+async function loadRecentWearableSnapshots(anonymousUserId) {
+  try {
+    return await supabaseFetch(
+      `wearable_feature_snapshots?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&select=provider,common_features,provider_features,source_confidence,freshness,created_at&period_end=not.is.null&order=created_at.desc&limit=24`,
+      { method: "GET" }
+    );
+  } catch (error) {
+    return [];
+  }
+}
+
 async function persistWearableSnapshot(anonymousUserId, payload) {
   const providers = Object.keys(payload.provider_features || {});
   const provider = providers.includes("apple_health")
@@ -450,6 +550,10 @@ exports.handler = async (event) => {
     const payload = compactPayload(body.payload || {});
     requireSafePrivacy(payload);
     await persistWearableSnapshot(anonymousUserId, payload);
+    const recentSnapshots = await loadRecentWearableSnapshots(anonymousUserId);
+    const resolvedWearable = resolveWearableSources({ currentPayload: payload, snapshots: recentSnapshots });
+    payload.resolved_wearable = resolvedWearable;
+    payload.wearable_decision_context = wearableDecisionContext(resolvedWearable);
     const wearableMemory = await loadWearableMemory(anonymousUserId);
     const fallbackInsight = buildInsight(payload, wearableMemory);
     let modelResult;
@@ -458,10 +562,10 @@ exports.handler = async (event) => {
     } catch (error) {
       modelResult = { insight: fallbackInsight, source: "deterministic_fallback_after_model_error", error: error.message };
     }
-    const insight = {
+    const insight = await applyPlanIntelligence(anonymousUserId, payload, {
       ...modelResult.insight,
       source: modelResult.source,
-    };
+    });
 
     const rows = await supabaseFetch("digital_wellness_feature_payloads?select=*", {
       method: "POST",

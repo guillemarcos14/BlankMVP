@@ -4,6 +4,7 @@ const PROVIDERS = {
   oura: {
     authUrl: "https://cloud.ouraring.com/oauth/authorize",
     tokenUrl: "https://api.ouraring.com/oauth/token",
+    revokeUrlEnv: "OURA_REVOKE_URL",
     scopes: ["email", "personal", "daily", "heartrate", "workout", "session", "spo2"],
     clientIdEnv: "OURA_CLIENT_ID",
     clientSecretEnv: "OURA_CLIENT_SECRET",
@@ -11,20 +12,28 @@ const PROVIDERS = {
   whoop: {
     authUrl: "https://api.prod.whoop.com/oauth/oauth2/auth",
     tokenUrl: "https://api.prod.whoop.com/oauth/oauth2/token",
+    revokeUrlEnv: "WHOOP_REVOKE_URL",
     scopes: ["offline", "read:profile", "read:recovery", "read:cycles", "read:sleep", "read:workout", "read:body_measurement"],
     clientIdEnv: "WHOOP_CLIENT_ID",
     clientSecretEnv: "WHOOP_CLIENT_SECRET",
   },
   fitbit_google_health: {
-    authUrl: "https://www.fitbit.com/oauth2/authorize",
-    tokenUrl: "https://api.fitbit.com/oauth2/token",
-    scopes: ["activity", "heartrate", "location", "nutrition", "profile", "settings", "sleep", "weight"],
-    clientIdEnv: "FITBIT_CLIENT_ID",
-    clientSecretEnv: "FITBIT_CLIENT_SECRET",
+    authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+    tokenUrl: "https://oauth2.googleapis.com/token",
+    revokeUrl: "https://oauth2.googleapis.com/revoke",
+    scopes: [
+      "https://www.googleapis.com/auth/googlehealth.profile.readonly",
+      "https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+      "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
+      "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+    ],
+    clientIdEnv: "GOOGLE_HEALTH_CLIENT_ID",
+    clientSecretEnv: "GOOGLE_HEALTH_CLIENT_SECRET",
   },
   withings: {
     authUrl: "https://account.withings.com/oauth2_user/authorize2",
     tokenUrl: "https://wbsapi.withings.net/v2/oauth2",
+    revokeUrlEnv: "WITHINGS_REVOKE_URL",
     scopes: ["user.info,user.metrics,user.activity"],
     clientIdEnv: "WITHINGS_CLIENT_ID",
     clientSecretEnv: "WITHINGS_CLIENT_SECRET",
@@ -120,6 +129,49 @@ async function exchangeCode(provider, code) {
   return data.body && provider === "withings" ? data.body : data;
 }
 
+async function refreshAccessToken(provider, refreshToken) {
+  const config = providerConfig(provider);
+  if (!config) throw new Error("unsupported_provider");
+  if (!refreshToken) throw new Error("missing_refresh_token");
+  const clientId = process.env[config.clientIdEnv];
+  const clientSecret = process.env[config.clientSecretEnv];
+  if (!clientId || !clientSecret) throw new Error("provider_oauth_not_configured");
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+  if (provider === "withings") body.set("action", "requesttoken");
+
+  const response = await fetch(config.tokenUrl, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw new Error(`token_refresh_failed_${response.status}:${text.slice(0, 180)}`);
+  return data.body && provider === "withings" ? data.body : data;
+}
+
+async function revokeToken(provider, token) {
+  const config = providerConfig(provider);
+  if (!config || !token) return { attempted: false, supported: false };
+  const revokeUrl = config.revokeUrl || process.env[config.revokeUrlEnv];
+  if (!revokeUrl) return { attempted: false, supported: false };
+
+  const response = await fetch(revokeUrl, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`token_revoke_failed_${response.status}:${text.slice(0, 180)}`);
+  return { attempted: true, supported: true };
+}
+
 module.exports = {
   providerConfig,
   redirectUri,
@@ -128,4 +180,6 @@ module.exports = {
   encryptToken,
   decryptToken,
   exchangeCode,
+  refreshAccessToken,
+  revokeToken,
 };

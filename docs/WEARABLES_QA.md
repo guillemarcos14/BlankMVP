@@ -99,10 +99,11 @@ Backend setup:
 - Set `WEARABLE_OAUTH_REDIRECT_BASE`.
 - Set `WEARABLE_OAUTH_STATE_SECRET`.
 - Set `WEARABLE_TOKEN_ENCRYPTION_KEY`.
+- Set `WEARABLE_SYNC_ADMIN_SECRET` or reuse `MEMBERSHIP_ADMIN_SECRET` for manual scheduled-sync checks.
 - Configure provider credentials only for providers being tested:
   - `OURA_CLIENT_ID` / `OURA_CLIENT_SECRET`
   - `WHOOP_CLIENT_ID` / `WHOOP_CLIENT_SECRET`
-  - `FITBIT_CLIENT_ID` / `FITBIT_CLIENT_SECRET`
+  - `GOOGLE_HEALTH_CLIENT_ID` / `GOOGLE_HEALTH_CLIENT_SECRET`
   - `WITHINGS_CLIENT_ID` / `WITHINGS_CLIENT_SECRET`
 - Treat Garmin as blocked until Garmin partner access is approved.
 
@@ -111,10 +112,11 @@ Connection endpoint checks:
 - POST `wearable-connections` with `action=list` returns current sources.
 - POST `wearable-connections` with `action=upsert_aggregator` stores Apple Health / Health Connect status.
 - POST `wearable-connections` with `action=disconnect` clears tokens and marks the provider disconnected.
+- POST `wearable-connections` with `action=disconnect` attempts provider token revocation when a revocation endpoint is configured or known.
 
 OAuth checks:
 
-- POST `wearable-oauth-start` returns `authorization_url` for Oura, WHOOP, Fitbit/Google Health or Withings when credentials exist.
+- POST `wearable-oauth-start` returns `authorization_url` for Oura, WHOOP, Google Health/Fitbit or Withings when credentials exist.
 - `wearable-oauth-callback` exchanges `code`, encrypts tokens and stores `wearable_connections.status=connected`.
 - Callback stores `external_account_hash`, never the external account id in clear text.
 - Missing credentials return `provider_oauth_not_configured`.
@@ -122,10 +124,15 @@ OAuth checks:
 
 Sync checks:
 
+- Netlify scheduled function `wearable-scheduled-sync` runs daily and syncs due direct-provider connections.
 - POST `wearable-sync` with `sync_kind=initial_30d` stores a 30-day `wearable_feature_snapshots` row.
 - POST `wearable-sync` with `sync_kind=incremental` stores a 7-day snapshot and updates `last_sync_at`.
+- POST `wearable-sync` with `provider=all` syncs all non-disconnected direct providers for the user and returns one result per provider.
+- Sources in `no_data`, `stale` or `error` remain syncable so recovery can happen automatically after new wearable data appears.
+- Expired access tokens are refreshed from encrypted refresh tokens before provider fetches.
 - Failed provider calls set `wearable_connections.status=error` and `last_error`.
 - Snapshot includes `common_features`, provider-specific `provider_features`, `source_confidence` and `freshness`.
+- `digital-wellness-features` resolves conflicts per metric across HealthKit/Health Connect and direct-provider snapshots before generating plans.
 - POST `wearable-outcome` records generated, accepted, ignored, dismissed, completed and failed recommendation outcomes.
 - New `digital-wellness-features` insights include recent wearable memory when outcomes exist.
 

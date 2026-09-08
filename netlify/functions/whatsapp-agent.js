@@ -159,6 +159,33 @@ function whatsappReplyText(plan, prompt = "") {
   return `${text}\n\nOpen Blanked to apply it:\n${link}`;
 }
 
+function whatsappActionButtonVariables(link) {
+  const configured = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_VARIABLES, 1000);
+  if (configured) {
+    try {
+      const parsed = JSON.parse(configured);
+      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value).replace(/\{\{link\}\}/g, link)]));
+    } catch (_) {
+      return { "1": link };
+    }
+  }
+  return { "1": link };
+}
+
+async function sendPlanReply(to, plan, prompt = "") {
+  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
+  const link = actionableLink(plan, prompt);
+  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
+  if (!link || !contentSid) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
+
+  const textResult = await sendWhatsAppMessage(to, text);
+  const buttonResult = await sendWhatsAppMessage(to, "", {
+    contentSid,
+    contentVariables: whatsappActionButtonVariables(link),
+  });
+  return { text: textResult, button: buttonResult };
+}
+
 function minuteOfDay(hour, minute, meridiem) {
   if (!Number.isFinite(hour) || hour < 1 || hour > 12 || !Number.isFinite(minute) || minute < 0 || minute > 59) return null;
   const normalized = meridiem === "pm" && hour !== 12 ? hour + 12 : meridiem === "am" && hour === 12 ? 0 : hour;
@@ -177,9 +204,13 @@ function lunchEndMinute(text) {
 }
 
 function memoryFactsFromText(text) {
+  const value = cleanText(text, 800).toLowerCase();
   const apps = requestedAppNames(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
+  if (/(sleep|bed|night|dormir|duermo|cama|noche)/i.test(value)) facts.last_topic = "sleep";
+  else if (/(scroll|social|instagram|tiktok|youtube|reddit|reels|shorts|redes)/i.test(value)) facts.last_topic = "social";
+  else if (/(focus|work|study|foco|trabaj|estudi)/i.test(value)) facts.last_topic = "focus";
   if (apps.length) facts.main_apps = apps;
   if (lunchMinute != null) {
     facts.lunch_end_minute = lunchMinute;
@@ -263,7 +294,7 @@ async function processMessage(message) {
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
   }
   const plan = await callBlankedAgent(message.text, message.from);
-  return sendWhatsAppMessage(message.from, whatsappReplyText(plan, message.text));
+  return sendPlanReply(message.from, plan, message.text);
 }
 
 exports.handler = async (event) => {

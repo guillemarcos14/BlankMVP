@@ -5,6 +5,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 
 const { handler: intelligenceHandler } = require("../netlify/functions/bai-intelligence");
 const { handler: outcomeHandler } = require("../netlify/functions/bai-outcome");
+const { handler: notificationsHandler } = require("../netlify/functions/bai-learning-notifications");
 
 function response(status, data) {
   return {
@@ -55,6 +56,7 @@ async function macroWinsWithoutPersonalEvidence() {
       ]);
     }
     if (target.includes("/rest/v1/bai_user_plan_outcomes")) return response(200, []);
+    if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "GET") return response(200, []);
     if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "POST") return response(201, null);
     throw new Error(`Unexpected request: ${url}`);
   };
@@ -88,10 +90,26 @@ async function microOverridesMacroWhenUserHistoryContradictsIt() {
         },
       ]);
     }
+    if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "GET") {
+      return response(200, [
+        {
+          decision_source: "macro",
+          final_recommendation: { minutes_before_target: 30, start_minute: 1350, end_minute: 1380, duration_days: 7 },
+          created_at: "2026-09-08T09:00:00.000Z",
+        },
+      ]);
+    }
     if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "POST") {
       const payload = JSON.parse(options.body);
       assert.strictEqual(payload.decision_source, "micro");
       assert.strictEqual(payload.final_recommendation.minutes_before_target, 45);
+      return response(201, null);
+    }
+    if (target.includes("/rest/v1/bai_learning_changes") && options.method === "POST") {
+      const payload = JSON.parse(options.body);
+      assert.strictEqual(payload.change_type, "personal_override");
+      assert.strictEqual(payload.autonomous_apply, true);
+      assert.strictEqual(payload.reversible, true);
       return response(201, null);
     }
     throw new Error(`Unexpected request: ${url}`);
@@ -104,6 +122,7 @@ async function microOverridesMacroWhenUserHistoryContradictsIt() {
   assert.strictEqual(body.final_recommendation.minutes_before_target, 45);
   assert.match(body.reason, /personal evidence wins/i);
   assert.strictEqual(body.evidence.contradiction, true);
+  assert.strictEqual(body.learning_change.change_type, "personal_override");
 }
 
 async function exploresWhenEvidenceIsWeak() {
@@ -121,10 +140,16 @@ async function exploresWhenEvidenceIsWeak() {
       ]);
     }
     if (target.includes("/rest/v1/bai_user_plan_outcomes")) return response(200, []);
+    if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "GET") return response(200, []);
     if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "POST") {
       const payload = JSON.parse(options.body);
       assert.strictEqual(payload.decision_source, "experiment");
       assert.strictEqual(payload.evidence.exploration, true);
+      return response(201, null);
+    }
+    if (target.includes("/rest/v1/bai_learning_changes") && options.method === "POST") {
+      const payload = JSON.parse(options.body);
+      assert.strictEqual(payload.change_type, "exploration_started");
       return response(201, null);
     }
     throw new Error(`Unexpected request: ${url}`);
@@ -140,6 +165,7 @@ async function exploresWhenEvidenceIsWeak() {
   assert.strictEqual(result.statusCode, 200, result.body);
   assert.strictEqual(body.decision_source, "experiment");
   assert.notStrictEqual(body.final_recommendation.minutes_before_target, 30);
+  assert.strictEqual(body.learning_change.change_type, "exploration_started");
 }
 
 async function recordsOutcomesForBothGlobalAndPersonalLearning() {
@@ -171,11 +197,44 @@ async function recordsOutcomesForBothGlobalAndPersonalLearning() {
   assert.strictEqual(inserted.proposed_value.minutes_before_target, 45);
 }
 
+async function listsAndReviewsLearningNotifications() {
+  global.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes("/rest/v1/bai_learning_changes") && options.method === "GET") {
+      return response(200, [
+        {
+          id: "change-1",
+          change_key: "abc",
+          status: "pending",
+          change_type: "personal_override",
+          title: "BAI applied a personal override",
+        },
+      ]);
+    }
+    if (target.includes("/rest/v1/bai_learning_changes") && options.method === "PATCH") {
+      const payload = JSON.parse(options.body);
+      assert.strictEqual(payload.status, "reviewed");
+      assert.ok(payload.reviewed_at);
+      return response(204, null);
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const listed = await notificationsHandler(post({ action: "list" }));
+  const listedBody = JSON.parse(listed.body);
+  assert.strictEqual(listed.statusCode, 200, listed.body);
+  assert.strictEqual(listedBody.notifications[0].change_type, "personal_override");
+
+  const reviewed = await notificationsHandler(post({ action: "review", change_key: "abc" }));
+  assert.strictEqual(reviewed.statusCode, 200, reviewed.body);
+}
+
 (async () => {
   await macroWinsWithoutPersonalEvidence();
   await microOverridesMacroWhenUserHistoryContradictsIt();
   await exploresWhenEvidenceIsWeak();
   await recordsOutcomesForBothGlobalAndPersonalLearning();
+  await listsAndReviewsLearningNotifications();
   console.log("bai_intelligence_smoke_test: ok");
 })().catch((error) => {
   console.error(error);

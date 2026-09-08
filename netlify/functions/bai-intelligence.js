@@ -125,6 +125,10 @@ function valuesDiffer(left = {}, right = {}) {
   return valueSignature(left) !== valueSignature(right);
 }
 
+function shortHash(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex").slice(0, 16);
+}
+
 function macroEvidenceScore(row = {}) {
   const sample = cleanNumber(row.sample_size, 0, 0, 100000);
   const rate = Number(row.positive_rate || 0) / 100;
@@ -258,6 +262,155 @@ async function insertDecision(record) {
   }
 }
 
+async function latestDecision({ anonymousUserId, pattern, kind }) {
+  try {
+    const rows = await supabaseFetch(`bai_recommendation_decisions?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&order=created_at.desc&limit=1`, { method: "GET" });
+    return rows[0] || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function buildLearningChange({ previousDecision, record }) {
+  const previousValue = previousDecision?.final_recommendation || {};
+  const newValue = record.final_recommendation || {};
+  const sourceChanged = previousDecision && previousDecision.decision_source !== record.decision_source;
+  const recommendationChanged = previousDecision && valuesDiffer(previousValue, newValue);
+  const personalOverride = record.decision_source === "micro" && record.evidence?.contradiction === true;
+  const explorationStarted = record.decision_source === "experiment";
+
+  let changeType = "";
+  let title = "";
+  let summary = "";
+  let severity = "notice";
+
+  if (personalOverride) {
+    changeType = "personal_override";
+    title = "BAI applied a personal override";
+    summary = "A user's own outcomes now override the segment pattern for this recommendation.";
+    severity = "important";
+  } else if (explorationStarted) {
+    changeType = "exploration_started";
+    title = "BAI started a bounded experiment";
+    summary = "Evidence is weak, so BAI applied a reversible variation to learn faster.";
+  } else if (sourceChanged) {
+    changeType = "decision_source_changed";
+    title = "BAI changed its decision source";
+    summary = `Decision source changed from ${previousDecision.decision_source} to ${record.decision_source}.`;
+  } else if (recommendationChanged) {
+    changeType = "recommendation_changed";
+    title = "BAI changed a recommendation";
+    summary = "The final recommendation changed because new evidence changed the ranking.";
+  }
+
+  if (!changeType) return null;
+
+  const fingerprint = [
+    record.anonymous_user_id,
+    record.segment_key,
+    record.pattern_key,
+    record.recommendation_kind,
+    changeType,
+    valueSignature(previousValue),
+    valueSignature(newValue),
+    record.decision_source,
+  ].join("|");
+
+  return {
+    change_key: shortHash(fingerprint),
+    scope: personalOverride || record.decision_source === "micro" ? "user" : "segment",
+    anonymous_user_id: record.anonymous_user_id,
+    segment_key: record.segment_key,
+    pattern_key: record.pattern_key,
+    recommendation_kind: record.recommendation_kind,
+    change_type: changeType,
+    title,
+    summary,
+    reason: record.reason,
+    evidence: record.evidence,
+    impact: {
+      confidence: record.confidence,
+      decision_source: record.decision_source,
+      expected: "Future matching responses can use this updated ranking without waiting for manual approval.",
+    },
+    previous_value: previousValue,
+    new_value: newValue,
+    autonomous_apply: true,
+    reversible: true,
+    severity,
+    status: "pending",
+  };
+}
+
+async function sendOwnerEmail(change) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  const to = process.env.BAI_OWNER_EMAIL || process.env.BLANK_OWNER_EMAIL;
+  if (!apiKey || !from || !to) return { skipped: true };
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to,
+      subject: `[Blanked] ${change.title}`,
+      text: [
+        change.summary,
+        "",
+        `Type: ${change.change_type}`,
+        `Scope: ${change.scope}`,
+        `Pattern: ${change.pattern_key}`,
+        `Kind: ${change.recommendation_kind}`,
+        `Reason: ${change.reason}`,
+        `Confidence: ${change.impact?.confidence ?? "unknown"}`,
+        "",
+        "This change was applied autonomously and logged for review.",
+      ].join("\n"),
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Resend request failed: ${detail}`);
+  }
+  return response.json();
+}
+
+async function insertLearningChange(change) {
+  if (!change) return null;
+  try {
+    await supabaseFetch("bai_learning_changes", {
+      method: "POST",
+      headers: { prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify(change),
+    });
+    try {
+      await sendOwnerEmail(change);
+    } catch (_) {
+      // Email is a delivery layer; the audit log is the source of truth.
+    }
+    return change;
+  } catch (_) {
+    return null;
+  }
+}
+
+function publicLearningChange(change) {
+  return change ? {
+    change_key: change.change_key,
+    change_type: change.change_type,
+    title: change.title,
+    summary: change.summary,
+    status: change.status,
+    autonomous_apply: change.autonomous_apply,
+    reversible: change.reversible,
+  } : null;
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -282,6 +435,7 @@ exports.handler = async (event) => {
     const macro = bestMacro(macroRows);
     const micro = bestMicro(microRows);
     const decision = decide({ macro, micro, fallback, explorationRate, seed });
+    const previousDecision = await latestDecision({ anonymousUserId, pattern, kind });
     const record = {
       anonymous_user_id: anonymousUserId,
       segment_key: segment,
@@ -295,7 +449,15 @@ exports.handler = async (event) => {
       confidence: decision.confidence,
       evidence: decision.evidence,
     };
+    const learningChange = buildLearningChange({ previousDecision, record });
+    if (learningChange) {
+      record.evidence = {
+        ...record.evidence,
+        learning_change: publicLearningChange(learningChange),
+      };
+    }
     await insertDecision(record);
+    await insertLearningChange(learningChange);
 
     return json(200, {
       ok: true,
@@ -309,6 +471,7 @@ exports.handler = async (event) => {
       reason: decision.reason,
       confidence: decision.confidence,
       evidence: decision.evidence,
+      learning_change: publicLearningChange(learningChange),
     });
   } catch (error) {
     return json(500, { error: "bai_intelligence_failed", detail: error.message });
@@ -320,6 +483,7 @@ module.exports = {
   bestMacro,
   bestMicro,
   candidateValue,
+  buildLearningChange,
   decide,
   explorationVariant,
   macroConfidence,

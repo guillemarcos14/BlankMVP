@@ -3369,7 +3369,7 @@ struct ReportView: View {
 
         var recommendations: [String] = []
         if let weakHour {
-            recommendations.append("Start Blank at \(activationTimeText(before: weakHour)).")
+            recommendations.append(weakWindowRecommendationText(for: weakHour, now: now))
         } else if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
             recommendations.append("Keep today's block short: 25-30 min before the risky window.")
         } else if let bestHour {
@@ -3427,6 +3427,8 @@ struct ReportView: View {
         let firstBlock: String
         if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
             firstBlock = "3 days: keep blocks at 25-30 min while recovery is light."
+        } else if weakHour != nil {
+            firstBlock = "Next 3 days: use a short block before that weak window."
         } else if let targetHour {
             firstBlock = "3 days: start Blank at \(activationTimeText(before: targetHour))."
         } else {
@@ -3439,6 +3441,28 @@ struct ReportView: View {
             : "Sunday: review whether you can increase one block."
 
         return [firstBlock, secondBlock, thirdBlock]
+    }
+
+    private func weakWindowRecommendationText(for hour: Int, now: Date) -> String {
+        let currentMinute = minuteOfDay(from: now)
+        let startMinute = ((max(0, min(23, hour)) * 60) + (24 * 60 - 10)) % (24 * 60)
+        let endMinute = ((max(0, min(23, hour)) + 1) * 60) % (24 * 60)
+        let isActiveWindow = startMinute < endMinute
+            ? currentMinute >= startMinute && currentMinute < endMinute
+            : currentMinute >= startMinute || currentMinute < endMinute
+
+        if isActiveWindow {
+            return "You are in that risk window now. Start a short block now."
+        }
+        if currentMinute < startMinute {
+            return "Start Blank today at \(minuteText(startMinute))."
+        }
+        return "Schedule tomorrow's block at \(minuteText(startMinute))."
+    }
+
+    private func minuteOfDay(from date: Date) -> Int {
+        let components = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return (components.hour ?? 0) * 60 + (components.minute ?? 0)
     }
 
     private func mostCommonHour(from events: [BlankUsageEvent], sessions: [BlankSession]) -> Int? {

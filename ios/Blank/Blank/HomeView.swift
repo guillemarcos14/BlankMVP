@@ -1258,7 +1258,29 @@ private struct ModesList: View {
     }
 
     private var planRoutineEditor: some View {
-        DisclosureGroup {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                        .background(Circle().fill(textColor.opacity(0.10)))
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Recurring routines")
+                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                        Text(routineSummaryText)
+                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                            .foregroundStyle(secondaryColor)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+                }
+
+                routineTimeline
+            }
+
             VStack(spacing: 12) {
                 ForEach($windows) { $window in
                     HabitWindowCard(
@@ -1295,28 +1317,6 @@ private struct ModesList: View {
                 TopSheetPrimaryButtonLabel(title: "Save plan")
             }
             .padding(.top, 2)
-        } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 34, height: 34)
-                    .background(Circle().fill(textColor.opacity(0.10)))
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Recurring routines")
-                        .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                    Text(routineSummaryText)
-                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                        .foregroundStyle(secondaryColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer()
-                }
-
-                routineTimeline
-            }
         }
         .foregroundStyle(textColor)
         .padding(18)
@@ -1393,10 +1393,14 @@ private struct ModesList: View {
     }
 
     private var routineSummaryText: String {
-        guard let first = enabledWindows.first else {
+        let count = enabledWindows.count
+        guard count > 0 else {
             return "No routine approved yet."
         }
-        return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
+        if count == 1, let first = enabledWindows.first {
+            return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
+        }
+        return "\(count) active routines. Configure each one below."
     }
 
     private func shortWeekday(_ index: Int) -> String {

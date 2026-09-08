@@ -35,10 +35,10 @@ function providerConfig(provider) {
   return PROVIDERS[provider] || null;
 }
 
-function redirectUri(provider) {
+function redirectUri() {
   const base = process.env.WEARABLE_OAUTH_REDIRECT_BASE || process.env.URL;
   if (!base) throw new Error("WEARABLE_OAUTH_REDIRECT_BASE is not configured");
-  return `${base.replace(/\/$/, "")}/.netlify/functions/wearable-oauth-callback?provider=${encodeURIComponent(provider)}`;
+  return `${base.replace(/\/$/, "")}/.netlify/functions/wearable-oauth-callback`;
 }
 
 function signState(payload) {

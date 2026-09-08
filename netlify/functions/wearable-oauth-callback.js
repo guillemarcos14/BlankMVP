@@ -30,15 +30,15 @@ exports.handler = async (event) => {
   if (methodError) return methodError;
 
   try {
-    const provider = cleanText(event.queryStringParameters?.provider, 64);
     const code = cleanText(event.queryStringParameters?.code, 600);
     const state = cleanText(event.queryStringParameters?.state, 2000);
     const oauthError = cleanText(event.queryStringParameters?.error, 180);
     if (oauthError) return html(400, closePage("Connection cancelled", oauthError));
-    if (!provider || !code || !state) return json(400, { error: "missing_oauth_callback_params" });
+    if (!code || !state) return json(400, { error: "missing_oauth_callback_params" });
 
     const statePayload = verifyState(state);
-    if (statePayload.provider !== provider) throw new Error("provider_state_mismatch");
+    const provider = cleanText(event.queryStringParameters?.provider || statePayload.provider, 64);
+    if (!provider || statePayload.provider !== provider) throw new Error("provider_state_mismatch");
 
     const token = await exchangeCode(provider, code);
     const expiresIn = Number(token.expires_in || 0);

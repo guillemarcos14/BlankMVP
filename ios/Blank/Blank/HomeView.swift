@@ -1656,8 +1656,7 @@ private struct AdvancedModeControls: View {
     let textColor: Color
     let secondaryColor: Color
 
-    private var cooldownSettingText: String {
-        let seconds = sessionStore.manualUnblankCooldownSeconds
+    private static func cooldownSettingText(for seconds: Int) -> String {
         if seconds == 0 { return "Off" }
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
@@ -1684,7 +1683,7 @@ private struct AdvancedModeControls: View {
                 HStack {
                     Text("Unblank cooldown")
                     Spacer()
-                    Text(cooldownSettingText)
+                    Text(Self.cooldownSettingText(for: sessionStore.manualUnblankCooldownSeconds))
                         .monospacedDigit()
                         .foregroundStyle(secondaryColor)
                 }

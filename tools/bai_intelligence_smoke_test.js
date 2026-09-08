@@ -54,7 +54,7 @@ async function macroWinsWithoutPersonalEvidence() {
         },
       ]);
     }
-    if (target.includes("/rest/v1/bai_user_plan_preferences")) return response(200, []);
+    if (target.includes("/rest/v1/bai_user_plan_outcomes")) return response(200, []);
     if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "POST") return response(201, null);
     throw new Error(`Unexpected request: ${url}`);
   };
@@ -78,7 +78,7 @@ async function microOverridesMacroWhenUserHistoryContradictsIt() {
         },
       ]);
     }
-    if (target.includes("/rest/v1/bai_user_plan_preferences")) {
+    if (target.includes("/rest/v1/bai_user_plan_outcomes")) {
       return response(200, [
         {
           proposed_value: { minutes_before_target: 45, start_minute: 1335, end_minute: 1380, duration_days: 7 },
@@ -103,6 +103,43 @@ async function microOverridesMacroWhenUserHistoryContradictsIt() {
   assert.strictEqual(body.decision_source, "micro");
   assert.strictEqual(body.final_recommendation.minutes_before_target, 45);
   assert.match(body.reason, /personal evidence wins/i);
+  assert.strictEqual(body.evidence.contradiction, true);
+}
+
+async function exploresWhenEvidenceIsWeak() {
+  global.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes("/rest/v1/bai_global_plan_patterns")) {
+      return response(200, [
+        {
+          proposed_value: { minutes_before_target: 30, start_minute: 1350, end_minute: 1380, duration_days: 7 },
+          positive_rate: 50,
+          sample_size: 2,
+          positive_count: 1,
+          negative_count: 1,
+        },
+      ]);
+    }
+    if (target.includes("/rest/v1/bai_user_plan_outcomes")) return response(200, []);
+    if (target.includes("/rest/v1/bai_recommendation_decisions") && options.method === "POST") {
+      const payload = JSON.parse(options.body);
+      assert.strictEqual(payload.decision_source, "experiment");
+      assert.strictEqual(payload.evidence.exploration, true);
+      return response(201, null);
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await intelligenceHandler(post({
+    ...baseRequest,
+    anonymous_user_id: "anon-explore-1",
+    exploration_enabled: true,
+    exploration_rate: 1,
+  }));
+  const body = JSON.parse(result.body);
+  assert.strictEqual(result.statusCode, 200, result.body);
+  assert.strictEqual(body.decision_source, "experiment");
+  assert.notStrictEqual(body.final_recommendation.minutes_before_target, 30);
 }
 
 async function recordsOutcomesForBothGlobalAndPersonalLearning() {
@@ -137,6 +174,7 @@ async function recordsOutcomesForBothGlobalAndPersonalLearning() {
 (async () => {
   await macroWinsWithoutPersonalEvidence();
   await microOverridesMacroWhenUserHistoryContradictsIt();
+  await exploresWhenEvidenceIsWeak();
   await recordsOutcomesForBothGlobalAndPersonalLearning();
   console.log("bai_intelligence_smoke_test: ok");
 })().catch((error) => {

@@ -6,6 +6,8 @@ const {
 } = require("./_membership");
 const {
   decide: decidePlanIntelligence,
+  bestMacro: bestMacroEvidence,
+  bestMicro: bestMicroEvidence,
   patternKey: intelligencePatternKey,
   recommendationKind,
   segmentKey,
@@ -323,20 +325,11 @@ async function applyPlanIntelligence(anonymousUserId, payload, insight) {
     const kind = recommendationKind(candidate);
     const [macroRows, microRows] = await Promise.all([
       supabaseFetch(`bai_global_plan_patterns?segment_key=eq.${encodeURIComponent(segment)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&order=positive_rate.desc,sample_size.desc&limit=5`, { method: "GET" }),
-      supabaseFetch(`bai_user_plan_preferences?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&limit=5`, { method: "GET" }),
+      supabaseFetch(`bai_user_plan_outcomes?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&pattern_key=eq.${encodeURIComponent(pattern)}&recommendation_kind=eq.${encodeURIComponent(kind)}&select=*&order=created_at.desc&limit=30`, { method: "GET" }),
     ]);
-    const macro = macroRows?.[0] ? {
-      value: macroRows[0].proposed_value || {},
-      positive_rate: Number(macroRows[0].positive_rate || 0),
-      sample_size: Number(macroRows[0].sample_size || 0),
-    } : null;
-    const micro = microRows?.[0] ? {
-      value: microRows[0].proposed_value || {},
-      outcome: microRows[0].outcome,
-      outcome_score: microRows[0].outcome_score,
-      last_seen_at: microRows[0].created_at,
-    } : null;
-    const decision = decidePlanIntelligence({ macro, micro, fallback: candidate });
+    const macro = bestMacroEvidence(macroRows);
+    const micro = bestMicroEvidence(microRows);
+    const decision = decidePlanIntelligence({ macro, micro, fallback: candidate, seed: `${anonymousUserId}|${segment}|${pattern}|${kind}` });
     const value = decision.final_recommendation || {};
     return {
       ...insight,

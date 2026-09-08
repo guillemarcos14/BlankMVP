@@ -37,9 +37,10 @@ create table if not exists bai_recommendation_decisions (
   decision_source text not null,
   reason text not null,
   confidence integer not null default 20,
+  evidence jsonb not null default '{}',
   created_at timestamptz not null default now(),
   constraint bai_recommendation_decisions_source_check
-    check (decision_source in ('macro', 'micro', 'fallback')),
+    check (decision_source in ('macro', 'micro', 'experiment', 'fallback')),
   constraint bai_recommendation_decisions_confidence_check
     check (confidence between 0 and 100)
 );

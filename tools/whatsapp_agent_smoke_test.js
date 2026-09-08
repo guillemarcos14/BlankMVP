@@ -222,7 +222,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 2);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
     assert.strictEqual(requests[1].ContentSid, "HXbutton");
-    assert.match(requests[1].ContentVariables, /getblank\.netlify\.app\/open/);
+    assert.match(requests[1].ContentVariables, /open\?action=setup-plan/);
   } finally {
     global.fetch = originalFetch;
     delete process.env.TWILIO_ACCOUNT_SID;

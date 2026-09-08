@@ -160,16 +160,28 @@ function whatsappReplyText(plan, prompt = "") {
 }
 
 function whatsappActionButtonVariables(link) {
+  let linkPath = link;
+  try {
+    const parsed = new URL(link);
+    linkPath = `${parsed.pathname.replace(/^\//, "")}${parsed.search}`;
+  } catch (_) {
+    linkPath = link.replace(/^https?:\/\/[^/]+\//i, "");
+  }
   const configured = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_VARIABLES, 1000);
   if (configured) {
     try {
       const parsed = JSON.parse(configured);
-      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value).replace(/\{\{link\}\}/g, link)]));
+      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
+        key,
+        String(value)
+          .replace(/\{\{link\}\}/g, link)
+          .replace(/\{\{link_path\}\}/g, linkPath),
+      ]));
     } catch (_) {
-      return { "1": link };
+      return { "1": linkPath };
     }
   }
-  return { "1": link };
+  return { "1": linkPath };
 }
 
 async function sendPlanReply(to, plan, prompt = "") {

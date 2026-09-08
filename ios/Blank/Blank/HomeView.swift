@@ -39,7 +39,6 @@ struct HomeView: View {
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
-    private let riskBlankMinutes = 30
     let onOpenOnboardingDemo: () -> Void
 
     init(_ onOpenOnboardingDemo: @escaping () -> Void = {}) {
@@ -238,7 +237,7 @@ struct HomeView: View {
             Button {
                 openSection(.emergency)
             } label: {
-                Image(systemName: "bolt.shield")
+                Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Color.white)
                     .foregroundColor(Color.white)
@@ -349,8 +348,6 @@ struct HomeView: View {
         let issues = configIssues
         if !issues.isEmpty {
             configCard(issues)
-        } else if !sessionStore.isBlankActive, purchaseStore.hasPremiumAccess {
-            aiPlanHomeCard(width: width)
         }
     }
 
@@ -366,84 +363,6 @@ struct HomeView: View {
             bottomAction(width: actionWidth)
         }
         .frame(maxWidth: maxWidth)
-    }
-
-    private func aiPlanHomeCard(width: CGFloat) -> some View {
-        let system = aiSystem
-
-        return HStack(alignment: .center, spacing: 10) {
-            notificationIcon
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text("Blanked AI")
-                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    Text("now")
-                        .font(.blankInter(size: 11, relativeTo: .caption2))
-                        .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
-                    Spacer(minLength: 0)
-                }
-
-                Text("\(system.plan.recommendedDurationMinutes) min before \(system.forecast.riskWindow)")
-                    .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.84)
-            }
-            .layoutPriority(1)
-
-            Button {
-                let result = withAnimation(.easeInOut(duration: 0.65)) {
-                    sessionStore.activateBlank(durationMinutes: system.plan.recommendedDurationMinutes)
-                }
-                screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                setMessage(for: result)
-            } label: {
-                Text("Start")
-                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                    .foregroundStyle(Color.white)
-                    .lineLimit(1)
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background { Capsule().fill(BlankColors.ink.opacity(0.92)) }
-            }
-            .buttonStyle(.plain)
-
-            Menu {
-                Button("Apply to Plan") {
-                    sessionStore.applyAIPlan()
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "home_ai_plan"]
-                        )
-                    }
-                    message = "Blanked AI applied to Plan."
-                    messageAction = nil
-                }
-                Button("Edit in Plan") {
-                    openSection(.modes)
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(BlankColors.ink.opacity(0.72))
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-        }
-        .foregroundStyle(BlankColors.ink)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(width: min(width, 330), alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.ultraThinMaterial)
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.66))
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.white.opacity(0.54), lineWidth: 1)
-        }
-        .shadow(color: BlankColors.ink.opacity(0.10), radius: 16, x: 0, y: 8)
     }
 
     private func configCard(_ issues: [ConfigIssue]) -> some View {
@@ -504,8 +423,10 @@ struct HomeView: View {
     @ViewBuilder
     private var centerStatus: some View {
         VStack(spacing: 8) {
-            if sessionStore.isBlankActive, let blankActiveSince = sessionStore.blankActiveSince {
-                Text(activeTimerText(since: blankActiveSince, until: sessionStore.blankActiveUntil))
+            if sessionStore.isBlankActive,
+               sessionStore.blankActiveUntil == nil,
+               let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
                     .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
                     .foregroundStyle(Color.white.opacity(0.86))
                     .monospacedDigit()
@@ -570,7 +491,7 @@ struct HomeView: View {
                 }
             }
             .simultaneousGesture(
-                LongPressGesture(minimumDuration: 20)
+                LongPressGesture(minimumDuration: 20, maximumDistance: .infinity)
                     .onEnded { _ in
                         guard sessionStore.isBlankActive, !sessionStore.hardBlankActive else { return }
                         scheduleDelayedManualUnlock()
@@ -609,6 +530,11 @@ struct HomeView: View {
 
             if let cooldownText {
                 Text(cooldownText)
+                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                    .monospacedDigit()
+                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.62) : BlankColors.mutedInk)
+            } else if let timerCountdownText {
+                Text(timerCountdownText)
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                     .monospacedDigit()
                     .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.62) : BlankColors.mutedInk)
@@ -774,91 +700,16 @@ struct HomeView: View {
         return "Cooldown: \(formatCooldown(seconds))"
     }
 
+    private var timerCountdownText: String? {
+        guard sessionStore.isBlankActive, let blankActiveUntil = sessionStore.blankActiveUntil else { return nil }
+        let seconds = max(0, Int(ceil(blankActiveUntil.timeIntervalSince(now))))
+        return "Timer: \(formatCooldown(seconds))"
+    }
+
     private func formatCooldown(_ seconds: Int) -> String {
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
         return "\(String(format: "%02d", minutes)):\(String(format: "%02d", remainingSeconds))"
-    }
-
-    private var aiRiskNotification: some View {
-        Button {
-            let result = withAnimation(.easeInOut(duration: 0.65)) {
-                sessionStore.activateBlank(durationMinutes: riskBlankMinutes)
-            }
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-            setMessage(for: result)
-        } label: {
-            HStack(alignment: .center, spacing: 10) {
-                notificationIcon
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text("BLANKED")
-                            .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                            .foregroundStyle(BlankColors.ink.opacity(0.76))
-                        Text("now")
-                            .font(.blankInter(size: 11, relativeTo: .caption2))
-                            .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
-                        Spacer(minLength: 0)
-                    }
-
-                    Text("High risk near \(riskWindowText). Start a \(riskBlankMinutes) min blank?")
-                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(BlankColors.ink.opacity(0.94))
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.84)
-                }
-                .layoutPriority(1)
-
-                Text("Start \(riskBlankMinutes) min")
-                    .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-                    .foregroundStyle(Color.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background {
-                        Capsule().fill(BlankColors.ink.opacity(0.92))
-                    }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: 330)
-            .background {
-                RoundedRectangle(cornerRadius: 19, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 19, style: .continuous)
-                    .fill(Color.white.opacity(0.64))
-                RoundedRectangle(cornerRadius: 19, style: .continuous)
-                    .stroke(Color.white.opacity(0.54), lineWidth: 1)
-            }
-            .shadow(color: BlankColors.ink.opacity(0.12), radius: 18, x: 0, y: 10)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("High risk near \(riskWindowText). Start a \(riskBlankMinutes) minute blank.")
-    }
-
-    private var notificationIcon: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(BlankColors.ink.opacity(0.92))
-            Image(systemName: "sparkles")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.white)
-        }
-        .frame(width: 30, height: 30)
-    }
-
-    private var shouldShowRiskNotification: Bool {
-        guard !sessionStore.isBlankActive,
-              purchaseStore.hasPremiumAccess,
-              message == nil,
-              configIssues.isEmpty else {
-            return false
-        }
-
-        return aiSystem.forecast.riskScore >= 70 &&
-            aiSystem.forecast.minutesUntilRisk <= 90
     }
 
     private func startTimedBlank(minutes: Int, hardMode: Bool) {
@@ -1076,24 +927,6 @@ struct HomeView: View {
         let minutes = (elapsed % 3600) / 60
         let seconds = elapsed % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-    }
-
-    private func activeTimerText(since startDate: Date, until endDate: Date?) -> String {
-        guard let endDate else {
-            return elapsedText(since: startDate)
-        }
-        return countdownText(until: endDate)
-    }
-
-    private func countdownText(until date: Date) -> String {
-        let remaining = max(0, Int(date.timeIntervalSince(now)))
-        let hours = remaining / 3600
-        let minutes = (remaining % 3600) / 60
-        let seconds = remaining % 60
-        if hours > 0 {
-            return String(format: "%01d:%02d:%02d", hours, minutes, seconds)
-        }
-        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     private func remainingText(until date: Date) -> String {
@@ -2295,54 +2128,148 @@ private struct RelapseReviewSheet: View {
     let onSelect: (RelapseReviewReason) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Relapse review", systemImage: "sparkles")
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(BlankColors.mutedInk)
-
-                Text("Why now?")
-                    .font(.blankInter(size: 30, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(BlankColors.ink)
-
-                Text(intervention.alternative)
-                    .font(.blankInter(size: 14, relativeTo: .subheadline))
-                    .foregroundStyle(BlankColors.mutedInk)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(RelapseReviewReason.allCases) { reason in
-                    Button {
-                        onSelect(reason)
-                        dismiss()
-                    } label: {
-                        Text(reason.title)
-                            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                            .foregroundStyle(BlankColors.ink)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 48)
-                            .background {
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(Color.white.opacity(0.78))
-                            }
-                    }
-                    .buttonStyle(.plain)
+        ZStack {
+            BlankAtmosphericBackground()
+                .overlay {
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.70),
+                            BlankColors.background.opacity(0.80),
+                            BlankColors.airMist.opacity(0.34)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .ignoresSafeArea()
                 }
-            }
 
-            Button("Skip") {
-                dismiss()
+            VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(BlankColors.ink.opacity(0.78))
+                        .frame(width: 38, height: 38)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay { Circle().fill(Color.white.opacity(0.34)) }
+                        }
+                        .overlay {
+                            Circle().stroke(BlankColors.glassBorder, lineWidth: 1)
+                        }
+                        .shadow(color: BlankColors.ink.opacity(0.08), radius: 14, x: 0, y: 8)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Why now?")
+                            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                            .foregroundStyle(BlankColors.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.86)
+
+                        Text(intervention.alternative)
+                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                            .foregroundStyle(BlankColors.mutedInk)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.top, 10)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(RelapseReviewReason.allCases) { reason in
+                        Button {
+                            onSelect(reason)
+                            dismiss()
+                        } label: {
+                            RelapseReasonTile(reason: reason)
+                        }
+                        .buttonStyle(RelapseReasonButtonStyle())
+                    }
+                }
+
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Skip")
+                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(BlankColors.ink.opacity(0.58))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+
+                Spacer(minLength: 0)
             }
-            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-            .foregroundStyle(BlankColors.mutedInk)
-            .frame(maxWidth: .infinity)
-            .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.top, 74)
+            .padding(.bottom, 28)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(BlankColors.background.ignoresSafeArea())
         .preferredColorScheme(.light)
+    }
+}
+
+private struct RelapseReasonTile: View {
+    let reason: RelapseReviewReason
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(BlankColors.ink.opacity(0.74))
+                .frame(width: 28, height: 28)
+                .background {
+                    Circle().fill(BlankColors.ink.opacity(0.055))
+                }
+
+            Text(reason.title)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(BlankColors.ink.opacity(0.94))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+        .frame(height: 58)
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var symbol: String {
+        switch reason {
+        case .bored: return "sparkles"
+        case .anxious: return "waveform.path.ecg"
+        case .tired: return "moon.fill"
+        case .neededApp: return "app.fill"
+        case .procrastinating: return "clock.fill"
+        case .other: return "ellipsis"
+        }
+    }
+}
+
+private struct RelapseReasonButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.white.opacity(configuration.isPressed ? 0.34 : 0.52))
+                    BlankGlassCornerHighlight(width: 76, height: 28, xOffset: -68, yOffset: -20)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                .allowsHitTesting(false)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(BlankColors.glassBorder, lineWidth: 1)
+            }
+            .shadow(color: BlankColors.ink.opacity(configuration.isPressed ? 0.025 : 0.065), radius: configuration.isPressed ? 8 : 16, x: 0, y: configuration.isPressed ? 4 : 10)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 

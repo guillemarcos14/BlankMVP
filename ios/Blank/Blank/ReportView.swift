@@ -1560,7 +1560,7 @@ struct ReportView: View {
             request.timeoutInterval = 12
             let defaults = BlankSharedState.defaults
             let userIdKey = "blankOnboardingAnonymousUserId"
-            let anonymousUserId = defaults.string(forKey: userIdKey).filter { !$0.isEmpty } ?? {
+            let anonymousUserId = defaults.string(forKey: userIdKey).flatMap { $0.isEmpty ? nil : $0 } ?? {
                 let created = UUID().uuidString
                 defaults.set(created, forKey: userIdKey)
                 return created

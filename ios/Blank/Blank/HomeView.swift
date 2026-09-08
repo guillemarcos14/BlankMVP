@@ -2,7 +2,6 @@ import FamilyControls
 import LocalAuthentication
 import SwiftUI
 import UIKit
-import UserNotifications
 
 enum HomeSection: Hashable {
     case modes
@@ -21,7 +20,7 @@ struct HomeView: View {
 
     @State private var now = Date()
     @State private var message: String?
-    @State private var messageAction: ConfigIssue.Action?
+    @State private var messageAction: HomeMessageAction?
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
     @State private var showingAssistantConnect = false
@@ -117,7 +116,6 @@ struct HomeView: View {
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
-            scheduleDailyInterventionIfNeeded()
             evaluateBAIProactiveSignals()
         }
         .onChange(of: scenePhase) { phase in
@@ -128,7 +126,6 @@ struct HomeView: View {
             healthKitStore.refresh()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
-            scheduleDailyInterventionIfNeeded()
             evaluateBAIProactiveSignals()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
@@ -345,10 +342,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private func topHomePanel(width: CGFloat) -> some View {
-        let issues = configIssues
-        if !issues.isEmpty {
-            configCard(issues)
-        }
+        EmptyView()
     }
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
@@ -363,61 +357,6 @@ struct HomeView: View {
             bottomAction(width: actionWidth)
         }
         .frame(maxWidth: maxWidth)
-    }
-
-    private func configCard(_ issues: [ConfigIssue]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(issues) { issue in
-                Button {
-                    resolve(issue.action)
-                } label: {
-                    HStack(alignment: .center, spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(BlankColors.ink.opacity(0.92))
-                            Image(systemName: "exclamationmark")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.white)
-                        }
-                        .frame(width: 30, height: 30)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Text("Blanked")
-                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                                Text("now")
-                                    .font(.blankInter(size: 11, relativeTo: .caption2))
-                                    .foregroundStyle(BlankColors.mutedInk.opacity(0.78))
-                            }
-                            Text(issue.title)
-                                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.84)
-                        }
-                        .layoutPriority(1)
-
-                        Spacer(minLength: 8)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(BlankColors.mutedInk)
-                    }
-                    .foregroundStyle(BlankColors.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(Color.white.opacity(0.74))
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.white.opacity(0.54), lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: 330, alignment: .leading)
-        .shadow(color: BlankColors.ink.opacity(0.10), radius: 16, x: 0, y: 8)
     }
 
     @ViewBuilder
@@ -738,38 +677,6 @@ struct HomeView: View {
         aiSystem.forecast.riskWindow
     }
 
-    private func scheduleDailyInterventionIfNeeded() {
-        guard !sessionStore.isBlankActive,
-              purchaseStore.hasPremiumAccess,
-              aiSystem.forecast.minutesUntilRisk > 15,
-              aiSystem.forecast.minutesUntilRisk <= 180 else {
-            return
-        }
-
-        let defaults = BlankSharedState.defaults
-        let dayKey = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? 0
-        let scheduledKey = "blankLastAIInterventionNotificationDay"
-        guard defaults.integer(forKey: scheduledKey) != dayKey else { return }
-        let system = aiSystem
-
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-            let content = UNMutableNotificationContent()
-            content.title = "Blanked"
-            content.body = DigitalWellnessAI.interventionNotificationText(system: system)
-            content.sound = .default
-            let trigger = UNTimeIntervalNotificationTrigger(
-                timeInterval: TimeInterval(max(60, (system.forecast.minutesUntilRisk - 15) * 60)),
-                repeats: false
-            )
-            let request = UNNotificationRequest(identifier: "blank-ai-daily-intervention", content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request) { error in
-                guard error == nil else { return }
-                defaults.set(dayKey, forKey: scheduledKey)
-            }
-        }
-    }
-
     private func configuredWhatsAppNumber() -> String? {
         guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankWhatsAppPhoneNumber") as? String else { return nil }
         let digits = rawValue.filter(\.isNumber)
@@ -816,26 +723,7 @@ struct HomeView: View {
         values.isEmpty ? nil : values.reduce(0, +) / values.count
     }
 
-    private var configIssues: [ConfigIssue] {
-        var issues: [ConfigIssue] = []
-        if screenTimeBlocker.authorizationStatus != .approved {
-            issues.append(ConfigIssue(
-                title: "Screen Time pending",
-                body: "Authorize Screen Time so iOS can apply shields.",
-                action: .screenTime
-            ))
-        }
-        if !sessionStore.hasSelectedApps {
-            issues.append(ConfigIssue(
-                title: "No apps selected",
-                body: "Choose apps, categories, or domains before starting.",
-                action: .selectApps
-            ))
-        }
-        return issues
-    }
-
-    private func resolve(_ action: ConfigIssue.Action) {
+    private func resolve(_ action: HomeMessageAction) {
         switch action {
         case .screenTime:
             Task { @MainActor in
@@ -1029,18 +917,10 @@ private struct GlassCornerHighlight: View {
     }
 }
 
-private struct ConfigIssue: Identifiable {
-    enum Action {
-        case screenTime
-        case relinkNfc
-        case selectApps
-    }
-
-    let title: String
-    let body: String
-    let action: Action
-
-    var id: String { title }
+private enum HomeMessageAction {
+    case screenTime
+    case relinkNfc
+    case selectApps
 }
 
 struct AppBackground: View {
@@ -2390,7 +2270,7 @@ private struct RelinkSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @Binding var message: String?
-    @Binding var messageAction: ConfigIssue.Action?
+    @Binding var messageAction: HomeMessageAction?
     @State private var nfcReader = NFCReader()
 
     var body: some View {

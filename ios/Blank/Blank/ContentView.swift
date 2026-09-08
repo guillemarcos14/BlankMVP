@@ -3,7 +3,6 @@ import FamilyControls
 import Foundation
 import Speech
 import SwiftUI
-import UserNotifications
 
 enum BlankedRuntimeMode {
     static let softwareOnly = true
@@ -111,12 +110,10 @@ private struct ConversationalHomeView: View {
         .onAppear {
             restoreRuntimeState()
             openWidgetTimerSelectorIfNeeded()
-            scheduleDailyInterventionIfNeeded()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             restoreRuntimeState()
-            scheduleDailyInterventionIfNeeded()
         }
         .onReceive(timer) { date in
             now = date
@@ -660,38 +657,6 @@ private struct ConversationalHomeView: View {
             adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
         )
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-    }
-
-    private func scheduleDailyInterventionIfNeeded() {
-        guard !sessionStore.isBlankActive,
-              purchaseStore.hasPremiumAccess,
-              system.forecast.minutesUntilRisk > 15,
-              system.forecast.minutesUntilRisk <= 180 else {
-            return
-        }
-
-        let defaults = BlankSharedState.defaults
-        let dayKey = Calendar.current.ordinality(of: .day, in: .era, for: now) ?? 0
-        let scheduledKey = "blankLastAIInterventionNotificationDay"
-        guard defaults.integer(forKey: scheduledKey) != dayKey else { return }
-        let forecastSystem = system
-
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
-            let content = UNMutableNotificationContent()
-            content.title = "Blanked"
-            content.body = DigitalWellnessAI.interventionNotificationText(system: forecastSystem)
-            content.sound = .default
-            let trigger = UNTimeIntervalNotificationTrigger(
-                timeInterval: TimeInterval(max(60, (forecastSystem.forecast.minutesUntilRisk - 15) * 60)),
-                repeats: false
-            )
-            let request = UNNotificationRequest(identifier: "blank-agent-daily-intervention", content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request) { error in
-                guard error == nil else { return }
-                defaults.set(dayKey, forKey: scheduledKey)
-            }
-        }
     }
 
     private func submit() {

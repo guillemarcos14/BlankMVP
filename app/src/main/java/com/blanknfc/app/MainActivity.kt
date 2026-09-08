@@ -19,6 +19,16 @@ class MainActivity : ComponentActivity() {
 
     private val sessionManager: SessionManager
         get() = BlankApp.get(this).container.sessionManager
+    private val purchaseStore
+        get() = BlankApp.get(this).container.purchaseStore
+    private val healthConnectStore
+        get() = BlankApp.get(this).container.healthConnectStore
+    private val digitalWellnessStore
+        get() = BlankApp.get(this).container.digitalWellnessStore
+    private val onboardingSyncStore
+        get() = BlankApp.get(this).container.onboardingSyncStore
+    private val referralStore
+        get() = BlankApp.get(this).container.referralStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,6 +48,11 @@ class MainActivity : ComponentActivity() {
                 NavGraph(
                     navController = navController,
                     sessionManager = sessionManager,
+                    purchaseStore = purchaseStore,
+                    healthConnectStore = healthConnectStore,
+                    digitalWellnessStore = digitalWellnessStore,
+                    onboardingSyncStore = onboardingSyncStore,
+                    referralStore = referralStore,
                     startDestination = startDestination
                 )
             }

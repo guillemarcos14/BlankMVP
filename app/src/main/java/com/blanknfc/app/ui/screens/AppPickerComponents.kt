@@ -50,11 +50,11 @@ import com.blanknfc.app.ui.theme.BlankPanel
 import com.blanknfc.app.util.AppInfo
 
 private enum class AppPickerCategory(val label: String) {
-    ALL("Todas"),
-    SOCIAL("Redes"),
-    VIDEO("Vídeo"),
-    GAMES("Juegos"),
-    MESSAGING("Mensajes")
+    ALL("All"),
+    SOCIAL("Social"),
+    VIDEO("Video"),
+    GAMES("Games"),
+    MESSAGING("Messages")
 }
 
 private val SocialPackages = listOf(
@@ -122,7 +122,7 @@ internal fun AppPickerContent(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar apps...") },
+            placeholder = { Text("Search apps...") },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null)
             },
@@ -163,7 +163,7 @@ internal fun AppPickerContent(
         ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Seleccionar distracciones comunes")
+            Text("Select common distractions")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -277,10 +277,10 @@ private fun matchesAny(app: AppInfo, needles: List<String>): Boolean {
 
 private fun categoryLabel(app: AppInfo): String {
     return when {
-        matchesCategory(app, AppPickerCategory.SOCIAL) -> "Red social"
-        matchesCategory(app, AppPickerCategory.VIDEO) -> "Vídeo"
-        matchesCategory(app, AppPickerCategory.GAMES) -> "Juego"
-        matchesCategory(app, AppPickerCategory.MESSAGING) -> "Mensajería"
+        matchesCategory(app, AppPickerCategory.SOCIAL) -> "Social"
+        matchesCategory(app, AppPickerCategory.VIDEO) -> "Video"
+        matchesCategory(app, AppPickerCategory.GAMES) -> "Game"
+        matchesCategory(app, AppPickerCategory.MESSAGING) -> "Messages"
         else -> "App"
     }
 }

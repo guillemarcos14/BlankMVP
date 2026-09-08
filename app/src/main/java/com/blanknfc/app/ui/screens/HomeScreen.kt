@@ -2,7 +2,7 @@
 
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -43,10 +43,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,13 +69,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.health.connect.client.PermissionController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.blanknfc.app.BlankApp
 import com.blanknfc.app.R
+import com.blanknfc.app.analytics.BlankEvent
+import com.blanknfc.app.analytics.BlankEvents
+import com.blanknfc.app.data.DigitalWellnessEngine
+import com.blanknfc.app.data.DigitalWellnessPlan
+import com.blanknfc.app.data.DigitalWellnessRemoteStore
 import com.blanknfc.app.data.FocusActivityDay
 import com.blanknfc.app.data.BlankMode
 import com.blanknfc.app.data.FocusSchedule
 import com.blanknfc.app.data.FocusStats
+import com.blanknfc.app.data.HealthConnectStore
+import com.blanknfc.app.data.PlayPurchaseStore
+import com.blanknfc.app.data.ReferralStore
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.service.BlankSchedule
 import com.blanknfc.app.ui.theme.BlankGray
@@ -82,9 +94,12 @@ import com.blanknfc.app.ui.theme.BlankSurface
 import com.blanknfc.app.util.AccessibilityHelper
 import com.blanknfc.app.util.AppInfo
 import com.blanknfc.app.util.BatteryHelper
-import com.blanknfc.app.util.NfcHelper
 import com.blanknfc.app.util.PackageHelper
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 private enum class HomePanel {
     HOME,
@@ -111,8 +126,7 @@ private data class ProgressPeriodSummary(
     val caption: String
 )
 
-private const val NfcOptionsUrl = "https://getblank.netlify.app/nfc.html"
-private const val HomeTagline = "Shaping what we\ncreate with the\npower of time."
+private const val HomeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
 private val HomeGlassScrim = Color.Black.copy(alpha = 0.18f)
 
 private fun homeCapsuleBorder(): BorderStroke = BorderStroke(
@@ -142,10 +156,17 @@ private fun homeCapsuleReflection(center: Offset, radius: Float): Brush = Brush.
 @Composable
 fun HomeScreen(
     sessionManager: SessionManager,
+    purchaseStore: PlayPurchaseStore,
+    healthConnectStore: HealthConnectStore,
+    digitalWellnessStore: DigitalWellnessRemoteStore,
+    referralStore: ReferralStore,
     onRelinkTag: () -> Unit,
     onForgetTag: () -> Unit
 ) {
     val context = LocalContext.current
+    val appContainer = remember(context) { BlankApp.get(context).container }
+    val analyticsTracker = appContainer.analyticsTracker
+    val backendClient = appContainer.backendClient
     val lifecycleOwner = LocalLifecycleOwner.current
     val isBlankActive by sessionManager.isBlankActive.collectAsState()
     val modes by sessionManager.modes.collectAsState()
@@ -153,7 +174,20 @@ fun HomeScreen(
     val stats by sessionManager.stats.collectAsState()
     val emergencyUnlocksRemaining by sessionManager.emergencyUnlocksRemaining.collectAsState()
     val schedule by sessionManager.schedule.collectAsState()
+    val purchaseState by purchaseStore.state.collectAsState()
+    val healthSummary by healthConnectStore.summary.collectAsState()
+    val remoteAiPlan by digitalWellnessStore.plan.collectAsState()
+    val referralState by referralStore.state.collectAsState()
+    val hasPremiumAccess = purchaseState.hasPremiumAccess || referralStore.hasReferralProAccess || referralState.rewardUnlocked
     val currentMode = modes.firstOrNull { it.id == currentModeId } ?: modes.first()
+    val localAiPlan = DigitalWellnessEngine.build(
+        stats = stats,
+        selectedAppCount = currentMode.packages.size,
+        emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+        schedule = schedule,
+        healthSummary = healthSummary
+    )
+    val aiPlan = remoteAiPlan ?: localAiPlan
     val buttonLight = !isBlankActive
     val apps = remember { PackageHelper.getInstalledApps(context) }
     var panel by remember { mutableStateOf(HomePanel.HOME) }
@@ -161,18 +195,10 @@ fun HomeScreen(
     var showCreateMode by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(AccessibilityHelper.isServiceEnabled(context)) }
     var batteryOptimizedIgnored by remember { mutableStateOf(BatteryHelper.isIgnoringBatteryOptimizations(context)) }
-    var nfcAvailable by remember { mutableStateOf(NfcHelper.isNfcAvailable(context)) }
-    var nfcEnabled by remember { mutableStateOf(NfcHelper.isNfcEnabled(context)) }
 
     fun refreshSystemConfig() {
         accessibilityEnabled = AccessibilityHelper.isServiceEnabled(context)
         batteryOptimizedIgnored = BatteryHelper.isIgnoringBatteryOptimizations(context)
-        nfcAvailable = NfcHelper.isNfcAvailable(context)
-        nfcEnabled = NfcHelper.isNfcEnabled(context)
-    }
-
-    fun openNfcOptions() {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(NfcOptionsUrl)))
     }
 
     DisposableEffect(lifecycleOwner, context) {
@@ -187,32 +213,52 @@ fun HomeScreen(
         }
     }
 
-    val configIssues = buildList {
-        if (!nfcAvailable) {
-            add(
-                ConfigIssue(
-                    title = "NFC no disponible",
-                    body = "Este móvil no tiene NFC compatible. Blank necesita NFC para desbloquear.",
-                    action = "Ver opciones NFC",
-                    onAction = ::openNfcOptions
+    LaunchedEffect(stats, currentMode.packages.size, emergencyUnlocksRemaining, schedule, healthSummary) {
+        digitalWellnessStore.refresh(
+            localPlan = localAiPlan,
+            stats = stats,
+            selectedAppCount = currentMode.packages.size,
+            emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+            schedule = schedule,
+            healthSummary = healthSummary
+        )
+        referralStore.refreshStatus()
+    }
+
+    LaunchedEffect(healthSummary) {
+        val status = healthSourceStatus(healthSummary)
+        if (status == "Connected" || status == "Partial" || status == "Stale") {
+            val baseProperties = mapOf(
+                "source" to "health_connect",
+                "status" to status.lowercase(),
+                "health_days" to healthSummary.daysWithAnySignal.toString(),
+                "signal_coverage_percent" to (
+                    healthSummary.daysWithAnySignal * 100 / healthSummary.daysRequested.coerceAtLeast(1)
+                    ).toString(),
+                "raw_health_samples_sent" to "false"
+            )
+            analyticsTracker.track(
+                BlankEvent(
+                    if (status == "Stale") BlankEvents.STALE_HEALTH_DATA else BlankEvents.HEALTH_DATA_AVAILABLE,
+                    baseProperties
                 )
             )
-        } else if (!nfcEnabled) {
-            add(
-                ConfigIssue(
-                    title = "NFC desactivado",
-                    body = "Activa NFC para que Blank pueda leer tu pieza física.",
-                    action = "Abrir NFC",
-                    onAction = { context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }
+            analyticsTracker.track(
+                BlankEvent(
+                    if (status == "Stale") BlankEvents.WEARABLE_DATA_STALE else BlankEvents.WEARABLE_DATA_AVAILABLE,
+                    baseProperties + ("provider" to "health_connect")
                 )
             )
         }
+    }
+
+    val configIssues = buildList {
         if (!accessibilityEnabled) {
             add(
                 ConfigIssue(
-                    title = "Accesibilidad desactivada",
-                    body = "Activa Blank en Accesibilidad para detectar apps protegidas.",
-                    action = "Abrir Accesibilidad",
+                    title = "Accessibility pending",
+                    body = "Enable Blanked in Accessibility so Android can detect protected apps.",
+                    action = "Open Accessibility",
                     onAction = { AccessibilityHelper.openAccessibilitySettings(context) }
                 )
             )
@@ -220,9 +266,9 @@ fun HomeScreen(
         if (!batteryOptimizedIgnored) {
             add(
                 ConfigIssue(
-                    title = "Batería restringida",
-                    body = "Permite que Blank funcione en segundo plano para mantener el bloqueo estable.",
-                    action = "Abrir batería",
+                    title = "Battery restricted",
+                    body = "Allow Blanked to keep running in the background so blocks stay stable.",
+                    action = "Open Battery",
                     onAction = { BatteryHelper.openBatteryOptimizationSettings(context) }
                 )
             )
@@ -244,10 +290,21 @@ fun HomeScreen(
             HomePanel.HOME -> HomePanelContent(
                 isBlankActive = isBlankActive,
                 configIssues = configIssues,
+                aiPlan = aiPlan,
+                hasPremiumAccess = hasPremiumAccess,
                 onSettings = { panel = HomePanel.SETTINGS },
                 onStats = { panel = HomePanel.STATS },
                 onMode = { panel = HomePanel.MODES },
                 onTimer = { panel = HomePanel.SCHEDULE },
+                onStartAIPlan = {
+                    if (currentMode.packages.isEmpty()) {
+                        modeBeingEdited = currentMode
+                    } else if (!AccessibilityHelper.isServiceEnabled(context)) {
+                        AccessibilityHelper.openAccessibilitySettings(context)
+                    } else {
+                        sessionManager.activateBlank()
+                    }
+                },
                 onMainAction = {
                     if (currentMode.packages.isEmpty()) {
                         modeBeingEdited = currentMode
@@ -268,12 +325,6 @@ fun HomeScreen(
                 },
                 onStats = {
                     panel = HomePanel.STATS
-                },
-                onRelink = {
-                    panel = HomePanel.RELINK
-                },
-                onForget = {
-                    panel = HomePanel.FORGET
                 },
                 onEmergency = {
                     panel = HomePanel.EMERGENCY
@@ -296,8 +347,8 @@ fun HomeScreen(
                 topTitle = "NFC",
                 label = "Nueva etiqueta",
                 title = "Vincula una nueva pieza.",
-                body = "Blank mantendrá tus apps protegidas y cambiará solo la llave física.",
-                action = "Abrir vinculación NFC",
+                body = "Blanked will keep your protected apps and replace only the optional unlock key.",
+                action = "Open pairing",
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.SETTINGS },
                 onAction = onRelinkTag
@@ -312,6 +363,17 @@ fun HomeScreen(
             HomePanel.STATS -> StatsPanel(
                 stats = stats,
                 emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+                aiPlan = aiPlan,
+                hasPremiumAccess = hasPremiumAccess,
+                healthConnectStore = healthConnectStore,
+                onTrack = analyticsTracker::track,
+                onStartWearableOAuth = { provider ->
+                    val body = backendClient.commonEnvelope(JSONObject().apply { put("provider", provider) })
+                    val response = backendClient.post("wearable-oauth-start", body)
+                    response.optString("authorization_url").takeIf { it.isNotBlank() }?.let { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                },
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME }
             )
@@ -413,10 +475,13 @@ private fun AppBackground(
 private fun HomePanelContent(
     isBlankActive: Boolean,
     configIssues: List<ConfigIssue>,
+    aiPlan: DigitalWellnessPlan,
+    hasPremiumAccess: Boolean,
     onSettings: () -> Unit,
     onStats: () -> Unit,
     onMode: () -> Unit,
     onTimer: () -> Unit,
+    onStartAIPlan: () -> Unit,
     onMainAction: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
@@ -430,6 +495,15 @@ private fun HomePanelContent(
         if (configIssues.isNotEmpty()) {
             ConfigIssuesCard(
                 issues = configIssues,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 62.dp)
+            )
+        } else if (!isBlankActive && hasPremiumAccess) {
+            AiPlanHomeCard(
+                aiPlan = aiPlan,
+                onStart = onStartAIPlan,
+                onOpenReport = onStats,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = 62.dp)
@@ -459,7 +533,7 @@ private fun HomePanelContent(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 HomeBlankearButton(
-                    text = if (isBlankActive) "Escanear Blank para salir" else "Blankear",
+                    text = if (isBlankActive) "Blanked active" else "Start Blanked",
                     enabled = !isBlankActive,
                     modifier = Modifier.widthIn(max = if (isBlankActive) 342.dp else 178.dp),
                     onClick = onMainAction
@@ -467,6 +541,52 @@ private fun HomePanelContent(
             }
         }
     }
+}
+
+@Composable
+private fun AiPlanHomeCard(
+    aiPlan: DigitalWellnessPlan,
+    onStart: () -> Unit,
+    onOpenReport: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.widthIn(max = 330.dp),
+        color = Color.White.copy(alpha = 0.74f),
+        shape = RoundedCornerShape(18.dp),
+        onClick = onOpenReport
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Blanked AI now",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = BlankOnSurface.copy(alpha = 0.74f)
+                )
+                Text(
+                    text = "${aiPlan.recommendedDurationMinutes} min before ${aiPlan.riskWindow}",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = BlankOnSurface
+                )
+            }
+            Surface(
+                color = BlankOnSurface,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(999.dp),
+                onClick = onStart
+            ) {
+                Text(
+                    text = "Start",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+
 }
 
 @Composable
@@ -507,7 +627,7 @@ private fun HomeTopNav(
             ) {
                 Image(
                     painter = painterResource(R.drawable.blank_logo_white),
-                    contentDescription = "Ajustes",
+                    contentDescription = "Settings",
                     modifier = Modifier.size(31.dp)
                 )
             }
@@ -533,8 +653,8 @@ private fun HomeTopNav(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HomeTopNavButton("Stats", onStats)
-                HomeTopNavButton("Mode", onMode)
-                HomeTopNavButton("Habits", onTimer)
+                HomeTopNavButton("Plan", onMode)
+                HomeTopNavButton("Timer", onTimer)
             }
         }
     }
@@ -570,7 +690,7 @@ private fun ConfigIssuesCard(issues: List<ConfigIssue>, modifier: Modifier = Mod
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "Revisa la configuración",
+                text = "Review setup",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
                 color = BlankOnSurface
             )
@@ -699,22 +819,18 @@ private fun SettingsPanel(
     onModes: () -> Unit,
     onSchedule: () -> Unit,
     onStats: () -> Unit,
-    onRelink: () -> Unit,
-    onForget: () -> Unit,
     onEmergency: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Ajustes", onBack = onBack)
+        ScreenHeader(title = "Settings", onBack = onBack)
         Spacer(modifier = Modifier.height(58.dp))
-        Text(text = "Ajustes", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+        Text(text = "Settings", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Modo", "Apps", onModes))
-            add(MenuItem("Programar mi Blank", "Diario", onSchedule))
-            add(MenuItem("Progreso", "Tiempo", onStats))
-            add(MenuItem("Vincular nuevo NFC", "Etiqueta", onRelink))
-            add(MenuItem("He olvidado mi Blank", "Reset", onForget))
-            add(MenuItem("Emergencia", "Salida", onEmergency, destructive = true))
+            add(MenuItem("Plan", "Apps", onModes))
+            add(MenuItem("Timer", "Daily", onSchedule))
+            add(MenuItem("Stats", "Time", onStats))
+            add(MenuItem("Emergency", "Exit", onEmergency, destructive = true))
         }
         MenuList(
             buttonLight = buttonLight,
@@ -760,6 +876,11 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
 private fun StatsPanel(
     stats: FocusStats,
     emergencyUnlocksRemaining: Int,
+    aiPlan: DigitalWellnessPlan,
+    hasPremiumAccess: Boolean,
+    healthConnectStore: HealthConnectStore,
+    onTrack: (BlankEvent) -> Unit,
+    onStartWearableOAuth: (String) -> Unit,
     buttonLight: Boolean,
     onBack: () -> Unit
 ) {
@@ -772,7 +893,7 @@ private fun StatsPanel(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
-            ScreenHeader(title = "Progreso", onBack = onBack)
+            ScreenHeader(title = "Stats", onBack = onBack)
             Spacer(modifier = Modifier.height(38.dp))
         }
         item {
@@ -787,6 +908,22 @@ private fun StatsPanel(
             WeeklySummaryCard(
                 stats = stats,
                 emergencyUnlocksRemaining = emergencyUnlocksRemaining,
+                buttonLight = buttonLight
+            )
+        }
+        item {
+            DigitalWellnessReportCard(
+                aiPlan = aiPlan,
+                hasPremiumAccess = hasPremiumAccess,
+                buttonLight = buttonLight
+            )
+        }
+        item {
+            HealthContextCard(
+                aiPlan = aiPlan,
+                healthConnectStore = healthConnectStore,
+                onTrack = onTrack,
+                onStartWearableOAuth = onStartWearableOAuth,
                 buttonLight = buttonLight
             )
         }
@@ -848,7 +985,7 @@ private fun ProgressMinimalHero(
                 shape = RoundedCornerShape(26.dp)
             ) {
                 ProgressLineChart(
-                    title = "Tendencia semanal",
+                    title = "Weekly trend",
                     values = savedChartValues(stats),
                     buttonLight = buttonLight,
                     modifier = Modifier
@@ -875,14 +1012,237 @@ private fun WeeklySummaryCard(
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-            Text(text = "Esta semana", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Text(text = "This week", color = textColor, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(12.dp))
-            SummaryLine("Protegidas", formatProtectedTime(stats.protectedMsThisWeek), "Tiempo en Blank", textColor)
+            SummaryLine("Protected", formatProtectedTime(stats.protectedMsThisWeek), "Time in Blanked", textColor)
             ProgressDivider(textColor)
-            SummaryLine("Sesiones", stats.sessionsThisWeek.toString(), "Bloques de foco", textColor)
+            SummaryLine("Sessions", stats.sessionsThisWeek.toString(), "Focus blocks", textColor)
             ProgressDivider(textColor)
-            SummaryLine("Emergencias", emergencyUnlocksRemaining.toString(), "Restantes", textColor)
+            SummaryLine("Emergency", emergencyUnlocksRemaining.toString(), "Left", textColor)
         }
+    }
+}
+
+@Composable
+private fun DigitalWellnessReportCard(
+    aiPlan: DigitalWellnessPlan,
+    hasPremiumAccess: Boolean,
+    buttonLight: Boolean
+) {
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text(text = "Digital Wellness Report", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(12.dp))
+            SummaryLine("AI Focus Plan", aiPlan.archetype, aiPlan.primaryAction, textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Early Risk", "${aiPlan.riskScore}/100", aiPlan.riskWindow, textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Wellness Score", "${aiPlan.score}/100", aiPlan.reportInsight, textColor)
+            if (!hasPremiumAccess) {
+                ProgressDivider(textColor)
+                Text(
+                    text = "Pro includes AI reports, adaptive plans, Health insights and preventive alerts.",
+                    color = textColor.copy(alpha = 0.64f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HealthContextCard(
+    aiPlan: DigitalWellnessPlan,
+    healthConnectStore: HealthConnectStore,
+    onTrack: (BlankEvent) -> Unit,
+    onStartWearableOAuth: (String) -> Unit,
+    buttonLight: Boolean
+) {
+    val healthSummary by healthConnectStore.summary.collectAsState()
+    val scope = rememberCoroutineScope()
+    var oauthError by remember { mutableStateOf<String?>(null) }
+    val launcher = rememberLauncherForActivityResult(
+        PermissionController.createRequestPermissionResultContract()
+    ) {
+        healthConnectStore.refresh()
+        val grantedCount = it.size
+        if (grantedCount > 0) {
+            onTrack(
+                BlankEvent(
+                    BlankEvents.WEARABLE_CONNECTED,
+                    mapOf(
+                        "provider" to "health_connect",
+                        "granted_count" to grantedCount.toString()
+                    )
+                )
+            )
+            onTrack(
+                BlankEvent(
+                    BlankEvents.PERMISSION_GRANTED,
+                    mapOf(
+                        "source" to "health_connect",
+                        "permission" to "health",
+                        "granted_count" to grantedCount.toString()
+                    )
+                )
+            )
+        }
+    }
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text(
+                text = "Health Sources",
+                color = textColor,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = aiPlan.healthContext,
+                color = textColor.copy(alpha = 0.66f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (healthSummary.permissionGranted) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "${healthSourceStatus(healthSummary)} · ${healthSummary.daysWithAnySignal}/${healthSummary.daysRequested} days · ${healthSummary.recoveryTrend}",
+                    color = textColor.copy(alpha = 0.52f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else if (healthSummary.partialPermission) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Partial permission · ${healthSummary.grantedPermissionCount}/${healthSummary.requestedPermissionCount} signals",
+                    color = textColor.copy(alpha = 0.52f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            WearableProviderList(
+                healthSummary = healthSummary,
+                textColor = textColor,
+                onConnect = { provider ->
+                    oauthError = null
+                    onTrack(BlankEvent(BlankEvents.WEARABLE_CONNECT_STARTED, mapOf("provider" to provider)))
+                    scope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { onStartWearableOAuth(provider) }
+                        }.onFailure { error ->
+                            oauthError = if (provider == "garmin") "Garmin requires partner access." else error.message?.take(90)
+                        }
+                    }
+                }
+            )
+            oauthError?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = it,
+                    color = textColor.copy(alpha = 0.58f),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                color = textColor,
+                contentColor = if (buttonLight) Color.White else Color.Black,
+                shape = RoundedCornerShape(999.dp),
+                onClick = {
+                    onTrack(
+                        BlankEvent(
+                            BlankEvents.WEARABLE_CONNECT_STARTED,
+                            mapOf("provider" to "health_connect")
+                        )
+                    )
+                    onTrack(
+                        BlankEvent(
+                            BlankEvents.PERMISSION_REQUESTED,
+                            mapOf("source" to "health_connect", "permission" to "health")
+                        )
+                    )
+                    launcher.launch(healthConnectStore.permissions)
+                }
+            ) {
+                Text(
+                    text = if (healthSummary.permissionGranted) "Refresh Health" else "Connect Health",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun WearableProviderList(
+    healthSummary: com.blanknfc.app.data.HealthConnectSummary,
+    textColor: Color,
+    onConnect: (String) -> Unit
+) {
+    val providers = listOf(
+        WearableProvider("Health Connect", "health_connect", healthSourceStatus(healthSummary), "Sleep, activity, heart and recovery context.", false),
+        WearableProvider("Oura", "oura", "Connect", "Readiness, sleep contributors and recovery signals.", true),
+        WearableProvider("WHOOP", "whoop", "Connect", "Recovery, strain, sleep debt and cycle signals.", true),
+        WearableProvider("Garmin", "garmin", "Partner gated", "Body Battery, stress, training readiness and HRV status.", false),
+        WearableProvider("Fitbit / Google", "fitbit_google_health", "Connect", "Daily Readiness, sleep score and active zone minutes.", true),
+        WearableProvider("Withings", "withings", "Connect", "Weight, body composition, blood pressure and temperature context.", true)
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        providers.forEach { provider ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = provider.canConnect) { onConnect(provider.id) },
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = provider.name,
+                        color = textColor.copy(alpha = 0.86f),
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                    Text(
+                        text = provider.detail,
+                        color = textColor.copy(alpha = 0.52f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    text = provider.status,
+                    color = textColor.copy(alpha = 0.58f),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
+        }
+    }
+}
+
+private data class WearableProvider(
+    val name: String,
+    val id: String,
+    val status: String,
+    val detail: String,
+    val canConnect: Boolean
+)
+
+private fun healthSourceStatus(summary: com.blanknfc.app.data.HealthConnectSummary): String {
+    return when {
+        !summary.available -> "Unavailable"
+        summary.partialPermission -> "Partial"
+        !summary.permissionGranted -> "Not connected"
+        summary.latestSignalAgeHours != null && summary.latestSignalAgeHours > 72 -> "Stale"
+        summary.daysWithAnySignal == 0 -> "No data"
+        else -> "Connected"
     }
 }
 
@@ -896,7 +1256,7 @@ private fun NextStepCard(stats: FocusStats, buttonLight: Boolean) {
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-            Text(text = "Siguiente mejora", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Text(text = "Next improvement", color = textColor, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = nextStepText(stats),
@@ -926,26 +1286,26 @@ private fun ProgressDetailCard(
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Ver detalle",
+                    text = "View details",
                     color = textColor,
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                     modifier = Modifier.weight(1f)
                 )
                 Text(
-                    text = if (expanded) "Ocultar" else "Abrir",
+                    text = if (expanded) "Hide" else "Open",
                     color = textColor.copy(alpha = 0.58f),
                     style = MaterialTheme.typography.bodySmall
                 )
             }
             if (expanded) {
                 Spacer(modifier = Modifier.height(10.dp))
-                SummaryLine("Tiempo blankeado", formatProtectedTime(stats.totalProtectedMs), "Total protegido", textColor)
+                SummaryLine("Blanked time", formatProtectedTime(stats.totalProtectedMs), "Total protected", textColor)
                 ProgressDivider(textColor)
-                SummaryLine("Mejor día", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), textColor)
+                SummaryLine("Best day", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), textColor)
                 ProgressDivider(textColor)
-                SummaryLine("Rescates usados", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), textColor)
+                SummaryLine("Unlocks used", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), textColor)
                 ProgressDivider(textColor)
-                SummaryLine("Impulsos frenados", stats.blockedAttemptsThisWeek.toString(), "Pausas creadas esta semana", textColor)
+                SummaryLine("Urges stopped", stats.blockedAttemptsThisWeek.toString(), "Pauses created this week", textColor)
             }
         }
     }
@@ -990,10 +1350,10 @@ private fun ProgressHeroCarousel(
     } else {
         focusChartValues(stats.activityDays, stats.protectedMsThisWeek)
     }
-    val label = if (selectedPage == 0) "Tiempo ahorrado" else "Tiempo en Blank"
+    val label = if (selectedPage == 0) "Time saved" else "Time in Blanked"
     val value = if (selectedPage == 0) formatProtectedTime(savedMs) else formatProtectedTime(stats.totalProtectedMs)
-    val description = if (selectedPage == 0) "Recuperadas de tu vida gracias a Blank" else "Protegidas con Blank"
-    val chartTitle = if (selectedPage == 0) "Ahorro estimado" else "Modo Blank"
+    val description = if (selectedPage == 0) "Recovered from your life with Blanked" else "Protected with Blanked"
+    val chartTitle = if (selectedPage == 0) "Estimated saved" else "Blanked mode"
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1005,8 +1365,8 @@ private fun ProgressHeroCarousel(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProgressTab("Tiempo ahorrado", selectedPage == 0, buttonLight) { onPageChange(0) }
-                ProgressTab("Tiempo en Blank", selectedPage == 1, buttonLight) { onPageChange(1) }
+                ProgressTab("Time saved", selectedPage == 0, buttonLight) { onPageChange(0) }
+                ProgressTab("Time in Blanked", selectedPage == 1, buttonLight) { onPageChange(1) }
             }
             Text(
                 text = label,
@@ -1181,19 +1541,19 @@ private fun ProgressInsightCards(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         StatRow(
-            label = "Momento de riesgo",
+            label = "Risk moment",
             value = riskMomentValue(stats),
             caption = riskMomentCaption(stats),
             buttonLight = buttonLight
         )
         StatRow(
-            label = "Calidad de protección",
+            label = "Protection quality",
             value = "${protectionQualityScore(stats, emergencyUnlocksRemaining)}/100",
             caption = protectionQualityCaption(stats, emergencyUnlocksRemaining),
             buttonLight = buttonLight
         )
         StatRow(
-            label = "Control recuperado",
+            label = "Control recovered",
             value = controlRecoveryValue(stats, emergencyUnlocksRemaining),
             caption = controlRecoveryCaption(stats, emergencyUnlocksRemaining),
             buttonLight = buttonLight
@@ -1208,12 +1568,12 @@ private fun ProgressMetricList(
     buttonLight: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatRow("Sesiones", stats.sessionsThisWeek.toString(), "Completadas", buttonLight)
-        StatRow("Media protegida", formatProtectedTime(averageSessionMs(stats)), "Por sesión real", buttonLight)
-        StatRow("Racha", "${currentStreakDays(stats.activityDays)}d", "Días con Blank", buttonLight)
-        StatRow("Mejor día", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), buttonLight)
-        StatRow("Impulsos frenados", stats.blockedAttemptsThisWeek.toString(), "Veces que Blank creó una pausa", buttonLight)
-        StatRow("Emergencias", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), buttonLight)
+        StatRow("Sessions", stats.sessionsThisWeek.toString(), "Completed", buttonLight)
+        StatRow("Average protected", formatProtectedTime(averageSessionMs(stats)), "Per real session", buttonLight)
+        StatRow("Streak", "${currentStreakDays(stats.activityDays)}d", "Days with Blanked", buttonLight)
+        StatRow("Best day", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), buttonLight)
+        StatRow("Urges stopped", stats.blockedAttemptsThisWeek.toString(), "Times Blanked created a pause", buttonLight)
+        StatRow("Emergency", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), buttonLight)
     }
 }
 
@@ -1252,26 +1612,26 @@ private fun SchedulePanel(
     var endMinute by remember(schedule) { mutableStateOf(schedule.endMinute) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Programar mi Blank", onBack = onBack)
+        ScreenHeader(title = "Timer", onBack = onBack)
         Spacer(modifier = Modifier.height(46.dp))
-        Text(text = "Ventana diaria", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+        Text(text = "Daily window", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Blank se activa solo en esa franja. Para salir antes, sigues necesitando el NFC.",
+            text = "Blanked can turn on automatically during this window. Emergency unlock stays available when needed.",
             style = MaterialTheme.typography.bodyLarge,
             color = BlankOnSurface
         )
         Spacer(modifier = Modifier.height(24.dp))
         ToggleRow(
-            label = "Activar horario diario",
+            label = "Enable daily schedule",
             checked = enabled,
             buttonLight = buttonLight,
             onCheckedChange = { enabled = it }
         )
         Spacer(modifier = Modifier.height(10.dp))
-        TimeDropdown(label = "Inicio", minute = startMinute, buttonLight = buttonLight, onMinuteChange = { startMinute = it })
+        TimeDropdown(label = "Start", minute = startMinute, buttonLight = buttonLight, onMinuteChange = { startMinute = it })
         Spacer(modifier = Modifier.height(10.dp))
-        TimeDropdown(label = "Fin", minute = endMinute, buttonLight = buttonLight, onMinuteChange = { endMinute = it })
+        TimeDropdown(label = "End", minute = endMinute, buttonLight = buttonLight, onMinuteChange = { endMinute = it })
         Spacer(modifier = Modifier.height(16.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -1280,7 +1640,7 @@ private fun SchedulePanel(
         ) {
             Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                 Text(
-                    text = "Ventana activa",
+                    text = "Active window",
                     color = progressTextColor(buttonLight).copy(alpha = 0.62f),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -1294,7 +1654,7 @@ private fun SchedulePanel(
         }
         Spacer(modifier = Modifier.weight(1f))
         MainActionButton(
-            text = "Guardar horario",
+            text = "Save schedule",
             light = buttonLight,
             onClick = {
                 onSave(
@@ -1387,9 +1747,9 @@ private fun ModesPanel(
     onDelete: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Modos", onBack = onBack)
+        ScreenHeader(title = "Plan", onBack = onBack)
         Spacer(modifier = Modifier.height(46.dp))
-        Text(text = "Elige un modo", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
+        Text(text = "Choose a mode", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(24.dp))
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -1408,7 +1768,7 @@ private fun ModesPanel(
                 )
             }
         }
-        MainActionButton(text = "Crear modo", light = buttonLight, onClick = onCreate)
+        MainActionButton(text = "Create mode", light = buttonLight, onClick = onCreate)
     }
 }
 
@@ -1469,7 +1829,7 @@ private fun ModeRow(
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Editar nombre") },
+                            text = { Text("Edit name") },
                             onClick = {
                                 menuOpen = false
                                 editing = true
@@ -1477,7 +1837,7 @@ private fun ModeRow(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Editar apps") },
+                            text = { Text("Edit apps") },
                             onClick = {
                                 menuOpen = false
                                 onSelect()
@@ -1485,7 +1845,7 @@ private fun ModeRow(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Eliminar") },
+                            text = { Text("Delete") },
                             enabled = canDelete,
                             onClick = {
                                 menuOpen = false
@@ -1503,7 +1863,7 @@ private fun ModeRow(
                             editing = false
                         }
                     ) {
-                        Text("Guardar", color = textColor)
+                        Text("Save", color = textColor)
                     }
                     TextButton(
                         onClick = {
@@ -1511,7 +1871,7 @@ private fun ModeRow(
                             editing = false
                         }
                     ) {
-                        Text("Cancelar", color = metaColor)
+                        Text("Cancel", color = metaColor)
                     }
                 }
             }
@@ -1529,7 +1889,7 @@ private fun ModeAppsDialog(
 ) {
     var selected by remember(mode.id) { mutableStateOf(mode.packages) }
     ModeSetupDialog(
-        title = "Editar apps",
+        title = "Edit apps",
         name = mode.name,
         apps = apps,
         selected = selected,
@@ -1537,7 +1897,7 @@ private fun ModeAppsDialog(
         buttonLight = buttonLight,
         onDismiss = onDismiss,
         onPrimary = { onSave(selected) },
-        primaryText = "Guardar apps"
+        primaryText = "Save apps"
     )
 }
 
@@ -1551,7 +1911,7 @@ private fun CreateModeDialog(
     var name by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     ModeSetupDialog(
-        title = "Configurar modo",
+        title = "Set up mode",
         name = name,
         nameEditable = true,
         apps = apps,
@@ -1561,7 +1921,7 @@ private fun CreateModeDialog(
         buttonLight = buttonLight,
         onDismiss = onDismiss,
         onPrimary = { onCreate(name, selected) },
-        primaryText = "Guardar modo"
+        primaryText = "Save mode"
     )
 }
 
@@ -1591,8 +1951,8 @@ private fun ModeSetupDialog(
                     OutlinedTextField(
                         value = name,
                         onValueChange = onNameChange,
-                        label = { Text("Nombre") },
-                        placeholder = { Text("Trabajo profundo") },
+                        label = { Text("Name") },
+                        placeholder = { Text("Deep work") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -1672,17 +2032,17 @@ private fun ForgetConfirmPanel(
         ScreenHeader(title = "Reset NFC", onBack = onBack)
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "Confirmación", color = BlankOnSurface, style = MaterialTheme.typography.labelLarge)
+                Text(text = "Confirmation", color = BlankOnSurface, style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Olvidar mi Blank.",
+                    text = "Forget my Blanked key.",
                     style = MaterialTheme.typography.headlineLarge,
                     color = BlankOnSurface,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Se desactivará Blank, se borrará la etiqueta NFC vinculada y volverás al onboarding para registrar una nueva.",
+                    text = "Blanked will turn off, the optional key will be removed, and onboarding will restart.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = BlankOnSurface,
                     textAlign = TextAlign.Center
@@ -1698,7 +2058,7 @@ private fun ForgetConfirmPanel(
                     ) {
                         Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
                         Text(
-                            text = "Entiendo que tendré que vincular un Blank de nuevo.",
+                            text = "I understand I will need to pair Blanked again.",
                             color = progressTextColor(buttonLight),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -1707,7 +2067,7 @@ private fun ForgetConfirmPanel(
             }
         }
         MainActionButton(
-            text = "Sí, olvidar mi Blank",
+            text = "Yes, forget Blanked",
             enabled = confirmed,
             light = buttonLight,
             onClick = onConfirm
@@ -1722,7 +2082,7 @@ private fun BlockPanel(onEmergency: () -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(text = "Instagram", color = BlankSurface.copy(alpha = 0.72f), style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(text = "App bloqueada", style = MaterialTheme.typography.headlineLarge, color = BlankSurface, textAlign = TextAlign.Center)
+                Text(text = "App blocked", style = MaterialTheme.typography.headlineLarge, color = BlankSurface, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = stringResource(R.string.block_message),
@@ -1754,18 +2114,18 @@ private fun EmergencyPanel(
     var phrase by remember { mutableStateOf("") }
     val expected = stringResource(R.string.emergency_phrase)
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Emergencia", onBack = onBack, dark = true)
+        ScreenHeader(title = "Emergency", onBack = onBack, dark = true)
         Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(text = "Desbloqueo", color = BlankSurface.copy(alpha = 0.72f), style = MaterialTheme.typography.labelLarge)
+                Text(text = "Unlock", color = BlankSurface.copy(alpha = 0.72f), style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(text = "Escribe la frase completa.", style = MaterialTheme.typography.headlineLarge, color = BlankSurface, textAlign = TextAlign.Center)
+                Text(text = "Type the full phrase.", style = MaterialTheme.typography.headlineLarge, color = BlankSurface, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = if (emergencyUnlocksRemaining > 0)
-                        "Te quedan $emergencyUnlocksRemaining desbloqueos de emergencia esta semana."
+                        "$emergencyUnlocksRemaining emergency unlocks left this week."
                     else
-                        "Ya has usado tus 3 desbloqueos de emergencia esta semana.",
+                        "You have used all 3 emergency unlocks this week.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = BlankSurface.copy(alpha = 0.72f),
                     textAlign = TextAlign.Center
@@ -1798,7 +2158,7 @@ private fun EmergencyPanel(
 @Composable
 private fun ScreenHeader(
     title: String,
-    backLabel: String = "Volver",
+    backLabel: String = "Back",
     onBack: () -> Unit,
     dark: Boolean = false
 ) {
@@ -1910,7 +2270,7 @@ private fun estimatedSavedMs(stats: FocusStats): Long {
 private fun savedTimeExplanation(stats: FocusStats): String {
     val saved = formatProtectedTime(estimatedSavedMs(stats))
     val protected = formatProtectedTime(stats.totalProtectedMs)
-    return "Tiempo ahorrado: $saved estimados desde sesiones completadas, limitado a $protected reales en Blank."
+    return "Time saved: $saved estimated from completed sessions, capped at $protected real time in Blanked."
 }
 
 private fun averageSessionMs(stats: FocusStats): Long {
@@ -1947,14 +2307,14 @@ private fun progressPeriodSummaries(stats: FocusStats): List<ProgressPeriodSumma
     }
 
     return listOf(
-        periodSummary("Hoy", daysSince(todayOrdinal)),
+        periodSummary("Today", daysSince(todayOrdinal)),
         ProgressPeriodSummary(
-            label = "Semana",
+            label = "Week",
             value = formatProtectedTime(stats.protectedMsThisWeek),
-            caption = if (stats.sessionsThisWeek == 1) "1 sesión" else "${stats.sessionsThisWeek} sesiones"
+            caption = if (stats.sessionsThisWeek == 1) "1 session" else "${stats.sessionsThisWeek} sessions"
         ),
-        periodSummary("Mes", daysSince(monthStartOrdinal)),
-        periodSummary("Año", daysSince(yearStartOrdinal))
+        periodSummary("Month", daysSince(monthStartOrdinal)),
+        periodSummary("Year", daysSince(yearStartOrdinal))
     )
 }
 
@@ -1964,7 +2324,7 @@ private fun periodSummary(label: String, days: List<FocusActivityDay>): Progress
     return ProgressPeriodSummary(
         label = label,
         value = formatProtectedTime(protectedMs),
-        caption = if (sessions == 1) "1 sesión" else "$sessions sesiones"
+        caption = if (sessions == 1) "1 session" else "$sessions sessions"
     )
 }
 
@@ -2023,49 +2383,49 @@ private fun bestDay(days: List<FocusActivityDay>): FocusActivityDay? {
 }
 
 private fun bestDayValue(days: List<FocusActivityDay>): String {
-    return bestDay(days)?.let { dayName(it.dayOfWeek) } ?: "Sin datos"
+    return bestDay(days)?.let { dayName(it.dayOfWeek) } ?: "No data"
 }
 
 private fun bestDayCaption(days: List<FocusActivityDay>): String {
-    val day = bestDay(days) ?: return "Esta semana"
+    val day = bestDay(days) ?: return "This week"
     val details = mutableListOf<String>()
     if (day.protectedMs > 0L) details += formatProtectedTime(day.protectedMs)
     if (day.blockedAttempts == 0) {
-        details += "Sin impulsos"
+        details += "No urges"
     } else {
-        details += "${day.blockedAttempts} impulsos frenados"
+        details += "${day.blockedAttempts} urges stopped"
     }
     return details.joinToString(" · ")
 }
 
 private fun dayName(dayOfWeek: Int): String {
     return when (dayOfWeek) {
-        Calendar.MONDAY -> "Lunes"
-        Calendar.TUESDAY -> "Martes"
-        Calendar.WEDNESDAY -> "Miércoles"
-        Calendar.THURSDAY -> "Jueves"
-        Calendar.FRIDAY -> "Viernes"
-        Calendar.SATURDAY -> "Sábado"
-        Calendar.SUNDAY -> "Domingo"
-        else -> "Sin datos"
+        Calendar.MONDAY -> "Monday"
+        Calendar.TUESDAY -> "Tuesday"
+        Calendar.WEDNESDAY -> "Wednesday"
+        Calendar.THURSDAY -> "Thursday"
+        Calendar.FRIDAY -> "Friday"
+        Calendar.SATURDAY -> "Saturday"
+        Calendar.SUNDAY -> "Sunday"
+        else -> "No data"
     }
 }
 
 private fun riskMomentValue(stats: FocusStats): String {
     val riskyDay = riskiestDay(stats.activityDays)
-    return riskyDay?.let { dayName(it.dayOfWeek) } ?: "Sin patrón"
+    return riskyDay?.let { dayName(it.dayOfWeek) } ?: "No pattern"
 }
 
 private fun riskMomentCaption(stats: FocusStats): String {
     val riskyDay = riskiestDay(stats.activityDays)
-        ?: return "Con más datos aparecerá tu franja vulnerable"
+        ?: return "Your vulnerable window will appear after more sessions"
     if (riskyDay.blockedAttempts > 0) {
-        return "${riskyDay.blockedAttempts} impulsos frenados ese día"
+        return "${riskyDay.blockedAttempts} urges stopped that day"
     }
     if (riskyDay.sessions > 0) {
-        return "Día donde más recurres a Blank"
+        return "The day you use Blanked most"
     }
-    return "Sin señales de riesgo todavía"
+    return "No risk signals yet"
 }
 
 private fun riskiestDay(days: List<FocusActivityDay>): FocusActivityDay? {
@@ -2100,34 +2460,34 @@ private fun protectionQualityScore(stats: FocusStats, emergencyUnlocksRemaining:
 }
 
 private fun protectionQualityCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
-    if (stats.sessionsThisWeek <= 0) return "Completa una sesión para medirlo"
+    if (stats.sessionsThisWeek <= 0) return "Complete a session to measure it"
     val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
     return when {
-        usedEmergencies == 0 && stats.blockedAttemptsThisWeek == 0 -> "Sesiones limpias, sin escapes ni impulsos"
-        usedEmergencies == 0 -> "Hubo impulsos, pero no rompiste Blank"
-        usedEmergencies < 3 -> "Mejorará al reducir emergencias"
-        else -> "Semana frágil: ya usaste todas las emergencias"
+        usedEmergencies == 0 && stats.blockedAttemptsThisWeek == 0 -> "Clean sessions, no exits or urges"
+        usedEmergencies == 0 -> "Urges appeared, but Blanked held"
+        usedEmergencies < 3 -> "Improves as emergency use goes down"
+        else -> "Fragile week: all emergency unlocks used"
     }
 }
 
 private fun controlRecoveryValue(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
     val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
     return when {
-        stats.blockedAttemptsThisWeek > 0 -> "${stats.blockedAttemptsThisWeek} pausas"
-        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Estable"
-        usedEmergencies < 3 -> "${3 - usedEmergencies} reservas"
-        else -> "Límite"
+        stats.blockedAttemptsThisWeek > 0 -> "${stats.blockedAttemptsThisWeek} pauses"
+        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Stable"
+        usedEmergencies < 3 -> "${3 - usedEmergencies} left"
+        else -> "Limit"
     }
 }
 
 private fun controlRecoveryCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
     val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
     return when {
-        stats.blockedAttemptsThisWeek > 0 && usedEmergencies == 0 -> "Impulsos frenados sin usar emergencias"
-        stats.blockedAttemptsThisWeek > 0 -> "Blank hizo visible el impulso antes de actuar"
-        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Todavía no necesitaste rescates esta semana"
-        usedEmergencies < 3 -> "Emergencias restantes esta semana"
-        else -> "Toca volver a depender del NFC"
+        stats.blockedAttemptsThisWeek > 0 && usedEmergencies == 0 -> "Urges stopped without emergency unlocks"
+        stats.blockedAttemptsThisWeek > 0 -> "Blanked surfaced the urge before action"
+        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "No emergency unlocks needed this week"
+        usedEmergencies < 3 -> "Emergency unlocks left this week"
+        else -> "Emergency limit reached"
     }
 }
 
@@ -2138,32 +2498,32 @@ private fun usedEmergencyUnlocks(emergencyUnlocksRemaining: Int): Int {
 private fun emergencyCaption(emergencyUnlocksRemaining: Int): String {
     val used = usedEmergencyUnlocks(emergencyUnlocksRemaining)
     return when {
-        used == 0 -> "Sin rescates esta semana"
-        emergencyUnlocksRemaining > 0 -> "$emergencyUnlocksRemaining disponibles todavía"
-        else -> "Límite semanal alcanzado"
+        used == 0 -> "No unlocks this week"
+        emergencyUnlocksRemaining > 0 -> "$emergencyUnlocksRemaining still available"
+        else -> "Weekly limit reached"
     }
 }
 
 private fun nextStepText(stats: FocusStats): String {
     val riskyDay = riskiestDay(stats.activityDays)
-        ?: return "Completa unas sesiones más y Blank detectará qué momento conviene reforzar."
+        ?: return "Complete a few more sessions and Blanked will detect which moment needs support."
     val day = dayName(riskyDay.dayOfWeek).lowercase()
     return when {
-        riskyDay.blockedAttempts > 0 -> "Tu momento de riesgo suele ser el $day. Programa Blank antes de esa franja."
-        riskyDay.sessions > 1 -> "El $day recurres más a Blank. Refuerza esa rutina antes de abrir las apps."
-        else -> "El $day fue tu punto más sensible. Refuerza esa franja antes de que aparezca el impulso."
+        riskyDay.blockedAttempts > 0 -> "Your risk moment is usually $day. Schedule Blanked before that window."
+        riskyDay.sessions > 1 -> "$day is when you use Blanked most. Reinforce that routine before opening apps."
+        else -> "$day was your most sensitive point. Reinforce that window before the urge appears."
     }
 }
 
 private fun progressInsight(stats: FocusStats, savedMs: Long): String {
     return when {
-        stats.totalSessions == 0 -> "Cuando completes tu primera sesión, Blank empezará a construir tu progreso semanal."
-        protectionQualityScore(stats, 3) >= 90 -> "Tus sesiones están saliendo limpias: poco impulso y mucho tiempo protegido."
-        stats.blockedAttemptsThisWeek >= 5 -> "Tu patrón ya es visible: Blank está interceptando varios impulsos antes de que manden ellos."
-        savedMs >= 60L * 60L * 1000L -> "Ya has recuperado más de una hora de atención con Blank."
-        stats.sessionsThisWeek >= 3 -> "La repetición empieza a contar: ya tienes varias sesiones completadas esta semana."
-        stats.blockedAttemptsThisWeek > 0 -> "Blank ya ha interceptado impulsos automáticos. Esa fricción es el producto."
-        else -> "Una sesión completada ya es una interrupción menos del piloto automático."
+        stats.totalSessions == 0 -> "After your first session, Blanked will start building weekly progress."
+        protectionQualityScore(stats, 3) >= 90 -> "Your sessions are clean: low urge pressure and strong protected time."
+        stats.blockedAttemptsThisWeek >= 5 -> "Your pattern is visible: Blanked is intercepting urges before they take over."
+        savedMs >= 60L * 60L * 1000L -> "You have recovered more than one hour of attention with Blanked."
+        stats.sessionsThisWeek >= 3 -> "Repetition is starting to count: several sessions completed this week."
+        stats.blockedAttemptsThisWeek > 0 -> "Blanked has already intercepted automatic urges. That pause is the product."
+        else -> "One completed session is one less automatic interruption."
     }
 }
 

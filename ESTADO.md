@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-08-29
+Ultima actualizacion: 2026-09-08
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
@@ -8,6 +8,12 @@ Ultima actualizacion: 2026-08-29
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
 
 ## Hecho hoy
+- 2026-09-08: Anadido sync directo de proveedores en `wearable-sync`: Oura, WHOOP, Fitbit/Google Health y Withings consultan APIs, normalizan a `common_features/provider_features/source_confidence/freshness`, guardan snapshot, actualizan `last_sync_at/status` y registran `wearable_sync_success/failed`; errores de proveedor marcan conexion `error`. `digital-wellness-features` carga memoria previa de `wearable_recommendation_outcomes` para evitar repetir recomendaciones ignoradas y reforzar aceptadas. iOS/Android Source Hub abre OAuth directo para proveedores configurados. Validado JS, Android tests y `git diff --check`.
+- 2026-09-08: Netlify produccion `getblank` redeploy `6a9fe59066d9e0490c340114` con funciones wearable; smoke real OK para `wearable-connections`, `wearable-outcome` y `digital-wellness-features`; bloqueos esperados: Oura `provider_oauth_not_configured`, Garmin `provider_requires_partner_access`, sync directo sin cuenta `wearable_connection_not_found`.
+- 2026-09-08: Aplicada en Supabase produccion `blank-membership` la migracion wearable `005_wearable_platform.sql`; verificada por SQL la existencia de `wearable_connections`, `wearable_feature_snapshots` y `wearable_recommendation_outcomes`.
+- 2026-09-08: Anadida base de outcome measurement y BAI wearable memory: `wearable_recommendation_outcomes` en migracion `005_wearable_platform.sql` y endpoint `wearable-outcome` para registrar recomendaciones generadas, aceptadas, ignoradas, completadas o fallidas. Validado `node --check`, Android `:app:testDebugUnitTest` y `git diff --check`.
+- 2026-09-08: Ampliada la implementacion del roadmap wearable: creados endpoints `wearable-connections`, `wearable-oauth-start` y `wearable-oauth-callback`; tokens directos se cifran con `WEARABLE_TOKEN_ENCRYPTION_KEY`; Oura/WHOOP/Fitbit/Withings quedan preparados por env vars; Garmin queda marcado como `provider_requires_partner_access`; Source Hub visible en iOS/Android lista Apple/Health Connect y proveedores directos. Validado `node --check`, `:app:compileDebugKotlin` y `git diff --check`.
+- 2026-09-08: Implementada base de roadmap wearable de excelencia: payload iOS/Android sube `common_features`, `provider_features`, `source_confidence` y `freshness`; Netlify los conserva, los usa en el insight y guarda snapshots wearable si existe la migracion; anadida migracion `005_wearable_platform.sql`; ampliado tracking wearable y checklist QA. Validado con `node --check`, carga de handler Netlify, `git diff --check`, Android `:app:compileDebugKotlin` y `:app:testDebugUnitTest`. Pendiente compilar iOS en MacinCloud.
 - 2026-08-29: Se probo una limpieza visual iOS para quitar formato de tarjetas en pantallas secundarias, pero el resultado no gusto. Revertido en rama `health` commit `4e5182a`, recuperando el formato anterior de tarjetas sin tocar las mejoras AI/Timer/Habits previas. MacinCloud queda pendiente de recompilar/reinstalar claramente desde `4e5182a` si se quiere verificar visualmente en simulador.
 - 2026-08-29: Compilado en MacinCloud `/Users/user301201/BlankMVPhealth/ios/Blank` tras subir `health` commit `16d2592`; comando `xcodebuild -project blank.xcodeproj -sdk iphonesimulator -configuration debug build`; resultado `** BUILD SUCCEEDED **`. Esto valida build Debug de simulador, no archive, TestFlight ni prueba en iPhone.
 - 2026-08-29: Implementada localmente una ampliacion AI Digital Wellness en iOS sobre la rama `health`: `ReportView` anade una tarjeta Pro con Wellness score semanal, Digital triggers, Relapse review y Sleep protection; `HomeView` cambia el hold-to-unblank para que, tras mantener pulsado, espere 60 segundos antes de desbloquear y registre `relapse_attempt` con `delay_seconds=60`. Validado en Windows con `git diff --check`, `node --check` de funciones Netlify relevantes y `gradlew test`. Limitacion: falta compilar Swift/iOS en MacinCloud porque Windows no tiene `xcodebuild`.
@@ -486,6 +492,10 @@ Ultima actualizacion: 2026-08-29
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- Configurar env vars OAuth por proveedor antes de probar conexiones directas: Oura, WHOOP, Fitbit/Google Health y Withings.
+- Configurar env vars OAuth wearable en Netlify antes de probar conexiones directas.
+- Compilar iOS en MacinCloud y probar en iPhone real con Apple Health/Apple Watch.
+- Probar Android real con Health Connect y una fuente wearable.
 - Si se retoca onboarding iOS, empezar por una pasada visual de bajo riesgo: unificar top bar, hero typografico, posicion vertical, botones glass y paginador; despues revisar en simulador los pasos 1, 2 y 3 juntos.
 - En MacinCloud/Xcode, revisar visualmente el onboarding iOS ya compilado en `90623ac` tras retirar top bar, `Paso X de 3` y `Apps listas`; comprobar especialmente que los pasos 1, 2 y 3 quedan centrados y que los dots inferiores bastan como indicador de progreso.
 - En MacinCloud/RDP, hacer pull del proximo commit y compilar por Terminal con pulsaciones individuales; despues revisar visualmente en Xcode que `Stats` y `Habits` abren desde top bar mostrando cabecera/primer bloque en sheet medio.

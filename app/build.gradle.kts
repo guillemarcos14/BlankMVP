@@ -30,9 +30,10 @@ android {
         applicationId = "com.blanknfc.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 21
-        versionName = "1.0"
+        versionCode = 24
+        versionName = "1.8"
         setProperty("archivesBaseName", "Blank-$versionName")
+        buildConfigField("String", "BLANK_API_BASE_URL", "\"https://getblank.netlify.app/.netlify/functions/\"")
     }
 
     signingConfigs {
@@ -70,6 +71,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
@@ -105,6 +107,10 @@ dependencies {
 
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
+
+    // Play Billing / Health Connect
+    implementation("com.android.billingclient:billing:9.1.0")
+    implementation("androidx.health.connect:connect-client:1.1.0")
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")

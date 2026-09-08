@@ -15,6 +15,9 @@ class BlankApp : Application() {
                 com.blanknfc.app.analytics.BlankEvents.APP_OPENED
             )
         )
+        container.purchaseStore.start()
+        container.healthConnectStore.refresh()
+        container.referralStore.refreshStatus()
     }
 
     companion object {

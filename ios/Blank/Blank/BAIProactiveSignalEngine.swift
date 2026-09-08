@@ -22,6 +22,18 @@ struct BAIProactiveSignalEngine {
         saveLatestAlert(body: message, signal: signal, defaults: defaults)
         await notify(body: message, signal: signal)
         await sendToPreferredAssistantChannel(body: message, signal: signal, defaults: defaults)
+        if signal.kind == "low_recovery" {
+            await BlankFunnelAnalytics.track(
+                "proactive_health_alert",
+                properties: [
+                    "signal_type": signal.kind,
+                    "priority": signal.priority,
+                    "selection_count": selectionCount,
+                    "relapse_risk_score": system.profile.relapseRiskScore
+                ],
+                defaults: defaults
+            )
+        }
         await BlankFunnelAnalytics.track(
             "bai_proactive_signal_sent",
             properties: [

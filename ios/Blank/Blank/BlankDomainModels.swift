@@ -828,6 +828,10 @@ struct DigitalWellnessFeaturePayload: Codable, Equatable {
     var generated_at: Date
     var period_start: Date
     var period_end: Date
+    var common_features: [String: String]
+    var provider_features: [String: [String: String]]
+    var source_confidence: [String: String]
+    var freshness: [String: String]
     var profile: DigitalWellnessProfileFeatures
     var daily: [DigitalWellnessDailyFeatures]
     var weekly: DigitalWellnessWeeklyFeatures
@@ -1121,15 +1125,20 @@ enum DigitalWellnessFeatureBuilder {
                 calendar: calendar
             )
         }
+        let weekly = makeWeeklyFeatures(daily: daily, selectionCount: selectionCount, selectionSnapshot: selectionSnapshot)
 
         return DigitalWellnessFeaturePayload(
-            schema_version: 1,
+            schema_version: 2,
             generated_at: now,
             period_start: periodStart,
             period_end: periodEnd,
+            common_features: commonFeatures(daily: daily, weekly: weekly),
+            provider_features: providerFeatures(daily: daily),
+            source_confidence: sourceConfidence(daily: daily),
+            freshness: freshnessFeatures(daily: daily, now: now),
             profile: makeProfile(defaults: defaults),
             daily: daily,
-            weekly: makeWeeklyFeatures(daily: daily, selectionCount: selectionCount, selectionSnapshot: selectionSnapshot),
+            weekly: weekly,
             correlations: makeCorrelations(daily: daily),
             privacy: DigitalWellnessPrivacyFeatures(
                 raw_health_samples_sent: false,
@@ -1140,6 +1149,92 @@ enum DigitalWellnessFeatureBuilder {
                 backend_payload_type: "daily_and_weekly_features"
             )
         )
+    }
+
+    private static func commonFeatures(daily: [DigitalWellnessDailyFeatures], weekly: DigitalWellnessWeeklyFeatures) -> [String: String] {
+        var features: [String: String] = [
+            "sleep": weekly.avg_sleep_minutes.map { "\($0)" } ?? "learning",
+            "sleep_timing": weekly.bedtime_variability_minutes.map { "\($0)" } ?? "learning",
+            "recovery": weekly.avg_recovery_score.map { "\($0)" } ?? "learning",
+            "activity": weekly.avg_steps.map { "\($0)" } ?? "learning",
+            "strain_load": weekly.avg_exercise_minutes.map { "\($0)" } ?? "learning",
+            "stress_proxy": weekly.avg_hrv.map { "\($0)" } ?? "learning",
+            "freshness": weekly.latest_health_signal_age_hours.map { "\($0)" } ?? "unknown",
+            "coverage": "\(weekly.health_signal_coverage_percent)",
+            "confidence": "\(wearableConfidence(weekly: weekly))"
+        ]
+        if daily.contains(where: { $0.low_recovery_flag == true }) {
+            features["low_recovery_mode"] = "candidate"
+        }
+        return features
+    }
+
+    private static func providerFeatures(daily: [DigitalWellnessDailyFeatures]) -> [String: [String: String]] {
+        let recent = Array(daily.suffix(7))
+        var appleHealth: [String: String] = [:]
+        average(recent.compactMap(\.deep_sleep_minutes)).map { appleHealth["deep_sleep_minutes"] = "\($0)" }
+        average(recent.compactMap(\.rem_sleep_minutes)).map { appleHealth["rem_sleep_minutes"] = "\($0)" }
+        average(recent.compactMap(\.core_sleep_minutes)).map { appleHealth["core_sleep_minutes"] = "\($0)" }
+        average(recent.compactMap(\.awake_minutes)).map { appleHealth["awake_minutes"] = "\($0)" }
+        average(recent.compactMap(\.respiratory_rate)).map { appleHealth["respiratory_rate"] = "\($0)" }
+        average(recent.compactMap(\.oxygen_saturation)).map { appleHealth["oxygen_saturation"] = "\($0)" }
+        average(recent.compactMap(\.vo2_max)).map { appleHealth["vo2_max"] = "\($0)" }
+        average(recent.compactMap(\.flights_climbed)).map { appleHealth["flights_climbed"] = "\($0)" }
+        return appleHealth.isEmpty ? [:] : ["apple_health": appleHealth]
+    }
+
+    private static func sourceConfidence(daily: [DigitalWellnessDailyFeatures]) -> [String: String] {
+        let recent = Array(daily.suffix(7))
+        let coverage = min(100, recent.reduce(0) { total, day in
+            total + min(12, signalDepth(day: day)) * 100 / 12
+        } / max(1, recent.count))
+        let confidence = wearableConfidence(coverage: coverage, daysWithHealth: recent.filter(hasHealthSignal).count)
+        return [
+            "apple_health": "\(confidence)",
+            "sleep": metricConfidence(recent.compactMap(\.sleep_total_minutes).count),
+            "recovery": metricConfidence(recent.compactMap(\.recovery_score).count),
+            "activity": metricConfidence(recent.compactMap(\.steps_total).count),
+            "vitals": metricConfidence(recent.compactMap(\.hrv_avg).count + recent.compactMap(\.resting_hr).count)
+        ]
+    }
+
+    private static func freshnessFeatures(daily: [DigitalWellnessDailyFeatures], now: Date) -> [String: String] {
+        let latest = daily.filter(hasHealthSignal).map(\.date).max()
+        let age = latest.map { Int(now.timeIntervalSince($0) / 3600) }
+        return [
+            "apple_health_latest_signal_age_hours": age.map { "\($0)" } ?? "unknown",
+            "status": age.map { $0 > 72 ? "stale" : "fresh" } ?? "no_data"
+        ]
+    }
+
+    private static func wearableConfidence(weekly: DigitalWellnessWeeklyFeatures) -> Int {
+        wearableConfidence(coverage: weekly.health_signal_coverage_percent, daysWithHealth: weekly.health_days_count)
+    }
+
+    private static func wearableConfidence(coverage: Int, daysWithHealth: Int) -> Int {
+        min(100, max(0, coverage / 2 + min(7, daysWithHealth) * 7))
+    }
+
+    private static func metricConfidence(_ days: Int) -> String {
+        "\(min(100, max(0, days * 14)))"
+    }
+
+    private static func hasHealthSignal(_ day: DigitalWellnessDailyFeatures) -> Bool {
+        signalDepth(day: day) > 0
+    }
+
+    private static func signalDepth(day: DigitalWellnessDailyFeatures) -> Int {
+        [
+            day.sleep_total_minutes,
+            day.steps_total,
+            day.exercise_minutes,
+            day.resting_hr,
+            day.hrv_avg,
+            day.respiratory_rate,
+            day.oxygen_saturation,
+            day.vo2_max,
+            day.flights_climbed
+        ].compactMap { $0 }.count
     }
 
     private struct HealthBaselines {

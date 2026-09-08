@@ -4,6 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.blanknfc.app.data.HealthConnectStore
+import com.blanknfc.app.data.DigitalWellnessRemoteStore
+import com.blanknfc.app.data.OnboardingSyncStore
+import com.blanknfc.app.data.PlayPurchaseStore
+import com.blanknfc.app.data.ReferralStore
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.ui.screens.AppSelectorScreen
 import com.blanknfc.app.ui.screens.ForgetNfcScreen
@@ -25,12 +30,19 @@ object Routes {
 fun NavGraph(
     navController: NavHostController,
     sessionManager: SessionManager,
+    purchaseStore: PlayPurchaseStore,
+    healthConnectStore: HealthConnectStore,
+    digitalWellnessStore: DigitalWellnessRemoteStore,
+    onboardingSyncStore: OnboardingSyncStore,
+    referralStore: ReferralStore,
     startDestination: String
 ) {
     NavHost(navController = navController, startDestination = startDestination) {
         composable(Routes.SETUP) {
             SetupScreen(
                 sessionManager = sessionManager,
+                purchaseStore = purchaseStore,
+                onboardingSyncStore = onboardingSyncStore,
                 onSetupComplete = {
                     sessionManager.setSetupComplete()
                     navController.navigate(Routes.HOME) {
@@ -48,6 +60,10 @@ fun NavGraph(
         composable(Routes.HOME) {
             HomeScreen(
                 sessionManager = sessionManager,
+                purchaseStore = purchaseStore,
+                healthConnectStore = healthConnectStore,
+                digitalWellnessStore = digitalWellnessStore,
+                referralStore = referralStore,
                 onRelinkTag = {
                     navController.navigate(Routes.RELINK_NFC)
                 },

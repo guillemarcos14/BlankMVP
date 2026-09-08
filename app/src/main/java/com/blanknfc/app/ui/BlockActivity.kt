@@ -59,7 +59,7 @@ class BlockActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(this) {
-            // Stay on the blocking screen until the paired NFC tag ends the session.
+            // Stay on the blocking screen until the user leaves intentionally.
         }
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
@@ -131,7 +131,7 @@ private fun BlockScreen(
                 ) {
                     Text(
                         text = if (emergencyMode)
-                            "Escribe la frase completa."
+                            "Type the full phrase."
                         else
                             stringResource(R.string.block_title),
                         style = MaterialTheme.typography.displayLarge,
@@ -143,7 +143,7 @@ private fun BlockScreen(
                         text = if (emergencyMode)
                             stringResource(R.string.emergency_desc)
                         else
-                            "Estás protegiendo el tiempo que querías recuperar.",
+                            "You are protecting the time you wanted back.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White.copy(alpha = 0.72f),
                         textAlign = TextAlign.Center
@@ -152,9 +152,9 @@ private fun BlockScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
                             text = if (emergencyUnlocksRemaining > 0)
-                                "Te quedan $emergencyUnlocksRemaining desbloqueos de emergencia esta semana."
+                                "$emergencyUnlocksRemaining emergency unlocks left this week."
                             else
-                                "Ya has usado tus 3 desbloqueos de emergencia esta semana.",
+                                "You have used all 3 emergency unlocks this week.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.72f),
                             textAlign = TextAlign.Center
@@ -197,7 +197,7 @@ private fun BlockScreen(
                         (context as? Activity)?.finish()
                     }
                 ) {
-                    Text("Volver al inicio", color = Color.White.copy(alpha = 0.64f))
+                    Text("Back to Home", color = Color.White.copy(alpha = 0.64f))
                 }
             } else {
                 PrimaryBlockButton(

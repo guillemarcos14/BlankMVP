@@ -156,14 +156,14 @@ struct BlankApp: App {
         }
     }
 
-    private func openBlockConfiguration(from components: URLComponents?) {
+    private func openBlockConfiguration(from components: URLComponents?, startsFreshSelection: Bool = false) {
         let appNames = components?.listQueryItem("apps") ?? []
-        sessionStore.requestBlockConfiguration(appNames: appNames)
+        sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: startsFreshSelection)
     }
 
     private func setupPlan(from components: URLComponents?) {
         applyPlan(from: components, shouldOpenPickerIfIncomplete: false)
-        openBlockConfiguration(from: components)
+        openBlockConfiguration(from: components, startsFreshSelection: true)
     }
 
     private func applyPlan(from components: URLComponents?, shouldOpenPickerIfIncomplete: Bool = true) {

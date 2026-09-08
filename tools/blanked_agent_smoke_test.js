@@ -42,8 +42,8 @@ function baseContext(overrides = {}) {
   const rememberedBedtime = await call("How can I not scroll at night?", baseContext({
     memory: { bedtime_minute: 23 * 60, weak_hours: [22], main_apps: ["TikTok"] },
   }));
-  assert.ok(rememberedBedtime.actions.some((action) => action.type === "apply_schedule"));
-  assert.strictEqual(rememberedBedtime.actions[0].end_minute, 23 * 60);
+  assert.strictEqual(rememberedBedtime.actions.length, 0);
+  assert.match(rememberedBedtime.message_text, /11:00 PM|sleep target|boundary/i);
 
   const missingApp = await call("I keep doomscrolling.", baseContext());
   assert.strictEqual(missingApp.actions.length, 0);
@@ -60,7 +60,13 @@ function baseContext(overrides = {}) {
   assert.strictEqual(explicitWindow.actions[0].start_minute, 22 * 60);
   assert.strictEqual(explicitWindow.actions[0].end_minute, 7 * 60);
 
-  const serialized = JSON.stringify([missingBedtime, rememberedBedtime, missingApp, rememberedApp, explicitWindow]);
+  const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am", baseContext());
+  assert.ok(sleepGoalWindow.actions.some((action) => action.type === "apply_schedule"));
+  assert.strictEqual(sleepGoalWindow.actions[0].start_minute, 22 * 60 + 45);
+  assert.strictEqual(sleepGoalWindow.actions[0].end_minute, 23 * 60);
+  assert.match(sleepGoalWindow.message_text, /before 11:00 PM|10:45 PM|last 15/i);
+
+  const serialized = JSON.stringify([missingBedtime, rememberedBedtime, missingApp, rememberedApp, explicitWindow, sleepGoalWindow]);
   assert.doesNotMatch(serialized, /source|model_error|openai|debug|QA/i);
 
   console.log("blanked-agent smoke tests passed");

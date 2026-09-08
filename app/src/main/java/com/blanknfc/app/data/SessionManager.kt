@@ -264,7 +264,7 @@ class SessionManager(
     }
 
     fun createMode(name: String, packages: Set<String>) {
-        val cleanName = name.trim().ifBlank { "Nuevo modo" }
+        val cleanName = name.trim().ifBlank { "Mode" }
         val mode = BlankMode(
             id = "mode_${System.currentTimeMillis()}",
             name = cleanName,
@@ -469,7 +469,7 @@ class SessionManager(
 
     private fun parseModes(serialized: String?, legacyPackages: Set<String>): List<BlankMode> {
         if (serialized.isNullOrBlank()) {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", legacyPackages)) + presetModes()
+            return listOf(BlankMode(DEFAULT_MODE_ID, "Routine", legacyPackages)) + presetModes()
         }
 
         val modes = serialized.split(MODE_SEPARATOR).mapNotNull { rawMode ->
@@ -477,12 +477,12 @@ class SessionManager(
             if (parts.size < 3) return@mapNotNull null
             BlankMode(
                 id = parts[0],
-                name = decode(parts[1]).ifBlank { "Modo" },
+                name = decode(parts[1]).ifBlank { "Mode" },
                 packages = parts[2].split(PACKAGE_SEPARATOR).filter { it.isNotBlank() }.toSet()
             )
         }
 
-        return modes.ifEmpty { listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", legacyPackages)) }
+        return modes.ifEmpty { listOf(BlankMode(DEFAULT_MODE_ID, "Routine", legacyPackages)) }
     }
 
     private fun ensurePresetModes(modes: List<BlankMode>): List<BlankMode> {
@@ -613,13 +613,13 @@ class SessionManager(
         private const val PACKAGE_SEPARATOR = ","
 
         private fun defaultModes(): List<BlankMode> {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Rutina diaria", emptySet())) + presetModes()
+            return listOf(BlankMode(DEFAULT_MODE_ID, "Routine", emptySet())) + presetModes()
         }
 
         private fun presetModes(): List<BlankMode> {
             return listOf(
-                BlankMode(STUDY_MODE_ID, "Estudio", emptySet()),
-                BlankMode("sleep", "Dormir", emptySet())
+                BlankMode(STUDY_MODE_ID, "Study", emptySet()),
+                BlankMode("sleep", "Sleep", emptySet())
             )
         }
 

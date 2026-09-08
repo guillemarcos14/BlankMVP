@@ -84,7 +84,7 @@ fun ForgetNfcScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "Esto borrará la etiqueta NFC vinculada, desactivará Blank y reiniciará el onboarding. Tus apps protegidas se mantienen.",
+                        text = "This removes the optional paired key, turns Blanked off, and restarts onboarding. Your protected apps stay saved.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = BlankGray,
                         textAlign = TextAlign.Center
@@ -93,7 +93,7 @@ fun ForgetNfcScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
                         Text(
-                            text = "Entiendo que tendré que vincular un Blank de nuevo.",
+                            text = "I understand I will need to pair Blanked again.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = BlankOnSurface
                         )
@@ -106,7 +106,7 @@ fun ForgetNfcScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = BlankOnSurface, contentColor = BlankSurface),
                         modifier = Modifier.fillMaxWidth().height(56.dp)
                     ) {
-                        Text("Confirmar reset")
+                        Text("Confirm reset")
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(onClick = onBack, shape = RoundedCornerShape(999.dp), modifier = Modifier.fillMaxWidth().height(56.dp)) {

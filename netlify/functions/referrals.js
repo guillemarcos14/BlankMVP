@@ -151,7 +151,7 @@ async function registerActivation(body) {
           source: cleanText(body.source, 40) || "ios",
         },
         insight: { event: "referral_activation" },
-        platform: "ios",
+        platform: cleanText(body.source, 40) || "ios",
         locale: cleanText(body.locale, 40),
         app_version: cleanText(body.app_version, 40),
         build_number: cleanText(body.build_number, 40),

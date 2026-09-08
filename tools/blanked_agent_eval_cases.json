@@ -152,6 +152,33 @@
     }
   },
   {
+    "id": "sleep_goal_window_infers_pre_bed_boundary",
+    "prompt": "I want to sleep good from 11pm to 7am",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "sleep",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "first_action": {
+        "start_minute": 1365,
+        "end_minute": 1380,
+        "duration_days": 7
+      },
+      "ui_text_matches": [
+        "before 11:00 PM|10:45 PM|last 15"
+      ],
+      "ui_text_not_matches": [
+        "specific protection window: 11:00 PM to 7:00 AM|from 11:00 PM to 7:00 AM\\. I"
+      ]
+    }
+  },
+  {
     "id": "explicit_evening_window",
     "prompt": "Block TikTok from 9 pm to 11 pm.",
     "expect": {

@@ -63,6 +63,18 @@ final class HealthKitStore: ObservableObject {
                     self.state = .failed(error?.localizedDescription ?? "Health access was not granted.")
                 }
                 Task {
+                    if success {
+                        await BlankFunnelAnalytics.track(
+                            "permission_granted",
+                            properties: ["source": "apple_health", "permission": "health"],
+                            defaults: self.defaults
+                        )
+                        await BlankFunnelAnalytics.track(
+                            "wearable_connected",
+                            properties: ["provider": "apple_health"],
+                            defaults: self.defaults
+                        )
+                    }
                     await BlankFunnelAnalytics.track(
                         "health_permission_result",
                         properties: [

@@ -6,6 +6,7 @@ const {
   recordAssistantChannel,
   recordAssistantMemory,
 } = require("./_assistant_channel");
+const { buildSignedAudioUrl } = require("./_elevenlabs_voice");
 
 function text(statusCode, body, contentType = "text/plain; charset=utf-8") {
   return {
@@ -165,8 +166,17 @@ async function transcribeAudio(item) {
   return cleanText(parsed.text, 800);
 }
 
-function twiml(message) {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escapeXml(message)}</Message></Response>`;
+function twiml(message, mediaUrl = "") {
+  if (!mediaUrl) {
+    return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
+  }
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<Response>`,
+    `<Message><Media>${escapeXml(mediaUrl)}</Media></Message>`,
+    `<Message><Body>${escapeXml(message)}</Body></Message>`,
+    `</Response>`,
+  ].join("");
 }
 
 function escapeXml(value) {
@@ -186,11 +196,91 @@ function connectReply(from, channel) {
 function actionIntro(actions) {
   const first = primaryAction(actions);
   if (!first) return "";
-  if (first.type === "set_daily_limit") return "Open Blanked to apply the daily limit:";
-  if (first.type === "apply_schedule") return "Open Blanked to apply the protection window:";
-  if (first.type === "start_protection") return "Open Blanked to start it:";
-  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup:";
-  return "Open Blanked to apply it:";
+  if (first.type === "set_daily_limit") return "Use this link to open Blanked and review the daily limit.";
+  if (first.type === "apply_schedule") return "Use this link to open Blanked and review the protection window.";
+  if (first.type === "start_protection") return "Use this link to open Blanked and start the block.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Use this link to open Blanked and finish setup.";
+  return "Use this link to open Blanked and review the next step.";
+}
+
+function minuteText(value) {
+  const minute = clamp(value, 0, 1439);
+  const hour24 = Math.floor(minute / 60);
+  const minutePart = String(minute % 60).padStart(2, "0");
+  const suffix = hour24 >= 12 ? "PM" : "AM";
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${minutePart} ${suffix}`;
+}
+
+function appTargetText(appNames = []) {
+  const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 4) : [];
+  if (names.length === 1) return names[0];
+  if (names.length > 1) return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return "selected apps";
+}
+
+function actionSentence(actions, appNames = []) {
+  const first = primaryAction(actions);
+  if (!first) return "";
+  if (first.type === "apply_schedule") {
+    return `This opens Blanked with a protection window for ${appTargetText(appNames)} from ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
+  }
+  if (first.type === "start_protection") {
+    return `This opens Blanked with a ${clamp(first.minutes || 25, 5, 240)}-minute app block ready to review.`;
+  }
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
+    return "This opens Blanked so you can choose the apps to block.";
+  }
+  if (first.type === "set_daily_limit") {
+    return `This opens Blanked with a ${clamp(first.minutes || 25, 5, 240)}-minute daily limit ready to review.`;
+  }
+  if (first.type === "enable_allow_only") return "This opens Blanked so you can turn on Allow Only.";
+  if (first.type === "enable_adult_filter") return "This opens Blanked so you can turn on adult web protection.";
+  if (first.type === "pause_rules") return "This opens Blanked so you can pause scheduled protection.";
+  if (first.type === "disable_pause") return "This opens Blanked so you can resume scheduled protection.";
+  return "This opens Blanked so you can review the next step.";
+}
+
+function voiceActionText(actions, appNames, link) {
+  const summary = actionSentence(actions, appNames);
+  const intro = actionIntro(actions);
+  if (!summary || !link) return "";
+  return `${summary}\n\n${intro}\n${link}`;
+}
+
+function voiceActionCue(actions, appNames = []) {
+  const summary = actionSentence(actions, appNames);
+  if (!summary) return "";
+  return `${summary} I left the link in the text message.`;
+}
+
+function voiceInputSummary(prompt) {
+  const value = cleanText(prompt, 160);
+  return value ? `I understood your voice note as "${value}".` : "";
+}
+
+function withVoiceInputContext(text, prompt) {
+  const summary = voiceInputSummary(prompt);
+  if (!summary) return text;
+  return `${summary}\n\n${text}`;
+}
+
+function naturalVoiceText(text) {
+  return cleanText(text, 800)
+    .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
+    .replace(/\bAction:\s*/gi, "")
+    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
+    .replace(/\bone concrete Blanked action\b/gi, "the next step in Blanked");
+}
+
+function naturalReplyText(text) {
+  return cleanText(text, 1400)
+    .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
+    .replace(/\bAction:\s*/gi, "")
+    .replace(/\bI prepared a Blanked link\b/gi, "This Blanked link")
+    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help you apply it in Blanked.")
+    .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
+    .trim();
 }
 
 async function recordMessageConnection(connectCode, from, channel) {
@@ -292,13 +382,27 @@ async function askBAI(prompt, from, channel) {
   }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    return "BAI could not read that yet. Try again in a moment.";
+    const fallback = "BAI could not read that yet. Try again in a moment.";
+    return { text: fallback, speechText: fallback };
   }
   const parsed = JSON.parse(response.body || "{}");
   const plan = parsed.plan || {};
-  const message = cleanText(plan.message_text || plan.response_text, 1400);
-  const actionLink = actionDeepLink(plan.actions || [], memory.main_apps);
-  return actionLink ? `${message}\n\n${actionIntro(plan.actions || [])}\n${actionLink}` : message;
+  const message = naturalReplyText(plan.message_text || plan.response_text);
+  const actions = plan.actions || [];
+  const actionLink = actionDeepLink(actions, memory.main_apps);
+  const modelSpeech = naturalVoiceText(plan.speech_text || "");
+  const modelFollowup = naturalReplyText(plan.followup_text || "");
+  const speechBase = modelSpeech || message;
+  const speechActionCue = actionLink && !/\blink\b/i.test(speechBase) ? "I left the link in the next message." : "";
+  return {
+    text: actionLink ? `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : message,
+    actionText: actionLink ? `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : "",
+    speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+  };
+}
+
+function wantsVoiceReply(text) {
+  return /\b(audio|voice|voice note|speak|spoken|say it|nota de voz|audio|voz|hablame|háblame|dimelo|dímelo)\b/i.test(cleanText(text, 800));
 }
 
 function publicOpenLink(actionName, params = {}) {
@@ -395,8 +499,15 @@ exports.handler = async (event) => {
   const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
   const reply = connectCode
-    ? (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel))
+    ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)), speechText: "" }
     : await askBAI(prompt, from, channel);
 
-  return text(200, twiml(reply), "application/xml; charset=utf-8");
+  const shouldAttachAudio = channel === "whatsapp" && !connectCode && (audio || wantsVoiceReply(body));
+  const mediaUrl = shouldAttachAudio
+    ? buildSignedAudioUrl(event, reply.speechText || reply.text)
+    : "";
+  const baseReplyText = mediaUrl && reply.actionText ? reply.actionText : reply.text;
+  const replyText = audio ? withVoiceInputContext(baseReplyText, prompt) : baseReplyText;
+
+  return text(200, twiml(replyText, mediaUrl), "application/xml; charset=utf-8");
 };

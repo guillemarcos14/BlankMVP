@@ -105,9 +105,9 @@ class SessionManagerTest {
 
         val modeNames = manager.modes.first().map { it.name }
 
-        assertTrue(modeNames.contains("Rutina diaria"))
-        assertTrue(modeNames.contains("Estudio"))
-        assertTrue(modeNames.contains("Dormir"))
+        assertTrue(modeNames.contains("Routine"))
+        assertTrue(modeNames.contains("Study"))
+        assertTrue(modeNames.contains("Sleep"))
     }
 
     @Test

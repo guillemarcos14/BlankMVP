@@ -177,7 +177,7 @@ async function sendSmsMessage(to, body) {
   return response.json();
 }
 
-async function sendWhatsAppMessage(to, body) {
+async function sendWhatsAppMessage(to, body, options = {}) {
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioFrom = process.env.TWILIO_WHATSAPP_FROM_NUMBER;
@@ -188,6 +188,7 @@ async function sendWhatsAppMessage(to, body) {
     params.set("To", normalizedTo);
     params.set("From", normalizedFrom);
     params.set("Body", body);
+    if (options.mediaUrl) params.set("MediaUrl", options.mediaUrl);
 
     const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(twilioSid)}/Messages.json`, {
       method: "POST",

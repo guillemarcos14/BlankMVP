@@ -26,6 +26,7 @@ struct HomeView: View {
     @State private var activeSection: HomeSection?
     @State private var showingAssistantConnect = false
     @State private var showingContextualAppPicker = false
+    @State private var contextualPlanSelection = FamilyActivitySelection()
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
@@ -150,6 +151,7 @@ struct HomeView: View {
             if sessionStore.pendingPlanAppNames.isEmpty {
                 openSection(.modes)
             } else {
+                contextualPlanSelection = sessionStore.pendingPlanStartsFreshSelection ? FamilyActivitySelection() : sessionStore.selection
                 showingContextualAppPicker = true
             }
             sessionStore.shouldOpenBlockConfiguration = false
@@ -158,11 +160,15 @@ struct HomeView: View {
             headerText: contextualPickerHeaderText,
             footerText: "",
             isPresented: $showingContextualAppPicker,
-            selection: $sessionStore.selection
+            selection: $contextualPlanSelection
         )
         .onChange(of: showingContextualAppPicker) { isPresented in
             if !isPresented {
+                if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
+                    sessionStore.selection = contextualPlanSelection
+                }
                 sessionStore.clearPendingPlanAppNames()
+                contextualPlanSelection = FamilyActivitySelection()
             }
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
@@ -3069,6 +3075,12 @@ private func dateForMinute(_ minuteOfDay: Int) -> Date {
 private func minuteOfDay(from date: Date) -> Int {
     let components = Calendar.current.dateComponents([.hour, .minute], from: date)
     return (components.hour ?? 0) * 60 + (components.minute ?? 0)
+}
+
+private extension FamilyActivitySelection {
+    var blankedSelectionCount: Int {
+        applicationTokens.count + categoryTokens.count + webDomainTokens.count
+    }
 }
 
 #if DEBUG

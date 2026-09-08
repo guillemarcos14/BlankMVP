@@ -626,7 +626,7 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("Optional Health context", systemImage: "heart.text.square.fill")
+                    Label("Health Sources", systemImage: "heart.text.square.fill")
                         .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                     Text(healthSignalsSubtitle)
                         .font(.caption)
@@ -640,6 +640,7 @@ struct ReportView: View {
 
             if case .notRequested = healthKitStore.state {
                 Button {
+                    trackHealthPermissionRequest()
                     healthKitStore.requestAccess()
                 } label: {
                     Text("Connect Apple Health")
@@ -652,6 +653,7 @@ struct ReportView: View {
                 .buttonStyle(.plain)
             } else if case .failed(_) = healthKitStore.state {
                 Button {
+                    trackHealthPermissionRequest()
                     healthKitStore.requestAccess()
                 } label: {
                     Text("Retry Apple Health")
@@ -664,9 +666,10 @@ struct ReportView: View {
                 .buttonStyle(.plain)
             } else if case .connected = healthKitStore.state {
                 if !healthKitStore.summaries.isEmpty {
+                    let context = healthRecoveryContext(summaries: healthKitStore.summaries)
                     HStack(spacing: 10) {
-                        statCapsule(title: "Coverage", value: "\(healthKitStore.summaries.count)d", caption: "Recent data", minHeight: 74)
-                        statCapsule(title: "Signals", value: "\(healthRecoveryContext(summaries: healthKitStore.summaries).signalCoveragePercent)%", caption: "Wearable depth", minHeight: 74)
+                        statCapsule(title: "Source", value: healthSourceStatus(context: context), caption: healthSourceCaption(context: context), minHeight: 74)
+                        statCapsule(title: "Signals", value: "\(context.signalCoveragePercent)%", caption: "Wearable depth", minHeight: 74)
                     }
                 }
 
@@ -702,7 +705,7 @@ struct ReportView: View {
         let text: String
         switch healthKitStore.state {
         case .connected:
-            text = healthKitStore.summaries.isEmpty ? "No data" : "On"
+            text = healthSourceStatus(context: healthRecoveryContext(summaries: healthKitStore.summaries))
         case .requesting:
             text = "Opening"
         case .unavailable:
@@ -1395,7 +1398,7 @@ struct ReportView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Control Forecast")
+                Text("Health Sources / Wearables")
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .headline))
                 Text(healthSignalsSubtitle)
                     .font(.caption)
@@ -1424,6 +1427,15 @@ struct ReportView: View {
             .buttonStyle(.plain)
             #endif
 
+            VStack(spacing: 8) {
+                wearableProviderRow(name: "Apple Health", provider: "apple_health", status: healthSourceStatus(context: context), detail: "Sleep, activity, heart and recovery context.", canConnect: false)
+                wearableProviderRow(name: "Oura", provider: "oura", status: "Connect", detail: "Readiness, sleep contributors and recovery signals.", canConnect: true)
+                wearableProviderRow(name: "WHOOP", provider: "whoop", status: "Connect", detail: "Recovery, strain, sleep debt and cycle signals.", canConnect: true)
+                wearableProviderRow(name: "Garmin", status: "Partner gated", detail: "Body Battery, stress, training readiness and HRV status.")
+                wearableProviderRow(name: "Fitbit / Google", provider: "fitbit_google_health", status: "Connect", detail: "Daily Readiness, sleep score and active zone minutes.", canConnect: true)
+                wearableProviderRow(name: "Withings", provider: "withings", status: "Connect", detail: "Weight, body composition, blood pressure and temperature context.", canConnect: true)
+            }
+
             switch healthKitStore.state {
             case .unavailable:
                 Text("Apple Health is not available on this device.")
@@ -1432,12 +1444,7 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             case .notRequested, .failed(_):
                 Button {
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "health_permission_requested",
-                            properties: ["requested": true, "state_before": "\(healthKitStore.state)"]
-                        )
-                    }
+                    trackHealthPermissionRequest()
                     healthKitStore.requestAccess()
                 } label: {
                     Text("Connect Apple Health")
@@ -1479,7 +1486,7 @@ struct ReportView: View {
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
                     }
                     HStack(spacing: 10) {
-                        statCapsule(title: "Coverage", value: "\(context.daysWithHealth)d", caption: "\(context.signalCoveragePercent)% signal depth", minHeight: 82)
+                        statCapsule(title: "Source", value: healthSourceStatus(context: context), caption: healthSourceCaption(context: context), minHeight: 82)
                         statCapsule(title: "VO2", value: context.averageVO2Max.map { "\($0)" } ?? "Learning", caption: "Fitness context", minHeight: 82)
                     }
                     aiReportSection(title: "Why", items: forecast.reasons)
@@ -1508,6 +1515,84 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func wearableProviderRow(name: String, provider: String = "", status: String, detail: String, canConnect: Bool = false) -> some View {
+        Button {
+            guard canConnect else { return }
+            startWearableOAuth(provider: provider)
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                        .foregroundStyle(reportPrimary.opacity(0.92))
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(reportSecondary.opacity(0.76))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Text(status)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportPrimary.opacity(0.76))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background {
+                        Capsule().fill(Color.white.opacity(0.16))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(!canConnect)
+    }
+
+    private func startWearableOAuth(provider: String) {
+        Task {
+            await BlankFunnelAnalytics.track(
+                "wearable_connect_started",
+                properties: ["provider": provider]
+            )
+            guard let baseURL = Self.configuredBackendURL() else { return }
+            var request = URLRequest(url: baseURL.appendingPathComponent("wearable-oauth-start"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 12
+            let defaults = BlankSharedState.defaults
+            let userIdKey = "blankOnboardingAnonymousUserId"
+            let anonymousUserId = defaults.string(forKey: userIdKey).filter { !$0.isEmpty } ?? {
+                let created = UUID().uuidString
+                defaults.set(created, forKey: userIdKey)
+                return created
+            }()
+            let body: [String: Any] = [
+                "anonymous_user_id": anonymousUserId,
+                "provider": provider,
+                "locale": Locale.current.identifier,
+                "platform": "ios",
+                "data_consent": true,
+                "consent_text": "Wearable connection"
+            ]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            guard let (data, response) = try? await URLSession.shared.data(for: request),
+                  let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let rawURL = object["authorization_url"] as? String,
+                  let url = URL(string: rawURL) else {
+                return
+            }
+            await MainActor.run {
+                UIApplication.shared.open(url)
+            }
+        }
+    }
+
+    private static func configuredBackendURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return URL(string: trimmed)
     }
 
     private func remoteWellnessInsightCard() -> some View {
@@ -2352,7 +2437,10 @@ struct ReportView: View {
     private var healthSignalsSubtitle: String {
         switch healthKitStore.state {
         case .connected:
-            return "Optional Apple Health context for your digital habits."
+            let context = healthRecoveryContext(summaries: healthKitStore.summaries)
+            return healthKitStore.summaries.isEmpty
+                ? "Connected. Waiting for sleep, activity or heart data."
+                : "\(healthSourceStatus(context: context)): sleep, recovery, activity and stress proxy."
         case .notRequested:
             return "Optional. Sleep, activity and heart signals stay local."
         case .requesting:
@@ -2361,6 +2449,52 @@ struct ReportView: View {
             return "Apple Health is unavailable here."
         case .failed(_):
             return "Permission can be retried any time."
+        }
+    }
+
+    private func trackHealthPermissionRequest() {
+        Task {
+            await BlankFunnelAnalytics.track(
+                "permission_requested",
+                properties: ["source": "apple_health", "permission": "health"]
+            )
+            await BlankFunnelAnalytics.track(
+                "wearable_connect_started",
+                properties: ["provider": "apple_health"]
+            )
+            await BlankFunnelAnalytics.track(
+                "health_permission_requested",
+                properties: ["requested": true, "state_before": "\(healthKitStore.state)"]
+            )
+        }
+    }
+
+    private func healthSourceStatus(context: HealthRecoveryContext) -> String {
+        guard case .connected = healthKitStore.state else {
+            if case .failed(_) = healthKitStore.state { return "Partial" }
+            return "Off"
+        }
+        if healthKitStore.summaries.isEmpty { return "No data" }
+        if let latest = healthKitStore.summaries.map(\.date).max(),
+           Date().timeIntervalSince(latest) > 72 * 60 * 60 {
+            return "Stale"
+        }
+        if context.signalCoveragePercent < 45 { return "Partial" }
+        return "Connected"
+    }
+
+    private func healthSourceCaption(context: HealthRecoveryContext) -> String {
+        switch healthSourceStatus(context: context) {
+        case "Connected":
+            return "\(context.daysWithHealth)d · \(context.signalCoveragePercent)% depth"
+        case "Stale":
+            return "Open Apple Health or wearable app"
+        case "Partial":
+            return "\(context.signalCoveragePercent)% signal depth"
+        case "No data":
+            return "Sync a wearable or Apple Health"
+        default:
+            return "Optional"
         }
     }
 
@@ -3507,6 +3641,7 @@ struct ReportView: View {
                         "selection_count": sessionStore.selectionCount
                     ]
                 )
+                trackHealthDataState(payload: payload)
                 let insight = try await DigitalWellnessFeaturesClient().submit(
                     payload: payload,
                     anonymousUserId: anonymousUserId,
@@ -3531,6 +3666,34 @@ struct ReportView: View {
                     isSubmittingWellnessFeatures = false
                 }
             }
+        }
+    }
+
+    private func trackHealthDataState(payload: DigitalWellnessFeaturePayload) {
+        let context = healthRecoveryContext(summaries: healthKitStore.summaries)
+        let status = healthSourceStatus(context: context)
+        guard status == "Connected" || status == "Partial" || status == "Stale" else { return }
+        Task {
+            await BlankFunnelAnalytics.track(
+                status == "Stale" ? "stale_health_data" : "health_data_available",
+                properties: [
+                    "source": "apple_health",
+                    "status": status.lowercased(),
+                    "health_days": payload.weekly.health_days_count,
+                    "signal_coverage_percent": payload.weekly.health_signal_coverage_percent,
+                    "raw_health_samples_sent": false
+                ]
+            )
+            await BlankFunnelAnalytics.track(
+                status == "Stale" ? "wearable_data_stale" : "wearable_data_available",
+                properties: [
+                    "provider": "apple_health",
+                    "status": status.lowercased(),
+                    "health_days": payload.weekly.health_days_count,
+                    "signal_coverage_percent": payload.weekly.health_signal_coverage_percent,
+                    "raw_health_samples_sent": false
+                ]
+            )
         }
     }
 

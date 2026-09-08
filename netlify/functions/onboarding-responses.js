@@ -42,7 +42,7 @@ exports.handler = async (event) => {
         locale: cleanText(body.locale, 40),
         app_version: cleanText(body.app_version, 40),
         build_number: cleanText(body.build_number, 40),
-        platform: "ios",
+        platform: cleanText(body.platform, 40) || "ios",
         data_consent: true,
         consent_text: cleanText(body.consent_text, 240),
         submitted_at: new Date().toISOString(),

@@ -38,12 +38,36 @@ function compactPayload(payload) {
     generated_at: payload.generated_at,
     period_start: payload.period_start,
     period_end: payload.period_end,
+    common_features: cleanFeatureMap(payload.common_features),
+    provider_features: cleanProviderFeatures(payload.provider_features),
+    source_confidence: cleanFeatureMap(payload.source_confidence),
+    freshness: cleanFeatureMap(payload.freshness),
     profile: payload.profile || {},
     daily: Array.isArray(payload.daily) ? payload.daily.slice(-14) : [],
     weekly: payload.weekly || {},
     correlations: payload.correlations || {},
     privacy: payload.privacy || {},
   };
+}
+
+function cleanFeatureMap(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(source)
+      .slice(0, 30)
+      .map(([key, rawValue]) => [cleanText(key, 64), cleanText(rawValue, 160)])
+      .filter(([key, rawValue]) => key && rawValue)
+  );
+}
+
+function cleanProviderFeatures(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return Object.fromEntries(
+    Object.entries(source)
+      .slice(0, 10)
+      .map(([provider, features]) => [cleanText(provider, 64), cleanFeatureMap(features)])
+      .filter(([provider, features]) => provider && Object.keys(features).length)
+  );
 }
 
 function hourWindow(hour) {
@@ -61,10 +85,13 @@ function clockTimeText(hour, minute = 0) {
   return `${displayHour}:${String(safeMinute).padStart(2, "0")} ${meridiem}`;
 }
 
-function buildInsight(payload) {
+function buildInsight(payload, memory = {}) {
   const weekly = payload.weekly || {};
   const correlations = payload.correlations || {};
   const profile = payload.profile || {};
+  const common = payload.common_features || {};
+  const freshness = payload.freshness || {};
+  const sourceConfidence = payload.source_confidence || {};
   const recommendations = [];
   const patterns = [];
 
@@ -92,6 +119,10 @@ function buildInsight(payload) {
     recommendations.push("Sync your wearable daily so Blanked can separate recovery dips from normal screen urges.");
   }
 
+  if (common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) {
+    patterns.push(`Wearable confidence is ${common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect}/100 with ${freshness.status || "unknown"} freshness.`);
+  }
+
   const weakWindow = weekly.worst_focus_window || hourWindow(weekly.weakest_hour);
   if (weakWindow) {
     recommendations.push(`Protect ${weakWindow} before opening high-friction apps.`);
@@ -111,12 +142,21 @@ function buildInsight(payload) {
     recommendations.push("Use a lighter block after short sleep instead of relying on willpower.");
   }
 
+  if (memory.acceptedActions?.includes("sleep_boundary")) {
+    recommendations.push("Keep the sleep boundary stable; this is already a pattern you accepted.");
+  }
+
+  if (memory.ignoredActions?.includes("recovery_mode")) {
+    recommendations.push("Try a smaller preventive block instead of repeating recovery mode.");
+  }
+
   if (weekly.selection_count < 3) {
     recommendations.push("Add at least three distracting apps or categories to improve protection.");
   }
 
   const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
-  const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 5 + (weekly.active_days_7d || 0) * 7 + Math.round((weekly.health_signal_coverage_percent || 0) / 4)));
+  const wearableConfidence = cleanNumber(common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) || 0;
+  const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 5 + (weekly.active_days_7d || 0) * 7 + Math.round((weekly.health_signal_coverage_percent || 0) / 4) + Math.round(wearableConfidence / 8)));
   const motivation = profile.motivation_cluster || "general_control";
 
   return {
@@ -292,7 +332,7 @@ function extractResponseText(responseBody) {
   return "";
 }
 
-async function buildModelInsight(payload, fallback) {
+async function buildModelInsight(payload, fallback, memory = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return { insight: fallback, source: "deterministic_fallback" };
@@ -319,6 +359,7 @@ async function buildModelInsight(payload, fallback) {
             task: "Create one weekly digital wellness insight for the app.",
             output_contract: insightSchema,
             aggregated_features: payload,
+            wearable_memory: memory,
           }),
         },
       ],
@@ -345,6 +386,55 @@ async function buildModelInsight(payload, fallback) {
   return { insight: normalizeInsight(parsed, fallback), source: `openai:${model}` };
 }
 
+async function loadWearableMemory(anonymousUserId) {
+  try {
+    const rows = await supabaseFetch(
+      `wearable_recommendation_outcomes?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&select=provider,signal_type,action_kind,outcome,confidence,created_at&order=created_at.desc&limit=30`,
+      { method: "GET" }
+    );
+    const acceptedActions = rows.filter((row) => row.outcome === "accepted" || row.outcome === "completed").map((row) => row.action_kind);
+    const ignoredActions = rows.filter((row) => row.outcome === "ignored" || row.outcome === "dismissed").map((row) => row.action_kind);
+    return {
+      acceptedActions: [...new Set(acceptedActions)].slice(0, 8),
+      ignoredActions: [...new Set(ignoredActions)].slice(0, 8),
+      recentOutcomes: rows.slice(0, 8),
+    };
+  } catch (error) {
+    return { acceptedActions: [], ignoredActions: [], recentOutcomes: [], unavailable: error.message };
+  }
+}
+
+async function persistWearableSnapshot(anonymousUserId, payload) {
+  const providers = Object.keys(payload.provider_features || {});
+  const provider = providers.includes("apple_health")
+    ? "apple_health"
+    : providers.includes("health_connect")
+      ? "health_connect"
+      : null;
+  if (!provider || !Object.keys(payload.common_features || {}).length) return;
+
+  try {
+    await supabaseFetch("wearable_feature_snapshots", {
+      method: "POST",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({
+        anonymous_user_id: anonymousUserId,
+        provider,
+        period_start: payload.period_start,
+        period_end: payload.period_end,
+        common_features: payload.common_features,
+        provider_features: payload.provider_features[provider] || {},
+        source_confidence: payload.source_confidence || {},
+        freshness: payload.freshness || {},
+        raw_samples_sent: false,
+        sync_kind: "incremental",
+      }),
+    });
+  } catch (error) {
+    console.warn("wearable_snapshot_skipped", error.message);
+  }
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -359,10 +449,12 @@ exports.handler = async (event) => {
 
     const payload = compactPayload(body.payload || {});
     requireSafePrivacy(payload);
-    const fallbackInsight = buildInsight(payload);
+    await persistWearableSnapshot(anonymousUserId, payload);
+    const wearableMemory = await loadWearableMemory(anonymousUserId);
+    const fallbackInsight = buildInsight(payload, wearableMemory);
     let modelResult;
     try {
-      modelResult = await buildModelInsight(payload, fallbackInsight);
+      modelResult = await buildModelInsight(payload, fallbackInsight, wearableMemory);
     } catch (error) {
       modelResult = { insight: fallbackInsight, source: "deterministic_fallback_after_model_error", error: error.message };
     }
@@ -380,7 +472,7 @@ exports.handler = async (event) => {
         period_start: payload.period_start,
         period_end: payload.period_end,
         payload,
-        insight: { ...insight, model_error: modelResult.error || null },
+        insight: { ...insight, wearable_memory: wearableMemory, model_error: modelResult.error || null },
         platform: cleanText(body.platform, 40) || "ios",
         locale: cleanText(body.locale, 40),
         app_version: cleanText(body.app_version, 40),

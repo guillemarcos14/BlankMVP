@@ -1138,7 +1138,7 @@ private struct ModesList: View {
     }
 
     private var planRoutineEditor: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "calendar.badge.clock")
@@ -1160,6 +1160,9 @@ private struct ModesList: View {
 
                 routineTimeline
             }
+            .foregroundStyle(textColor)
+            .padding(18)
+            .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
 
             VStack(spacing: 12) {
                 ForEach($windows) { $window in
@@ -1198,9 +1201,6 @@ private struct ModesList: View {
             }
             .padding(.top, 2)
         }
-        .foregroundStyle(textColor)
-        .padding(18)
-        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
     }
 
     private var routineTimeline: some View {
@@ -1776,41 +1776,104 @@ private struct HabitWindowCard: View {
     let textColor: Color
     let secondaryColor: Color
     let onDelete: () -> Void
+    @State private var isExpanded = false
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             HStack(spacing: 10) {
+                Image(systemName: "clock.badge.checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(textColor.opacity(0.86))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+
                 TextField("Routine", text: $window.name)
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                     .foregroundStyle(textColor)
+                    .submitLabel(.done)
 
                 Toggle("", isOn: $window.enabled)
                     .labelsHidden()
 
-                if canDelete {
-                    Button(action: onDelete) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(secondaryColor)
-                            .frame(width: 32, height: 32)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(secondaryColor)
+                        .frame(width: 32, height: 32)
                 }
+                .buttonStyle(.plain)
             }
 
-            VStack(spacing: 12) {
-                WheelTimePicker(minute: $window.startMinute)
-                WheelTimePicker(minute: $window.endMinute)
+            HStack(spacing: 8) {
+                routineMetric(title: "Start", value: formatMinute(window.startMinute))
+                routineMetric(title: "End", value: formatMinute(window.endMinute))
+                routineMetric(title: "Days", value: daysSummary)
             }
 
-            HabitDaysPicker(
-                selectedWeekdays: $window.weekdays,
-                textColor: textColor,
-                secondaryColor: secondaryColor
-            )
+            if isExpanded {
+                VStack(spacing: 12) {
+                    VStack(spacing: 10) {
+                        WheelTimePicker(minute: $window.startMinute)
+                        WheelTimePicker(minute: $window.endMinute)
+                    }
+                    .padding(.top, 2)
+
+                    HabitDaysPicker(
+                        selectedWeekdays: $window.weekdays,
+                        textColor: textColor,
+                        secondaryColor: secondaryColor
+                    )
+
+                    if canDelete {
+                        Button(action: onDelete) {
+                            Label("Delete routine", systemImage: "trash")
+                                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                                .foregroundStyle(secondaryColor)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .blankGlassCard(cornerRadius: 16, tintOpacity: 0.12)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(16)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: window.enabled ? 0.30 : 0.18)
+        .foregroundStyle(textColor)
+        .blankControlSurface(cornerRadius: 20, tintOpacity: window.enabled ? 0.10 : 0.06)
+        .opacity(window.enabled ? 1 : 0.72)
+    }
+
+    private func routineMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(secondaryColor)
+            Text(value)
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .frame(height: 48)
+        .background {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(textColor.opacity(0.075))
+        }
+    }
+
+    private var daysSummary: String {
+        if window.runsEveryDay {
+            return "Everyday"
+        }
+        return "\(window.weekdays.count)d"
     }
 }
 

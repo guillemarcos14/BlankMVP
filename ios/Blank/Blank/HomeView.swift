@@ -2128,14 +2128,17 @@ private struct RelapseReviewSheet: View {
     let onSelect: (RelapseReviewReason) -> Void
 
     var body: some View {
-        ZStack {
-            BlankAtmosphericBackground()
+        GeometryReader { proxy in
+            let contentWidth = min(max(proxy.size.width - 48, 0), 360)
+
+            ZStack {
+                AppBackground(isActive: false)
                 .overlay {
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.70),
-                            BlankColors.background.opacity(0.80),
-                            BlankColors.airMist.opacity(0.34)
+                            Color.white.opacity(0.14),
+                            BlankColors.background.opacity(0.20),
+                            Color.white.opacity(0.06)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -2143,68 +2146,70 @@ private struct RelapseReviewSheet: View {
                     .ignoresSafeArea()
                 }
 
-            VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(BlankColors.ink.opacity(0.78))
-                        .frame(width: 38, height: 38)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay { Circle().fill(Color.white.opacity(0.34)) }
-                        }
-                        .overlay {
-                            Circle().stroke(BlankColors.glassBorder, lineWidth: 1)
-                        }
-                        .shadow(color: BlankColors.ink.opacity(0.08), radius: 14, x: 0, y: 8)
+                VStack(alignment: .leading, spacing: 22) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(BlankColors.ink.opacity(0.78))
+                            .frame(width: 38, height: 38)
+                            .background {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay { Circle().fill(Color.white.opacity(0.28)) }
+                            }
+                            .overlay {
+                                Circle().stroke(BlankColors.glassBorder, lineWidth: 1)
+                            }
+                            .shadow(color: BlankColors.ink.opacity(0.08), radius: 14, x: 0, y: 8)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Why now?")
-                            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                            .foregroundStyle(BlankColors.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.86)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Why now?")
+                                .font(.blankInter(size: 32, weight: .medium, relativeTo: .largeTitle))
+                                .foregroundStyle(BlankColors.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.86)
 
-                        Text(intervention.alternative)
-                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
-                            .foregroundStyle(BlankColors.mutedInk)
-                            .lineSpacing(2)
-                            .fixedSize(horizontal: false, vertical: true)
+                            Text(intervention.alternative)
+                                .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                                .foregroundStyle(BlankColors.mutedInk)
+                                .lineSpacing(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                }
-                .padding(.top, 10)
+                    .padding(.top, 6)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(RelapseReviewReason.allCases) { reason in
-                        Button {
-                            onSelect(reason)
-                            dismiss()
-                        } label: {
-                            RelapseReasonTile(reason: reason)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        ForEach(RelapseReviewReason.allCases) { reason in
+                            Button {
+                                onSelect(reason)
+                                dismiss()
+                            } label: {
+                                RelapseReasonTile(reason: reason)
+                            }
+                            .buttonStyle(RelapseReasonButtonStyle())
                         }
-                        .buttonStyle(RelapseReasonButtonStyle())
                     }
-                }
 
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Skip")
-                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(BlankColors.ink.opacity(0.58))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 2)
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Skip")
+                            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(BlankColors.ink.opacity(0.58))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .frame(width: contentWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, 92)
+                .padding(.bottom, 28)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 74)
-            .padding(.bottom, 28)
         }
         .preferredColorScheme(.light)
     }
@@ -2257,7 +2262,7 @@ private struct RelapseReasonButtonStyle: ButtonStyle {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(configuration.isPressed ? 0.34 : 0.52))
+                        .fill(Color.white.opacity(configuration.isPressed ? 0.24 : 0.38))
                     BlankGlassCornerHighlight(width: 76, height: 28, xOffset: -68, yOffset: -20)
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }

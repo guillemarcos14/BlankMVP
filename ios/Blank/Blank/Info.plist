@@ -48,7 +48,7 @@
 	<key>NFCReaderUsageDescription</key>
 	<string>Blanked may use NFC for legacy tag backup flows when enabled.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Blanked reads Apple Health data you allow, including sleep, steps, workouts, mindful minutes, heart rate, resting heart rate, HRV and energy, to generate digital wellness insights. It does not provide medical diagnosis.</string>
+	<string>Blanked reads Apple Health data you allow, including sleep, activity, workouts, mindful minutes, heart rate, resting heart rate, HRV, respiratory rate, oxygen saturation, VO2 max and energy, to generate digital wellness insights. It does not provide medical diagnosis.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Blanked does not write data to Apple Health.</string>
 	<key>NSFaceIDUsageDescription</key>

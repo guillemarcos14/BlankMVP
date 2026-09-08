@@ -82,6 +82,16 @@ function buildInsight(payload) {
     patterns.push(`Average activity signal is ${weekly.avg_steps} steps.`);
   }
 
+  if (weekly.avg_recovery_score) {
+    patterns.push(`Recovery context is ${weekly.avg_recovery_score}/100 across ${weekly.health_days_count || 0} Health days.`);
+  } else if (weekly.avg_hrv || weekly.avg_resting_hr) {
+    patterns.push(`Wearable recovery signals include HRV ${weekly.avg_hrv || "learning"} and resting HR ${weekly.avg_resting_hr || "learning"}.`);
+  }
+
+  if ((weekly.health_signal_coverage_percent || 0) > 0 && weekly.health_signal_coverage_percent < 45) {
+    recommendations.push("Sync your wearable daily so Blanked can separate recovery dips from normal screen urges.");
+  }
+
   const weakWindow = weekly.worst_focus_window || hourWindow(weekly.weakest_hour);
   if (weakWindow) {
     recommendations.push(`Protect ${weakWindow} before opening high-friction apps.`);
@@ -93,7 +103,11 @@ function buildInsight(payload) {
     recommendations.push("Keep the current plan stable for one more week.");
   }
 
-  if (correlations.relapses_after_short_sleep > 0 || correlations.screen_risk_after_bad_sleep === "high") {
+  if (
+    correlations.relapses_after_short_sleep > 0 ||
+    correlations.screen_risk_after_bad_sleep === "high" ||
+    (weekly.avg_recovery_score && weekly.avg_recovery_score < 45)
+  ) {
     recommendations.push("Use a lighter block after short sleep instead of relying on willpower.");
   }
 
@@ -102,7 +116,7 @@ function buildInsight(payload) {
   }
 
   const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
-  const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 6 + (weekly.active_days_7d || 0) * 8));
+  const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 5 + (weekly.active_days_7d || 0) * 7 + Math.round((weekly.health_signal_coverage_percent || 0) / 4)));
   const motivation = profile.motivation_cluster || "general_control";
 
   return {
@@ -125,9 +139,12 @@ function buildPlanUpdate(payload, weakWindow) {
   const startHour = Number.isFinite(Number(weekly.weakest_hour)) ? Number(weekly.weakest_hour) : 22;
   const startMinute = Math.max(0, Math.min(1439, startHour * 60 - 30));
   const endMinute = (startMinute + 9 * 60) % (24 * 60);
-  const sleepPattern = correlations.night_scroll_after_late_bedtime || correlations.screen_risk_after_bad_sleep === "high";
+  const lowRecovery = weekly.avg_recovery_score && weekly.avg_recovery_score < 45;
+  const sleepPattern = correlations.night_scroll_after_late_bedtime || correlations.screen_risk_after_bad_sleep === "high" || lowRecovery;
   const evidence = sleepPattern
-    ? "Night scroll signals are overlapping with weaker sleep and recovery."
+    ? lowRecovery
+      ? "Recovery context is low, so the next protection window should start before the usual urge."
+      : "Night scroll signals are overlapping with weaker sleep and recovery."
     : `Your riskiest window is ${weakWindow || hourWindow(startHour) || "later in the day"}.`;
 
   return {
@@ -234,7 +251,7 @@ function cleanInsightText(value, maxLength) {
 }
 
 function normalizeClockText(text) {
-  return cleanText(text, 400).replace(/\b([01]?\d|2[0-3]):([0-5]\d)(?:\s*[-–]\s*([01]?\d|2[0-3]):([0-5]\d))?/g, (match, hour, minute, endHour, endMinute) => {
+  return cleanText(text, 400).replace(/\b([01]?\d|2[0-3]):([0-5]\d)(?!\s*(?:AM|PM)\b)(?:\s*[-–]\s*([01]?\d|2[0-3]):([0-5]\d)(?!\s*(?:AM|PM)\b))?/gi, (match, hour, minute, endHour, endMinute) => {
     const start = clockTimeText(Number(hour), Number(minute));
     if (endHour === undefined) return start;
     return `${start} to ${clockTimeText(Number(endHour), Number(endMinute))}`;
@@ -364,7 +381,7 @@ exports.handler = async (event) => {
         period_end: payload.period_end,
         payload,
         insight: { ...insight, model_error: modelResult.error || null },
-        platform: "ios",
+        platform: cleanText(body.platform, 40) || "ios",
         locale: cleanText(body.locale, 40),
         app_version: cleanText(body.app_version, 40),
         build_number: cleanText(body.build_number, 40),

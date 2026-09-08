@@ -102,6 +102,14 @@ struct BAIProactiveSignalEngine {
             reasons.append("higher_resting_hr")
             priority += 14
         }
+        if let respiratory = today.respiratoryRate, respiratory >= 19 {
+            reasons.append("higher_respiratory_rate")
+            priority += 10
+        }
+        if let oxygen = today.oxygenSaturation, oxygen < 95 {
+            reasons.append("lower_oxygen_saturation")
+            priority += 10
+        }
         if let steps = today.steps, steps < 2500 {
             reasons.append("low_movement")
             priority += 10
@@ -118,6 +126,9 @@ struct BAIProactiveSignalEngine {
                 "sleep_minutes": today.sleepMinutes ?? -1,
                 "hrv_avg": today.hrvSDNN ?? -1,
                 "resting_hr": today.restingHeartRate ?? -1,
+                "respiratory_rate": today.respiratoryRate ?? -1,
+                "oxygen_saturation": today.oxygenSaturation ?? -1,
+                "vo2_max": today.vo2Max ?? -1,
                 "steps": today.steps ?? -1,
                 "relapse_risk_score": system.profile.relapseRiskScore
             ]

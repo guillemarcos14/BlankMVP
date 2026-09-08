@@ -663,6 +663,13 @@ struct ReportView: View {
                 }
                 .buttonStyle(.plain)
             } else if case .connected = healthKitStore.state {
+                if !healthKitStore.summaries.isEmpty {
+                    HStack(spacing: 10) {
+                        statCapsule(title: "Coverage", value: "\(healthKitStore.summaries.count)d", caption: "Recent data", minHeight: 74)
+                        statCapsule(title: "Signals", value: "\(healthRecoveryContext(summaries: healthKitStore.summaries).signalCoveragePercent)%", caption: "Wearable depth", minHeight: 74)
+                    }
+                }
+
                 Button {
                     healthKitStore.disconnect()
                 } label: {
@@ -1470,6 +1477,10 @@ struct ReportView: View {
                     HStack(spacing: 10) {
                         statCapsule(title: "Recovery", value: recoveryValue(context.recoveryScore), caption: "Context only", minHeight: 82)
                         statCapsule(title: "Sleep drift", value: driftValue(context.bedtimeDriftMinutes), caption: "Recent timing", minHeight: 82)
+                    }
+                    HStack(spacing: 10) {
+                        statCapsule(title: "Coverage", value: "\(context.daysWithHealth)d", caption: "\(context.signalCoveragePercent)% signal depth", minHeight: 82)
+                        statCapsule(title: "VO2", value: context.averageVO2Max.map { "\($0)" } ?? "Learning", caption: "Fitness context", minHeight: 82)
                     }
                     aiReportSection(title: "Why", items: forecast.reasons)
                     aiReportSection(title: "Unblank Pattern", items: unblankPatternInsights(events: sessionStore.usageEvents, sessions: sessionStore.sessions))
@@ -2439,6 +2450,8 @@ struct ReportView: View {
             insights.append("Night blocks are active. Keep the final hour before sleep protected.")
         } else if let averageHRV {
             insights.append("HRV signal averages \(averageHRV) ms. Use it as context, not a medical score.")
+        } else if let oxygen = context.averageOxygenSaturation, let respiratory = context.averageRespiratoryRate {
+            insights.append("Breathing context is available: SpO2 \(oxygen)% and respiratory rate \(respiratory)/min.")
         } else {
             insights.append("Heart signals are optional context for recovery, not a score or diagnosis.")
         }
@@ -2453,6 +2466,9 @@ struct ReportView: View {
         let workoutValues = recent.compactMap(\.workoutMinutes)
         let hrvValues = recent.compactMap(\.hrvSDNN)
         let restingHeartRateValues = recent.compactMap(\.restingHeartRate)
+        let respiratoryValues = recent.compactMap(\.respiratoryRate)
+        let oxygenValues = recent.compactMap(\.oxygenSaturation)
+        let vo2Values = recent.compactMap(\.vo2Max)
         let bedtimeValues = recent.compactMap(\.bedtimeMinute)
         let wakeValues = recent.compactMap(\.wakeMinute)
 
@@ -2461,8 +2477,13 @@ struct ReportView: View {
         let averageWorkoutMinutes = average(workoutValues)
         let averageHRV = average(hrvValues)
         let averageRestingHeartRate = average(restingHeartRateValues)
+        let averageRespiratoryRate = average(respiratoryValues)
+        let averageOxygenSaturation = average(oxygenValues)
+        let averageVO2Max = average(vo2Values)
         let bedtimeDrift = circularMinuteDrift(bedtimeValues)
         let wakeDrift = circularMinuteDrift(wakeValues)
+        let daysWithHealth = recent.filter(\.hasSignals).count
+        let signalCoverage = min(100, recent.reduce(0) { $0 + min(12, $1.signalCount) * 100 / 12 } / max(1, recent.count))
 
         var scoreParts: [Int] = []
         if let averageSleep {
@@ -2480,6 +2501,12 @@ struct ReportView: View {
         if averageHRV != nil || averageRestingHeartRate != nil {
             scoreParts.append(70)
         }
+        if let averageRespiratoryRate {
+            scoreParts.append(max(0, 100 - abs(averageRespiratoryRate - 15) * 8))
+        }
+        if let averageOxygenSaturation {
+            scoreParts.append(max(0, min(100, (averageOxygenSaturation - 90) * 10)))
+        }
 
         return HealthRecoveryContext(
             averageSleepMinutes: averageSleep,
@@ -2487,8 +2514,13 @@ struct ReportView: View {
             averageWorkoutMinutes: averageWorkoutMinutes,
             averageHRV: averageHRV,
             averageRestingHeartRate: averageRestingHeartRate,
+            averageRespiratoryRate: averageRespiratoryRate,
+            averageOxygenSaturation: averageOxygenSaturation,
+            averageVO2Max: averageVO2Max,
             bedtimeDriftMinutes: bedtimeDrift,
             wakeDriftMinutes: wakeDrift,
+            daysWithHealth: daysWithHealth,
+            signalCoveragePercent: signalCoverage,
             recoveryScore: average(scoreParts)
         )
     }
@@ -3597,8 +3629,13 @@ private struct HealthRecoveryContext {
     let averageWorkoutMinutes: Int?
     let averageHRV: Int?
     let averageRestingHeartRate: Int?
+    let averageRespiratoryRate: Int?
+    let averageOxygenSaturation: Int?
+    let averageVO2Max: Int?
     let bedtimeDriftMinutes: Int?
     let wakeDriftMinutes: Int?
+    let daysWithHealth: Int
+    let signalCoveragePercent: Int
     let recoveryScore: Int?
 }
 

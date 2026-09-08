@@ -120,7 +120,12 @@ final class HealthKitStore: ObservableObject {
                 mindfulMinutes: dayIndex % 3 == 0 ? 8 + dayIndex % 4 : nil,
                 averageHeartRate: 76 - dayIndex % 5,
                 restingHeartRate: shortSleepDay ? 68 + dayIndex % 3 : 58 + dayIndex % 4,
-                hrvSDNN: shortSleepDay ? 31 + dayIndex % 5 : 54 + dayIndex % 8
+                hrvSDNN: shortSleepDay ? 31 + dayIndex % 5 : 54 + dayIndex % 8,
+                respiratoryRate: shortSleepDay ? 18 : 15,
+                oxygenSaturation: shortSleepDay ? 96 : 98,
+                vo2Max: activeDay ? 43 : 39,
+                flightsClimbed: activeDay ? 14 : 4,
+                signalCount: activeDay ? 11 : 8
             )
         }
         state = .connected
@@ -151,6 +156,10 @@ final class HealthKitStore: ObservableObject {
         var heartRateByDay: [Date: Int] = [:]
         var restingHeartRateByDay: [Date: Int] = [:]
         var hrvByDay: [Date: Int] = [:]
+        var respiratoryRateByDay: [Date: Int] = [:]
+        var oxygenSaturationByDay: [Date: Int] = [:]
+        var vo2MaxByDay: [Date: Int] = [:]
+        var flightsClimbedByDay: [Date: Int] = [:]
 
         group.enter()
         readSleepMinutes(start: start, end: end, calendar: calendar) { values in
@@ -228,6 +237,38 @@ final class HealthKitStore: ObservableObject {
             }
         }
 
+        if let type = HKQuantityType.quantityType(forIdentifier: .respiratoryRate) {
+            group.enter()
+            readDailyAverage(type: type, unit: HKUnit.count().unitDivided(by: .minute()), start: start, end: end, calendar: calendar) { values in
+                respiratoryRateByDay = values
+                group.leave()
+            }
+        }
+
+        if let type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation) {
+            group.enter()
+            readDailyAverageDouble(type: type, unit: .percent(), start: start, end: end, calendar: calendar) { values in
+                oxygenSaturationByDay = values.mapValues { Int(($0 * 100).rounded()) }
+                group.leave()
+            }
+        }
+
+        if let type = HKQuantityType.quantityType(forIdentifier: .vo2Max) {
+            group.enter()
+            readDailyAverage(type: type, unit: HKUnit.literUnit(with: .milli).unitDivided(by: .gramUnit(with: .kilo)).unitDivided(by: .minute()), start: start, end: end, calendar: calendar) { values in
+                vo2MaxByDay = values
+                group.leave()
+            }
+        }
+
+        if let type = HKQuantityType.quantityType(forIdentifier: .flightsClimbed) {
+            group.enter()
+            readDailySum(type: type, unit: .count(), start: start, end: end, calendar: calendar) { values in
+                flightsClimbedByDay = values
+                group.leave()
+            }
+        }
+
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             let loadedSummaries = (0..<days).compactMap { offset -> HealthDaySummary? in
@@ -251,7 +292,27 @@ final class HealthKitStore: ObservableObject {
                     mindfulMinutes: mindfulMinutesByDay[day],
                     averageHeartRate: heartRateByDay[day],
                     restingHeartRate: restingHeartRateByDay[day],
-                    hrvSDNN: hrvByDay[day]
+                    hrvSDNN: hrvByDay[day],
+                    respiratoryRate: respiratoryRateByDay[day],
+                    oxygenSaturation: oxygenSaturationByDay[day],
+                    vo2Max: vo2MaxByDay[day],
+                    flightsClimbed: flightsClimbedByDay[day],
+                    signalCount: Self.signalCount(
+                        sleep: sleepByDay[day],
+                        steps: stepsByDay[day],
+                        distance: distanceByDay[day],
+                        activeEnergy: activeEnergyByDay[day],
+                        basalEnergy: basalEnergyByDay[day],
+                        workout: workoutMinutesByDay[day],
+                        mindful: mindfulMinutesByDay[day],
+                        heartRate: heartRateByDay[day],
+                        restingHeartRate: restingHeartRateByDay[day],
+                        hrv: hrvByDay[day],
+                        respiratoryRate: respiratoryRateByDay[day],
+                        oxygenSaturation: oxygenSaturationByDay[day],
+                        vo2Max: vo2MaxByDay[day],
+                        flights: flightsClimbedByDay[day]
+                    )
                 )
             }
             self.summaries = loadedSummaries.filter(\.hasSignals)
@@ -271,7 +332,11 @@ final class HealthKitStore: ObservableObject {
             HKObjectType.categoryType(forIdentifier: .mindfulSession),
             HKQuantityType.quantityType(forIdentifier: .heartRate),
             HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
-            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)
+            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN),
+            HKQuantityType.quantityType(forIdentifier: .respiratoryRate),
+            HKQuantityType.quantityType(forIdentifier: .oxygenSaturation),
+            HKQuantityType.quantityType(forIdentifier: .vo2Max),
+            HKQuantityType.quantityType(forIdentifier: .flightsClimbed)
         ].forEach { type in
             if let type {
                 types.insert(type)
@@ -428,6 +493,24 @@ final class HealthKitStore: ObservableObject {
         }
     }
 
+    private func readDailyAverageDouble(
+        type: HKQuantityType,
+        unit: HKUnit,
+        start: Date,
+        end: Date,
+        calendar: Calendar,
+        completion: @escaping ([Date: Double]) -> Void
+    ) {
+        readQuantitySamples(type: type, start: start, end: end, calendar: calendar) { samples in
+            var values: [Date: [Double]] = [:]
+            for sample in samples {
+                let day = calendar.startOfDay(for: sample.startDate)
+                values[day, default: []].append(sample.quantity.doubleValue(for: unit))
+            }
+            completion(values.mapValues { $0.reduce(0, +) / Double(max(1, $0.count)) })
+        }
+    }
+
     private func readQuantitySamples(
         type: HKQuantityType,
         start: Date,
@@ -463,5 +546,43 @@ final class HealthKitStore: ObservableObject {
         let currentScore = current < 12 * 60 ? current : current - 24 * 60
         let candidateScore = candidate < 12 * 60 ? candidate : candidate - 24 * 60
         return candidateScore > currentScore ? candidate : current
+    }
+
+    private static func signalCount(
+        sleep: HealthSleepSummary?,
+        steps: Int?,
+        distance: Int?,
+        activeEnergy: Int?,
+        basalEnergy: Int?,
+        workout: Int?,
+        mindful: Int?,
+        heartRate: Int?,
+        restingHeartRate: Int?,
+        hrv: Int?,
+        respiratoryRate: Int?,
+        oxygenSaturation: Int?,
+        vo2Max: Int?,
+        flights: Int?
+    ) -> Int {
+        [
+            sleep?.sleepMinutes,
+            sleep?.deepSleepMinutes,
+            sleep?.remSleepMinutes,
+            sleep?.coreSleepMinutes,
+            sleep?.awakeMinutes,
+            steps,
+            distance,
+            activeEnergy,
+            basalEnergy,
+            workout,
+            mindful,
+            heartRate,
+            restingHeartRate,
+            hrv,
+            respiratoryRate,
+            oxygenSaturation,
+            vo2Max,
+            flights
+        ].compactMap { $0 }.count
     }
 }

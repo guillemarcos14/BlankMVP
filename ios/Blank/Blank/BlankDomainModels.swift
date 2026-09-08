@@ -108,6 +108,11 @@ struct HealthDaySummary: Identifiable, Equatable {
     var averageHeartRate: Int?
     var restingHeartRate: Int?
     var hrvSDNN: Int?
+    var respiratoryRate: Int?
+    var oxygenSaturation: Int?
+    var vo2Max: Int?
+    var flightsClimbed: Int?
+    var signalCount: Int = 0
 
     var hasSignals: Bool {
         inBedMinutes != nil ||
@@ -126,7 +131,12 @@ struct HealthDaySummary: Identifiable, Equatable {
         mindfulMinutes != nil ||
         averageHeartRate != nil ||
         restingHeartRate != nil ||
-        hrvSDNN != nil
+        hrvSDNN != nil ||
+        respiratoryRate != nil ||
+        oxygenSaturation != nil ||
+        vo2Max != nil ||
+        flightsClimbed != nil ||
+        signalCount > 0
     }
 }
 
@@ -854,9 +864,15 @@ struct DigitalWellnessDailyFeatures: Codable, Identifiable, Equatable {
     var resting_hr_delta: Int?
     var hrv_avg: Int?
     var hrv_vs_baseline_percent: Int?
+    var respiratory_rate: Int?
+    var oxygen_saturation: Int?
+    var vo2_max: Int?
     var recovery_score: Int?
     var steps_total: Int?
+    var distance_meters: Int?
     var active_energy_kcal: Int?
+    var basal_energy_kcal: Int?
+    var flights_climbed: Int?
     var exercise_minutes: Int?
     var workout_total_minutes: Int?
     var workout_intensity_score: Int?
@@ -894,8 +910,19 @@ struct DigitalWellnessWeeklyFeatures: Codable, Equatable {
     var wake_time_variability_minutes: Int?
     var avg_resting_hr: Int?
     var avg_hrv: Int?
+    var avg_respiratory_rate: Int?
+    var avg_oxygen_saturation: Int?
+    var avg_vo2_max: Int?
+    var avg_recovery_score: Int?
+    var health_days_count: Int
+    var health_signal_coverage_percent: Int
+    var latest_health_signal_age_hours: Int?
     var recovery_trend_14d: String
     var avg_steps: Int?
+    var avg_distance_meters: Int?
+    var avg_active_energy_kcal: Int?
+    var avg_basal_energy_kcal: Int?
+    var avg_flights_climbed: Int?
     var avg_exercise_minutes: Int?
     var blocks_started: Int
     var blocks_completed: Int
@@ -1171,7 +1198,9 @@ enum DigitalWellnessFeatureBuilder {
             hrvDelta: hrvDelta,
             restingHRDelta: restingDelta,
             steps: health?.steps,
-            stepsBaseline: baselines.steps
+            stepsBaseline: baselines.steps,
+            respiratoryRate: health?.respiratoryRate,
+            oxygenSaturation: health?.oxygenSaturation
         )
         let shortSleep = health?.sleepMinutes.map { $0 < 6 * 60 }
         let lowRecovery = recovery.map { $0 < 45 }
@@ -1195,9 +1224,15 @@ enum DigitalWellnessFeatureBuilder {
             resting_hr_delta: restingDelta,
             hrv_avg: health?.hrvSDNN,
             hrv_vs_baseline_percent: hrvDelta,
+            respiratory_rate: health?.respiratoryRate,
+            oxygen_saturation: health?.oxygenSaturation,
+            vo2_max: health?.vo2Max,
             recovery_score: recovery,
             steps_total: health?.steps,
+            distance_meters: health?.distanceMeters,
             active_energy_kcal: health?.activeEnergyKcal,
+            basal_energy_kcal: health?.basalEnergyKcal,
+            flights_climbed: health?.flightsClimbed,
             exercise_minutes: health?.workoutMinutes,
             workout_total_minutes: health?.workoutMinutes,
             workout_intensity_score: workoutIntensityScore(workoutMinutes: health?.workoutMinutes, activeEnergy: health?.activeEnergyKcal, averageHeartRate: health?.averageHeartRate),
@@ -1251,8 +1286,37 @@ enum DigitalWellnessFeatureBuilder {
             wake_time_variability_minutes: average(recent.compactMap(\.wake_time_variability_minutes)),
             avg_resting_hr: average(recent.compactMap(\.resting_hr)),
             avg_hrv: average(recent.compactMap(\.hrv_avg)),
+            avg_respiratory_rate: average(recent.compactMap(\.respiratory_rate)),
+            avg_oxygen_saturation: average(recent.compactMap(\.oxygen_saturation)),
+            avg_vo2_max: average(recent.compactMap(\.vo2_max)),
+            avg_recovery_score: average(recent.compactMap(\.recovery_score)),
+            health_days_count: recent.filter { day in
+                day.sleep_total_minutes != nil ||
+                day.steps_total != nil ||
+                day.resting_hr != nil ||
+                day.hrv_avg != nil ||
+                day.respiratory_rate != nil ||
+                day.oxygen_saturation != nil ||
+                day.vo2_max != nil
+            }.count,
+            health_signal_coverage_percent: min(100, recent.reduce(0) { total, day in
+                total +
+                (day.sleep_total_minutes == nil ? 0 : 12) +
+                (day.steps_total == nil ? 0 : 10) +
+                (day.exercise_minutes == nil ? 0 : 8) +
+                (day.resting_hr == nil ? 0 : 10) +
+                (day.hrv_avg == nil ? 0 : 14) +
+                (day.respiratory_rate == nil ? 0 : 8) +
+                (day.oxygen_saturation == nil ? 0 : 8) +
+                (day.vo2_max == nil ? 0 : 6)
+            } / max(1, recent.count)),
+            latest_health_signal_age_hours: latestHealthSignalAgeHours(recent: recent),
             recovery_trend_14d: recoveryTrend(daily),
             avg_steps: average(recent.compactMap(\.steps_total)),
+            avg_distance_meters: average(recent.compactMap(\.distance_meters)),
+            avg_active_energy_kcal: average(recent.compactMap(\.active_energy_kcal)),
+            avg_basal_energy_kcal: average(recent.compactMap(\.basal_energy_kcal)),
+            avg_flights_climbed: average(recent.compactMap(\.flights_climbed)),
             avg_exercise_minutes: average(recent.compactMap(\.exercise_minutes)),
             blocks_started: started,
             blocks_completed: completed,
@@ -1314,7 +1378,7 @@ enum DigitalWellnessFeatureBuilder {
         return max(0, (baseline ?? 8 * 60) - sleep)
     }
 
-    private static func recoveryScore(sleepMinutes: Int?, hrvDelta: Int?, restingHRDelta: Int?, steps: Int?, stepsBaseline: Int?) -> Int? {
+    private static func recoveryScore(sleepMinutes: Int?, hrvDelta: Int?, restingHRDelta: Int?, steps: Int?, stepsBaseline: Int?, respiratoryRate: Int?, oxygenSaturation: Int?) -> Int? {
         var parts: [Int] = []
         if let sleepMinutes {
             parts.append(min(100, max(0, Int(Double(sleepMinutes) / Double(8 * 60) * 100))))
@@ -1327,6 +1391,12 @@ enum DigitalWellnessFeatureBuilder {
         }
         if let steps, let stepsBaseline, stepsBaseline > 0 {
             parts.append(min(100, max(0, Int(Double(steps) / Double(stepsBaseline) * 70))))
+        }
+        if let respiratoryRate {
+            parts.append(min(100, max(0, 100 - abs(respiratoryRate - 15) * 8)))
+        }
+        if let oxygenSaturation {
+            parts.append(min(100, max(0, (oxygenSaturation - 90) * 10)))
         }
         return average(parts)
     }
@@ -1376,6 +1446,21 @@ enum DigitalWellnessFeatureBuilder {
         if second >= first + 8 { return "improving" }
         if second <= first - 8 { return "worsening" }
         return "stable"
+    }
+
+    private static func latestHealthSignalAgeHours(recent: [DigitalWellnessDailyFeatures], now: Date = Date(), calendar: Calendar = .current) -> Int? {
+        guard let latestDay = recent.last(where: { day in
+            day.sleep_total_minutes != nil ||
+            day.steps_total != nil ||
+            day.resting_hr != nil ||
+            day.hrv_avg != nil ||
+            day.respiratory_rate != nil ||
+            day.oxygen_saturation != nil ||
+            day.vo2_max != nil
+        })?.date else {
+            return nil
+        }
+        return max(0, Int(now.timeIntervalSince(calendar.startOfDay(for: latestDay)) / 3600))
     }
 
     private static func trainingLoadProxy(_ score: Int?) -> String? {

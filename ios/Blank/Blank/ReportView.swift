@@ -1012,7 +1012,7 @@ struct ReportView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("This week's adjustment")
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                Text(forecast.recommendedAction)
+                Text(forecast.actionText)
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)

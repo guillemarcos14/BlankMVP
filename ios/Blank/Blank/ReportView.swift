@@ -26,6 +26,10 @@ struct ReportView: View {
     @AppStorage("blankRemotePlanDurationDays", store: BlankSharedState.defaults) private var remotePlanDurationDays = 5
     @AppStorage("blankRemotePlanActionLabel", store: BlankSharedState.defaults) private var remotePlanActionLabel = "Apply preventive block"
     @AppStorage("blankRemoteWellnessLastSyncAt", store: BlankSharedState.defaults) private var remoteWellnessLastSyncAt = 0.0
+    @AppStorage("blankWellnessLastMood", store: BlankSharedState.defaults) private var lastMood = 0
+    @AppStorage("blankWellnessLastEnergy", store: BlankSharedState.defaults) private var lastEnergy = 0
+    @AppStorage("blankWellnessLastStress", store: BlankSharedState.defaults) private var lastStress = 0
+    @AppStorage("blankWellnessLastQuickLog", store: BlankSharedState.defaults) private var lastQuickLog = ""
 
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
@@ -96,6 +100,13 @@ struct ReportView: View {
                 )
 
                 proAIPlanCapsule(system: v3System)
+
+                wellnessDashboardCapsule(
+                    system: v3System,
+                    context: healthContext,
+                    forecast: controlForecast,
+                    progress: progress
+                )
 
                 if hasProgress {
                     statsDetailedReportCapsule(
@@ -975,6 +986,84 @@ struct ReportView: View {
         .liquidGlass(cornerRadius: 24)
     }
 
+    private func wellnessDashboardCapsule(
+        system: DigitalWellnessV3System,
+        context: HealthRecoveryContext,
+        forecast: ControlForecast,
+        progress: BlankProgressReport
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Wellness Dashboard")
+                    .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
+                Text("Objective wellness signals only. No calendar, music, money, reading or TV.")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                proMetricTile(title: "Screen Control", value: "\(system.profile.adherenceScore)/100", symbol: "iphone.slash", tint: accentBlue)
+                proMetricTile(title: "Recovery", value: recoveryValue(context.recoveryScore), symbol: "heart.fill", tint: recoveryGreen)
+                proMetricTile(title: "Training", value: "Strava", symbol: "figure.run", tint: activityOrange)
+                proMetricTile(title: "Weather", value: "Context", symbol: "cloud.sun.fill", tint: sleepBlue)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("This week's adjustment")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                Text(forecast.recommendedAction)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text("Quick check-in")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                HStack(spacing: 8) {
+                    wellnessSignalButton("Mood", signal: "mood", value: 7)
+                    wellnessSignalButton("Energy", signal: "energy", value: 7)
+                    wellnessSignalButton("Stress", signal: "stress", value: 4)
+                }
+                HStack(spacing: 8) {
+                    wellnessSignalButton("Coffee", signal: "caffeine", value: 1)
+                    wellnessSignalButton("Alcohol", signal: "alcohol", value: 1)
+                    wellnessSignalButton("Meditation", signal: "meditation", value: 1)
+                }
+                if !lastQuickLog.isEmpty {
+                    Text(lastQuickLog)
+                        .font(.caption2)
+                        .foregroundStyle(reportSecondary.opacity(0.78))
+                }
+            }
+
+            Text("\(progress.weeklyReport.completedSessionCount) focus starts this week. \(healthSourceStatus(context: context)) Health context.")
+                .font(.caption2)
+                .foregroundStyle(reportSecondary.opacity(0.72))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 24)
+    }
+
+    private func wellnessSignalButton(_ title: String, signal: String, value: Int) -> some View {
+        Button {
+            recordLocalWellnessSignal(signal: signal, value: value)
+            submitWellnessSignal(signal: signal, value: value)
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(reportPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.74)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background { Capsule().fill(Color.white.opacity(0.16)) }
+        }
+        .buttonStyle(.plain)
+    }
+
     private func proMetricTile(title: String, value: String, symbol: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
@@ -1429,11 +1518,13 @@ struct ReportView: View {
 
             VStack(spacing: 8) {
                 wearableProviderRow(name: "Apple Health", provider: "apple_health", status: healthSourceStatus(context: context), detail: "Sleep, activity, heart and recovery context.", canConnect: false)
+                wearableProviderRow(name: "Strava", provider: "strava", status: "Connect", detail: "Training, load, cardio and outdoor activity.", canConnect: true)
                 wearableProviderRow(name: "Oura", provider: "oura", status: "Connect", detail: "Readiness, sleep contributors and recovery signals.", canConnect: true)
                 wearableProviderRow(name: "WHOOP", provider: "whoop", status: "Connect", detail: "Recovery, strain, sleep debt and cycle signals.", canConnect: true)
                 wearableProviderRow(name: "Garmin", status: "Partner gated", detail: "Body Battery, stress, training readiness and HRV status.")
                 wearableProviderRow(name: "Google Health / Fitbit", provider: "fitbit_google_health", status: "Connect", detail: "Fitbit, Pixel Watch and Google Health metrics.", canConnect: true)
                 wearableProviderRow(name: "Withings", provider: "withings", status: "Connect", detail: "Weight, body composition, blood pressure and temperature context.", canConnect: true)
+                wearableProviderRow(name: "Weather", status: "Ready", detail: "Temperature, rain, daylight and UV context.")
             }
 
             switch healthKitStore.state {
@@ -1584,6 +1675,60 @@ struct ReportView: View {
             }
             await MainActor.run {
                 UIApplication.shared.open(url)
+            }
+        }
+    }
+
+    private func recordLocalWellnessSignal(signal: String, value: Int) {
+        switch signal {
+        case "mood":
+            lastMood = value
+        case "energy":
+            lastEnergy = value
+        case "stress":
+            lastStress = value
+        default:
+            break
+        }
+        lastQuickLog = "Logged \(signal)."
+    }
+
+    private func submitWellnessSignal(signal: String, value: Int) {
+        Task {
+            guard let baseURL = Self.configuredBackendURL() else { return }
+            var request = URLRequest(url: baseURL.appendingPathComponent("wellness-signal"))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 10
+            let defaults = BlankSharedState.defaults
+            let userIdKey = "blankOnboardingAnonymousUserId"
+            let anonymousUserId = defaults.string(forKey: userIdKey).flatMap { $0.isEmpty ? nil : $0 } ?? {
+                let created = UUID().uuidString
+                defaults.set(created, forKey: userIdKey)
+                return created
+            }()
+            let body: [String: Any] = [
+                "anonymous_user_id": anonymousUserId,
+                "locale": Locale.current.identifier,
+                "platform": "ios",
+                "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "",
+                "build_number": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "",
+                "data_consent": true,
+                "consent_text": "Wellness signal",
+                "signal_type": signal,
+                "value_number": value,
+                "source": "ios_app",
+                "measured_at": ISO8601DateFormatter().string(from: Date())
+            ]
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+                    throw URLError(.badServerResponse)
+                }
+                await MainActor.run { lastQuickLog = "Logged \(signal)." }
+            } catch {
+                await MainActor.run { lastQuickLog = "Saved locally. Sync failed." }
             }
         }
     }

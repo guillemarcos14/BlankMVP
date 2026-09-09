@@ -44,7 +44,7 @@ exports.handler = async (event) => {
     const expiresIn = Number(token.expires_in || 0);
     const tokenExpiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 1000).toISOString() : null;
 
-    const externalId = token.user_id || token.userid || token.owner_id || null;
+    const externalId = token.user_id || token.userid || token.owner_id || token.athlete?.id || null;
 
     await supabaseFetch("wearable_connections?on_conflict=anonymous_user_id,provider", {
       method: "POST",

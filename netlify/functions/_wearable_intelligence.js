@@ -2,6 +2,7 @@ const DIRECT_PROVIDER_WEIGHT = {
   oura: 18,
   whoop: 18,
   fitbit_google_health: 14,
+  strava: 14,
   withings: 12,
   apple_health: 8,
   health_connect: 8,

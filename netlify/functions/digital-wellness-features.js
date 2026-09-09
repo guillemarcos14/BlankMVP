@@ -107,6 +107,7 @@ function buildInsight(payload, memory = {}) {
   const wearableDecision = payload.wearable_decision_context || {};
   const freshness = payload.freshness || {};
   const sourceConfidence = payload.source_confidence || {};
+  const wellnessSignals = payload.wellness_signals || {};
   const recommendations = [];
   const patterns = [];
 
@@ -167,6 +168,14 @@ function buildInsight(payload, memory = {}) {
 
   if (wearableDecision.flags?.includes("stale_signals")) {
     recommendations.push("Sync your wearable before changing the plan intensity.");
+  }
+
+  if (wellnessSignals.latest_weather?.value_text) {
+    patterns.push(`Weather context is ${wellnessSignals.latest_weather.value_text}.`);
+  }
+
+  if (wellnessSignals.latest_check_in?.signal_type) {
+    patterns.push(`Latest check-in is ${wellnessSignals.latest_check_in.signal_type} ${wellnessSignals.latest_check_in.value_number || ""}.`.replace(/\s+\./, "."));
   }
 
   if (memory.acceptedActions?.includes("sleep_boundary")) {
@@ -497,6 +506,27 @@ async function loadRecentWearableSnapshots(anonymousUserId) {
   }
 }
 
+async function loadRecentWellnessSignals(anonymousUserId) {
+  try {
+    const rows = await supabaseFetch(
+      `wellness_signal_events?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}&select=signal_type,value_number,value_text,source,metadata,measured_at&order=measured_at.desc&limit=30`,
+      { method: "GET" }
+    );
+    const latestWeather = rows.find((row) => row.signal_type === "weather_context") || null;
+    const latestCheckIn = rows.find((row) => ["mood", "energy", "stress"].includes(row.signal_type)) || null;
+    const recentLogs = rows
+      .filter((row) => ["caffeine", "alcohol", "sick", "meditation"].includes(row.signal_type))
+      .slice(0, 8);
+    return {
+      latest_weather: latestWeather,
+      latest_check_in: latestCheckIn,
+      recent_logs: recentLogs,
+    };
+  } catch (error) {
+    return { unavailable: error.message };
+  }
+}
+
 async function persistWearableSnapshot(anonymousUserId, payload) {
   const providers = Object.keys(payload.provider_features || {});
   const provider = providers.includes("apple_health")
@@ -547,6 +577,7 @@ exports.handler = async (event) => {
     const resolvedWearable = resolveWearableSources({ currentPayload: payload, snapshots: recentSnapshots });
     payload.resolved_wearable = resolvedWearable;
     payload.wearable_decision_context = wearableDecisionContext(resolvedWearable);
+    payload.wellness_signals = await loadRecentWellnessSignals(anonymousUserId);
     const wearableMemory = await loadWearableMemory(anonymousUserId);
     const fallbackInsight = buildInsight(payload, wearableMemory);
     let modelResult;

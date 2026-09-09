@@ -38,6 +38,14 @@ const PROVIDERS = {
     clientIdEnv: "WITHINGS_CLIENT_ID",
     clientSecretEnv: "WITHINGS_CLIENT_SECRET",
   },
+  strava: {
+    authUrl: "https://www.strava.com/oauth/authorize",
+    tokenUrl: "https://www.strava.com/oauth/token",
+    revokeUrl: "https://www.strava.com/oauth/deauthorize",
+    scopes: ["read", "activity:read_all"],
+    clientIdEnv: "STRAVA_CLIENT_ID",
+    clientSecretEnv: "STRAVA_CLIENT_SECRET",
+  },
 };
 
 function providerConfig(provider) {

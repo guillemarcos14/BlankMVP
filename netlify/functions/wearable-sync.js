@@ -10,7 +10,7 @@ const {
   refreshAccessToken,
 } = require("./_wearable_oauth");
 
-const DIRECT_PROVIDERS = new Set(["oura", "whoop", "fitbit_google_health", "withings"]);
+const DIRECT_PROVIDERS = new Set(["oura", "whoop", "fitbit_google_health", "withings", "strava"]);
 const SYNCABLE_STATUSES = "connected,partial,no_data,stale,error";
 
 function cleanText(value, maxLength = 160) {
@@ -159,6 +159,7 @@ async function fetchProvider(provider, accessToken, start, end) {
   if (provider === "whoop") return fetchWhoop(accessToken, start, end);
   if (provider === "fitbit_google_health") return fetchGoogleHealth(accessToken, start, end);
   if (provider === "withings") return fetchWithings(accessToken, start, end);
+  if (provider === "strava") return fetchStrava(accessToken, start, end);
   throw new Error("unsupported_provider");
 }
 
@@ -235,11 +236,23 @@ async function fetchWithings(accessToken, start, end) {
   };
 }
 
+async function fetchStrava(accessToken, start, end) {
+  const params = new URLSearchParams({
+    after: String(Math.floor(start.getTime() / 1000)),
+    before: String(Math.floor(end.getTime() / 1000)),
+    per_page: "80",
+  });
+  return {
+    activities: await providerGet(`https://www.strava.com/api/v3/athlete/activities?${params.toString()}`, accessToken),
+  };
+}
+
 function normalizeProvider(provider, raw, start, end) {
   if (provider === "oura") return normalizeOura(raw, start, end);
   if (provider === "whoop") return normalizeWhoop(raw, start, end);
   if (provider === "fitbit_google_health") return normalizeGoogleHealth(raw, start, end);
   if (provider === "withings") return normalizeWithings(raw, start, end);
+  if (provider === "strava") return normalizeStrava(raw, start, end);
   throw new Error("unsupported_provider");
 }
 
@@ -378,6 +391,43 @@ function normalizeWithings(raw, start, end) {
     }),
     source_confidence: confidence(common, "withings"),
     freshness: freshness(raw, "withings"),
+  };
+}
+
+function normalizeStrava(raw, start, end) {
+  const activities = Array.isArray(raw.activities) ? raw.activities : [];
+  const movingMinutes = activities
+    .map((item) => cleanNumber(item.moving_time))
+    .filter(Number.isFinite)
+    .map((value) => Math.round(value / 60));
+  const distances = activities.map((item) => cleanNumber(item.distance)).filter(Number.isFinite);
+  const elevation = activities.map((item) => cleanNumber(item.total_elevation_gain)).filter(Number.isFinite);
+  const heartRates = activities.map((item) => cleanNumber(item.average_heartrate)).filter(Number.isFinite);
+  const sufferScores = activities.map((item) => cleanNumber(item.suffer_score)).filter(Number.isFinite);
+  const common = makeCommon({
+    sleepMinutes: null,
+    recovery: null,
+    steps: null,
+    strain: movingMinutes.reduce((sum, value) => sum + value, 0) || null,
+    stress: average(heartRates),
+  }, "strava", start, end);
+  return {
+    status: activities.length ? "connected" : "no_data",
+    common_features: {
+      ...common,
+      workout_count: activities.length,
+      active_minutes: movingMinutes.reduce((sum, value) => sum + value, 0) || null,
+    },
+    provider_features: compactObject({
+      activity_count: activities.length,
+      distance_meters: Math.round(distances.reduce((sum, value) => sum + value, 0)) || null,
+      elevation_gain_meters: Math.round(elevation.reduce((sum, value) => sum + value, 0)) || null,
+      average_heart_rate: average(heartRates),
+      suffer_score: average(sufferScores),
+      sport_types: [...new Set(activities.map((item) => cleanText(item.sport_type || item.type, 40)).filter(Boolean))].slice(0, 8).join(","),
+    }),
+    source_confidence: confidence(common, "strava"),
+    freshness: freshness(raw, "strava"),
   };
 }
 

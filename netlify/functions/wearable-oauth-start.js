@@ -42,6 +42,9 @@ exports.handler = async (event) => {
       url.searchParams.set("access_type", "offline");
       url.searchParams.set("prompt", "consent");
     }
+    if (provider === "strava") {
+      url.searchParams.set("approval_prompt", "auto");
+    }
 
     return json(200, { ok: true, provider, authorization_url: url.toString() });
   } catch (error) {

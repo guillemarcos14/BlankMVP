@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -373,6 +374,14 @@ fun HomeScreen(
                     response.optString("authorization_url").takeIf { it.isNotBlank() }?.let { url ->
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                     }
+                },
+                onLogWellnessSignal = { signal, value ->
+                    val body = backendClient.commonEnvelope(JSONObject().apply {
+                        put("signal_type", signal)
+                        put("value_number", value)
+                        put("source", "android_app")
+                    })
+                    backendClient.post("wellness-signal", body)
                 },
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME }
@@ -881,6 +890,7 @@ private fun StatsPanel(
     healthConnectStore: HealthConnectStore,
     onTrack: (BlankEvent) -> Unit,
     onStartWearableOAuth: (String) -> Unit,
+    onLogWellnessSignal: (String, Int) -> Unit,
     buttonLight: Boolean,
     onBack: () -> Unit
 ) {
@@ -919,6 +929,15 @@ private fun StatsPanel(
             )
         }
         item {
+            WellnessDashboardCard(
+                stats = stats,
+                aiPlan = aiPlan,
+                healthConnectStore = healthConnectStore,
+                buttonLight = buttonLight,
+                onLogWellnessSignal = onLogWellnessSignal
+            )
+        }
+        item {
             HealthContextCard(
                 aiPlan = aiPlan,
                 healthConnectStore = healthConnectStore,
@@ -942,6 +961,111 @@ private fun StatsPanel(
                 onToggle = { showDetail = !showDetail }
             )
         }
+    }
+}
+
+@Composable
+private fun WellnessDashboardCard(
+    stats: FocusStats,
+    aiPlan: DigitalWellnessPlan,
+    healthConnectStore: HealthConnectStore,
+    buttonLight: Boolean,
+    onLogWellnessSignal: (String, Int) -> Unit
+) {
+    val healthSummary by healthConnectStore.summary.collectAsState()
+    val scope = rememberCoroutineScope()
+    var logStatus by remember { mutableStateOf<String?>(null) }
+    val rowColor = if (buttonLight) Color.White else Color.Black
+    val textColor = progressTextColor(buttonLight)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = rowColor,
+        shape = RoundedCornerShape(22.dp)
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            Text(text = "Wellness Dashboard", color = textColor, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Body, screen control and context signals only. No calendar, music, money, reading or TV.",
+                color = textColor.copy(alpha = 0.64f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            SummaryLine("Screen Control", "${aiPlan.score}/100", "${stats.sessionsThisWeek} focus starts this week", textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Recovery", healthSummary.recoveryScore?.let { "$it/100" } ?: "Learning", healthSummary.recoveryTrend, textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Training", "Strava", "Connect workouts, load and outdoor activity", textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Weather", "Context", "Objective context for energy and activity", textColor)
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "This week's adjustment",
+                color = textColor,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = aiPlan.primaryAction,
+                color = textColor.copy(alpha = 0.66f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Quick check-in",
+                color = textColor,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickSignalButton("Mood", textColor) { scope.launch { logSignal("mood", 7, onLogWellnessSignal) { logStatus = it } } }
+                QuickSignalButton("Energy", textColor) { scope.launch { logSignal("energy", 7, onLogWellnessSignal) { logStatus = it } } }
+                QuickSignalButton("Stress", textColor) { scope.launch { logSignal("stress", 4, onLogWellnessSignal) { logStatus = it } } }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                QuickSignalButton("Coffee", textColor) { scope.launch { logSignal("caffeine", 1, onLogWellnessSignal) { logStatus = it } } }
+                QuickSignalButton("Alcohol", textColor) { scope.launch { logSignal("alcohol", 1, onLogWellnessSignal) { logStatus = it } } }
+                QuickSignalButton("Meditation", textColor) { scope.launch { logSignal("meditation", 1, onLogWellnessSignal) { logStatus = it } } }
+            }
+            logStatus?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = it, color = textColor.copy(alpha = 0.56f), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.QuickSignalButton(label: String, textColor: Color, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.weight(1f),
+        color = textColor.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(999.dp),
+        onClick = onClick
+    ) {
+        Text(
+            text = label,
+            color = textColor.copy(alpha = 0.78f),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp)
+        )
+    }
+}
+
+private suspend fun logSignal(
+    signal: String,
+    value: Int,
+    onLogWellnessSignal: (String, Int) -> Unit,
+    setStatus: (String) -> Unit
+) {
+    runCatching {
+        withContext(Dispatchers.IO) { onLogWellnessSignal(signal, value) }
+    }.onSuccess {
+        setStatus("Logged $signal.")
+    }.onFailure { error ->
+        setStatus(error.message?.take(90) ?: "Could not log signal.")
     }
 }
 
@@ -1191,11 +1315,13 @@ private fun WearableProviderList(
 ) {
     val providers = listOf(
         WearableProvider("Health Connect", "health_connect", healthSourceStatus(healthSummary), "Sleep, activity, heart and recovery context.", false),
+        WearableProvider("Strava", "strava", "Connect", "Training, load, cardio and outdoor activity.", true),
         WearableProvider("Oura", "oura", "Connect", "Readiness, sleep contributors and recovery signals.", true),
         WearableProvider("WHOOP", "whoop", "Connect", "Recovery, strain, sleep debt and cycle signals.", true),
         WearableProvider("Garmin", "garmin", "Partner gated", "Body Battery, stress, training readiness and HRV status.", false),
         WearableProvider("Google Health / Fitbit", "fitbit_google_health", "Connect", "Fitbit, Pixel Watch and Google Health metrics.", true),
-        WearableProvider("Withings", "withings", "Connect", "Weight, body composition, blood pressure and temperature context.", true)
+        WearableProvider("Withings", "withings", "Connect", "Weight, body composition, blood pressure and temperature context.", true),
+        WearableProvider("Weather", "weather", "Ready", "Temperature, rain, daylight and UV context.", false)
     )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         providers.forEach { provider ->

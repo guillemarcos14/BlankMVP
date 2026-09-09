@@ -64,6 +64,16 @@ const ALLOWED_EVENTS = new Set([
   "block_screen_shown",
   "nfc_scan_failed",
   "tag_forgotten",
+  "web_page_viewed",
+  "web_session_engaged",
+  "web_bai_prompt_submitted",
+  "web_bai_response_received",
+  "web_bai_response_failed",
+  "web_bai_voice_started",
+  "web_bai_voice_failed",
+  "web_cta_clicked",
+  "web_chat_started",
+  "web_chat_token_limit_reached",
 ]);
 
 function cleanText(value, maxLength = 160) {

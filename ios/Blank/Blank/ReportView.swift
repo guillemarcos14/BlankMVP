@@ -75,6 +75,7 @@ struct ReportView: View {
 
         let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
+            wearableConnectEntryCapsule(context: healthContext)
 
             if purchaseStore.hasPremiumAccess {
                 proControlTodayCapsule(
@@ -814,6 +815,97 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 24)
+    }
+
+    private func wearableConnectEntryCapsule(context: HealthRecoveryContext) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "waveform.path.ecg.rectangle.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(reportPrimary)
+                    .frame(width: 38, height: 38)
+                    .background { Circle().fill(Color.white.opacity(0.16)) }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Connect health and wearables")
+                        .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                        .foregroundStyle(reportPrimary)
+                    Text("Apple Health, Oura, WHOOP, Fitbit, Withings and Strava help Blanked adapt blocks to sleep, recovery and activity.")
+                        .font(.caption)
+                        .foregroundStyle(reportSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 8) {
+                healthStatePill()
+
+                Text(healthSourceStatus(context: context))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(reportPrimary.opacity(0.76))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background { Capsule().fill(Color.white.opacity(0.12)) }
+
+                Spacer(minLength: 0)
+            }
+
+            if case .connected = healthKitStore.state {
+                Text("Apple Health connected. Add a direct wearable source below for richer recovery signals.")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if case .requesting = healthKitStore.state {
+                Text("Opening Apple Health permissions...")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+            } else {
+                Button {
+                    trackHealthPermissionRequest()
+                    healthKitStore.requestAccess()
+                } label: {
+                    Text("Connect Apple Health")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(reportPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background { Capsule().fill(Color.white.opacity(0.22)) }
+                        .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(spacing: 8) {
+                wearableQuickConnectButton("Oura", provider: "oura")
+                wearableQuickConnectButton("WHOOP", provider: "whoop")
+                wearableQuickConnectButton("Fitbit", provider: "fitbit_google_health")
+            }
+
+            HStack(spacing: 8) {
+                wearableQuickConnectButton("Withings", provider: "withings")
+                wearableQuickConnectButton("Strava", provider: "strava")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .liquidGlass(cornerRadius: 26)
+    }
+
+    private func wearableQuickConnectButton(_ title: String, provider: String) -> some View {
+        Button {
+            startWearableOAuth(provider: provider)
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 9)
+                .background { Capsule().fill(Color.white.opacity(0.14)) }
+                .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
+        }
+        .buttonStyle(.plain)
     }
 
     private func proPatternsCapsule(

@@ -1102,9 +1102,27 @@ struct ReportView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("This week's adjustment")
+                Text("Next risk forecast")
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                 Text(forecast.actionText)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Behavior chain")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                Text(system.profile.behaviorChain)
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Experiment")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                Text("\(system.profile.experimentName): \(system.profile.experimentHypothesis)")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1205,6 +1223,7 @@ struct ReportView: View {
 
                 aiReportSection(title: "Why", items: forecast.reasons, tint: accentBlue)
                 aiReportSection(title: "Plan", items: forecast.plan, tint: recoveryGreen)
+                aiReportSection(title: "Experiment", items: [forecast.experimentHypothesis, forecast.experimentMetric], tint: activityOrange)
                 aiReportSection(title: "Patterns", items: report.patterns.prefix(2).map { $0 }, tint: sleepBlue)
                 aiReportSection(title: "Health", items: healthInsights.prefix(2).map { $0 }, tint: activityOrange)
 
@@ -3069,6 +3088,7 @@ struct ReportView: View {
         let shortManualUnblanks = recentEvents.filter { event in
             event.endedReason == .manual && (event.duration ?? .greatestFiniteMagnitude) < 20 * 60
         }.count
+        let pickupPressure = min(100, manualUnblanks * 18 + shortManualUnblanks * 18 + emergencyBreaks * 16)
         let weakHour = DigitalWellnessAI.weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
         let minutesToWeakWindow = minutesUntilNextHour(weakHour, now: now)
 
@@ -3118,6 +3138,11 @@ struct ReportView: View {
         if shortManualUnblanks > 0 {
             risk += min(12, shortManualUnblanks * 6)
             reasons.append("Some exits happened early, which suggests the protection started too hard or too late.")
+        }
+
+        if pickupPressure >= 50 {
+            risk += min(14, pickupPressure / 7)
+            reasons.append("Pickup pressure is \(pickupPressure)/100, so Blanked should act before repeated quick checks become a scroll loop.")
         }
 
         if emergencyBreaks > 0 {
@@ -3180,6 +3205,12 @@ struct ReportView: View {
         if reasons.isEmpty {
             reasons.append("Blanked is combining Health context with your block history to find your control pattern.")
         }
+        let experiment = forecastExperiment(
+            pickupPressure: pickupPressure,
+            manualUnblanks: manualUnblanks,
+            emergencyBreaks: emergencyBreaks,
+            recoveryLow: (context.recoveryScore ?? 100) < 45
+        )
 
         return ControlForecast(
             level: level,
@@ -3191,7 +3222,37 @@ struct ReportView: View {
             actionText: actionText,
             durationMinutes: duration,
             reasons: Array(reasons.prefix(3)),
-            plan: Array(plan.prefix(2))
+            plan: Array(plan.prefix(2)),
+            experimentName: experiment.name,
+            experimentHypothesis: experiment.hypothesis,
+            experimentMetric: experiment.metric
+        )
+    }
+
+    private func forecastExperiment(
+        pickupPressure: Int,
+        manualUnblanks: Int,
+        emergencyBreaks: Int,
+        recoveryLow: Bool
+    ) -> (name: String, hypothesis: String, metric: String) {
+        if pickupPressure >= 65 {
+            return (
+                "Chain Intercept",
+                "Stop the second quick check before it becomes a longer scroll loop.",
+                "Fewer exits in the same risk window."
+            )
+        }
+        if manualUnblanks >= 2 || emergencyBreaks >= 2 || recoveryLow {
+            return (
+                "Lighter Earlier Block",
+                "A shorter earlier block should hold better than strict late friction.",
+                "Completed block without manual or emergency exit."
+            )
+        }
+        return (
+            "Stable Repeat",
+            "Repeat the same window to build a clean baseline.",
+            "Three completed sessions with no relapse."
         )
     }
 
@@ -4091,6 +4152,9 @@ private struct ControlForecast {
     let durationMinutes: Int
     let reasons: [String]
     let plan: [String]
+    let experimentName: String
+    let experimentHypothesis: String
+    let experimentMetric: String
 
     var activationStartMinute: Int {
         ((max(0, min(23, weakHour)) * 60) + (24 * 60 - 10)) % (24 * 60)

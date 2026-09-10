@@ -846,6 +846,9 @@ struct DigitalWellnessProfileFeatures: Codable, Equatable {
     var declared_daily_usage_hours: Double?
     var weak_moment: String?
     var motivation_cluster: String
+    var latest_mood_score: Int?
+    var latest_energy_score: Int?
+    var latest_stress_score: Int?
 }
 
 struct DigitalWellnessDailyFeatures: Codable, Identifiable, Equatable {
@@ -885,6 +888,7 @@ struct DigitalWellnessDailyFeatures: Codable, Identifiable, Equatable {
     var blocks_started: Int
     var blocks_completed: Int
     var relapses_count: Int
+    var pickup_pressure_score: Int
     var blocked_minutes: Int
     var avg_block_duration_minutes: Int?
     var plan_adherence_percent: Int
@@ -933,6 +937,9 @@ struct DigitalWellnessWeeklyFeatures: Codable, Equatable {
     var relapses_count: Int
     var relapse_rate: Double
     var unlock_pressure_score: Int
+    var pickup_pressure_score: Int
+    var dominant_app_sequence: String
+    var app_sequence_risk: String
     var blocked_minutes: Int
     var plan_adherence_percent: Int
     var weakest_hour: Int?
@@ -950,6 +957,8 @@ struct DigitalWellnessCorrelationFeatures: Codable, Equatable {
     var focus_success_after_workout: Bool
     var screen_risk_after_workout: String
     var screen_risk_after_bad_sleep: String
+    var rapid_pickups_before_relapse: Bool
+    var sequence_risk_after_harmless_check: Bool
 }
 
 struct DigitalWellnessPrivacyFeatures: Codable, Equatable {
@@ -1159,6 +1168,9 @@ enum DigitalWellnessFeatureBuilder {
             "activity": weekly.avg_steps.map { "\($0)" } ?? "learning",
             "strain_load": weekly.avg_exercise_minutes.map { "\($0)" } ?? "learning",
             "stress_proxy": weekly.avg_hrv.map { "\($0)" } ?? "learning",
+            "pickup_pressure": "\(weekly.pickup_pressure_score)",
+            "behavior_chain": weekly.dominant_app_sequence,
+            "sequence_risk": weekly.app_sequence_risk,
             "freshness": weekly.latest_health_signal_age_hours.map { "\($0)" } ?? "unknown",
             "coverage": "\(weekly.health_signal_coverage_percent)",
             "confidence": "\(wearableConfidence(weekly: weekly))"
@@ -1269,7 +1281,10 @@ enum DigitalWellnessFeatureBuilder {
             profile: profile,
             declared_daily_usage_hours: dailyUsage,
             weak_moment: weakMoment,
-            motivation_cluster: motivationCluster(goal: goal, profile: profile, weakMoment: weakMoment)
+            motivation_cluster: motivationCluster(goal: goal, profile: profile, weakMoment: weakMoment),
+            latest_mood_score: defaults.object(forKey: "blankWellnessLastMood") == nil ? nil : defaults.integer(forKey: "blankWellnessLastMood"),
+            latest_energy_score: defaults.object(forKey: "blankWellnessLastEnergy") == nil ? nil : defaults.integer(forKey: "blankWellnessLastEnergy"),
+            latest_stress_score: defaults.object(forKey: "blankWellnessLastStress") == nil ? nil : defaults.integer(forKey: "blankWellnessLastStress")
         )
     }
 
@@ -1285,6 +1300,7 @@ enum DigitalWellnessFeatureBuilder {
         let blockedMinutes = Int(sessions.reduce(TimeInterval.zero) { $0 + $1.duration } / 60)
         let relapseEvents = events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency || $0.endedReason == .manual }
         let started = events.filter { $0.kind == .blockStarted }.count
+        let pickupPressure = pickupPressureScore(events: events, sessions: sessions)
         let weakHour = mostCommon(relapseEvents.map(\.localHour) + sessions.compactMap(\.localStartHour))
         let hrvDelta = percentDelta(value: health?.hrvSDNN, baseline: baselines.hrv)
         let restingDelta = delta(value: health?.restingHeartRate, baseline: baselines.restingHR)
@@ -1336,6 +1352,7 @@ enum DigitalWellnessFeatureBuilder {
             blocks_started: started,
             blocks_completed: completed.count,
             relapses_count: relapseEvents.count,
+            pickup_pressure_score: pickupPressure,
             blocked_minutes: blockedMinutes,
             avg_block_duration_minutes: completed.isEmpty ? nil : blockedMinutes / max(1, completed.count),
             plan_adherence_percent: started == 0 ? 0 : Int(Double(completed.count) / Double(started) * 100),
@@ -1364,6 +1381,8 @@ enum DigitalWellnessFeatureBuilder {
         let adherence = started == 0 ? 0 : Int(Double(completed) / Double(started) * 100)
         let bedtimeDrift = average(recent.compactMap(\.bedtime_variability_minutes))
         let weakHour = mostCommon(recent.compactMap(\.weakest_hour))
+        let pickupPressure = min(100, recent.reduce(0) { $0 + $1.pickup_pressure_score } / max(1, recent.count) + relapses * 8)
+        let behaviorChain = behaviorChain(started: started, completed: completed, relapses: relapses, selectionSnapshot: selectionSnapshot)
         let volatility = min(100, relapses * 16 + max(0, 100 - adherence) / 2 + (bedtimeDrift ?? 0) / 3)
 
         return DigitalWellnessWeeklyFeatures(
@@ -1417,7 +1436,10 @@ enum DigitalWellnessFeatureBuilder {
             blocks_completed: completed,
             relapses_count: relapses,
             relapse_rate: Double(relapses) / Double(attempts),
-            unlock_pressure_score: min(100, relapses * 22 + max(0, 70 - adherence) / 2),
+            unlock_pressure_score: min(100, relapses * 22 + max(0, 70 - adherence) / 2 + pickupPressure / 3),
+            pickup_pressure_score: pickupPressure,
+            dominant_app_sequence: behaviorChain,
+            app_sequence_risk: sequenceRisk(pickupPressure: pickupPressure, relapses: relapses),
             blocked_minutes: recent.reduce(0) { $0 + $1.blocked_minutes },
             plan_adherence_percent: adherence,
             weakest_hour: weakHour,
@@ -1444,7 +1466,9 @@ enum DigitalWellnessFeatureBuilder {
             morning_scroll_after_poor_sleep: shortSleepDays.contains { $0.first_phone_risk_after_wake == "high" },
             focus_success_after_workout: workoutBlocks > workoutRelapses,
             screen_risk_after_workout: workoutRelapses > workoutBlocks ? "high" : "low",
-            screen_risk_after_bad_sleep: badSleepRelapses > 0 ? "high" : "low"
+            screen_risk_after_bad_sleep: badSleepRelapses > 0 ? "high" : "low",
+            rapid_pickups_before_relapse: daily.contains { $0.pickup_pressure_score >= 65 && $0.relapses_count > 0 },
+            sequence_risk_after_harmless_check: daily.contains { $0.pickup_pressure_score >= 50 && $0.relapses_count > 0 }
         )
     }
 
@@ -1520,6 +1544,36 @@ enum DigitalWellnessFeatureBuilder {
         let score = nightEvents.count * 25 + nightSessions.count * 8 + (shortSleep ? 18 : 0) + (lowRecovery ? 18 : 0)
         if score >= 45 { return "high" }
         if score >= 20 { return "medium" }
+        return "low"
+    }
+
+    private static func pickupPressureScore(events: [BlankUsageEvent], sessions: [BlankSession]) -> Int {
+        let relapseEvents = events.filter { $0.kind == .blockBroken || $0.endedReason == .emergency || $0.endedReason == .manual }
+        let shortSessions = sessions.filter { ($0.duration / 60) < 20 && ($0.endedReason == .manual || $0.endedReason == .emergency) }
+        let clusteredHours = Dictionary(grouping: relapseEvents.map(\.localHour), by: { $0 }).values.filter { $0.count >= 2 }.count
+        return min(100, relapseEvents.count * 22 + shortSessions.count * 18 + clusteredHours * 12)
+    }
+
+    private static func behaviorChain(started: Int, completed: Int, relapses: Int, selectionSnapshot: BlankSelectionSnapshot) -> String {
+        let selectionType: String
+        if selectionSnapshot.categoryCount > selectionSnapshot.applicationCount {
+            selectionType = "category"
+        } else if selectionSnapshot.applicationCount > 0 {
+            selectionType = "app"
+        } else {
+            selectionType = "selection"
+        }
+
+        if relapses >= 3 { return "quick check -> \(selectionType) urge -> exit" }
+        if started > completed { return "planned block -> early exit" }
+        if completed >= 3 && relapses == 0 { return "planned block -> clean session" }
+        if selectionSnapshot.totalCount > 0 { return "\(selectionType) urge -> protected window" }
+        return "learning"
+    }
+
+    private static func sequenceRisk(pickupPressure: Int, relapses: Int) -> String {
+        if pickupPressure >= 70 || relapses >= 4 { return "high" }
+        if pickupPressure >= 40 || relapses >= 2 { return "medium" }
         return "low"
     }
 
@@ -1724,6 +1778,10 @@ struct DigitalWellnessV3Profile: Equatable {
     var weakestWindow: Int?
     var dominantModeName: String?
     var confidence: Int
+    var pickupPressureScore: Int
+    var behaviorChain: String
+    var experimentName: String
+    var experimentHypothesis: String
 }
 
 struct AdaptiveFocusPlan: Equatable {
@@ -1744,6 +1802,9 @@ struct DigitalWellnessV3Forecast: Equatable {
     var minutesUntilRisk: Int
     var reason: String
     var recommendedAction: String
+    var reasons: [String]
+    var experimentName: String
+    var experimentMetric: String
 }
 
 struct DigitalWellnessV3System: Equatable {
@@ -1973,6 +2034,9 @@ enum DigitalWellnessAI {
         let strongest = mostCommonValue(weeklySessions.compactMap(\.localStartHour) + weeklyEvents.filter { $0.kind == .blockStarted }.map(\.localHour))
         let weakest = weakHour(events: events, sessions: sessions, now: now) ?? diagnosis.recommendedHour
         let confidence = min(100, max(16, sessionCount * 13 + weeklyEvents.count * 4))
+        let pickupPressure = min(100, brokenEvents.count * 18 + weeklySessions.filter { $0.endedReason == .manual || $0.endedReason == .emergency }.count * 14 + max(0, 70 - adherence) / 3)
+        let chain = v3BehaviorChain(events: weeklyEvents, sessions: weeklySessions)
+        let experiment = v3ExperimentName(pickupPressure: pickupPressure, breakCount: breakCount, adherence: adherence)
 
         return DigitalWellnessV3Profile(
             archetype: diagnosis.archetype,
@@ -1985,7 +2049,51 @@ enum DigitalWellnessAI {
             strongestWindow: strongest,
             weakestWindow: weakest,
             dominantModeName: modeName,
-            confidence: confidence
+            confidence: confidence,
+            pickupPressureScore: pickupPressure,
+            behaviorChain: chain,
+            experimentName: experiment.name,
+            experimentHypothesis: experiment.hypothesis
+        )
+    }
+
+    private static func v3BehaviorChain(events: [BlankUsageEvent], sessions: [BlankSession]) -> String {
+        let relapses = events.filter { $0.kind == .blockBroken || $0.endedReason == .manual || $0.endedReason == .emergency }.count
+        let started = events.filter { $0.kind == .blockStarted }.count
+        let completed = sessions.filter { $0.endedAt != nil && $0.endedReason != .manual && $0.endedReason != .emergency }.count
+        if relapses >= 3 { return "quick check -> protected app urge -> exit" }
+        if started > completed { return "planned block -> early exit" }
+        if completed >= 3 && relapses == 0 { return "planned block -> clean session" }
+        if started > 0 { return "urge -> protected window" }
+        return "learning"
+    }
+
+    private static func v3ExperimentName(pickupPressure: Int, breakCount: Int, adherence: Int) -> (name: String, hypothesis: String, metric: String) {
+        if pickupPressure >= 65 {
+            return (
+                "Chain Intercept",
+                "Stop the second quick check before it becomes a longer scroll loop.",
+                "Fewer exits in the same window."
+            )
+        }
+        if breakCount >= 2 || adherence < 45 {
+            return (
+                "Lighter Earlier Block",
+                "A shorter earlier block should hold better than strict late friction.",
+                "Completed block without manual exit."
+            )
+        }
+        if adherence >= 78 {
+            return (
+                "Progressive Window",
+                "A stable window can be extended without raising relapse risk.",
+                "Three clean completed sessions."
+            )
+        }
+        return (
+            "Stable Repeat",
+            "Repeat the same window to build a clean baseline.",
+            "Completed sessions without emergency exits."
         )
     }
 
@@ -2039,14 +2147,24 @@ enum DigitalWellnessAI {
         let targetHour = profile.weakestWindow ?? plan.recommendedStartHour
         let minutes = minutesUntilNextHour(targetHour, now: now)
         let urgencyBonus = minutes <= 60 ? 18 : 0
-        let risk = min(100, profile.relapseRiskScore + urgencyBonus)
+        let risk = min(100, profile.relapseRiskScore + urgencyBonus + profile.pickupPressureScore / 5)
         let reason: String
+        var reasons: [String] = []
         if profile.weeklyBreakCount > 0 {
             reason = "Breaks clustered around \(hourRangeText(targetHour))."
+            reasons.append(reason)
         } else if profile.weeklySessionCount == 0 {
             reason = "Your onboarding profile points to this as the first window to protect."
+            reasons.append(reason)
         } else {
             reason = "This is the next window with the highest expected attention leak."
+            reasons.append(reason)
+        }
+        if profile.pickupPressureScore >= 50 {
+            reasons.append("Pickup pressure is \(profile.pickupPressureScore)/100.")
+        }
+        if profile.behaviorChain != "learning" {
+            reasons.append("Behavior chain: \(profile.behaviorChain).")
         }
 
         return DigitalWellnessV3Forecast(
@@ -2055,7 +2173,10 @@ enum DigitalWellnessAI {
             riskScore: risk,
             minutesUntilRisk: minutes,
             reason: reason,
-            recommendedAction: plan.primaryAction
+            recommendedAction: plan.primaryAction,
+            reasons: Array(reasons.prefix(4)),
+            experimentName: profile.experimentName,
+            experimentMetric: v3ExperimentName(pickupPressure: profile.pickupPressureScore, breakCount: profile.weeklyBreakCount, adherence: profile.adherenceScore).metric
         )
     }
 

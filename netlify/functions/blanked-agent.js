@@ -40,7 +40,7 @@ function naturalChannelText(value, maxLength = 320) {
   return userFacingText(value, maxLength)
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
-    .replace(/\s*[—–]\s*/g, ". ")
+    .replace(/\s*[—–]\s*/g, " - ")
     .replace(/\bI prepared a Blanked link\b/gi, "I left a Blanked link")
     .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help with that.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")

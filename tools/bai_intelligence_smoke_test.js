@@ -5,6 +5,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 
 const { handler: intelligenceHandler } = require("../netlify/functions/bai-intelligence");
 const { handler: outcomeHandler } = require("../netlify/functions/bai-outcome");
+const { handler: feedbackHandler } = require("../netlify/functions/bai-feedback");
+const { handler: dashboardHandler } = require("../netlify/functions/bai-learning-dashboard");
 const { handler: notificationsHandler } = require("../netlify/functions/bai-learning-notifications");
 
 function response(status, data) {
@@ -197,6 +199,67 @@ async function recordsOutcomesForBothGlobalAndPersonalLearning() {
   assert.strictEqual(inserted.proposed_value.minutes_before_target, 45);
 }
 
+async function recordsExplicitFeedbackAndMemorySignals() {
+  const inserts = [];
+  global.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes("/rest/v1/bai_recommendation_feedback") && options.method === "POST") {
+      inserts.push({ table: "feedback", body: JSON.parse(options.body) });
+      return response(201, null);
+    }
+    if (target.includes("/rest/v1/bai_user_plan_outcomes") && options.method === "POST") {
+      inserts.push({ table: "outcomes", body: JSON.parse(options.body) });
+      return response(201, null);
+    }
+    if (target.includes("/rest/v1/bai_user_memory_signals") && options.method === "POST") {
+      inserts.push({ table: "memory", body: JSON.parse(options.body) });
+      return response(201, null);
+    }
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await feedbackHandler(post({
+    ...baseRequest,
+    recommendation_id: "rec-1",
+    prompt: "Block Instagram at night",
+    response_text: "I would protect the night window.",
+    feedback_type: "too_strict",
+    recommendation: {
+      kind: "sleep_boundary",
+      start_minute: 1320,
+      end_minute: 1380,
+      duration_days: 7,
+    },
+  }));
+  const body = JSON.parse(result.body);
+  assert.strictEqual(result.statusCode, 200, result.body);
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(inserts.find((item) => item.table === "feedback").body.feedback_type, "too_strict");
+  assert.strictEqual(inserts.find((item) => item.table === "outcomes").body.outcome, "edited");
+  assert.ok(inserts.find((item) => item.table === "memory").body.some((item) => item.signal_type === "blocking_tolerance"));
+}
+
+async function dashboardListsLearningData() {
+  global.fetch = async (url, options = {}) => {
+    const target = String(url);
+    assert.strictEqual(options.method, "GET");
+    if (target.includes("/rest/v1/bai_learning_dashboard")) return response(200, [{ pattern_key: "sleep_night_scroll", sample_size: 4 }]);
+    if (target.includes("/rest/v1/bai_recommendation_feedback")) return response(200, [{ feedback_type: "helpful" }]);
+    if (target.includes("/rest/v1/bai_user_memory_signals")) return response(200, [{ signal_type: "weak_moment" }]);
+    if (target.includes("/rest/v1/bai_learning_changes")) return response(200, [{ change_type: "personal_override" }]);
+    if (target.includes("/rest/v1/bai_user_plan_outcomes")) return response(200, [{ outcome: "accepted" }]);
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const result = await dashboardHandler(post({ limit: 5 }));
+  const body = JSON.parse(result.body);
+  assert.strictEqual(result.statusCode, 200, result.body);
+  assert.strictEqual(body.ok, true);
+  assert.strictEqual(body.recommendations[0].pattern_key, "sleep_night_scroll");
+  assert.strictEqual(body.feedback[0].feedback_type, "helpful");
+  assert.strictEqual(body.memory_signals[0].signal_type, "weak_moment");
+}
+
 async function listsAndReviewsLearningNotifications() {
   global.fetch = async (url, options = {}) => {
     const target = String(url);
@@ -234,6 +297,8 @@ async function listsAndReviewsLearningNotifications() {
   await microOverridesMacroWhenUserHistoryContradictsIt();
   await exploresWhenEvidenceIsWeak();
   await recordsOutcomesForBothGlobalAndPersonalLearning();
+  await recordsExplicitFeedbackAndMemorySignals();
+  await dashboardListsLearningData();
   await listsAndReviewsLearningNotifications();
   console.log("bai_intelligence_smoke_test: ok");
 })().catch((error) => {

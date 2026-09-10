@@ -130,15 +130,20 @@ function isProductivityPrompt(prompt) {
   ]);
 }
 
-function webConversionNote(language = "en") {
+function webConversionNote(language = "en", prompt = "") {
+  if (isProductivityPrompt(prompt)) {
+    return language === "es"
+      ? "En la app, esto puede convertirse en un bloque de trabajo que cierre redes y apps de scroll."
+      : "In the app, this can become a work block that closes social and scroll apps.";
+  }
   return language === "es"
     ? "Desde la web no puedo bloquear apps ni pedir permisos; en la app puedo convertirlo en bloqueos automáticos."
     : "From the web I cannot block apps or request permissions; in the app I can turn this into automatic blocks.";
 }
 
 function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
-  if (!isWebPreview(context) || !isPhoneControlConversionPrompt(prompt)) return plan;
-  const note = webConversionNote(language);
+  if (!isWebPreview(context) || (!isPhoneControlConversionPrompt(prompt) && !isProductivityPrompt(prompt))) return plan;
+  const note = webConversionNote(language, prompt);
   const current = naturalChannelText(plan.message_text || plan.response_text || "", 420);
   if (/from the web|desde la web|cannot block|no puedo bloquear|permissions|permisos/i.test(current)) return plan;
   const append = (value, maxLength) => {

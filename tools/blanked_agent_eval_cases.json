@@ -127,16 +127,16 @@
       }
     },
     "expect": {
-      "intent": "social",
+      "intent": "focus",
       "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
+        "activate_mode"
       ],
       "first_action": {
-        "minutes": 25
+        "name": "Social",
+        "minutes": 35
       },
       "text_matches": [
-        "lunch|1:30 PM|2:30 PM|rule|protect|friction"
+        "Social mode|35|lunch|start"
       ],
       "ui_text_not_matches": [
         "those apps|This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:"
@@ -1206,16 +1206,16 @@
     "expect": {
       "intent": "focus",
       "action_types": [
-        "switch_mode",
-        "start_protection"
+        "activate_mode"
       ],
       "first_action": {
-        "name": "Work"
+        "name": "Work",
+        "minutes": 45
       },
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Work mode|45|existing|authorized"
+        "Work mode|45"
       ]
     }
   },
@@ -1232,7 +1232,7 @@
     "expect": {
       "intent": "sleep",
       "action_types": [
-        "switch_mode",
+        "activate_mode",
         "apply_schedule"
       ],
       "first_action": {
@@ -1241,7 +1241,7 @@
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Sleep mode|10:00 PM|7:00 AM|authorized"
+        "Sleep mode|10:00 PM|7:00 AM|30 minutes"
       ]
     }
   },

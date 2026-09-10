@@ -41,15 +41,27 @@ function naturalChannelText(value, maxLength = 320) {
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
     .replace(/\bI prepared a Blanked link\b/gi, "I left a Blanked link")
-    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help you apply it in Blanked.")
+    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help with that.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
     .trim();
 }
 
+function completeNaturalText(value, maxLength = 420) {
+  const text = naturalChannelText(value, maxLength);
+  if (!text || /[.!?¿]$/.test(text)) return text;
+  const punctuationIndex = Math.max(text.lastIndexOf("."), text.lastIndexOf("!"), text.lastIndexOf("?"));
+  if (punctuationIndex >= 80) return text.slice(0, punctuationIndex + 1).trim();
+  const lastSpace = text.lastIndexOf(" ");
+  return `${text.slice(0, lastSpace > 40 ? lastSpace : text.length).trim()}.`;
+}
+
 function responseLanguage(prompt, context = {}) {
-  const explicit = cleanText(context.language || context.locale || "", 20).toLowerCase();
+  const channel = cleanText(context.channel || context.assistant_channel || "", 20).toLowerCase();
+  const appSurface = channel === "app" || channel === "web";
+  const explicit = cleanText(context.language || (appSurface ? "" : context.locale) || "", 20).toLowerCase();
   if (explicit.startsWith("es")) return "es";
   if (explicit.startsWith("en")) return "en";
+  if (appSurface) return "en";
   const text = cleanText(prompt, 600).toLowerCase();
   const spanishScore = [
     "¿", "á", "é", "í", "ó", "ú", "ñ",
@@ -64,7 +76,73 @@ function responseLanguage(prompt, context = {}) {
     "how can i", "what should i", "block", "after", "phone", "sleep", "work", "study",
     "instagram", "tiktok", "youtube", "scroll", "focus", "advice", "help me",
   ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
-  return spanishScore > englishScore ? "es" : "en";
+  if (spanishScore > englishScore) return "es";
+  return "en";
+}
+
+function isWebPreview(context = {}) {
+  const channel = cleanText(context.channel || "", 30).toLowerCase();
+  const assistantChannel = cleanText(context.assistant_channel || "", 30).toLowerCase();
+  return context.web_preview === true || channel === "web_preview" || assistantChannel === "web";
+}
+
+function asksAboutBlankedDataOrPrediction(prompt) {
+  const text = paddedText(prompt, 700);
+  const product = contains(text, [" blanked ", " bai ", " you ", " vuestra ", " vosotros ", " puedes ", " podéis ", " podeis "]);
+  const prediction = contains(text, [" predict", " prediction", " forecast", " know that", " know if", " tomorrow", " tired", " cansado", " cansada", " mañana", " manana", " predec", " saber que", " saber si", " comportamiento", " behavior"]);
+  const signals = contains(text, [" data", " datos", " wearable", " wearables", " health", " screen time", " screentime", " sueño", " sueno", " sleep", " recovery", " hrv", " heart rate", " actividad", " activity"]);
+  return (product && (prediction || signals)) || (prediction && signals);
+}
+
+function isPhoneControlConversionPrompt(prompt) {
+  const text = paddedText(prompt, 700);
+  if (isConversationalOnly(prompt)) return false;
+  return contains(text, [
+    " scroll", " scrolling", " doomscroll", " scrollear", " scrolleando",
+    " phone", " móvil", " movil", " teléfono", " telefono", " screen time", " screentime",
+    " distract", " distraccion", " distracción", " redes", " social media", " social apps",
+    " instagram", " tiktok", " tik tok", " youtube", " shorts", " reels", " reddit", " twitter", " snapchat",
+    " block", " bloquear", " bloquea", " limit", " límite", " limite", " protect", " proteger",
+    " focus", " foco", " concentrate", " concentrarme", " work", " study", " estudiar", " trabajar",
+    " app ", " apps ", " aplicación", " aplicaciones",
+  ]);
+}
+
+function webConversionNote(language = "en") {
+  return language === "es"
+    ? "Desde la web no puedo bloquear apps ni pedir permisos; en la app puedo convertirlo en bloqueos automáticos."
+    : "From the web I cannot block apps or request permissions; in the app I can turn this into automatic blocks.";
+}
+
+function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
+  if (!isWebPreview(context) || !isPhoneControlConversionPrompt(prompt)) return plan;
+  const note = webConversionNote(language);
+  const current = naturalChannelText(plan.message_text || plan.response_text || "", 420);
+  if (/from the web|desde la web|cannot block|no puedo bloquear|permissions|permisos/i.test(current)) return plan;
+  const append = (value, maxLength) => {
+    const base = naturalChannelText(value || current, maxLength);
+    if (!base) return note.slice(0, maxLength);
+    if (/from the web|desde la web|cannot block|no puedo bloquear|permissions|permisos/i.test(base)) return base;
+    const availableForBase = Math.max(80, maxLength - note.length - 1);
+    let trimmedBase = base;
+    if (base.length > availableForBase) {
+      const candidate = base.slice(0, availableForBase).trim();
+      const punctuationIndex = Math.max(candidate.lastIndexOf("."), candidate.lastIndexOf("!"), candidate.lastIndexOf("?"));
+      if (punctuationIndex >= 80) {
+        trimmedBase = candidate.slice(0, punctuationIndex + 1).trim();
+      } else {
+        const lastSpace = candidate.lastIndexOf(" ");
+        trimmedBase = `${candidate.slice(0, lastSpace > 80 ? lastSpace : availableForBase - 1).trim()}…`;
+      }
+    }
+    return `${trimmedBase} ${note}`.slice(0, maxLength);
+  };
+  return {
+    ...plan,
+    response_text: append(plan.response_text, 320),
+    message_text: append(plan.message_text || plan.response_text, 320),
+    speech_text: append(plan.speech_text || plan.message_text || plan.response_text, 420),
+  };
 }
 
 function localizeMinuteText(text, language) {
@@ -76,8 +154,8 @@ function localizeMinuteText(text, language) {
     .replace(/m\.\./g, "m.");
 }
 
-function localizeText(value, language) {
-  const text = cleanText(value, 220);
+function localizeText(value, language, maxLength = 420) {
+  const text = cleanText(value, maxLength);
   if (language !== "es" || !text) return text;
   const scheduleMatch = text.match(/^I read this as a specific protection window: (.+) to (.+)\.$/i);
   if (scheduleMatch) return localizeMinuteText(`Vale. Protegería esa franja de ${scheduleMatch[1]} a ${scheduleMatch[2]}.`, language);
@@ -136,9 +214,9 @@ function localizeText(value, language) {
     "Not now": "Ahora no",
     "I can help make access harder, but I will only create bounded rules with a clear target and exit path. Tell me the app or moment to protect first.": "Puedo hacer el acceso más difícil, pero solo crearé reglas limitadas con un objetivo claro y una salida. Dime primero la app o el momento que quieres proteger.",
     "Got it. I will not use that app as context. Which app, moment or habit should we focus on instead?": "Entendido. No usaré esa app como contexto. ¿En qué app, momento o hábito deberíamos centrarnos?",
-    "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.": "Esto suena a bucle de scroll de noche. Antes de bloquear nada, necesito tu hora objetivo para dormir.",
+    "That usually starts before bedtime. What time do you want to be asleep?": "Eso suele empezar antes de irte a dormir. ¿A qué hora quieres estar dormido?",
     "If you want to be asleep from 11:00 PM to 7:00 AM, the phone should get harder to use before 11:00 PM.": "Si quieres dormir de 11:00 PM a 7:00 AM, el móvil debería ser más difícil de usar antes de las 11:00 PM.",
-    "I can help with that, but first I need to know where the loop happens.": "Puedo ayudarte con eso, pero primero necesito saber dónde ocurre el bucle.",
+    "Got it. Which app pulls you in most, and when does it usually happen?": "Entendido. ¿Qué app te atrapa más y cuándo suele pasar?",
     "Most people do best starting 10-15 minutes after lunch. What time do you usually finish eating?": "Suele funcionar mejor empezar 10-15 minutos después de comer. ¿A qué hora sueles terminar de comer?",
     "Lunch is probably the right moment to protect, but I need two details before setting anything: which apps count as social media for you, and what time do you usually finish eating?": "Comer probablemente es el momento a proteger, pero necesito dos datos antes de configurar nada: ¿qué apps cuentan como redes sociales para ti y a qué hora sueles terminar de comer?",
     "What time do you usually finish dinner?": "¿A qué hora sueles terminar de cenar?",
@@ -148,7 +226,7 @@ function localizeText(value, language) {
     "I can use counts and context you choose to share, but I do not need your exact app list to reason about the pattern.": "Puedo usar conteos y contexto que decidas compartir, pero no necesito tu lista exacta de apps para razonar sobre el patrón.",
     "This is an execution moment, so the useful move is immediate friction.": "Este es un momento de ejecución: lo útil ahora es añadir fricción inmediata.",
     "I read this as a study window, so the useful move is a short plan with friction already in place.": "Lo leo como una franja de estudio: lo útil es un plan corto con fricción ya preparada.",
-    "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.": "Esto suena a scroll nocturno invadiendo descanso, no a un problema genérico de productividad.",
+    "That late scroll is probably leaking into sleep, not just adding screen time.": "Ese scroll tarde probablemente se está metiendo en tu descanso, no solo sumando tiempo de pantalla.",
     "You are already protected; changing settings now would weaken the boundary.": "Ya estás protegido; cambiar ajustes ahora debilitaría el límite.",
     "This is a high-risk moment. Reduce choice immediately.": "Este es un momento de alto riesgo. Reduce opciones de inmediato.",
     "This is about reducing decisions: keep essentials available and remove the rest.": "Esto va de reducir decisiones: deja lo esencial disponible y quita el resto.",
@@ -156,9 +234,9 @@ function localizeText(value, language) {
     "Pausing is fine when the context changes, as long as it has an end.": "Pausar está bien cuando cambia el contexto, siempre que tenga final.",
     "The useful question is whether the current protection is preventing breaks, not whether the plan sounds good.": "La pregunta útil es si la protección actual evita rupturas, no si el plan suena bien.",
     "This is a cue-control problem: make access harder before the urge peaks.": "Esto es un problema de control de señales: haz el acceso más difícil antes de que el impulso suba.",
-    "I can build a plan, but first I need the real loop. Which app, moment or habit should we focus on?": "Puedo crear un plan, pero primero necesito el bucle real. ¿En qué app, momento o hábito nos centramos?",
+    "Tell me the app, moment, or habit you want to change first.": "Dime primero qué app, momento o hábito quieres cambiar.",
     "Start by identifying the moment when the phone becomes automatic. Then make that moment slightly harder before adding strict blocks.": "Empieza identificando el momento en que el móvil se vuelve automático. Después haz ese momento un poco más difícil antes de añadir bloqueos estrictos.",
-    "I can help with screen-habit advice, a diagnosis or a protection plan if you want to go further.": "Puedo ayudarte con consejo sobre hábitos digitales, una lectura del patrón o un plan de protección si quieres ir más allá.",
+    "I'm here. Tell me what's going on, and I'll help from there.": "Estoy aquí. Cuéntame qué pasa y te ayudo desde ahí.",
     "Read: you are asking for guidance, not a blocking plan yet.": "Lectura: estás pidiendo guía, no un plan de bloqueo todavía.",
     "Pattern: the trigger usually matters more than total screen time.": "Patrón: el disparador suele importar más que el tiempo total de pantalla.",
     "Move: name the app and the moment it usually takes over.": "Movimiento: dime la app y el momento en que suele tomar el control.",
@@ -287,7 +365,50 @@ function stripBulletPrefix(value) {
     .replace(/\.$/, "");
 }
 
-function conversationalMessage(plan, language = "en") {
+function appTargetFromPrompt(prompt = "") {
+  const app = namedApp(prompt);
+  if (app && app !== "the app") return app;
+  const category = requestedAppCategory(prompt);
+  if (category && category !== "social apps") return category;
+  return category || "selected apps";
+}
+
+function actionMessage(plan, prompt = "", language = "en") {
+  const actions = Array.isArray(plan.actions) ? plan.actions.filter((item) => item && item.type && item.type !== "none") : [];
+  if (!actions.length) return "";
+  const first = actions[0];
+  const target = appTargetFromPrompt(prompt);
+  if (first.type === "apply_schedule") {
+    const start = minuteText(first.start_minute);
+    const end = minuteText(first.end_minute);
+    return language === "es"
+      ? `Protegería ${target} de ${localizeMinuteText(start, language)} a ${localizeMinuteText(end, language)}.`
+      : `Protect ${target} from ${start} to ${end}, before the scroll has momentum.`;
+  }
+  if (first.type === "start_protection") {
+    const minutes = cleanNumber(first.minutes, 25, 5, 240);
+    return language === "es"
+      ? `Empezaría un bloqueo de ${minutes} minutos.`
+      : `Start a ${minutes}-minute block now and keep the app list unchanged.`;
+  }
+  if (first.type === "set_daily_limit") {
+    const minutes = cleanNumber(first.minutes, 25, 5, 240);
+    return language === "es"
+      ? `Pondría un límite diario de ${minutes} minutos.`
+      : `Set a ${minutes}-minute daily limit and review it after a day.`;
+  }
+  if (first.type === "enable_allow_only") return language === "es" ? "Activaría Allow Only para dejar solo lo esencial." : "Turn on Allow Only and leave only the essentials available.";
+  if (first.type === "enable_adult_filter") return language === "es" ? "Activaría protección web para contenido adulto." : "Turn on adult web protection before the urge peaks.";
+  if (first.type === "pause_rules") return language === "es" ? "Pausaría las reglas con una fecha de vuelta." : "Pause the rules with a clear return point.";
+  if (first.type === "disable_pause") return language === "es" ? "Reactivaría tus reglas." : "Resume your rules and bring the structure back.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
+    return language === "es" ? `Primero elige ${target} en Screen Time.` : `Choose ${target} in Screen Time first.`;
+  }
+  if (first.type === "apply_ai_plan") return language === "es" ? "Aplicaría el siguiente ajuste recomendado." : "Apply the next recommended adjustment and review the result later.";
+  return "";
+}
+
+function conversationalMessage(plan, language = "en", prompt = "") {
   const response = cleanText(plan.response_text, 220);
   const bullets = Array.isArray(plan.bullets) ? plan.bullets.map(stripBulletPrefix).filter(Boolean) : [];
   const actions = Array.isArray(plan.actions) ? plan.actions.filter((item) => item && item.type && item.type !== "none") : [];
@@ -303,10 +424,8 @@ function conversationalMessage(plan, language = "en") {
   }
 
   if (actions.length) {
-    const actionLine = language === "es"
-      ? "Te dejo una acción concreta para aplicarlo en Blanked."
-      : "I can help you apply it in Blanked.";
-    return `${response} ${actionLine}`.slice(0, 320);
+    const actionLine = actionMessage(plan, prompt, language);
+    return (actionLine || response).slice(0, 320);
   }
 
   return response || (language === "es" ? "Puedo ayudarte con eso en Blanked." : "I can help with that in Blanked.");
@@ -323,20 +442,32 @@ function fallbackFollowupText(plan, language = "en") {
   if (!actions.length) return "";
   const first = actions[0];
   if (language === "es") {
-    if (first.type === "apply_schedule") return "Puedes abrir Blanked desde este enlace y revisar la franja antes de aplicarla.";
-    if (first.type === "start_protection") return "Puedes abrir Blanked desde este enlace y empezar el bloqueo.";
-    if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Puedes abrir Blanked desde este enlace y terminar la configuración.";
-    return "Puedes abrir Blanked desde este enlace y revisar el siguiente paso.";
+    if (first.type === "apply_schedule") return "Abre Blanked para revisar y aplicar la franja.";
+    if (first.type === "start_protection") return "Abre Blanked para empezar el bloqueo.";
+    if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Abre Blanked para terminar la configuración.";
+    return "Abre Blanked para revisar el siguiente paso.";
   }
-  if (first.type === "apply_schedule") return "Use this link to open Blanked and review the protection window before applying it.";
-  if (first.type === "start_protection") return "Use this link to open Blanked and start the block.";
-  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Use this link to open Blanked and finish setup.";
-  return "Use this link to open Blanked and review the next step.";
+  if (first.type === "apply_schedule") return "Open Blanked to review and apply the window.";
+  if (first.type === "start_protection") return "Open Blanked to start the block.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
+  return "Open Blanked to review the next step.";
 }
 
 function hasExplicitBlockRequest(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
-  return contains(text, ["block", "bloquea", "bloquear", "shield", "protect", "set ", "schedule", "limit", "from"]);
+  return contains(text, ["block", "bloquea", "bloquear", "shield", "protect", "schedule", "limit"]) ||
+    /\bset\s+(a|an|up|rule|block|limit|schedule|protection)\b/i.test(text) ||
+    /\bfrom\s+\d{1,2}(:\d{2})?\s*(am|pm)?\s+to\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(text);
+}
+
+function isGeneralWellnessPrompt(prompt) {
+  const text = paddedText(prompt, 700);
+  return contains(text, [
+    " sleep", " dormir", " descanso", " run", " running", " correr", " workout", " training", " entren",
+    " exercise", " ejercicio", " energy", " energia", " energía", " tired", " cansado", " cansada",
+    " stress", " estrés", " estres", " anxiety", " ansiedad", " recovery", " recuperacion", " recuperación",
+    " wellness", " wellbeing", " bienestar", " habit", " hábito", " habito", " nutrition", " comida", " dinner", " cena",
+  ]);
 }
 
 function asksForAdvice(prompt) {
@@ -390,6 +521,49 @@ function isSimpleGreeting(prompt) {
   return /^(hey|hi|hello|yo|hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai)?$/.test(text);
 }
 
+function isConversationalOnly(prompt) {
+  const text = cleanText(prompt, 180).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
+  if (!text) return false;
+  if (hasExplicitBlockRequest(prompt) || asksForAdvice(prompt) || asksForPlan(prompt) || asksAboutAssistantCapabilities(prompt)) return false;
+  return /^(hey|hi|hello|yo|hola|buenas|good morning|good afternoon|good evening|gm|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai)?$/.test(text) ||
+    /^(how are you|how are u|how you doing|how's it going|hows it going|what's up|whats up|qué tal|que tal|cómo estás|como estas)(\s+blanked|\s+bai)?$/.test(text) ||
+    /^(thanks|thank you|thx|gracias|ok|okay|vale|perfect|perfecto|cool|nice|great|genial)$/.test(text);
+}
+
+function conversationalOnlyPlan(prompt, language = "en") {
+  const text = cleanText(prompt, 180).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
+  const spanish = language === "es";
+  let response = spanish ? "Hey, ¿qué tal?" : "Hey, what's up?";
+  if (/good morning|gm|buenos dias|buenos días/.test(text)) {
+    response = spanish ? "Buenos días. ¿Cómo va la mañana?" : "Good morning. How's your morning going?";
+  } else if (/good afternoon|buenas tardes/.test(text)) {
+    response = spanish ? "Buenas tardes. ¿Cómo va el día?" : "Good afternoon. How's your day going?";
+  } else if (/good evening|buenas noches/.test(text)) {
+    response = spanish ? "Buenas noches. ¿Cómo va todo?" : "Good evening. How's everything going?";
+  } else if (/how are you|how are u|how you doing|how's it going|hows it going|qué tal|que tal|cómo estás|como estas/.test(text)) {
+    response = spanish ? "Bien, por aquí. ¿Tú qué tal?" : "I'm good. How are you doing?";
+  } else if (/thanks|thank you|thx|gracias/.test(text)) {
+    response = spanish ? "De nada." : "Anytime.";
+  } else if (/ok|okay|vale|perfect|perfecto|cool|nice|great|genial/.test(text)) {
+    response = spanish ? "Vale." : "Got it.";
+  }
+  return {
+    intent: "general",
+    title: "Conversation",
+    response_text: response,
+    bullets: [
+      "Read: this is conversation, not a product action.",
+      "Pattern: answer the human turn before guiding anywhere.",
+      "Move: keep talking unless a real Blanked solution helps."
+    ],
+    primary_label: "Reply",
+    secondary_label: "Not now",
+    actions: [],
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+  };
+}
+
 function asksWhereToStart(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
   return contains(text, [
@@ -409,7 +583,10 @@ function lastConversationTopic(context = {}) {
 }
 
 function hasSleepConversationContext(context = {}) {
-  return ["sleep", "bedtime", "night"].includes(lastConversationTopic(context)) || Number.isFinite(Number(context.memory?.bedtime_minute));
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  return ["sleep", "bedtime", "night"].includes(lastConversationTopic(context)) ||
+    cleanText(memory.pattern_cluster, 80).toLowerCase().includes("bedtime") ||
+    Number.isFinite(Number(memory.bedtime_minute));
 }
 
 function asksForPermanentLockout(prompt) {
@@ -479,6 +656,17 @@ function relativeMoment(prompt) {
     };
   }
   return null;
+}
+
+function hasExplicitRelativeMomentContext(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  const moment = relativeMoment(prompt);
+  if (!moment) return false;
+  return contains(text, [
+    "scroll", "doomscroll", "social", "apps", "instagram", "tiktok", "tik tok", "youtube", "reels", "shorts", "feed",
+    "too much", "demasiado", "tired", "low energy", "cansado", "cansada",
+    "not bedtime", "not bed", "not night", "no por la noche", "no de noche",
+  ]) || /^(no|nope|nah|not|after|right after|despues|después)\b/i.test(text);
 }
 
 function promptHasFutureTiming(prompt) {
@@ -645,6 +833,7 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
 function classify(prompt, context = {}) {
   const text = paddedText(prompt, 600);
   if (hasSleepConversationContext(context) && explicitTimeWindow(prompt, context)) return "sleep";
+  if (hasExplicitRelativeMomentContext(prompt)) return "social";
   if (asksWhereToStart(prompt)) return "general";
   if (asksForPlan(prompt) && !hasExplicitBlockRequest(prompt) && !contains(text, ["after", "when", "from", "at ", "tonight", "now", "ahora"])) return "general";
   if (contains(text, ["screen time is bad", "use my phone too much", "too much with my phone", "demasiado con el movil", "demasiado con el móvil", "phone is killing my focus"])) return "general";
@@ -985,6 +1174,7 @@ function fallbackPlan(prompt, context = {}) {
   const language = responseLanguage(prompt, context);
   const proactive = proactivePlan(prompt, context, language);
   if (proactive) return proactive;
+  if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
   const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
@@ -1142,8 +1332,8 @@ function fallbackPlan(prompt, context = {}) {
       intent: "sleep",
       title: "Bedtime Scroll Read",
       response_text: asksForAdvice(prompt)
-        ? "I’d start a bit before you get into bed, not when you’re already tired: charge the phone away and have one easy offline option ready. If you want, tell me your sleep target and I’ll shape it around that."
-        : "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.",
+        ? "I'd start before you get into bed, not once you're already tired: charge the phone away and keep one easy offline option ready. If you tell me when you want to be asleep, I'll shape it around that."
+        : "That usually starts before bedtime. What time do you want to be asleep?",
       bullets: [
         "Read: you want nights to feel less automatic.",
         "Pattern: the risky window depends on when you actually go to sleep.",
@@ -1161,7 +1351,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Scroll Pattern",
-      response_text: "I can help with that, but first I need to know where the loop happens.",
+      response_text: "Got it. Which app pulls you in most, and when does it usually happen?",
       bullets: [
         "Read: this is a scroll habit, not a generic focus issue.",
         "Pattern: the useful protection depends on the app and time window.",
@@ -1313,7 +1503,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Scroll Context",
-      response_text: "I can help, but I need the real loop before creating a block. Which app or moment does the scrolling usually start with?",
+      response_text: "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day.",
       bullets: [
         "Read: you want to stop scrolling, but the target is still broad.",
         "Pattern: useful protection needs the app, trigger or time window.",
@@ -1415,7 +1605,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Remembered Scroll Pattern",
-      response_text: `This sounds like the same ${activeApp || "app"} loop returning, so the next move should use the pattern already known.`,
+      response_text: `Looks like ${activeApp || "that app"} is pulling you back at the same time again. I'd use that instead of starting from scratch.`,
       bullets: [
         `Pattern: ${activeApp || "that app"} has been risky around ${rememberedRisk || riskWindow}.`,
         `Move: protect earlier than ${rememberedRisk || riskWindow}, especially because the last plan ${lastOutcome || "needs review"}.`,
@@ -1545,9 +1735,9 @@ function fallbackPlan(prompt, context = {}) {
     const targetBedtime = bedtime ?? rememberedBedtime;
     if (targetBedtime != null) {
       const start = (targetBedtime + 24 * 60 - 30) % (24 * 60);
-      return { ...base, title: "Bedtime Boundary", response_text: `If ${minuteText(targetBedtime)} is your sleep target, the useful boundary starts before that, not at random.`, bullets: [`Read: your target bedtime is ${minuteText(targetBedtime)}.`, "Pattern: the phone needs to become less available before the final scroll starts.", `Move: protect distracting apps from ${minuteText(start)} to ${minuteText(targetBedtime)} first.`], primary_label: "Apply boundary", actions: [action("apply_schedule", { name: "Sleep Boundary", start_minute: start, end_minute: targetBedtime, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
+      return { ...base, title: "Bedtime Boundary", response_text: `If you want to be asleep by ${minuteText(targetBedtime)}, the phone should get harder to use before then.`, bullets: [`Read: your target bedtime is ${minuteText(targetBedtime)}.`, "Pattern: the phone needs to become less available before the final scroll starts.", `Move: protect distracting apps from ${minuteText(start)} to ${minuteText(targetBedtime)} first.`], primary_label: "Apply boundary", actions: [action("apply_schedule", { name: "Sleep Boundary", start_minute: start, end_minute: targetBedtime, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })] };
     }
-    return { ...base, title: "Bedtime Scroll Loop", response_text: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.", bullets: ["Read: nights are the risky context.", "Pattern: the phone extends the day when your body needs shutdown.", "Move: tell me your usual bedtime before I suggest a block."], primary_label: "Tell bedtime", actions: [] };
+    return { ...base, title: "Bedtime Scroll Loop", response_text: "That late scroll is probably leaking into sleep, not just adding screen time. What time do you want to be asleep?", bullets: ["Read: nights are the risky context.", "Pattern: the phone extends the day when your body needs shutdown.", "Move: tell me your usual bedtime before I suggest a block."], primary_label: "Tell bedtime", actions: [] };
   }
 
   if (intent === "emergency") {
@@ -1598,7 +1788,7 @@ function fallbackPlan(prompt, context = {}) {
         ? lunchEnd != null
           ? `I’d protect the lunch reset window from ${minuteText(startMinute)} to ${minuteText((startMinute + 60) % (24 * 60))}, when social apps are most likely to become automatic.`
           : "Lunch is a common weak spot: you stop working, your energy dips, and the phone becomes the easiest reset."
-        : `This sounds less like free time and more like an automatic ${cluster}.`,
+        : `That sounds less like free time and more like automatic scrolling.`,
       bullets: [
         "Pattern: the trigger matters more than total screen time.",
         `Move: add friction ${momentText}, before the scroll has momentum.`,
@@ -1613,7 +1803,7 @@ function fallbackPlan(prompt, context = {}) {
       return {
         ...base,
         title: "Plan Context",
-        response_text: "I can build a plan, but first I need the real loop. Which app, moment or habit should we focus on?",
+        response_text: "Tell me the app, moment, or habit you want to change first.",
         bullets: [
           "Read: you want a plan, but the target is still too broad.",
           "Pattern: useful protection starts from one repeated trigger.",
@@ -1645,11 +1835,11 @@ function fallbackPlan(prompt, context = {}) {
     return {
       ...base,
       title: "Noted",
-      response_text: "I can help with screen-habit advice, a diagnosis or a protection plan if you want to go further.",
+      response_text: "I'm here. Tell me what's going on, and I'll help from there.",
       bullets: [
         "Read: there is no clear action request yet.",
         "Pattern: Blanked should not turn every message into a blocking plan.",
-        "Move: tell me whether you want advice or a plan."
+        "Move: answer naturally and wait for the real need."
       ],
       primary_label: "Tell goal",
       actions: [],
@@ -1736,6 +1926,115 @@ function appCapabilities(context = {}) {
   };
 }
 
+function shouldUseAppLayer(prompt, context = {}) {
+  const intent = classify(prompt, context);
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  const hasRememberedScrollPattern = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 &&
+    Array.isArray(memory.weak_hours) && memory.weak_hours.some((hour) => Number.isFinite(Number(hour)));
+  if (proactiveTrigger(prompt, context)) return true;
+  if (isWebPreview(context)) return false;
+  if (isWebPreview(context) && asksAboutBlankedDataOrPrediction(prompt)) return false;
+  if (isWebPreview(context) && !hasExplicitBlockRequest(prompt) && !explicitTimeWindow(prompt, context) && !explicitDurationMinutes(prompt)) {
+    if (isGeneralWellnessPrompt(prompt)) return false;
+    if (asksForAdvice(prompt) || asksForPlan(prompt) || asksWhereToStart(prompt) || asksAboutAssistantCapabilities(prompt)) return false;
+  }
+  if (intent !== "general") return true;
+  if (hasSleepConversationContext(context) && looseSingleTime(prompt) != null) return true;
+  if (hasRememberedScrollPattern && contains(cleanText(prompt, 600).toLowerCase(), ["again", "evening", "worse", "same"])) return true;
+  if (hasExplicitBlockRequest(prompt) || asksForAdvice(prompt) || asksForPlan(prompt)) return true;
+  if (asksWhereToStart(prompt) || asksAboutAssistantCapabilities(prompt)) return true;
+  if (asksForUnsupportedReminder(prompt) || asksForBroadAutomation(prompt) || asksForPermanentLockout(prompt)) return true;
+  if (appCorrection(prompt) || asksAboutExactAppList(prompt)) return true;
+  if (namedApp(prompt) !== "the app" || requestedAppCategory(prompt) || requestedUnknownApp(prompt)) return true;
+  if (explicitTimeWindow(prompt, context) || explicitDurationMinutes(prompt) || relativeMoment(prompt)) return true;
+  return false;
+}
+
+function conversationFallbackPlan(prompt, language = "en") {
+  const text = cleanText(prompt, 180);
+  const lower = cleanText(prompt, 700).toLowerCase();
+  let fallbackText = language === "es" ? "Estoy aquí. Cuéntame qué ha pasado." : "I'm here. Tell me what's on your mind.";
+  if (asksAboutBlankedDataOrPrediction(prompt)) {
+    fallbackText = language === "es"
+      ? "No lo adivinamos de la nada. Blanked puede estimarlo combinando señales como sueño, recuperación, actividad, Screen Time, patrones de uso del móvil y tu baseline personal. Si duermes peor, baja tu recuperación y sube el scroll nocturno frente a tu patrón normal, la predicción es probabilística: mañana puede haber menos energía o control, no un diagnóstico médico."
+      : "We do not guess it from thin air. Blanked can estimate it from signals like sleep, recovery, activity, Screen Time, phone-use patterns and your personal baseline. If sleep drops, recovery weakens and night scrolling rises versus your normal pattern, the forecast is probabilistic: tomorrow may be a lower-energy or lower-control day, not a medical diagnosis.";
+  } else if (contains(lower, ["sleep", "dormir", "descanso"])) {
+    fallbackText = language === "es"
+      ? "Para dormir mejor, empezaría por una hora fija para levantarte, luz natural por la mañana, cafeína solo temprano, cenas más ligeras, bajar luces por la noche y una rutina corta sin pantalla antes de la cama. Si tu problema es el scroll nocturno, Blanked puede añadir una barrera 15-45 minutos antes de dormir para que el móvil no entre contigo en la cama."
+      : "To sleep better, start with a consistent wake time, morning daylight, caffeine earlier in the day, lighter late meals, dimmer lights at night, and a short screen-free wind-down before bed. If the problem is night scrolling, Blanked can add a 15-45 minute pre-bed barrier so the phone does not follow you into bed.";
+  } else if (contains(lower, ["run", "running", "correr"])) {
+    fallbackText = language === "es"
+      ? "Para correr más, sube volumen poco a poco: 2-3 salidas fáciles por semana, una tirada algo más larga, fuerza básica de piernas y descanso suficiente. Cuando eso sea estable, añade series cortas o cuestas una vez por semana. Blanked solo entra si el móvil te rompe la constancia, por ejemplo bloqueando distracciones antes de la hora de entrenar."
+      : "To run more, build volume gradually: 2-3 easy runs per week, one slightly longer run, basic leg strength, and enough recovery. Once that is stable, add short intervals or hill work once a week. Blanked only matters if the phone breaks consistency, for example by blocking distractions before your training window.";
+  } else if (isGeneralWellnessPrompt(prompt) && asksForAdvice(prompt)) {
+    fallbackText = language === "es"
+      ? "Primero separaría energía, sueño, movimiento y móvil. Elige una palanca pequeña para esta semana: dormir y levantarte a horas parecidas, caminar o entrenar suave, comer algo más estable, y quitar fricción digital en el momento que más te arrastra. Si el móvil es parte del problema, Blanked puede convertir esa parte en bloqueos o alertas."
+      : "I would separate energy, sleep, movement, and phone behavior first. Pick one small lever for this week: steadier sleep and wake times, light movement, more stable meals, and less digital friction at the moment that pulls you off track. If the phone is part of the problem, Blanked can turn that part into blocks or alerts.";
+  }
+  return {
+    intent: "general",
+    title: "Conversation",
+    response_text: fallbackText,
+    bullets: [
+      "Read: this is normal conversation.",
+      "Pattern: no Blanked app action is needed.",
+      "Move: answer as a regular chat."
+    ],
+    primary_label: "Reply",
+    secondary_label: "Not now",
+    actions: [],
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+    message_text: fallbackText,
+    speech_text: fallbackText,
+    followup_text: "",
+  };
+}
+
+async function modelConversationPlan(prompt, context = {}, language = "en") {
+  const fallback = conversationFallbackPlan(prompt, language);
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return { plan: fallback, source: "deterministic_conversation_fallback" };
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      input: [
+        {
+          role: "system",
+          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Reply like a normal, warm, useful person in chat, not a support assistant, sales funnel, or setup wizard. Write compact conversational paragraphs, not markdown, bullets, or numbered lists unless the user explicitly asks for a list. The main answer must be valuable even if Blanked did not exist. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. On the web preview, you are allowed to add only a tiny Blanked-specific note at the end when phone control, scrolling, distractions, apps, or blocking are relevant: the web can reason and plan, but the app is needed for permissions and real automatic blocks. Keep that note to one short sentence and never let it replace the helpful answer. If the user asks about Blanked, digital wellness, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, Screen Time, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            prompt: cleanText(prompt, 600),
+            response_language: language,
+            recent_context: context.recent_messages || context.conversation || null,
+          }),
+        },
+      ],
+      max_output_tokens: 220,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`openai_conversation_failed_${response.status}:${detail.slice(0, 240)}`);
+  }
+  const reply = completeNaturalText(extractResponseText(await response.json()), 420);
+  if (!reply) return { plan: fallback, source: `openai:${model}:conversation_empty` };
+  return {
+    plan: {
+      ...fallback,
+      response_text: reply,
+      message_text: reply,
+      speech_text: reply,
+    },
+    source: `openai:${model}:conversation`,
+  };
+}
+
 function actionNeedsScreenTime(actionType) {
   return ["start_protection", "apply_schedule", "set_daily_limit", "enable_allow_only", "enable_adult_filter", "switch_mode", "apply_ai_plan"].includes(actionType);
 }
@@ -1763,6 +2062,7 @@ function deterministicNoActionTitle(title) {
     "Personal Assistant",
     "Automation Setup",
     "Reminder Context",
+    "Conversation",
     "Noted",
     "Greeting",
     "Loss Of Control",
@@ -1806,6 +2106,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const authorized = context.screen_time_authorized === true;
   const promptIntent = classify(prompt, context);
   const adviceOnly = asksForAdvice(prompt) && ["sleep", "social", "general"].includes(promptIntent) && !hasExplicitBlockRequest(prompt) && !proactiveTrigger(prompt, context);
+  if (isConversationalOnly(prompt)) return [];
   if (proactiveTrigger(prompt, context)) return fallbackActions.slice(0, 4);
   if (adviceOnly) return [];
   if (fallbackActions.length === 0 && deterministicNoActionTitle(fallback.title)) return [];
@@ -1894,7 +2195,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
   };
-  const messageText = conversationalMessage(normalizedPlan, language);
+  const messageText = conversationalMessage(normalizedPlan, language, prompt);
   const modelSpeechText = shouldUseFallbackPresentation || shouldUseLanguageFallback
     ? ""
     : naturalChannelText(plan.speech_text, 420);
@@ -1981,7 +2282,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-            "You are BAI, Blanked's personal assistant for healthier screen habits. The visible reply must feel like a sharp WhatsApp assistant, not a product template or a report. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move. BAI is conversational first: if the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Use light emoji only when it feels natural in chat, especially for confirmations, corrections or small wins; do not decorate every message. Recommend executable actions only when they are clearly useful or explicitly requested: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Do not use apply_schedule as a reminder or notification. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked when relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal implementation/QA/model/source/debug details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write a natural short text that introduces the app link when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:, or phrases like I prepared a Blanked link. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+            "You are BAI, Blanked's personal assistant for healthier screen habits. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward the app only when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention the app only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",
@@ -1998,10 +2299,13 @@ async function modelPlan(prompt, context, fallback, language) {
               "For broad questions, use memory as background but do not invent exact app details."
             ],
             examples: [
+              { user: "how you doing?", answer: "Read: this is small talk, not a product request. Move: answer naturally without mentioning Blanked, the app, blocks or plans." },
+              { user: "thanks", answer: "Read: this is a conversational acknowledgement. Move: reply briefly and do not route anywhere." },
               { user: "What can you do for me?", answer: "Read: I can help you understand phone patterns and turn them into blocks, schedules, limits, reports or habits. Move: tell me the moment you most want help with, or ask me to review your current pattern." },
               { user: "I feel terrible today", answer: "Read: this is a low-control moment, not a time for a complex plan. Move: start a short protection block or choose one tiny offline reset." },
               { user: "I feel bad because I lose 3 hours on TikTok after work.", answer: "Read: decompression loop after work. Pattern: TikTok is being used to exit stress, then it becomes the evening. Move: protect the first 45 minutes after work and choose one offline decompression action." },
-              { user: "How can I not scroll at nights?", answer: "Read: bedtime scrolling is the habit to understand. Pattern: the right boundary depends on the user's sleep target. Move: ask what time they usually want to be asleep before creating any block." },
+              { user: "How can I not scroll at nights?", answer: "Read: bedtime scrolling is the habit to understand. Pattern: the right boundary depends on when the person wants to be asleep. Move: ask that time before creating any block." },
+              { user: "No, after lunch. Not bedtime.", answer: "Read: this corrects the previous context to a post-lunch scroll loop. Pattern: lunch timing overrides bedtime memory. Move: ask what time lunch usually ends before creating any block." },
               { user: "Block Instagram from 10 to 7.", answer: "Read: explicit schedule request. Pattern: bedtime risk window is clear. Move: apply a nightly shield from 10 PM to 7 AM." },
               { user: "I keep checking WhatsApp while working.", answer: "Read: compulsive checking loop. Pattern: the interruption is frequent and short, so app limits alone may be weak. Move: use Allow Only or a timed focus block." },
               { user: "proactive signal: social use is 42% above baseline after lunch", answer: "Read: I am interrupting because today's social use is above your usual pattern after lunch. Move: apply a short lunch boundary for the next 7 days." },
@@ -2032,6 +2336,17 @@ exports.handler = async (event) => {
     if (!prompt) return json(400, { error: "missing_prompt" });
     const context = body.context && typeof body.context === "object" ? body.context : {};
     const language = responseLanguage(prompt, context);
+    if (!shouldUseAppLayer(prompt, context)) {
+      let conversationResult;
+      try {
+        conversationResult = await modelConversationPlan(prompt, context, language);
+      } catch (error) {
+        conversationResult = { plan: conversationFallbackPlan(prompt, language), source: "deterministic_conversation_fallback_after_model_error", error: error.message };
+      }
+      conversationResult.plan = appendWebConversionNote(conversationResult.plan, prompt, context, language);
+      conversationResult.plan = localizePlan(conversationResult.plan, language);
+      return json(200, { ok: true, plan: conversationResult.plan, source: conversationResult.source, model_error: conversationResult.error || null });
+    }
     const fallback = fallbackPlan(prompt, context);
     let result;
     try {

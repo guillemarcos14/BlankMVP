@@ -92,6 +92,7 @@ Latest cycle:
 - After the first debugging pass: 43/50 strict conversations, 745/752, 99.1%.
 - Zero failures in safety, natural tone, malformed copy, same-product consistency, wrong context, action fit, and channel fit.
 - Remaining failures are 1-point context-literal misses, mostly where the answer is acceptable but does not repeat the exact expected app or moment token.
+- Human-readable review file: `docs/BAI_SYNTHETIC_CONVERSATIONS_REVIEW.md`.
 
 Fixes from the first debugging pass:
 

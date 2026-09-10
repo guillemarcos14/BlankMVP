@@ -70,11 +70,11 @@ Each candidate model is scored on:
 
 ## Candidate Models
 
-Current production model:
+Previous production model:
 
 - `gpt-4.1-mini`
 
-Primary candidate:
+Official model:
 
 - `gpt-5.6-luna`
 
@@ -96,4 +96,3 @@ Recommended rollout:
 4. Run 50 synthetic conversations.
 5. If `gpt-5.6-luna` wins, test it behind env var in staging/preview.
 6. Move production only after smoke tests and sample review pass.
-

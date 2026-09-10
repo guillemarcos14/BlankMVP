@@ -229,7 +229,7 @@ function assertPlan(testCase, plan) {
 
   const report = {
     mode: endpointUrl ? "remote" : useModel ? "model" : "deterministic",
-    model: useModel ? (process.env.OPENAI_MODEL || "gpt-4.1-mini") : null,
+    model: useModel ? (process.env.OPENAI_MODEL || "gpt-5.6-luna") : null,
     endpoint_url: endpointUrl || null,
     metrics: {
       total: metrics.total,

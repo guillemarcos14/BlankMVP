@@ -2045,7 +2045,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
   if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: fallback, source: "deterministic_conversation_fallback" };
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
@@ -2323,7 +2323,7 @@ function extractResponseText(responseBody) {
 async function modelPlan(prompt, context, fallback, language) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: normalizePlan({ plan: fallback }, fallback, context, prompt, language), source: "deterministic_fallback" };
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },

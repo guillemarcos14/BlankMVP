@@ -676,7 +676,7 @@ struct HomeView: View {
         if let modeName = sessionStore.pendingPlanModeName {
             return "Select apps for \(modeName) mode."
         }
-        "Select \(formattedPendingPlanAppNames) to apply this plan."
+        return "Select \(formattedPendingPlanAppNames) to apply this plan."
     }
 
     private var formattedPendingPlanAppNames: String {

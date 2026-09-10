@@ -40,6 +40,7 @@ function naturalChannelText(value, maxLength = 320) {
   return userFacingText(value, maxLength)
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
+    .replace(/\s*[—–]\s*/g, ". ")
     .replace(/\bI prepared a Blanked link\b/gi, "I left a Blanked link")
     .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help with that.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
@@ -94,6 +95,17 @@ function asksAboutBlankedDataOrPrediction(prompt) {
   return (product && (prediction || signals)) || (prediction && signals);
 }
 
+function isOutOfWellnessScope(prompt) {
+  const text = paddedText(prompt, 700);
+  if (isGeneralWellnessPrompt(prompt) || isProductivityPrompt(prompt) || isPhoneControlConversionPrompt(prompt) || asksAboutBlankedDataOrPrediction(prompt)) return false;
+  return contains(text, [
+    " israel", " palestine", " palestina", " gaza", " hamas", " netanyahu", " trump", " biden",
+    " election", " elecciones", " politics", " politica", " política", " war ", " guerra",
+    " stock", " crypto", " bitcoin", " recipe", " receta", " movie", " pelicula", " película",
+    " history", " historia", " religion", " religión", " game", " football", " futbol", " fútbol",
+  ]);
+}
+
 function isPhoneControlConversionPrompt(prompt) {
   const text = paddedText(prompt, 700);
   if (isConversationalOnly(prompt)) return false;
@@ -105,6 +117,16 @@ function isPhoneControlConversionPrompt(prompt) {
     " block", " bloquear", " bloquea", " limit", " límite", " limite", " protect", " proteger",
     " focus", " foco", " concentrate", " concentrarme", " work", " study", " estudiar", " trabajar",
     " app ", " apps ", " aplicación", " aplicaciones",
+  ]);
+}
+
+function isProductivityPrompt(prompt) {
+  const text = paddedText(prompt, 700);
+  return contains(text, [
+    " productivity", " productive", " focus", " deep work", " concentrate", " concentration",
+    " procrastinat", " distractions", " distract", " get work done", " trabajo profundo",
+    " productividad", " productivo", " productiva", " concentrarme", " concentracion", " concentración",
+    " procrastin", " distraccion", " distracción", " distracciones",
   ]);
 }
 
@@ -476,6 +498,7 @@ function isGeneralWellnessPrompt(prompt) {
     " exercise", " ejercicio", " energy", " energia", " energía", " tired", " cansado", " cansada",
     " stress", " estrés", " estres", " anxiety", " ansiedad", " recovery", " recuperacion", " recuperación",
     " wellness", " wellbeing", " bienestar", " habit", " hábito", " habito", " nutrition", " comida", " dinner", " cena",
+    " productivity", " productive", " productividad", " productivo", " productiva",
   ]);
 }
 
@@ -1967,7 +1990,11 @@ function conversationFallbackPlan(prompt, language = "en") {
   const text = cleanText(prompt, 180);
   const lower = cleanText(prompt, 700).toLowerCase();
   let fallbackText = language === "es" ? "Estoy aquí. Cuéntame qué ha pasado." : "I'm here. Tell me what's on your mind.";
-  if (asksAboutBlankedDataOrPrediction(prompt)) {
+  if (isOutOfWellnessScope(prompt)) {
+    fallbackText = language === "es"
+      ? "Solo puedo ayudarte con bienestar, hábitos, sueño, energía, foco y relación con el móvil. Si quieres, dime qué parte de tu bienestar quieres mejorar hoy."
+      : "I can only help with wellness, habits, sleep, energy, focus, and your relationship with your phone. If you want, tell me what part of your wellbeing you want to improve today.";
+  } else if (asksAboutBlankedDataOrPrediction(prompt)) {
     fallbackText = language === "es"
       ? "No lo adivinamos de la nada. Blanked puede estimarlo combinando señales como sueño, recuperación, actividad, Screen Time, patrones de uso del móvil y tu baseline personal. Si duermes peor, baja tu recuperación y sube el scroll nocturno frente a tu patrón normal, la predicción es probabilística: mañana puede haber menos energía o control, no un diagnóstico médico."
       : "We do not guess it from thin air. Blanked can estimate it from signals like sleep, recovery, activity, Screen Time, phone-use patterns and your personal baseline. If sleep drops, recovery weakens and night scrolling rises versus your normal pattern, the forecast is probabilistic: tomorrow may be a lower-energy or lower-control day, not a medical diagnosis.";
@@ -1979,6 +2006,10 @@ function conversationFallbackPlan(prompt, language = "en") {
     fallbackText = language === "es"
       ? "Para correr más, sube volumen poco a poco: 2-3 salidas fáciles por semana, una tirada algo más larga, fuerza básica de piernas y descanso suficiente. Cuando eso sea estable, añade series cortas o cuestas una vez por semana. Blanked solo entra si el móvil te rompe la constancia, por ejemplo bloqueando distracciones antes de la hora de entrenar."
       : "To run more, build volume gradually: 2-3 easy runs per week, one slightly longer run, basic leg strength, and enough recovery. Once that is stable, add short intervals or hill work once a week. Blanked only matters if the phone breaks consistency, for example by blocking distractions before your training window.";
+  } else if (isProductivityPrompt(prompt)) {
+    fallbackText = language === "es"
+      ? "Para producir más, elige una sola prioridad para el siguiente bloque y reduce decisiones antes de empezar. Trabaja 25-50 minutos, descansa poco y quita notificaciones. Este sí es un buen caso para Blanked: en la app podrías bloquear redes y apps de scroll durante ese bloque."
+      : "To boost productivity, choose one priority for the next work block and remove decisions before you start. Work for 25-50 minutes, take a short break, and turn off nonessential notifications. This is a good Blanked use case: in the app, you could block social and scroll apps during that block.";
   } else if (isGeneralWellnessPrompt(prompt) && asksForAdvice(prompt)) {
     fallbackText = language === "es"
       ? "Primero separaría energía, sueño, movimiento y móvil. Elige una palanca pequeña para esta semana: dormir y levantarte a horas parecidas, caminar o entrenar suave, comer algo más estable, y quitar fricción digital en el momento que más te arrastra. Si el móvil es parte del problema, Blanked puede convertir esa parte en bloqueos o alertas."
@@ -2006,6 +2037,7 @@ function conversationFallbackPlan(prompt, language = "en") {
 
 async function modelConversationPlan(prompt, context = {}, language = "en") {
   const fallback = conversationFallbackPlan(prompt, language);
+  if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: fallback, source: "deterministic_conversation_fallback" };
   const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
@@ -2017,7 +2049,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
       input: [
         {
           role: "system",
-          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Reply like a normal, warm, useful person in chat, not a support assistant, sales funnel, or setup wizard. Write compact conversational paragraphs, not markdown, bullets, or numbered lists unless the user explicitly asks for a list. The main answer must be valuable even if Blanked did not exist. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. On the web preview, you are allowed to add only a tiny Blanked-specific note at the end when phone control, scrolling, distractions, apps, or blocking are relevant: the web can reason and plan, but the app is needed for permissions and real automatic blocks. Keep that note to one short sentence and never let it replace the helpful answer. If the user asks about Blanked, digital wellness, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, Screen Time, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
+          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Stay strictly inside wellness, habits, sleep, energy, stress, focus, attention, recovery, training, digital wellness, screen habits, and phone control. If the user asks about politics, war, history, religion, finance, entertainment, general trivia, or anything outside wellness, do not answer the topic; briefly say you can only help with wellness and invite a wellness-related question. Reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Keep answers compact: 2-4 short sentences, no em dashes, no long generic list, no markdown unless asked. The main answer must be valuable even if Blanked did not exist. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, improve productivity, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. On web preview, add a tiny Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant. For productivity/focus requests, it is relevant to suggest a work block in the app that blocks social, reels, shorts, or other scroll apps during the chosen window. Keep that note to one short sentence and never let it replace the helpful answer. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, Screen Time, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
         },
         {
           role: "user",
@@ -2028,14 +2060,14 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
           }),
         },
       ],
-      max_output_tokens: 220,
+      max_output_tokens: 160,
     }),
   });
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(`openai_conversation_failed_${response.status}:${detail.slice(0, 240)}`);
   }
-  const reply = completeNaturalText(extractResponseText(await response.json()), 420);
+  const reply = completeNaturalText(extractResponseText(await response.json()), 280);
   if (!reply) return { plan: fallback, source: `openai:${model}:conversation_empty` };
   return {
     plan: {

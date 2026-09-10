@@ -6,7 +6,21 @@ const {
   segmentKey,
 } = require("./bai-intelligence");
 
-const OUTCOMES = new Set(["generated", "accepted", "ignored", "dismissed", "completed", "failed", "broke", "held"]);
+const OUTCOMES = new Set([
+  "generated",
+  "accepted",
+  "activated",
+  "edited",
+  "cancelled",
+  "ignored",
+  "dismissed",
+  "completed",
+  "failed",
+  "broke",
+  "held",
+  "relapse_after",
+  "improved_after",
+]);
 
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);

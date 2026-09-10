@@ -9,12 +9,17 @@ const TAXONOMY = {
 const OUTCOME_WEIGHTS = {
   generated: 0,
   accepted: 12,
+  activated: 16,
+  edited: 4,
+  cancelled: -12,
   completed: 24,
   held: 30,
+  improved_after: 22,
   ignored: -8,
   dismissed: -10,
   failed: -18,
   broke: -30,
+  relapse_after: -26,
 };
 
 function cleanText(value, maxLength = 240) {

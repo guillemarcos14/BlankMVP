@@ -81,12 +81,17 @@
       }
 
       const target = targetFromQuery(new URLSearchParams(window.location.search));
+      if (target) {
+        window.location.replace(target);
+      }
+
       const link = document.getElementById("openLink");
       if (target) {
         link.href = target;
-        window.setTimeout(() => {
-          window.location.href = target;
-        }, 150);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) return;
+          window.setTimeout(() => window.location.replace(target), 50);
+        });
       } else {
         link.style.display = "none";
       }

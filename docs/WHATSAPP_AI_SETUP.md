@@ -23,6 +23,7 @@ WHATSAPP_PHONE_NUMBER_ID=meta-phone-number-id
 WHATSAPP_APP_SECRET=meta-app-secret
 WHATSAPP_GRAPH_API_VERSION=v26.0
 BLANKED_APP_DEEP_LINK_SCHEME=blank
+BLANKED_PUBLIC_APP_LINK_BASE=https://getblank.netlify.app
 
 TWILIO_ACCOUNT_SID=replace-me
 TWILIO_AUTH_TOKEN=replace-me
@@ -65,11 +66,12 @@ BLANK_SMS_PHONE_NUMBER=+13478366767
 ## Product contract
 
 - WhatsApp receives user messages and sends them to `blanked-agent`.
-- WhatsApp replies with guidance and, when there is an executable action, a `blank://...` link.
+- WhatsApp replies with guidance and, when there is an executable action, uses a Twilio CTA template button when `TWILIO_WHATSAPP_ACTION_CONTENT_SID` is configured.
+- The WhatsApp button should point to a Universal Link such as `https://getblank.netlify.app/open?action=start-focus...`; move `BLANKED_PUBLIC_APP_LINK_BASE` to `https://blanked.app` only when `/open` and AASA are served there.
 - Twilio WhatsApp can receive voice notes, transcribe them with OpenAI, answer with BAI text, and attach an ElevenLabs-generated MP3 when the inbound message was audio or explicitly asks for voice.
 - iOS is still the authority for Screen Time actions.
 - `/.netlify/functions/assistant-channel` stores the user's preferred BAI interface (`whatsapp` or `sms`) by `CONNECT <code>` and sends proactive BAI alerts through the selected channel after the external thread has sent `CONNECT`.
-- SMS uses `/.netlify/functions/sms-agent` as an inbound SMS webhook. It accepts Twilio-style form posts, sends the message to `blanked-agent`, replies with TwiML plus a `blank://...` action link when needed, and supports outbound via Twilio credentials.
+- SMS uses `/.netlify/functions/sms-agent` as an inbound SMS webhook. It accepts Twilio-style form posts, sends the message to `blanked-agent`, replies first with commands like `Reply BLOCK` instead of raw URLs, stores the pending action, and sends the Universal Link only after the user replies with `BLOCK`, `START` or `OPEN`.
 - Users can send `stop` or `disconnect` in WhatsApp to pause this channel.
 
 ## Autonomous checks
@@ -119,7 +121,8 @@ Voice smoke expected result: `sms-agent voice smoke tests passed`.
 - Send the message and confirm Blanked replies `Connected`.
 - For SMS, configure the SMS provider inbound webhook to `https://getblank.netlify.app/.netlify/functions/sms-agent`, then tap `Connect SMS` in Blanked and send `CONNECT <code>`.
 - Send `Block Instagram TikTok and X from 10 to 7`.
-- Confirm the reply includes a `blank://setup-plan?...apps=Instagram%2CTikTok%2CX` link.
+- In WhatsApp, confirm the reply uses the `Open Blanked` CTA template when configured.
+- In SMS, confirm the first reply says `Reply BLOCK` without a raw URL; reply `BLOCK` and confirm the next SMS includes the Universal Link.
 - Send a WhatsApp voice note or a text asking for a voice note.
 - Confirm Twilio receives TwiML with `<Media>` pointing to `/.netlify/functions/assistant-audio`.
 - Confirm the WhatsApp reply includes playable audio plus the text/deep link fallback.

@@ -1,5 +1,47 @@
 [
   {
+    "id": "small_talk_how_you_doing_does_not_route_to_app",
+    "prompt": "how you doing?",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp"
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "good|doing|you|here|mind"
+      ],
+      "ui_text_not_matches": [
+        "Blanked|app|screen-habit|advice|diagnosis|protection plan|block|plan|Open|blank://|https://"
+      ],
+      "min_message_length": 8,
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "good_morning_does_not_route_to_app",
+    "prompt": "Good morning",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp"
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "Good morning|morning|here|mind"
+      ],
+      "ui_text_not_matches": [
+        "Blanked|app|screen-habit|advice|diagnosis|protection plan|block|plan|Open|blank://|https://"
+      ],
+      "min_message_length": 8,
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
     "id": "simple_whatsapp_greeting_feels_natural",
     "prompt": "hey blanked",
     "context": {
@@ -10,7 +52,7 @@
       "intent": "general",
       "action_types": [],
       "ui_text_matches": [
-        "hey|what.?s up"
+        "hey|what.?s up|here|mind|help"
       ],
       "ui_text_not_matches": [
         "need anything|screen-habit advice|diagnosis|protection plan|diagnose|Blanked\\?|Read:|Pattern:|Move:|blank://|https://"
@@ -37,6 +79,32 @@
       ],
       "ui_text_not_matches": [
         "those apps|This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:|blank://"
+      ],
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "after_lunch_correction_overrides_bedtime_memory",
+    "prompt": "No, after lunch. Not bedtime.",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true,
+      "memory": {
+        "last_topic": "sleep",
+        "pattern_cluster": "bedtime scroll"
+      }
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "ui_text_matches": [
+        "lunch|finish eating|apps|what time"
+      ],
+      "ui_text_not_matches": [
+        "bedtime scroll|sleep target|sleep|bedtime"
       ],
       "min_quality_score": 2,
       "min_utility_score": 3
@@ -483,7 +551,7 @@
       "intent": "general",
       "action_types": [],
       "text_matches": [
-        "phone|screen|habit|willpower"
+        "phone|relationship|here|mind"
       ]
     }
   },
@@ -1219,7 +1287,7 @@
       "intent": "general",
       "action_types": [],
       "text_matches": [
-        "advice|diagnosis|protection plan"
+        "phone|today|here|mind"
       ],
       "ui_text_not_matches": [
         "Start by|you should|Apply protection|Start now"
@@ -1446,7 +1514,7 @@
       "intent": "general",
       "action_types": [],
       "text_matches": [
-        "consejo|lectura|plan|quieres|ir más allá"
+        "móvil|hoy|aquí|Cuéntame"
       ],
       "ui_text_not_matches": [
         "Start by|you should|Apply protection|Start now"
@@ -1784,6 +1852,54 @@
       "text_matches": [
         "recovery|sleep|phone|lighter"
       ]
+    }
+  },
+  {
+    "id": "web_general_wellness_stays_conversational",
+    "prompt": "How can I improve my sleep?",
+    "context": {
+      "channel": "web_preview",
+      "assistant_channel": "web",
+      "web_preview": true,
+      "has_selected_apps": false,
+      "screen_time_authorized": false
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "sleep|wake|light|caffeine|routine|bed"
+      ],
+      "ui_text_not_matches": [
+        "download|App Store|automatic blocks|cannot block apps"
+      ],
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 2
+    }
+  },
+  {
+    "id": "web_scroll_adds_small_app_conversion_note",
+    "prompt": "How can I stop scrolling on Instagram at night?",
+    "context": {
+      "channel": "web_preview",
+      "assistant_channel": "web",
+      "web_preview": true,
+      "has_selected_apps": false,
+      "screen_time_authorized": false
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "Instagram|night|scroll|web|app|automatic blocks|permissions"
+      ],
+      "ui_text_not_matches": [
+        "Open Blanked|download|App Store|Read:|Pattern:|Move:"
+      ],
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 2
     }
   }
 ]

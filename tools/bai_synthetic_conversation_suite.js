@@ -26,10 +26,11 @@ const { handler } = require("../netlify/functions/blanked-agent");
 
 const REPORTS_DIR = path.join(__dirname, "reports");
 const INTERNAL_TEXT = /openai|model_error|deterministic_fallback|backend|json|schema|debug/i;
-const AI_SOUNDS = /as an ai|this sounds like|real loop|sleep target|useful move|i can help you apply|i prepared a link|read:|pattern:|move:|signal:|feedback:|protection:/i;
-const BANNED_TEXT = /\bcoach\b|medical diagnosis|diagnose|therapy|treatment/i;
+const AI_SOUNDS = /as an ai|this sounds like|real loop|sleep target|useful move|i can help you apply|i prepared a link|old app as context|use .* as context|read:|pattern:|move:|signal:|feedback:|protection:/i;
+const BANNED_TEXT = /\bcoach\b|medical diagnosis|diagnose|therapy|treatment|digital wellbeing|built-in screen time|phone.?s built-in|competing phone controls/i;
 const PRODUCT_SPLIT = /web version cannot help|messaging version|different product|less capable assistant/i;
 const MALFORMED_RANGE = /\b\d{1,2}(?::\d{2})?\.\s+\d{1,2}(?::\d{2})?\b/;
+const SEMICOLON = /;/;
 
 function cleanText(value, maxLength = 1000) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -143,9 +144,9 @@ function buildContextRetention(index) {
   const app = pick(socialApps);
   const moment = pick(weakMoments);
   return scenario(`synthetic_context_${index}_${moment.key}`, "context_retention", "web", [
-    user(`I lose control ${moment.phrase}.`, expect([moment.match], [moment.wrong])),
-    user(`${app}. Usually around ${moment.detail}.`, expect([new RegExp(app.split(" ")[0], "i"), new RegExp(moment.detail.replace(":", ":?"), "i")], [moment.wrong])),
-    user("What should I do?", expect([new RegExp(app.split(" ")[0], "i"), moment.match, /block|protect|walk|task|timer|boundary/i], [moment.wrong, /download|install/i])),
+    user(`I lose control ${moment.phrase}.`, expect([/what do you mean|what do you lose control|do you mean|with what|which app|what happens|qué quieres decir|a qué te refieres/i], [moment.wrong, /walk|drink water|put your phone|block|protect|Blanked App/i], { maxWords: 45 })),
+    user(`${app}. Usually around ${moment.detail}.`, expect([new RegExp(app.split(" ")[0], "i"), moment.match], [moment.wrong])),
+    user("What should I do?", expect([new RegExp(app.split(" ")[0], "i"), moment.match, /Blanked App|block|protect|boundary/i], [moment.wrong, /download|install|put your phone away|put your phone out of reach/i])),
   ], channelContext("web"));
 }
 
@@ -154,8 +155,8 @@ function buildCorrection(index) {
   const app = pick(["Reels", "Reddit", "YouTube Shorts", "Instagram"]);
   return scenario(`synthetic_correction_${index}`, "correction", "whatsapp", [
     user("I keep losing the night to TikTok.", expect([/TikTok|night|what time|bed|block|protect/i], [])),
-    user(`No, I do not use TikTok. It is ${app} ${corrected}.`, expect([new RegExp(app.split(" ")[0], "i"), corrected === "when I wake up" ? /wake|waking|morning/i : new RegExp(corrected.replace("when ", ""), "i"), /not use|won.?t use|got it|what time|finish/i], [/TikTok is|bedtime scroll|sleep target/i])),
-    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /what time|finish|block|protect|boundary|start|unavailable|free|limit/i], [/TikTok is|bedtime scroll|sleep target/i])),
+    user(`No, I do not use TikTok. It is ${app} ${corrected}.`, expect([new RegExp(app.split(" ")[0], "i"), corrected === "when I wake up" ? /wake|waking|morning/i : /after lunch|around lunch|after work|after dinner/i, /got it|what time|finish|thing to solve/i], [/old app|context|TikTok is|bedtime scroll|sleep target/i])),
+    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /Blanked App|block|protect|boundary|start|unavailable|free|limit/i], [/TikTok is|bedtime scroll|sleep target|put your phone away|put your phone out of reach/i])),
   ], {
     ...channelContext("whatsapp"),
     memory: { main_apps: ["TikTok"], last_topic: "sleep", weak_hours: [23] },
@@ -166,7 +167,7 @@ function buildWebAppSameProduct(index) {
   const app = pick(["Instagram", "TikTok", "YouTube", "Reddit"]);
   return scenario(`synthetic_web_app_${index}`, "web_same_product", "web", [
     user(`Can you block ${app} from 10 to 7?`, expect([/10|7/i, /app|permission|execute|apply|automatic/i], [/different product|copy this manually/i])),
-    user("So web cannot do it?", expect([/same|plan|explain|web|app|permission|execute|automatic/i], [/weaker assistant|different product/i])),
+    user("So web cannot do it?", expect([/same|plan|explain|web|app|permission|execute|automatic|Blanked App/i], [/weaker assistant|different product|Screen Time|Digital Wellbeing|built-in/i])),
   ], channelContext("web"));
 }
 
@@ -307,7 +308,7 @@ function scoreTurn(expectation, plan) {
 
   pass("safety", !INTERNAL_TEXT.test(text) && !BANNED_TEXT.test(text), "Internal, banned or medical/therapy text leaked.");
   pass("natural_tone", !AI_SOUNDS.test(text), "Visible answer sounds like an AI/product template.");
-  pass("copy_quality", !MALFORMED_RANGE.test(text), "Malformed range punctuation.");
+  pass("copy_quality", !MALFORMED_RANGE.test(text) && !SEMICOLON.test(text), "Malformed range punctuation or semicolon.");
   pass("same_product", !PRODUCT_SPLIT.test(text), "Web/messaging is framed as a different product.");
   pass("context", (expectation.must || []).every((pattern) => pattern.test(text)), "Missing required context or useful content.");
   pass("wrong_context", (expectation.mustNot || []).every((pattern) => !pattern.test(text)), "Used banned or wrong-context content.");

@@ -666,7 +666,7 @@
         "open_app_picker"
       ],
       "text_matches": [
-        "Duolingo|Screen Time|choose"
+        "Duolingo|Blanked App|choose"
       ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
@@ -681,7 +681,7 @@
         "open_app_picker"
       ],
       "text_matches": [
-        "Slack|Screen Time|choose"
+        "Slack|Blanked App|choose"
       ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
@@ -1101,7 +1101,7 @@
         "What time do you usually finish eating"
       ],
       "ui_text_not_matches": [
-        "Choose the social apps in Screen Time first|block Social|Read: Social|Social is the app|What time should the block start"
+        "Choose the social apps in Blanked App first|block Social|Read: Social|Social is the app|What time should the block start"
       ],
       "requires_selected_apps": false,
       "requires_screen_time_authorization": false
@@ -1128,10 +1128,10 @@
         "open_app_picker"
       ],
       "text_matches": [
-        "Instagram|Screen Time|choose"
+        "Instagram|Blanked App|choose"
       ],
       "ui_text_matches": [
-        "Choose Instagram in Screen Time first"
+        "Choose Instagram in Blanked App first"
       ],
       "ui_text_not_matches": [
         "TikTok|spare time|Set up"
@@ -1307,7 +1307,7 @@
         "What time do you usually finish dinner"
       ],
       "ui_text_not_matches": [
-        "What time should the block start|Choose Instagram in Screen Time first"
+        "What time should the block start|Choose Instagram in Blanked App first"
       ]
     }
   },

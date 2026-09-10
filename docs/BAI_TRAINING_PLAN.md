@@ -25,6 +25,21 @@ They must share the same brain, tone, memory, context rules, and recommendation 
 
 The evaluation must penalize any behavior that makes web feel like a weaker or different assistant.
 
+## Conversation Style Guide
+
+Product direction from Guillem:
+
+- Naturalness is the top priority.
+- Do not add text just to make the answer feel complete.
+- If BAI lacks context, it should ask one clear question and avoid giving advice too early.
+- When the user's problem is app scrolling, distraction, focus blocks, phone boundaries or app control, BAI can naturally explain that Blanked App can solve it by blocking apps or creating a plan.
+- Web can explain and plan, but only Blanked App can ask for permissions and execute blocking.
+- Do not recommend competing phone-control solutions such as built-in Screen Time or Digital Wellbeing.
+- Avoid internal wording such as `context`, `old app`, `pattern`, `useful move`, `backend`, `schema`, or `I will not use the old app as context`.
+- Do not use semicolons in user-visible BAI copy.
+- Mention `Blanked App` when the app is relevant.
+- Response length depends on the situation: short when a single question is enough, longer when useful detail genuinely helps.
+
 ## Training Moments
 
 1. Before release
@@ -90,11 +105,12 @@ Latest cycle:
 
 - Baseline after adding the suite: 24/50 strict conversations, 718/752, 95.5%.
 - After the first debugging pass: 43/50 strict conversations, 745/752, 99.1%.
-- Zero failures in safety, natural tone, malformed copy, same-product consistency, wrong context, action fit, and channel fit.
-- Remaining failures are 1-point context-literal misses, mostly where the answer is acceptable but does not repeat the exact expected app or moment token.
+- After applying Guillem's editorial criteria: 45/50 strict conversations, 747/752, 99.3%.
+- Zero failures in safety, natural tone, copy quality, same-product consistency, wrong context, action fit, and channel fit.
+- Remaining failures are 1-point context/editorial misses where the answer is usable but not yet exact enough for the expected conversation shape.
 - Human-readable review file: `docs/BAI_SYNTHETIC_CONVERSATIONS_REVIEW.md`.
 
-Fixes from the first debugging pass:
+Fixes from the debugging passes:
 
 - Short timing replies such as "Usually 9" now use recent conversation context and can create an `apply_schedule` action.
 - Existing mode activation is prioritized before generic sleep-context questions, so "Start Sleep mode for 45 minutes" activates the saved mode.
@@ -102,6 +118,10 @@ Fixes from the first debugging pass:
 - `Reels` is recognized as an app target.
 - Immediate block copy is less template-like.
 - Synthetic scoring now allows good concise messaging answers without forcing unnecessary app-name repetition.
+- If context is missing, BAI now asks one clear question instead of adding advice too early.
+- Web and messaging keep the same product logic: web can plan, Blanked App executes because it has permissions.
+- User-visible copy avoids semicolons, internal phrasing, and competing phone-control suggestions.
+- When Blanked can solve the user's app/scroll/focus problem, BAI naturally recommends Blanked App blocks or plans.
 
 ## Candidate Models
 

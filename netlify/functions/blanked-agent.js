@@ -40,7 +40,12 @@ function naturalChannelText(value, maxLength = 320) {
   return userFacingText(value, maxLength)
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
+    .replace(/;/g, ",")
     .replace(/\s*[—–]\s*/g, " - ")
+    .replace(/\bI will not use the old app as context\.?\s*/gi, "")
+    .replace(/\bI will not use that app as context\.?\s*/gi, "")
+    .replace(/\*\*/g, "")
+    .replace(/\b\d+\.\s+/g, "")
     .replace(/\bI prepared a Blanked link\b/gi, "I left a Blanked link")
     .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help with that.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
@@ -133,12 +138,12 @@ function isProductivityPrompt(prompt) {
 function webConversionNote(language = "en", prompt = "") {
   if (isProductivityPrompt(prompt)) {
     return language === "es"
-      ? "En la app, esto puede convertirse en un bloque de trabajo que cierre redes y apps de scroll."
-      : "In the app, this can become a work block that closes social and scroll apps.";
+      ? "En Blanked App, esto puede convertirse en un bloque de trabajo que cierre redes y apps de scroll."
+      : "In Blanked App, this can become a work block that closes social and scroll apps.";
   }
   return language === "es"
-    ? "Desde la web no puedo bloquear apps ni pedir permisos; en la app puedo convertirlo en bloqueos automáticos."
-    : "From the web I cannot block apps or request permissions; in the app I can turn this into automatic blocks.";
+    ? "Desde la web puedo planearlo, pero solo Blanked App puede pedir permisos y bloquear apps automáticamente."
+    : "I can plan it here, but only Blanked App can ask for permissions and block apps automatically.";
 }
 
 function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
@@ -240,7 +245,7 @@ function localizeText(value, language, maxLength = 420) {
     "Tell goal": "Contar objetivo",
     "Not now": "Ahora no",
     "I can help make access harder, but I will only create bounded rules with a clear target and exit path. Tell me the app or moment to protect first.": "Puedo hacer el acceso más difícil, pero solo crearé reglas limitadas con un objetivo claro y una salida. Dime primero la app o el momento que quieres proteger.",
-    "Got it. I will not use that app as context. Which app, moment or habit should we focus on instead?": "Entendido. No usaré esa app como contexto. ¿En qué app, momento o hábito deberíamos centrarnos?",
+    "Got it. Which app, moment or habit should we focus on instead?": "Entendido. ¿En qué app, momento o hábito deberíamos centrarnos?",
     "That usually starts before bedtime. What time do you want to be asleep?": "Eso suele empezar antes de irte a dormir. ¿A qué hora quieres estar dormido?",
     "If you want to be asleep from 11:00 PM to 7:00 AM, the phone should get harder to use before 11:00 PM.": "Si quieres dormir de 11:00 PM a 7:00 AM, el móvil debería ser más difícil de usar antes de las 11:00 PM.",
     "Got it. Which app pulls you in most, and when does it usually happen?": "Entendido. ¿Qué app te atrapa más y cuándo suele pasar?",
@@ -250,7 +255,7 @@ function localizeText(value, language, maxLength = 420) {
     "What time do you usually finish dinner?": "¿A qué hora sueles terminar de cenar?",
     "What time do you usually wake up?": "¿A qué hora sueles despertarte?",
     "What time do you usually finish work?": "¿A qué hora sueles terminar de trabajar?",
-    "Choose the social apps in Screen Time first, then I can apply the block.": "Elige primero las apps sociales en Screen Time y después puedo aplicar el bloqueo.",
+    "Choose the social apps in Blanked App first, then I can apply the block.": "Elige primero las apps sociales en Blanked App y después puedo aplicar el bloqueo.",
     "I can use counts and context you choose to share, but I do not need your exact app list to reason about the pattern.": "Puedo usar conteos y contexto que decidas compartir, pero no necesito tu lista exacta de apps para razonar sobre el patrón.",
     "This is an execution moment, so the useful move is immediate friction.": "Este es un momento de ejecución: lo útil ahora es añadir fricción inmediata.",
     "I read this as a study window, so the useful move is a short plan with friction already in place.": "Lo leo como una franja de estudio: lo útil es un plan corto con fricción ya preparada.",
@@ -444,7 +449,7 @@ function actionMessage(plan, prompt = "", language = "en") {
   if (first.type === "pause_rules") return language === "es" ? "Pausaría las reglas con una fecha de vuelta." : "Pause the rules with a clear return point.";
   if (first.type === "disable_pause") return language === "es" ? "Reactivaría tus reglas." : "Resume your rules and bring the structure back.";
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
-    return language === "es" ? `Primero elige ${target} en Screen Time.` : `Choose ${target} in Screen Time first.`;
+    return language === "es" ? `Primero elige ${target} en Blanked App.` : `Choose ${target} in Blanked App first.`;
   }
   if (first.type === "apply_ai_plan") return language === "es" ? "Aplicaría el siguiente ajuste recomendado." : "Apply the next recommended adjustment and review the result later.";
   return "";
@@ -754,9 +759,9 @@ function namedApp(prompt) {
     ["instagram", "Instagram"],
     ["insta", "Instagram"],
     [" ig ", "Instagram"],
+    ["youtube shorts", "YouTube Shorts"],
     ["youtube", "YouTube"],
     ["yt", "YouTube"],
-    ["youtube shorts", "YouTube"],
     ["reels", "Reels"],
     ["reddit", "Reddit"],
     ["twitter", "Twitter"],
@@ -1033,6 +1038,69 @@ function recentRelativeTimeQuestion(context = {}) {
   return { ...moment, app };
 }
 
+function conversationalFollowupPlan(prompt, context = {}, language = "en") {
+  const messages = recentMessages(context);
+  const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
+  const app = namedApp(prompt);
+  const timeMatch = cleanText(prompt, 120).match(/\b(?:around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  const timeText = timeMatch ? `${timeMatch[1]}:${String(timeMatch[2] || "00").padStart(2, "0")}${timeMatch[3] ? ` ${timeMatch[3].toUpperCase()}` : ""}` : "";
+  const hasRecentAmbiguousLoss = /lose control|what do you lose control|do you mean|a qué te refieres|qué quieres decir/i.test(recentText);
+  if (app !== "the app" && timeText && hasRecentAmbiguousLoss) {
+    const message = language === "es"
+      ? `Entendido: ${app} sobre las ${timeText}. Yo lo convertiría en una franja de bloqueo en Blanked App justo antes de ese momento. Desde la web puedo planearlo, pero solo Blanked App puede pedir permisos y bloquear apps automáticamente.`
+      : `Got it: ${app} around ${timeText}. I’d turn that into a Blanked App block just before that moment. I can plan it here, but only Blanked App can ask for permissions and block apps automatically.`;
+    return {
+      intent: "social",
+      title: "App Timing",
+      response_text: message,
+      bullets: [
+        `Read: ${app} is the app and ${timeText} is the risk time.`,
+        "Pattern: this is specific enough to propose a Blanked App block.",
+        "Move: plan the block before the usual pull starts."
+      ],
+      primary_label: "Plan block",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (/^exactly\b|^yes\b|^yeah\b|^yep\b|^correct\b/i.test(cleanText(prompt, 80)) && /thing to solve|what time do you usually|after waking|after work|after lunch|after dinner/i.test(recentText)) {
+    const appMatches = [...recentText.matchAll(/\b(instagram|tiktok|tik tok|youtube shorts|youtube|reddit|reels)\b/gi)];
+    const appMatch = appMatches.length ? appMatches[appMatches.length - 1] : null;
+    const appLabel = appMatch ? namedApp(appMatch[1]) : "that app";
+    const moment = /wake|waking|morning/i.test(recentText) ? "after waking" :
+      /after work/i.test(recentText) ? "after work" :
+      /after lunch|around lunch/i.test(recentText) ? "after lunch" :
+      /after dinner/i.test(recentText) ? "after dinner" : "at that moment";
+    const message = language === "es"
+      ? `Lo resolvería con una franja de bloqueo para ${appLabel} en Blanked App ${moment}. La idea es quitar la decisión antes de que empiece el impulso, no confiar en fuerza de voluntad.`
+      : `I’d solve it with a Blanked App block for ${appLabel} ${moment}. The point is to remove the decision before the pull starts, not rely on willpower.`;
+    return {
+      intent: "social",
+      title: "Blanked App Block",
+      response_text: message,
+      bullets: [
+        `Read: ${appLabel} ${moment} is the target.`,
+        "Pattern: a block should happen before the automatic opening.",
+        "Move: recommend a Blanked App block."
+      ],
+      primary_label: "Plan block",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  return null;
+}
+
 function explicitDurationMinutes(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
   const match = text.match(/(\d{1,3})\s*(?:min|mins|minute|minutes)/i);
@@ -1282,7 +1350,7 @@ function fallbackPlan(prompt, context = {}) {
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
   const modeName = requestedModeName(prompt, context);
-  const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow Screen Time.";
+  const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow permissions in Blanked App.";
   const outcomeLine = lastOutcome === "broke"
     ? "Feedback: the last plan broke, so the next move should be easier and earlier."
     : lastOutcome === "held"
@@ -1459,7 +1527,7 @@ function fallbackPlan(prompt, context = {}) {
       return {
         intent: "social",
         title: "Context Corrected",
-        response_text: `Got it. I will not use the old app as context. If it is ${appLabel} ${momentLabel}, ${question.charAt(0).toLowerCase()}${question.slice(1)}`,
+        response_text: `Got it. Then ${appLabel} ${momentLabel} is the thing to solve. ${question.charAt(0).toUpperCase()}${question.slice(1)}`,
         bullets: [
           "Read: the previous app context was wrong.",
           `Pattern: the real target is ${appLabel}${corrected.moment ? ` ${momentLabel}` : ""}.`,
@@ -1475,7 +1543,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "general",
       title: "Context Corrected",
-      response_text: "Got it. I will not use that app as context. Which app, moment or habit should we focus on instead?",
+      response_text: "Got it. Which app, moment or habit should we focus on instead?",
       bullets: [
         "Read: the previous app context was wrong.",
         "Pattern: a useful plan needs your real trigger, not a guessed app.",
@@ -1646,7 +1714,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose Apps",
-      response_text: `Choose the social apps in Screen Time first, then I can apply the block.`,
+      response_text: `Choose the social apps in Blanked App first, then I can apply the block.`,
       bullets: [
         "Read: this is a category of apps, not one exact app.",
         "Pattern: iOS needs you to choose the apps before Blanked can shield them.",
@@ -1663,7 +1731,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose App",
-      response_text: `I can help block ${unknownApp}, but first you need to choose it in Screen Time.`,
+      response_text: `I can help block ${unknownApp}, but first you need to choose it in Blanked App.`,
       bullets: [
         `Read: ${unknownApp} is the app you want to control.`,
         "Pattern: iOS requires the exact app selection before Blanked can shield it.",
@@ -1682,7 +1750,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose App",
-      response_text: `Choose ${promptApp} in Screen Time first, then I can apply the block.`,
+      response_text: `Choose ${promptApp} in Blanked App first, then I can apply the block.`,
       bullets: [
         `Read: ${promptApp} is the app you want to control.`,
         "Pattern: iOS needs that app inside your authorized selection before Blanked can shield it.",
@@ -2161,8 +2229,8 @@ function conversationFallbackPlan(prompt, language = "en") {
       : "I can only help with wellness, habits, sleep, energy, focus, and your relationship with your phone. If you want, tell me what part of your wellbeing you want to improve today.";
   } else if (asksAboutBlankedDataOrPrediction(prompt)) {
     fallbackText = language === "es"
-      ? "No lo adivinamos de la nada. Blanked puede estimarlo combinando señales como sueño, recuperación, actividad, Screen Time, patrones de uso del móvil y tu baseline personal. Si duermes peor, baja tu recuperación y sube el scroll nocturno frente a tu patrón normal, la predicción es probabilística: mañana puede haber menos energía o control, no un diagnóstico médico."
-      : "We do not guess it from thin air. Blanked can estimate it from signals like sleep, recovery, activity, Screen Time, phone-use patterns and your personal baseline. If sleep drops, recovery weakens and night scrolling rises versus your normal pattern, the forecast is probabilistic: tomorrow may be a lower-energy or lower-control day, not a medical diagnosis.";
+      ? "No lo adivinamos de la nada. Blanked puede estimarlo combinando señales como sueño, recuperación, actividad, uso del móvil y tu baseline personal. Si duermes peor, baja tu recuperación y sube el scroll nocturno frente a tu patrón normal, la predicción es probabilística: mañana puede haber menos energía o control, no un diagnóstico médico."
+      : "We do not guess it from thin air. Blanked can estimate it from signals like sleep, recovery, activity, phone-use patterns and your personal baseline. If sleep drops, recovery weakens and night scrolling rises versus your normal pattern, the forecast is probabilistic: tomorrow may be a lower-energy or lower-control day, not a medical diagnosis.";
   } else if (contains(lower, ["sleep", "dormir", "descanso"])) {
     fallbackText = language === "es"
       ? "Para dormir mejor, empezaría por una hora fija para levantarte, luz natural por la mañana, cafeína solo temprano, cenas más ligeras, bajar luces por la noche y una rutina corta sin pantalla antes de la cama. Si tu problema es el scroll nocturno, Blanked puede añadir una barrera 15-45 minutos antes de dormir para que el móvil no entre contigo en la cama."
@@ -2203,6 +2271,8 @@ function conversationFallbackPlan(prompt, language = "en") {
 async function modelConversationPlan(prompt, context = {}, language = "en") {
   const fallback = conversationFallbackPlan(prompt, language);
   if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
+  const contextual = conversationalFollowupPlan(prompt, context, language);
+  if (contextual) return { plan: contextual, source: "deterministic_conversation_context" };
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: fallback, source: "deterministic_conversation_fallback" };
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
@@ -2214,7 +2284,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
       input: [
         {
           role: "system",
-          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Stay strictly inside wellness, habits, sleep, energy, stress, focus, attention, recovery, training, digital wellness, screen habits, and phone control. If the user asks about politics, war, history, religion, finance, entertainment, general trivia, or anything outside wellness, do not answer the topic; briefly say you can only help with wellness and invite a wellness-related question. Reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Keep answers compact: 2-4 short sentences, no em dashes, no long generic list, no markdown unless asked. The main answer must be valuable even if Blanked did not exist. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, improve productivity, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. On web preview, add a tiny Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant. For productivity/focus requests, it is relevant to suggest a work block in the app that blocks social, reels, shorts, or other scroll apps during the chosen window. Keep that note to one short sentence and never let it replace the helpful answer. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, Screen Time, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
+          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Stay strictly inside wellness, habits, sleep, energy, stress, focus, attention, recovery, training, digital wellness, screen habits, and phone control. If the user asks about politics, war, history, religion, finance, entertainment, general trivia, or anything outside wellness, do not answer the topic; briefly say you can only help with wellness and invite a wellness-related question. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough context, ask one clear question and do not add advice yet. The main answer must be valuable even if Blanked did not exist. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, improve productivity, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. When the problem is apps, scrolling, focus blocks, distraction control, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blanked App executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blanked App that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
         },
         {
           role: "user",
@@ -2497,7 +2567,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-              "You are BAI, Blanked's personal assistant for healthier screen habits. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward the app only when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention the app only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. When the person corrects the app, timing, or situation, treat that correction as the current truth and explicitly carry the corrected app or moment into the next answer. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: activate_mode when the user says they are in a named mode or asks to block a category that likely maps to a saved profile, start_protection for immediate blocks without a named profile, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only when they want to change profile without starting protection, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+              "You are BAI, Blanked's personal assistant for healthier screen habits. Naturalness is the top priority. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward Blanked App when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention Blanked App only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. When the person corrects the app, timing, or situation, treat that correction as the current truth and explicitly carry the corrected app or moment into the next answer. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. If the person has not given enough context, ask one clear question and do not add advice yet. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: activate_mode when the user says they are in a named mode or asks to block a category that likely maps to a saved profile, start_protection for immediate blocks without a named profile, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only when they want to change profile without starting protection, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. When the problem is apps, scrolling, focus blocks, distraction control, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",

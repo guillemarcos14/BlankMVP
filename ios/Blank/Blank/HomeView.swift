@@ -150,7 +150,7 @@ struct HomeView: View {
         }
         .familyActivityPicker(
             headerText: contextualPickerHeaderText,
-            footerText: "",
+            footerText: contextualPickerFooterText,
             isPresented: $showingContextualAppPicker,
             selection: $contextualPlanSelection
         )
@@ -160,6 +160,20 @@ struct HomeView: View {
                     if let modeName = sessionStore.pendingPlanModeName,
                        contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.createOrUpdateMode(named: modeName, selection: contextualPlanSelection)
+                        if sessionStore.pendingPlanShouldActivate {
+                            let result = withAnimation(.easeInOut(duration: 0.65)) {
+                                sessionStore.activateBlank(
+                                    durationMinutes: sessionStore.pendingPlanDurationMinutes,
+                                    hardMode: sessionStore.pendingPlanHardMode
+                                )
+                            }
+                            screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
+                            setMessage(for: result)
+                            activeSection = nil
+                        } else {
+                            message = "\(modeName) mode saved."
+                            messageAction = nil
+                        }
                     } else {
                         sessionStore.selection = contextualPlanSelection
                     }
@@ -674,9 +688,19 @@ struct HomeView: View {
 
     private var contextualPickerHeaderText: String {
         if let modeName = sessionStore.pendingPlanModeName {
-            return "Select apps for \(modeName) mode."
+            return "Create \(modeName) mode"
         }
         return "Select \(formattedPendingPlanAppNames) to apply this plan."
+    }
+
+    private var contextualPickerFooterText: String {
+        guard let modeName = sessionStore.pendingPlanModeName else {
+            return "Blanked will use this selection for the plan."
+        }
+        if sessionStore.pendingPlanShouldActivate {
+            return "Choose apps once. Blanked will save \(modeName) and start it now. Next time, the WhatsApp button starts this mode directly."
+        }
+        return "Choose apps once. Blanked will save \(modeName) so WhatsApp can start it directly next time."
     }
 
     private var formattedPendingPlanAppNames: String {

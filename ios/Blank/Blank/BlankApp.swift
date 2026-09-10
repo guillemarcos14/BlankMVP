@@ -158,15 +158,36 @@ struct BlankApp: App {
                     _ = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode, entryMode: .app)
                 }
             } else {
-                openBlockConfiguration(from: components, startsFreshSelection: true, modeName: name.isEmpty ? nil : name)
+                openBlockConfiguration(
+                    from: components,
+                    startsFreshSelection: true,
+                    modeName: name.isEmpty ? nil : name,
+                    shouldActivate: shouldActivate,
+                    durationMinutes: minutes,
+                    hardMode: hardMode
+                )
             }
             applyScreenTimeState()
         }
     }
 
-    private func openBlockConfiguration(from components: URLComponents?, startsFreshSelection: Bool = false, modeName: String? = nil) {
+    private func openBlockConfiguration(
+        from components: URLComponents?,
+        startsFreshSelection: Bool = false,
+        modeName: String? = nil,
+        shouldActivate: Bool = false,
+        durationMinutes: Int? = nil,
+        hardMode: Bool = false
+    ) {
         let appNames = components?.listQueryItem("apps") ?? []
-        sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: startsFreshSelection, modeName: modeName)
+        sessionStore.requestBlockConfiguration(
+            appNames: appNames,
+            startsFreshSelection: startsFreshSelection,
+            modeName: modeName,
+            shouldActivate: shouldActivate,
+            durationMinutes: durationMinutes,
+            hardMode: hardMode
+        )
     }
 
     private func setupPlan(from components: URLComponents?) {

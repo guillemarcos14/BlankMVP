@@ -830,7 +830,13 @@ private struct ConversationalHomeView: View {
                     screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                     appliedLabels.append("\(name) mode: \(agentResultText(result))")
                 } else {
-                    sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
+                    sessionStore.requestBlockConfiguration(
+                        startsFreshSelection: true,
+                        modeName: name,
+                        shouldActivate: true,
+                        durationMinutes: minutes,
+                        hardMode: hardMode
+                    )
                     showingPicker = true
                     appliedLabels.append("Choose apps for \(name)")
                 }

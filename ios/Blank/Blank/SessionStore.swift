@@ -149,6 +149,9 @@ final class SessionStore: ObservableObject {
     @Published var pendingPlanAppNames: [String] = []
     @Published var pendingPlanStartsFreshSelection = false
     @Published var pendingPlanModeName: String?
+    @Published var pendingPlanShouldActivate = false
+    @Published var pendingPlanDurationMinutes: Int?
+    @Published var pendingPlanHardMode = false
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -488,11 +491,21 @@ final class SessionStore: ObservableObject {
         setupComplete = true
     }
 
-    func requestBlockConfiguration(appNames: [String] = [], startsFreshSelection: Bool = false, modeName: String? = nil) {
+    func requestBlockConfiguration(
+        appNames: [String] = [],
+        startsFreshSelection: Bool = false,
+        modeName: String? = nil,
+        shouldActivate: Bool = false,
+        durationMinutes: Int? = nil,
+        hardMode: Bool = false
+    ) {
         pendingPlanAppNames = appNames
         pendingPlanStartsFreshSelection = startsFreshSelection
         let cleanModeName = modeName?.trimmingCharacters(in: .whitespacesAndNewlines)
         pendingPlanModeName = cleanModeName?.isEmpty == false ? cleanModeName : nil
+        pendingPlanShouldActivate = shouldActivate
+        pendingPlanDurationMinutes = durationMinutes.map { min(max($0, 5), 240) }
+        pendingPlanHardMode = hardMode
         shouldOpenBlockConfiguration = true
     }
 
@@ -500,6 +513,9 @@ final class SessionStore: ObservableObject {
         pendingPlanAppNames = []
         pendingPlanStartsFreshSelection = false
         pendingPlanModeName = nil
+        pendingPlanShouldActivate = false
+        pendingPlanDurationMinutes = nil
+        pendingPlanHardMode = false
     }
 
     func requestWidgetTimerSelector() {

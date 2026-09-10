@@ -341,7 +341,7 @@ function localizePlan(plan, language) {
     message_text: localizeText(plan.message_text, language).slice(0, 320),
     speech_text: localizeText(plan.speech_text, language).slice(0, 420),
     followup_text: localizeText(plan.followup_text, language).slice(0, 240),
-    response_text: localizeText(plan.response_text, language).slice(0, 180),
+    response_text: localizeText(plan.response_text, language).slice(0, 320),
     bullets: Array.isArray(plan.bullets) ? plan.bullets.map((item) => localizeText(item, language).slice(0, 140)) : [],
     primary_label: localizeText(plan.primary_label, language).slice(0, 32),
     secondary_label: localizeText(plan.secondary_label, language).slice(0, 32),

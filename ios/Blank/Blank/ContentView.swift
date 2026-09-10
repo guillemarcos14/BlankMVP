@@ -817,9 +817,20 @@ private struct ConversationalHomeView: View {
                 sessionStore.disableVacationMode()
                 appliedLabels.append("Rules resumed")
             case .switchMode(let name):
-                if sessionStore.selectMode(named: name) {
+                if sessionStore.selectBestMode(matching: name) {
                     appliedLabels.append("\(name) mode selected")
                 } else {
+                    sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
+                    showingPicker = true
+                    appliedLabels.append("Choose apps for \(name)")
+                }
+            case .activateMode(let name, let minutes, let hardMode):
+                if sessionStore.selectBestMode(matching: name) {
+                    let result = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
+                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+                    appliedLabels.append("\(name) mode: \(agentResultText(result))")
+                } else {
+                    sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
                     showingPicker = true
                     appliedLabels.append("Choose apps for \(name)")
                 }
@@ -1058,6 +1069,7 @@ private enum AgentAction: Equatable {
     case pauseRules(hours: Int)
     case disablePause
     case switchMode(name: String)
+    case activateMode(name: String, minutes: Int?, hardMode: Bool)
     case openAppPicker
     case requestScreenTimePermission
     case applyAIPlan
@@ -1200,7 +1212,7 @@ private enum BlankedAgentPlanner {
             return AgentPlan(
                 intent: .sleep,
                 title: "Bedtime Scroll Read",
-                responseText: "This sounds like a bedtime scroll loop. Before I block anything, I need your sleep target.",
+                responseText: "That usually starts before bedtime. What time do you want to be asleep?",
                 bullets: [
                     "Read: you want nights to feel less automatic.",
                     "Pattern: the risky window depends on when you actually go to sleep.",
@@ -1222,7 +1234,7 @@ private enum BlankedAgentPlanner {
             return AgentPlan(
                 intent: .social,
                 title: "Scroll Pattern",
-                responseText: "I can help with that, but first I need to know where the loop happens.",
+                responseText: "Got it. Which app pulls you in most, and when does it usually happen?",
                 bullets: [
                     "Read: this is a scroll habit, not a generic focus issue.",
                     "Pattern: the useful protection depends on the app and time window.",
@@ -1403,7 +1415,7 @@ private enum BlankedAgentPlanner {
         return AgentPlan(
             intent: .sleep,
             title: "Bedtime Scroll Loop",
-            responseText: "This sounds like bedtime scrolling spilling into recovery, not a generic productivity issue.",
+            responseText: "That late scroll is probably leaking into sleep, not just adding screen time.",
             bullets: [
                 "Read: nights are the risky context.",
                 "Pattern: the phone extends the day when your body needs shutdown.",
@@ -1664,7 +1676,7 @@ private enum BlankedAgentPlanner {
                 return AgentPlan(
                     intent: .general,
                     title: "Plan Context",
-                    responseText: "I can build a plan, but first I need the real loop. Which app, moment or habit should we focus on?",
+                    responseText: "Tell me the app, moment, or habit you want to change first.",
                     bullets: [
                         "Read: you want a plan, but the target is still too broad.",
                         "Pattern: useful protection starts from one repeated trigger.",
@@ -1948,6 +1960,12 @@ private struct RemoteAgentAction: Decodable {
             return .disablePause
         case "switch_mode":
             return .switchMode(name: String((name ?? "Routine").prefix(40)))
+        case "activate_mode":
+            return .activateMode(
+                name: String((name ?? "Routine").prefix(40)),
+                minutes: minutes.map { clamp($0, 5, 240) },
+                hardMode: hard_mode ?? false
+            )
         case "open_app_picker":
             return .openAppPicker
         case "request_screen_time_permission":

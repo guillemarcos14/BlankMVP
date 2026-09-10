@@ -5,6 +5,7 @@ const {
   getAssistantMemory,
   recordAssistantChannel,
   recordAssistantMemory,
+  sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { buildSignedAudioUrl } = require("./_elevenlabs_voice");
 
@@ -193,14 +194,22 @@ function connectReply(from, channel) {
   return `Hey! Blanked here 👋 Connected. BAI will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
+function detectedLanguage(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+    ? "es"
+    : "en";
+}
+
 function actionIntro(actions) {
   const first = primaryAction(actions);
   if (!first) return "";
-  if (first.type === "set_daily_limit") return "Use this link to open Blanked and review the daily limit.";
-  if (first.type === "apply_schedule") return "Use this link to open Blanked and review the protection window.";
-  if (first.type === "start_protection") return "Use this link to open Blanked and start the block.";
-  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Use this link to open Blanked and finish setup.";
-  return "Use this link to open Blanked and review the next step.";
+  if (first.type === "set_daily_limit") return "Open Blanked to review the daily limit.";
+  if (first.type === "apply_schedule") return "Open Blanked to review the protection window.";
+  if (first.type === "start_protection") return "Open Blanked to start the block.";
+  if (first.type === "activate_mode") return "Open Blanked to start that mode.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
+  return "Open Blanked to review the next step.";
 }
 
 function minuteText(value) {
@@ -228,6 +237,9 @@ function actionSentence(actions, appNames = []) {
   if (first.type === "start_protection") {
     return `This opens Blanked with a ${clamp(first.minutes || 25, 5, 240)}-minute app block ready to review.`;
   }
+  if (first.type === "activate_mode") {
+    return `This opens Blanked with ${cleanText(first.name, 40) || "that"} mode ready to start.`;
+  }
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
     return "This opens Blanked so you can choose the apps to block.";
   }
@@ -252,6 +264,98 @@ function voiceActionCue(actions, appNames = []) {
   const summary = actionSentence(actions, appNames);
   if (!summary) return "";
   return `${summary} I left the link in the text message.`;
+}
+
+function whatsappActionButtonVariables(link) {
+  let linkPath = link;
+  try {
+    const parsed = new URL(link);
+    linkPath = `${parsed.pathname.replace(/^\//, "")}${parsed.search}`;
+  } catch (_) {
+    linkPath = link.replace(/^https?:\/\/[^/]+\//i, "");
+  }
+  const configured = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_VARIABLES, 1000);
+  if (configured) {
+    try {
+      const parsed = JSON.parse(configured);
+      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
+        key,
+        String(value)
+          .replace(/\{\{link\}\}/g, link)
+          .replace(/\{\{link_path\}\}/g, linkPath),
+      ]));
+    } catch (_) {
+      return { "1": linkPath };
+    }
+  }
+  return { "1": linkPath };
+}
+
+function smsCommand(text) {
+  const value = cleanText(text, 40).toUpperCase();
+  return ["BLOCK", "START", "OPEN", "REPORT"].includes(value) ? value : "";
+}
+
+function commandForAction(actions) {
+  const first = primaryAction(actions);
+  if (!first) return "OPEN";
+  if (["start_protection", "activate_mode", "apply_schedule", "open_app_picker", "request_screen_time_permission", "enable_allow_only"].includes(first.type)) {
+    return "BLOCK";
+  }
+  if (first.type === "set_daily_limit") return "START";
+  return "OPEN";
+}
+
+function smsActionCue(actions) {
+  const command = commandForAction(actions);
+  if (command === "BLOCK") return "Reply BLOCK to open Blanked with this ready.";
+  if (command === "START") return "Reply START to open Blanked with this ready.";
+  return "Reply OPEN to review it in Blanked.";
+}
+
+function pendingActionFromMemory(memory = {}) {
+  const link = cleanText(memory.pending_action_link, 1200);
+  if (!link) return null;
+  return {
+    link,
+    summary: cleanText(memory.pending_action_summary, 500),
+    command: cleanText(memory.pending_action_command, 20).toUpperCase() || "OPEN",
+  };
+}
+
+async function smsCommandReply(from, command) {
+  let memory = {};
+  try {
+    memory = await getAssistantMemory("sms", from);
+  } catch (_) {
+    memory = {};
+  }
+  const pending = pendingActionFromMemory(memory);
+  if (command === "REPORT" && !pending) {
+    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step.", speechText: "" };
+  }
+  if (!pending) {
+    return { text: "No pending Blanked action. Tell me what you want to block or change.", speechText: "" };
+  }
+  if (command !== "OPEN" && command !== pending.command && !(command === "START" && pending.command === "BLOCK")) {
+    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.`, speechText: "" };
+  }
+  try {
+    await recordAssistantMemory({
+      channel: "sms",
+      channelUser: from,
+      memory: {
+        pending_action_link: null,
+        pending_action_summary: null,
+        pending_action_command: null,
+      },
+      source: command,
+    });
+  } catch (_) {
+    // Clearing a pending action must never block delivery.
+  }
+  const intro = pending.summary ? `${pending.summary}\n\n` : "";
+  return { text: `${intro}Open Blanked: ${pending.link}`, speechText: "" };
 }
 
 function voiceInputSummary(prompt) {
@@ -355,9 +459,11 @@ async function askBAI(prompt, from, channel) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt);
+  const language = savedMemory.language || detectedLanguage(prompt);
   const memory = {
     ...savedMemory,
     ...newFacts,
+    language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
   };
@@ -370,6 +476,8 @@ async function askBAI(prompt, from, channel) {
       context: {
         channel,
         assistant_channel: channel,
+        language,
+        allow_spanish_response: true,
         has_selected_apps: true,
         screen_time_authorized: true,
         memory,
@@ -379,7 +487,7 @@ async function askBAI(prompt, from, channel) {
 
   if (Object.keys(newFacts).length) {
     try {
-      await recordAssistantMemory({ channel, channelUser: from, memory: newFacts, source: prompt });
+      await recordAssistantMemory({ channel, channelUser: from, memory: { ...newFacts, language }, source: prompt });
     } catch (_) {
       // Memory must never block a reply.
     }
@@ -398,6 +506,50 @@ async function askBAI(prompt, from, channel) {
   const modelFollowup = naturalReplyText(plan.followup_text || "");
   const speechBase = modelSpeech || message;
   const speechActionCue = actionLink && !/\blink\b/i.test(speechBase) ? "I left the link in the next message." : "";
+  if (channel === "sms" && actionLink) {
+    const pendingCommand = commandForAction(actions);
+    let pendingStored = false;
+    try {
+      await recordAssistantMemory({
+        channel,
+        channelUser: from,
+        memory: {
+          pending_action_link: actionLink,
+          pending_action_summary: actionSentence(actions, memory.main_apps),
+          pending_action_command: pendingCommand,
+          language,
+        },
+        source: prompt,
+      });
+      pendingStored = true;
+    } catch (_) {
+      // SMS should still reply even if pending action storage is unavailable.
+    }
+    if (!pendingStored) {
+      return {
+        text: `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
+        actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
+        speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+      };
+    }
+    return {
+      text: `${message}\n\n${smsActionCue(actions)}`,
+      actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
+      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+    };
+  }
+  if (channel === "whatsapp" && actionLink) {
+    const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
+    return {
+      text: contentSid ? message : `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
+      actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
+      actionButton: contentSid ? {
+        contentSid,
+        contentVariables: whatsappActionButtonVariables(actionLink),
+      } : null,
+      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+    };
+  }
   return {
     text: actionLink ? `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : message,
     actionText: actionLink ? `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : "",
@@ -431,6 +583,14 @@ function actionDeepLink(actions, appNames = []) {
   if (first.type === "start_protection") {
     return publicOpenLink("start-focus", {
       minutes: clamp(first.minutes || 25, 5, 240),
+      hard: first.hard_mode ? "true" : "",
+    });
+  }
+  if (first.type === "activate_mode" && first.name) {
+    return publicOpenLink("mode", {
+      name: first.name,
+      activate: "true",
+      minutes: clamp(first.minutes || 30, 5, 240),
       hard: first.hard_mode ? "true" : "",
     });
   }
@@ -502,14 +662,22 @@ exports.handler = async (event) => {
 
   const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
+  const command = channel === "sms" ? smsCommand(prompt) : "";
   const reply = connectCode
     ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)), speechText: "" }
+    : command
+      ? await smsCommandReply(from, command)
     : await askBAI(prompt, from, channel);
 
   const shouldAttachAudio = channel === "whatsapp" && !connectCode && (audio || wantsVoiceReply(body));
   const mediaUrl = shouldAttachAudio
     ? buildSignedAudioUrl(event, reply.speechText || reply.text)
     : "";
+  if (channel === "whatsapp" && reply.actionButton && !mediaUrl) {
+    await sendWhatsAppMessage(from, reply.text);
+    await sendWhatsAppMessage(from, "", reply.actionButton);
+    return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
+  }
   const baseReplyText = mediaUrl && reply.actionText ? reply.actionText : reply.text;
   const replyText = audio ? withVoiceInputContext(baseReplyText, prompt) : baseReplyText;
 

@@ -263,6 +263,43 @@ class SessionManager(
         }
     }
 
+    fun selectBestModeMatching(rawName: String): Boolean {
+        val target = normalizeModeName(rawName)
+        if (target.isBlank()) return false
+        val exact = _modes.value.firstOrNull { normalizeModeName(it.name) == target }
+        if (exact != null) {
+            selectMode(exact.id)
+            return true
+        }
+        val fuzzy = _modes.value.firstOrNull { mode ->
+            val normalized = normalizeModeName(mode.name)
+            normalized.contains(target) || target.contains(normalized)
+        }
+        if (fuzzy != null) {
+            selectMode(fuzzy.id)
+            return true
+        }
+        val aliases = listOf(
+            listOf("social", "redes", "instagram", "tiktok", "reels", "shorts") to listOf("social", "social media", "redes sociales"),
+            listOf("deep focus", "focus", "foco", "work", "trabajo") to listOf("deep focus", "focus", "work"),
+            listOf("study", "estudio", "exam", "examen") to listOf("study", "study mode"),
+            listOf("sleep", "night", "bedtime", "dormir", "noche") to listOf("sleep", "night", "bedtime")
+        )
+        aliases.forEach { (keys, names) ->
+            if (keys.any { target.contains(it) }) {
+                val match = _modes.value.firstOrNull { mode ->
+                    val normalized = normalizeModeName(mode.name)
+                    names.any { normalized.contains(it) || it.contains(normalized) }
+                }
+                if (match != null) {
+                    selectMode(match.id)
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
     fun createMode(name: String, packages: Set<String>) {
         val cleanName = name.trim().ifBlank { "Mode" }
         val mode = BlankMode(
@@ -465,6 +502,19 @@ class SessionManager(
                 prefs[PrefsKeys.BLOCKED_PACKAGES] = _blockedPackages.value
             }
         }
+    }
+
+    private fun normalizeModeName(value: String): String {
+        return value
+            .trim()
+            .lowercase()
+            .replace("-", " ")
+            .replace("_", " ")
+            .replace(" mode", "")
+            .replace(" profile", "")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
     }
 
     private fun parseModes(serialized: String?, legacyPackages: Set<String>): List<BlankMode> {

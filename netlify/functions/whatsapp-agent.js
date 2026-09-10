@@ -97,6 +97,13 @@ function requestedAppNames(text) {
     .map((candidate) => candidate.label);
 }
 
+function detectedLanguage(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+    ? "es"
+    : "en";
+}
+
 function appsQuery(appNames) {
   const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 8) : [];
   return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
@@ -117,6 +124,10 @@ function appLink(action, appNames = []) {
   if (type === "start_protection") {
     const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
     return publicOpenLink("start-focus", { minutes, hard: action.hard_mode ? "true" : "" });
+  }
+  if (type === "activate_mode" && action.name) {
+    const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
+    return publicOpenLink("mode", { name: action.name, activate: "true", minutes, hard: action.hard_mode ? "true" : "" });
   }
   if (type === "apply_schedule") {
     const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
@@ -239,21 +250,26 @@ async function agentContext(from, prompt) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt);
+  const language = savedMemory.language || detectedLanguage(prompt);
   const memory = {
     ...savedMemory,
     ...newFacts,
+    language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
   };
   if (Object.keys(newFacts).length) {
     try {
-      await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: newFacts, source: prompt });
+      await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
     } catch (_) {
       // Memory must never block a reply.
     }
   }
   return {
     channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    language,
+    allow_spanish_response: true,
     is_blank_active: false,
     has_selected_apps: true,
     selection_count: 1,

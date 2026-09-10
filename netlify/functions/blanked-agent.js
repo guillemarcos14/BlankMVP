@@ -391,6 +391,13 @@ function actionMessage(plan, prompt = "", language = "en") {
       ? `Empezaría un bloqueo de ${minutes} minutos.`
       : `Start a ${minutes}-minute block now and keep the app list unchanged.`;
   }
+  if (first.type === "activate_mode") {
+    const minutes = cleanNumber(first.minutes, 30, 5, 240);
+    const name = cleanText(first.name, 40) || "that";
+    return language === "es"
+      ? `Activaría el modo ${name} durante ${minutes} minutos.`
+      : `Start ${name} mode for ${minutes} minutes.`;
+  }
   if (first.type === "set_daily_limit") {
     const minutes = cleanNumber(first.minutes, 25, 5, 240);
     return language === "es"
@@ -444,11 +451,13 @@ function fallbackFollowupText(plan, language = "en") {
   if (language === "es") {
     if (first.type === "apply_schedule") return "Abre Blanked para revisar y aplicar la franja.";
     if (first.type === "start_protection") return "Abre Blanked para empezar el bloqueo.";
+    if (first.type === "activate_mode") return "Abre Blanked para empezar ese modo.";
     if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Abre Blanked para terminar la configuración.";
     return "Abre Blanked para revisar el siguiente paso.";
   }
   if (first.type === "apply_schedule") return "Open Blanked to review and apply the window.";
   if (first.type === "start_protection") return "Open Blanked to start the block.";
+  if (first.type === "activate_mode") return "Open Blanked to start that mode.";
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
   return "Open Blanked to review the next step.";
 }
@@ -773,6 +782,8 @@ function requestedModeName(prompt, context = {}) {
   const exact = modes.find((mode) => text.includes(mode.toLowerCase()));
   if (exact) return exact;
   const aliases = [
+    { keys: ["social", "social media", "social apps", "social networks", "redes sociales", "instagram", "tiktok", "tik tok", "reels", "shorts"], mode: ["Social", "Social Media"] },
+    { keys: ["deep focus", "deep work"], mode: ["Deep Focus", "Focus", "Work"] },
     { keys: ["sleep", "night", "bedtime"], mode: ["Sleep", "Night"] },
     { keys: ["study", "exam"], mode: ["Study"] },
     { keys: ["work", "focus", "deep work"], mode: ["Work", "Focus"] },
@@ -781,6 +792,7 @@ function requestedModeName(prompt, context = {}) {
     if (!contains(text, alias.keys)) continue;
     const match = modes.find((mode) => alias.mode.some((name) => mode.toLowerCase() === name.toLowerCase()));
     if (match) return match;
+    return alias.mode[0];
   }
   return "";
 }
@@ -1535,18 +1547,21 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
 
-  if (modeName && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode"])) {
+  const asksForModeActivation = contains(promptText, [
+    " mode", "modo", "profile", "perfil", "i'm in", "im in", "estoy en", "deep focus", "deep work", "social media", "social apps", "redes sociales"
+  ]);
+  if (modeName && asksForModeActivation && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
     const requestedDuration = explicitDurationMinutes(prompt) || duration;
     const hardMode = wantsHardMode(prompt);
-    const modeAction = action("switch_mode", { name: modeName });
+    const modeAction = action("activate_mode", { name: modeName, minutes: requestedDuration, hard_mode: hardMode });
     if (timeWindow) {
       return {
         intent: intent === "sleep" || intent === "study" || intent === "focus" ? intent : "focus",
         title: `${modeName} Mode`,
-        response_text: `I can use ${modeName} mode for this plan because that selection already exists.`,
+        response_text: `I can use ${modeName} mode if that profile exists; if not, create it once in Blanked and it will be reusable next time.`,
         bullets: [
-          `Read: ${modeName} mode is already available.`,
-          `Move: switch to ${modeName} mode and protect from ${minuteText(timeWindow.start)} to ${minuteText(timeWindow.end)}.`,
+          `Read: ${modeName} mode matches this request.`,
+          `Move: open ${modeName} mode and protect from ${minuteText(timeWindow.start)} to ${minuteText(timeWindow.end)}.`,
           "Protection: use the apps already authorized for that mode."
         ],
         primary_label: `Use ${modeName}`,
@@ -1562,18 +1577,15 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: intent === "sleep" || intent === "study" || intent === "focus" ? intent : "focus",
       title: `${modeName} Mode`,
-      response_text: `I can switch to ${modeName} mode and start protection on its existing app selection.`,
+      response_text: `I can start ${modeName} mode now. If that profile does not exist yet, Blanked will ask you to create it once.`,
       bullets: [
-        `Read: ${modeName} mode is already available.`,
-        `Move: switch to ${modeName} mode for ${requestedDuration} minutes.`,
+        `Read: ${modeName} mode matches this request.`,
+        `Move: activate ${modeName} mode for ${requestedDuration} minutes.`,
         "Protection: use the apps already authorized for that mode."
       ],
       primary_label: `Start ${modeName}`,
       secondary_label: "Choose apps",
-      actions: [
-        modeAction,
-        action("start_protection", { minutes: requestedDuration, hard_mode: hardMode })
-      ],
+      actions: [modeAction],
       requires_selected_apps: false,
       requires_screen_time_authorization: true,
     };
@@ -1856,7 +1868,7 @@ const actionSchema = {
   additionalProperties: false,
   required: ["type", "minutes", "hard_mode", "name", "start_minute", "end_minute", "weekdays", "duration_days", "hours"],
   properties: {
-    type: { type: "string", enum: ["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
+    type: { type: "string", enum: ["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "activate_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
     minutes: { type: ["integer", "null"], minimum: 5, maximum: 240 },
     hard_mode: { type: ["boolean", "null"] },
     name: { type: ["string", "null"], maxLength: 40 },
@@ -1908,6 +1920,7 @@ function appCapabilities(context = {}) {
       "pause_rules",
       "disable_pause",
       "switch_mode",
+      "activate_mode",
       "open_app_picker",
       "request_screen_time_permission",
       "apply_ai_plan",
@@ -2036,7 +2049,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
 }
 
 function actionNeedsScreenTime(actionType) {
-  return ["start_protection", "apply_schedule", "set_daily_limit", "enable_allow_only", "enable_adult_filter", "switch_mode", "apply_ai_plan"].includes(actionType);
+  return ["start_protection", "apply_schedule", "set_daily_limit", "enable_allow_only", "enable_adult_filter", "switch_mode", "activate_mode", "apply_ai_plan"].includes(actionType);
 }
 
 function actionNeedsSelection(actionType) {
@@ -2111,7 +2124,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   if (adviceOnly) return [];
   if (fallbackActions.length === 0 && deterministicNoActionTitle(fallback.title)) return [];
   const fallbackNeedsSetup = fallbackActions.some((item) => (actionNeedsSelection(item.type) && !selected) || (actionNeedsScreenTime(item.type) && !authorized));
-  if (fallbackActions.some((item) => item.type === "switch_mode") && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
+  if (fallbackActions.some((item) => item.type === "switch_mode" || item.type === "activate_mode") && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
   if (fallback.title === "Scroll Loop" && fallbackActions.length > 0 && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
   if (fallbackActions.length > 0 && deterministicActionTitle(fallback.title) && !fallbackNeedsSetup) return fallbackActions.slice(0, 4);
   if (hasClearFutureWindow && fallbackActions.some((item) => item.type === "apply_schedule")) return fallbackActions.slice(0, 4);
@@ -2215,7 +2228,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
 function normalizeAction(candidate) {
   if (!candidate || typeof candidate !== "object") return null;
   const type = cleanText(candidate.type, 60);
-  const allowed = new Set(["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
+  const allowed = new Set(["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "switch_mode", "activate_mode", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
   if (!allowed.has(type)) return null;
   if (type === "none") return action("none");
   const candidateStart = candidate.start_minute == null ? null : cleanNumber(candidate.start_minute, 1320, 0, 1439);
@@ -2242,6 +2255,7 @@ function normalizeAction(candidate) {
   if (type === "set_daily_limit") return action(type, { minutes: normalized.minutes });
   if (type === "enable_allow_only" || type === "enable_adult_filter" || type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan" || type === "disable_pause") return action(type);
   if (type === "switch_mode") return action(type, { name: normalized.name });
+  if (type === "activate_mode") return action(type, { name: normalized.name, minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "start_protection") return action(type, { minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "pause_rules") return action(type, { hours: normalized.hours });
   if (type === "apply_schedule") {
@@ -2282,7 +2296,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-            "You are BAI, Blanked's personal assistant for healthier screen habits. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward the app only when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention the app only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: start_protection for immediate blocks, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only for existing modes, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+            "You are BAI, Blanked's personal assistant for healthier screen habits. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward the app only when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention the app only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: activate_mode when the user says they are in a named mode or asks to block a category that likely maps to a saved profile, start_protection for immediate blocks without a named profile, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only when they want to change profile without starting protection, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",

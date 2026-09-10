@@ -148,6 +148,7 @@ final class SessionStore: ObservableObject {
     @Published var shouldShowWidgetTimerSelector = false
     @Published var pendingPlanAppNames: [String] = []
     @Published var pendingPlanStartsFreshSelection = false
+    @Published var pendingPlanModeName: String?
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -487,15 +488,18 @@ final class SessionStore: ObservableObject {
         setupComplete = true
     }
 
-    func requestBlockConfiguration(appNames: [String] = [], startsFreshSelection: Bool = false) {
+    func requestBlockConfiguration(appNames: [String] = [], startsFreshSelection: Bool = false, modeName: String? = nil) {
         pendingPlanAppNames = appNames
         pendingPlanStartsFreshSelection = startsFreshSelection
+        let cleanModeName = modeName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        pendingPlanModeName = cleanModeName?.isEmpty == false ? cleanModeName : nil
         shouldOpenBlockConfiguration = true
     }
 
     func clearPendingPlanAppNames() {
         pendingPlanAppNames = []
         pendingPlanStartsFreshSelection = false
+        pendingPlanModeName = nil
     }
 
     func requestWidgetTimerSelector() {
@@ -556,6 +560,39 @@ final class SessionStore: ObservableObject {
         return true
     }
 
+    @discardableResult
+    func selectBestMode(matching rawName: String) -> Bool {
+        let target = Self.normalizedModeName(rawName)
+        guard !target.isEmpty else { return false }
+        if let exact = focusModes.first(where: { Self.normalizedModeName($0.name) == target }) {
+            selectMode(exact.id)
+            return true
+        }
+        if let fuzzy = focusModes.first(where: { mode in
+            let normalized = Self.normalizedModeName(mode.name)
+            return normalized.contains(target) || target.contains(normalized)
+        }) {
+            selectMode(fuzzy.id)
+            return true
+        }
+        let aliases: [(keys: [String], modes: [String])] = [
+            (["social", "redes", "instagram", "tiktok", "tik tok", "reels", "shorts"], ["social", "social media", "redes sociales"]),
+            (["deep focus", "focus", "foco", "work", "trabajo"], ["deep focus", "focus", "work"]),
+            (["study", "estudio", "exam", "examen"], ["study", "study mode"]),
+            (["sleep", "night", "bedtime", "dormir", "noche"], ["sleep", "night", "bedtime"])
+        ]
+        for alias in aliases where alias.keys.contains(where: { target.contains($0) }) {
+            if let match = focusModes.first(where: { mode in
+                let normalized = Self.normalizedModeName(mode.name)
+                return alias.modes.contains(where: { normalized.contains($0) || $0.contains(normalized) })
+            }) {
+                selectMode(match.id)
+                return true
+            }
+        }
+        return false
+    }
+
     func createMode(named name: String) {
         let mode = BlankFocusMode(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New mode" : name,
@@ -563,6 +600,21 @@ final class SessionStore: ObservableObject {
         )
         focusModes.append(mode)
         selectMode(mode.id)
+    }
+
+    func createOrUpdateMode(named name: String, selection: FamilyActivitySelection) {
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let modeName = cleanName.isEmpty ? "New mode" : cleanName
+        if let existing = focusModes.first(where: { Self.normalizedModeName($0.name) == Self.normalizedModeName(modeName) }) {
+            currentModeId = existing.id
+            self.selection = selection
+            updateCurrentModeSelection(selection)
+            return
+        }
+        let mode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection))
+        focusModes.append(mode)
+        currentModeId = mode.id
+        self.selection = selection
     }
 
     func applyOnboardingPlan(modeName: String, startHour: Int) {
@@ -943,6 +995,18 @@ final class SessionStore: ObservableObject {
     private static func selection(from data: Data?) -> FamilyActivitySelection? {
         guard let data else { return nil }
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
+    }
+
+    private static func normalizedModeName(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: " mode", with: "")
+            .replacingOccurrences(of: " profile", with: "")
+            .split(separator: " ")
+            .joined(separator: " ")
     }
 
     private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {

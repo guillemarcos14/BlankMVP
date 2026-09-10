@@ -111,6 +111,24 @@ class SessionManagerTest {
     }
 
     @Test
+    fun modeAliasSelectsDifferentSavedAppSetBeforeActivation() = runTest {
+        val manager = createManager(backgroundScope)
+
+        manager.createMode("Social", setOf("com.instagram.android", "com.zhiliaoapp.musically"))
+        manager.createMode("Deep Focus", setOf("com.slack", "com.google.android.gm"))
+        advanceUntilIdle()
+
+        assertTrue(manager.selectBestModeMatching("social media"))
+        advanceUntilIdle()
+        assertEquals(setOf("com.instagram.android", "com.zhiliaoapp.musically"), manager.blockedPackages.first())
+
+        assertEquals(SessionManager.NfcResult.BLANKED, manager.activateBlank())
+        advanceUntilIdle()
+        assertTrue(manager.isAppBlocked("com.instagram.android"))
+        assertFalse(manager.isAppBlocked("com.slack"))
+    }
+
+    @Test
     fun blockedAttemptsAreCountedInWeeklyStats() = runTest {
         val manager = createManager(backgroundScope)
 

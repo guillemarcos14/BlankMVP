@@ -232,6 +232,102 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
   }
 }
 
+async function modePhraseOpensActivateModeLink() {
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  let outboundText = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    outboundText = JSON.parse(options.body).text.body;
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      from: "34600000000",
+                      id: "wamid.mode",
+                      text: { body: "I'm in social mode now" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=mode/);
+    assert.match(outboundText, /name=Social/);
+    assert.match(outboundText, /activate=true/);
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
+async function categoryRequestOpensActivateModeLink() {
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  let outboundText = "";
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options) => {
+    outboundText = JSON.parse(options.body).text.body;
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  messages: [
+                    {
+                      from: "34600000000",
+                      id: "wamid.social.category",
+                      text: { body: "Block social media" },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=mode/);
+    assert.match(outboundText, /name=Social/);
+    assert.match(outboundText, /activate=true/);
+  } finally {
+    global.fetch = originalFetch;
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
 (async () => {
   await verifyWebhook();
   await receiveMessage();
@@ -239,6 +335,8 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
   await connectGreeting();
   await linkIncludesRequestedApps();
   await twilioButtonTemplateHidesRawUrlFromMainReply();
+  await modePhraseOpensActivateModeLink();
+  await categoryRequestOpensActivateModeLink();
   console.log("whatsapp-agent smoke tests passed");
 })().catch((error) => {
   console.error(error);

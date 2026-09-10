@@ -114,6 +114,7 @@ struct HomeView: View {
             applyScreenTimeControls()
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
+            processPendingBlockConfigurationIfNeeded()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
@@ -124,6 +125,7 @@ struct HomeView: View {
             applyScreenTimeControls()
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
+            processPendingBlockConfigurationIfNeeded()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
@@ -144,13 +146,7 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
-            if sessionStore.pendingPlanAppNames.isEmpty {
-                openSection(.modes)
-            } else {
-                contextualPlanSelection = sessionStore.pendingPlanStartsFreshSelection ? FamilyActivitySelection() : sessionStore.selection
-                showingContextualAppPicker = true
-            }
-            sessionStore.shouldOpenBlockConfiguration = false
+            processPendingBlockConfigurationIfNeeded()
         }
         .familyActivityPicker(
             headerText: contextualPickerHeaderText,
@@ -161,7 +157,12 @@ struct HomeView: View {
         .onChange(of: showingContextualAppPicker) { isPresented in
             if !isPresented {
                 if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
-                    sessionStore.selection = contextualPlanSelection
+                    if let modeName = sessionStore.pendingPlanModeName,
+                       contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.createOrUpdateMode(named: modeName, selection: contextualPlanSelection)
+                    } else {
+                        sessionStore.selection = contextualPlanSelection
+                    }
                 }
                 sessionStore.clearPendingPlanAppNames()
                 contextualPlanSelection = FamilyActivitySelection()
@@ -660,17 +661,31 @@ struct HomeView: View {
         closeSection()
     }
 
+    private func processPendingBlockConfigurationIfNeeded() {
+        guard sessionStore.shouldOpenBlockConfiguration else { return }
+        if sessionStore.pendingPlanAppNames.isEmpty && sessionStore.pendingPlanModeName == nil {
+            openSection(.modes)
+        } else {
+            contextualPlanSelection = sessionStore.pendingPlanStartsFreshSelection ? FamilyActivitySelection() : sessionStore.selection
+            showingContextualAppPicker = true
+        }
+        sessionStore.shouldOpenBlockConfiguration = false
+    }
+
     private var contextualPickerHeaderText: String {
-        "Vamos a implementar el plan. Selecciona \(formattedPendingPlanAppNames) en la lista."
+        if let modeName = sessionStore.pendingPlanModeName {
+            return "Select apps for \(modeName) mode."
+        }
+        "Select \(formattedPendingPlanAppNames) to apply this plan."
     }
 
     private var formattedPendingPlanAppNames: String {
         let cleaned = sessionStore.pendingPlanAppNames
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        guard !cleaned.isEmpty else { return "las apps recomendadas" }
+        guard !cleaned.isEmpty else { return "the recommended apps" }
         guard cleaned.count > 1 else { return cleaned[0] }
-        return "\(cleaned.dropLast().joined(separator: ", ")) y \(cleaned.last ?? "")"
+        return "\(cleaned.dropLast().joined(separator: ", ")) and \(cleaned.last ?? "")"
     }
 
     private var riskWindowText: String {

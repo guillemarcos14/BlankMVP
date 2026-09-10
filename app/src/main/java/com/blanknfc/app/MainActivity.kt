@@ -8,12 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.ui.navigation.NavGraph
 import com.blanknfc.app.ui.navigation.Routes
 import com.blanknfc.app.ui.theme.BlankTheme
 import com.blanknfc.app.util.NfcHelper
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -35,6 +39,7 @@ class MainActivity : ComponentActivity() {
 
         // Handle NFC intent that launched the activity
         if (intent != null) {
+            handleDeepLinkIntent(intent)
             handleNfcIntent(intent)
         }
 
@@ -77,7 +82,35 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleDeepLinkIntent(intent)
         handleNfcIntent(intent)
+    }
+
+    private fun handleDeepLinkIntent(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
+        if (uri.scheme != "blank") return
+        val action = uri.host.orEmpty()
+        if (action != "mode") return
+        val name = uri.getQueryParameter("name").orEmpty()
+        val activate = uri.getQueryParameter("activate").equals("true", ignoreCase = true)
+        lifecycleScope.launch {
+            sessionManager.stateLoaded.filter { it }.first()
+            val selected = sessionManager.selectBestModeMatching(name)
+            if (!selected) {
+                Toast.makeText(this@MainActivity, "Create $name mode first", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            if (activate) {
+                val result = sessionManager.activateBlank()
+                val messageRes = when (result) {
+                    SessionManager.NfcResult.BLANKED -> R.string.session_activated
+                    SessionManager.NfcResult.NO_APPS_SELECTED -> R.string.nfc_no_apps_selected
+                    else -> R.string.session_activated
+                }
+                Toast.makeText(this@MainActivity, messageRes, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun handleNfcIntent(intent: Intent) {

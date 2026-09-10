@@ -149,16 +149,24 @@ struct BlankApp: App {
         }
 
         if action == "mode" {
-            if let name = components?.stringQueryItem("name"), !sessionStore.selectMode(named: name) {
-                sessionStore.requestBlockConfiguration()
+            let name = components?.stringQueryItem("name") ?? ""
+            let shouldActivate = components?.boolQueryItem("activate") ?? false
+            let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
+            let hardMode = components?.boolQueryItem("hard") ?? false
+            if !name.isEmpty, sessionStore.selectBestMode(matching: name) {
+                if shouldActivate {
+                    _ = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode, entryMode: .app)
+                }
+            } else {
+                openBlockConfiguration(from: components, startsFreshSelection: true, modeName: name.isEmpty ? nil : name)
             }
             applyScreenTimeState()
         }
     }
 
-    private func openBlockConfiguration(from components: URLComponents?, startsFreshSelection: Bool = false) {
+    private func openBlockConfiguration(from components: URLComponents?, startsFreshSelection: Bool = false, modeName: String? = nil) {
         let appNames = components?.listQueryItem("apps") ?? []
-        sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: startsFreshSelection)
+        sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: startsFreshSelection, modeName: modeName)
     }
 
     private func setupPlan(from components: URLComponents?) {
@@ -188,7 +196,7 @@ struct BlankApp: App {
             allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
             adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
         )
-        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+        screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
     }
 
     private func isBlankedUniversalLink(_ url: URL) -> Bool {

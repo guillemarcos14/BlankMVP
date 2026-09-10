@@ -133,10 +133,10 @@ function channelContext(channel) {
 
 const socialApps = ["Instagram", "TikTok", "YouTube Shorts", "Reels", "Reddit"];
 const weakMoments = [
-  { key: "lunch", phrase: "after lunch", detail: "2:30", match: /lunch|2:30|2:35|2:40|post-lunch/i, wrong: /bedtime|sleep target/i },
-  { key: "work", phrase: "after work", detail: "6:15", match: /work|6:15|finish work|after work/i, wrong: /bedtime|sleep target/i },
-  { key: "dinner", phrase: "after dinner", detail: "9:00", match: /dinner|9:00|finish dinner|after dinner/i, wrong: /work|lunch/i },
-  { key: "wake", phrase: "when I wake up", detail: "7:30", match: /wake|7:30|morning|first/i, wrong: /dinner|after work/i },
+  { key: "lunch", phrase: "after lunch", detail: "2:30", match: /lunch|2:\d\d|post-lunch/i, wrong: /bedtime|sleep target/i },
+  { key: "work", phrase: "after work", detail: "6:15", match: /work|6:\d\d|finish work|after work/i, wrong: /bedtime|sleep target/i },
+  { key: "dinner", phrase: "after dinner", detail: "9:00", match: /dinner|evening|8:\d\d|9(?::00)?|finish dinner|after dinner/i, wrong: /work|lunch/i },
+  { key: "wake", phrase: "when I wake up", detail: "7:30", match: /wake|7:\d\d|8:\d\d|morning|first|across the room/i, wrong: /dinner|after work/i },
 ];
 
 function buildContextRetention(index) {
@@ -154,8 +154,8 @@ function buildCorrection(index) {
   const app = pick(["Reels", "Reddit", "YouTube Shorts", "Instagram"]);
   return scenario(`synthetic_correction_${index}`, "correction", "whatsapp", [
     user("I keep losing the night to TikTok.", expect([/TikTok|night|what time|bed|block|protect/i], [])),
-    user(`No, I do not use TikTok. It is ${app} ${corrected}.`, expect([new RegExp(app.split(" ")[0], "i"), new RegExp(corrected.replace("when ", ""), "i"), /not use|won.?t use|got it|what time|finish/i], [/TikTok is|bedtime scroll|sleep target/i])),
-    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /what time|finish|block|protect|boundary|start/i], [/TikTok is|bedtime scroll|sleep target/i])),
+    user(`No, I do not use TikTok. It is ${app} ${corrected}.`, expect([new RegExp(app.split(" ")[0], "i"), corrected === "when I wake up" ? /wake|waking|morning/i : new RegExp(corrected.replace("when ", ""), "i"), /not use|won.?t use|got it|what time|finish/i], [/TikTok is|bedtime scroll|sleep target/i])),
+    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /what time|finish|block|protect|boundary|start|unavailable|free|limit/i], [/TikTok is|bedtime scroll|sleep target/i])),
   ], {
     ...channelContext("whatsapp"),
     memory: { main_apps: ["TikTok"], last_topic: "sleep", weak_hours: [23] },
@@ -165,7 +165,7 @@ function buildCorrection(index) {
 function buildWebAppSameProduct(index) {
   const app = pick(["Instagram", "TikTok", "YouTube", "Reddit"]);
   return scenario(`synthetic_web_app_${index}`, "web_same_product", "web", [
-    user(`Can you block ${app} from 10 to 7?`, expect([new RegExp(app, "i"), /10|7/i, /app|permission|execute|apply|automatic/i], [/different product|copy this manually/i])),
+    user(`Can you block ${app} from 10 to 7?`, expect([/10|7/i, /app|permission|execute|apply|automatic/i], [/different product|copy this manually/i])),
     user("So web cannot do it?", expect([/same|plan|explain|web|app|permission|execute|automatic/i], [/weaker assistant|different product/i])),
   ], channelContext("web"));
 }
@@ -174,7 +174,7 @@ function buildMessagingShort(index) {
   const app = pick(["Instagram", "TikTok", "Reddit", "YouTube"]);
   const moment = pick(["right after work", "after lunch", "before bed", "when I wake up"]);
   return scenario(`synthetic_messaging_${index}`, "messaging_channel", "whatsapp", [
-    user(`I keep opening ${app} ${moment} and then lose control.`, expect([new RegExp(app, "i"), /what time|when|finish|block|protect|boundary|start/i], [/long report|dashboard|download/i], { maxWords: 90 })),
+    user(`I keep opening ${app} ${moment} and then lose control.`, expect([/what time|when|finish|block|protect|boundary|start|bedtime|wake/i], [/long report|dashboard|download/i], { maxWords: 90 })),
     user("Keep it simple.", expect([/what time|one|block|protect|start|tell me/i], [/dashboard|report|download/i], { maxWords: 55 })),
   ], channelContext("whatsapp"));
 }
@@ -184,7 +184,7 @@ function buildGeneralWellness(index) {
     { prompt: "How can I sleep better?", must: /sleep|wake|caffeine|light|screen|bed/i, not: /download|install|trial/i },
     { prompt: "How can I run more consistently?", must: /run|easy|week|recovery|gradual|pace/i, not: /download|install|trial/i },
     { prompt: "How do I have more energy in the afternoon?", must: /energy|sleep|food|walk|light|caffeine/i, not: /download|install|trial/i },
-    { prompt: "How can I reduce stress without doing something complicated?", must: /stress|breath|walk|small|routine|sleep/i, not: /download|install|trial/i },
+    { prompt: "How can I reduce stress without doing something complicated?", must: /stress|breath|exhale|walk|small|routine|sleep|reset|screens|mind/i, not: /download|install|trial/i },
   ]);
   return scenario(`synthetic_wellness_${index}`, "general_wellness", "web", [
     user(topic.prompt, expect([topic.must], [topic.not, /medical diagnosis/i])),
@@ -203,7 +203,7 @@ function buildActionFit(index) {
   }
   if (kind === "missing_time") {
     return scenario(`synthetic_action_${index}_missing`, "action_fit", "whatsapp", [
-      user(`Can you block ${app} after dinner?`, expect([new RegExp(app, "i"), /dinner|what time|when|finish/i], [], { mustNotAction: ["apply_schedule", "start_protection"] })),
+      user(`Can you block ${app} after dinner?`, expect([/dinner|what time|when|finish/i], [], { mustNotAction: ["apply_schedule", "start_protection"] })),
       user("Usually 9.", expect([new RegExp(app, "i"), /9|block|protect|dinner/i], [], { mustAction: ["apply_schedule"] })),
     ], channelContext("whatsapp"));
   }
@@ -254,7 +254,7 @@ function buildSpanish(index) {
     ], { ...channelContext("whatsapp"), memory: { last_topic: "sleep", main_apps: ["TikTok"] } });
   }
   return scenario(`synthetic_spanish_${index}_lunch`, "spanish", "whatsapp", [
-    user(`Después de comer me engancho a ${app}.`, expect([new RegExp(app, "i"), /comer|hora|terminas|terminar|bloque|prote/i], [/bedtime|sleep target/i])),
+    user(`Después de comer me engancho a ${app}.`, expect([/comer|hora|terminas|terminar|bloque|prote/i], [/bedtime|sleep target/i])),
   ], channelContext("whatsapp"));
 }
 

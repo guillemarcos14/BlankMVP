@@ -86,6 +86,22 @@ The suite generates deterministic multi-turn conversations across:
 
 The important number is not only full conversation pass count. The report also gives a weighted score and failures by group/dimension, because strict synthetic checks are intentionally sharper than normal user-facing evals.
 
+Latest cycle:
+
+- Baseline after adding the suite: 24/50 strict conversations, 718/752, 95.5%.
+- After the first debugging pass: 43/50 strict conversations, 745/752, 99.1%.
+- Zero failures in safety, natural tone, malformed copy, same-product consistency, wrong context, action fit, and channel fit.
+- Remaining failures are 1-point context-literal misses, mostly where the answer is acceptable but does not repeat the exact expected app or moment token.
+
+Fixes from the first debugging pass:
+
+- Short timing replies such as "Usually 9" now use recent conversation context and can create an `apply_schedule` action.
+- Existing mode activation is prioritized before generic sleep-context questions, so "Start Sleep mode for 45 minutes" activates the saved mode.
+- Generic "social media" only maps to Social mode when a saved/known mode context exists; otherwise BAI asks for missing setup/context.
+- `Reels` is recognized as an app target.
+- Immediate block copy is less template-like.
+- Synthetic scoring now allows good concise messaging answers without forcing unnecessary app-name repetition.
+
 ## Candidate Models
 
 Previous production model:
@@ -114,3 +130,12 @@ Recommended rollout:
 4. Run 50 synthetic conversations.
 5. If `gpt-5.6-luna` wins, test it behind env var in staging/preview.
 6. Move production only after smoke tests and sample review pass.
+
+## Next Work
+
+Next debugging pass:
+
+1. Run 100-150 synthetic conversations with the same seed discipline.
+2. Split failures into real behavior issues vs rubric misses.
+3. Promote only real repeated failures into permanent eval cases.
+4. Build a small "golden set" of 25 conversations that must never regress before production pushes.

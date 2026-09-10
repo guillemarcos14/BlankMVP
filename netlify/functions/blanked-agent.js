@@ -245,6 +245,7 @@ function localizeText(value, language, maxLength = 420) {
     "If you want to be asleep from 11:00 PM to 7:00 AM, the phone should get harder to use before 11:00 PM.": "Si quieres dormir de 11:00 PM a 7:00 AM, el móvil debería ser más difícil de usar antes de las 11:00 PM.",
     "Got it. Which app pulls you in most, and when does it usually happen?": "Entendido. ¿Qué app te atrapa más y cuándo suele pasar?",
     "Most people do best starting 10-15 minutes after lunch. What time do you usually finish eating?": "Suele funcionar mejor empezar 10-15 minutos después de comer. ¿A qué hora sueles terminar de comer?",
+    "What time do you usually finish eating?": "¿A qué hora sueles terminar de comer?",
     "Lunch is probably the right moment to protect, but I need two details before setting anything: which apps count as social media for you, and what time do you usually finish eating?": "Comer probablemente es el momento a proteger, pero necesito dos datos antes de configurar nada: ¿qué apps cuentan como redes sociales para ti y a qué hora sueles terminar de comer?",
     "What time do you usually finish dinner?": "¿A qué hora sueles terminar de cenar?",
     "What time do you usually wake up?": "¿A qué hora sueles despertarte?",
@@ -783,6 +784,15 @@ function appCorrection(prompt) {
   return apps.find((app) => text.includes(app)) || "";
 }
 
+function correctedAppContext(prompt) {
+  const text = cleanText(prompt, 600);
+  const match = text.match(/\b(?:it is|it's|its|es|son)\s+(.+)$/i);
+  const fragment = match ? match[1] : "";
+  const app = fragment ? namedApp(fragment) : "the app";
+  const moment = relativeMoment(fragment) || relativeMoment(prompt);
+  return { app: app === "the app" ? "" : app, moment };
+}
+
 function requestedUnknownApp(prompt) {
   const text = cleanText(prompt, 600);
   const match = text.match(/\b(?:block|limit|bloquea|bloquear)\s+([a-z][a-z0-9._+-]{1,30})\b/i);
@@ -1313,6 +1323,27 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (appCorrection(prompt)) {
+    const corrected = correctedAppContext(prompt);
+    if (corrected.app || corrected.moment) {
+      const appLabel = corrected.app || "that app";
+      const momentLabel = corrected.moment ? corrected.moment.label : "that moment";
+      const question = corrected.moment ? corrected.moment.question : "when does it usually pull you in?";
+      return {
+        intent: "social",
+        title: "Context Corrected",
+        response_text: `Got it. I will not use the old app as context. If it is ${appLabel} ${momentLabel}, ${question.charAt(0).toLowerCase()}${question.slice(1)}`,
+        bullets: [
+          "Read: the previous app context was wrong.",
+          `Pattern: the real target is ${appLabel}${corrected.moment ? ` ${momentLabel}` : ""}.`,
+          "Move: ask only for the missing timing before creating a boundary."
+        ],
+        primary_label: "Tell time",
+        secondary_label: "Not now",
+        actions: [],
+        requires_selected_apps: false,
+        requires_screen_time_authorization: false,
+      };
+    }
     return {
       intent: "general",
       title: "Context Corrected",
@@ -1425,10 +1456,13 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (missingContext && moment && missingContext === moment.key) {
+    const momentQuestion = namedApp(prompt) !== "the app" && moment.key === "lunch"
+      ? "What time do you usually finish eating?"
+      : moment.question;
     return {
       intent: "social",
       title: "Contextual Boundary",
-      response_text: moment.question,
+      response_text: momentQuestion,
       bullets: [
         `Read: you want protection ${moment.label}.`,
         "Pattern: the useful boundary should match your real routine, not a generic clock time.",

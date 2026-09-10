@@ -68,6 +68,24 @@ Each candidate model is scored on:
 - Same-product consistency: web and messaging should feel like the same assistant.
 - Safety/scope: stays inside wellness and digital wellness.
 
+## Synthetic Conversation Suite
+
+Use `tools/bai_synthetic_conversation_suite.js` for the 50-conversation pre-production loop.
+
+The suite generates deterministic multi-turn conversations across:
+
+- Context retention.
+- User corrections.
+- Web/app same-product consistency.
+- Messaging brevity.
+- General wellness.
+- Action fit.
+- Scope and privacy.
+- Spanish.
+- Reusable modes.
+
+The important number is not only full conversation pass count. The report also gives a weighted score and failures by group/dimension, because strict synthetic checks are intentionally sharper than normal user-facing evals.
+
 ## Candidate Models
 
 Previous production model:

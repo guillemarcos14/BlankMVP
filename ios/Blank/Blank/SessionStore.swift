@@ -657,7 +657,7 @@ final class SessionStore: ObservableObject {
         schedulePausedUntil = nil
     }
 
-    func applyAdaptivePlan(startMinute: Int, endMinute: Int, durationDays: Int) {
+    func applyAdaptivePlan(startMinute: Int, endMinute: Int, durationDays: Int, activateCurrentWindow: Bool = true) {
         schedule = BlankFocusSchedule(
             enabled: true,
             startMinute: startMinute,
@@ -672,7 +672,9 @@ final class SessionStore: ObservableObject {
             value: max(1, min(14, durationDays)),
             to: Date()
         )
-        applyScheduleWindow()
+        if activateCurrentWindow {
+            applyScheduleWindow()
+        }
     }
 
     func applyAIPlan(durationMinutes: Int? = nil) {

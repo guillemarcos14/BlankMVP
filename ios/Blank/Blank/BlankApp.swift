@@ -204,7 +204,8 @@ struct BlankApp: App {
             sessionStore.applyAdaptivePlan(
                 startMinute: min(max(startMinute, 0), 1439),
                 endMinute: min(max(endMinute, 0), 1439),
-                durationDays: min(max(durationDays, 1), 14)
+                durationDays: min(max(durationDays, 1), 14),
+                activateCurrentWindow: false
             )
             applyScreenTimeState()
         } else if shouldOpenPickerIfIncomplete {

@@ -792,7 +792,7 @@ private struct ConversationalHomeView: View {
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 appliedLabels.append(agentResultText(result))
             case .applySchedule(let name, let startMinute, let endMinute, let weekdays, let durationDays):
-                sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: durationDays)
+                sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: durationDays, activateCurrentWindow: false)
                 if var window = sessionStore.schedule.windows.first {
                     window.name = name
                     window.weekdays = weekdays

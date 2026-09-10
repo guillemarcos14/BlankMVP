@@ -215,9 +215,9 @@ struct ReportView: View {
     }
 
     private func scheduleForecastBlock(_ forecast: ControlForecast, source: String) {
-        let startMinute = forecast.activationStartMinute
-        let endMinute = forecast.activationEndMinute
-        sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: 1)
+        let startMinute = forecast.windowStartMinute
+        let endMinute = forecast.windowEndMinute
+        sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: 1, activateCurrentWindow: false)
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         Task {
             await BlankFunnelAnalytics.track(
@@ -233,7 +233,7 @@ struct ReportView: View {
     }
 
     private func forecastActivationButtonTitle(_ forecast: ControlForecast) -> String {
-        "Activate at \(minuteText(forecast.activationStartMinute))"
+        "Protect \(minuteText(forecast.windowStartMinute)) to \(minuteText(forecast.windowEndMinute))"
     }
 
     private func reportHeader() -> some View {
@@ -3979,7 +3979,8 @@ struct ReportView: View {
         sessionStore.applyAdaptivePlan(
             startMinute: remotePlanStartMinute,
             endMinute: remotePlanEndMinute,
-            durationDays: remotePlanDurationDays
+            durationDays: remotePlanDurationDays,
+            activateCurrentWindow: false
         )
         screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
         wellnessSyncMessage = "Preventive plan applied."
@@ -4096,6 +4097,14 @@ private struct ControlForecast {
     }
 
     var activationEndMinute: Int {
+        ((max(0, min(23, weakHour)) + 1) * 60) % (24 * 60)
+    }
+
+    var windowStartMinute: Int {
+        max(0, min(23, weakHour)) * 60
+    }
+
+    var windowEndMinute: Int {
         ((max(0, min(23, weakHour)) + 1) * 60) % (24 * 60)
     }
 }

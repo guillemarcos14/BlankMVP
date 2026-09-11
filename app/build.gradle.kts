@@ -30,8 +30,8 @@ android {
         applicationId = "com.blanknfc.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 24
-        versionName = "1.8"
+        versionCode = 25
+        versionName = "1.9"
         setProperty("archivesBaseName", "Blank-$versionName")
         buildConfigField("String", "BLANK_API_BASE_URL", "\"https://getblank.netlify.app/.netlify/functions/\"")
     }

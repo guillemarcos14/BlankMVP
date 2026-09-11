@@ -27,4 +27,5 @@ object PrefsKeys {
     val SCHEDULE_ENABLED = booleanPreferencesKey("schedule_enabled")
     val SCHEDULE_START_MINUTE = intPreferencesKey("schedule_start_minute")
     val SCHEDULE_END_MINUTE = intPreferencesKey("schedule_end_minute")
+    val SCHEDULE_EXPIRES_AT = longPreferencesKey("schedule_expires_at")
 }

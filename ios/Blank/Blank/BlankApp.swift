@@ -28,6 +28,7 @@ struct BlankApp: App {
                         await membershipStore.refreshIfNeeded()
                     }
                     await screenTimeBlocker.restore(selection: sessionStore.selection)
+                    sessionStore.syncRecurringSchedule()
                     screenTimeBlocker.updateAdvancedControls(
                         allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
                         adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
@@ -46,6 +47,7 @@ struct BlankApp: App {
                             }
                         }
                         screenTimeBlocker.refreshAuthorizationStatus()
+                        sessionStore.syncRecurringSchedule()
                         screenTimeBlocker.updateAdvancedControls(
                             allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
                             adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled

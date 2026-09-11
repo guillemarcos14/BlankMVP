@@ -12,6 +12,8 @@ private let log = Logger(
 
 final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     private let strategyActivityPrefix = "BlankStrategyTimer"
+    private let recurringSchedulePrefix = "BlankRecurringSchedule"
+    private let recurringExpiryActivity = "BlankRecurringScheduleExpiry"
     private let dailyLimitActivity = "BlankDailyLimit"
     private let dailyLimitEvent = "BlankDailyLimitReached"
     private let store = ManagedSettingsStore()
@@ -19,15 +21,36 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
     override func intervalDidStart(for activity: DeviceActivityName) {
         super.intervalDidStart(for: activity)
         log.info("DeviceActivity interval started: \(activity.rawValue)")
+
+        if activity.rawValue == recurringExpiryActivity {
+            let names = (0..<8).map {
+                DeviceActivityName(rawValue: "\(recurringSchedulePrefix):\($0)")
+            }
+            DeviceActivityCenter().stopMonitoring(names)
+            store.clearAllSettings()
+        } else if activity.rawValue.hasPrefix(recurringSchedulePrefix) {
+            applySelectedProtection()
+        }
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
         super.intervalDidEnd(for: activity)
         log.info("DeviceActivity interval ended: \(activity.rawValue)")
 
-        if activity.rawValue.hasPrefix(strategyActivityPrefix) || activity.rawValue == dailyLimitActivity {
+        if activity.rawValue.hasPrefix(strategyActivityPrefix) ||
+            activity.rawValue.hasPrefix(recurringSchedulePrefix) ||
+            activity.rawValue == recurringExpiryActivity ||
+            activity.rawValue == dailyLimitActivity {
             store.clearAllSettings()
         }
+    }
+
+    private func applySelectedProtection() {
+        guard let selection = Self.loadSelection() else { return }
+        store.shield.applications = selection.applicationTokens
+        store.shield.applicationCategories = selection.categoryTokens.isEmpty ? nil : .specific(selection.categoryTokens)
+        store.shield.webDomains = selection.webDomainTokens
+        store.webContent.blockedByFilter = Self.adultContentBlockingEnabled ? .auto() : nil
     }
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {

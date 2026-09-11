@@ -43,7 +43,8 @@ data class FocusActivityDay(
 data class FocusSchedule(
     val enabled: Boolean = false,
     val startMinute: Int = 23 * 60 + 30,
-    val endMinute: Int = 8 * 60
+    val endMinute: Int = 8 * 60,
+    val expiresAtMillis: Long? = null
 )
 
 class SessionManager(
@@ -146,7 +147,8 @@ class SessionManager(
                 _schedule.value = FocusSchedule(
                     enabled = prefs[PrefsKeys.SCHEDULE_ENABLED] ?: false,
                     startMinute = prefs[PrefsKeys.SCHEDULE_START_MINUTE] ?: (23 * 60 + 30),
-                    endMinute = prefs[PrefsKeys.SCHEDULE_END_MINUTE] ?: (8 * 60)
+                    endMinute = prefs[PrefsKeys.SCHEDULE_END_MINUTE] ?: (8 * 60),
+                    expiresAtMillis = prefs[PrefsKeys.SCHEDULE_EXPIRES_AT]?.takeIf { it > 0L }
                 )
                 _stateLoaded.value = true
             }
@@ -460,6 +462,11 @@ class SessionManager(
                 prefs[PrefsKeys.SCHEDULE_ENABLED] = cleanSchedule.enabled
                 prefs[PrefsKeys.SCHEDULE_START_MINUTE] = cleanSchedule.startMinute
                 prefs[PrefsKeys.SCHEDULE_END_MINUTE] = cleanSchedule.endMinute
+                if (cleanSchedule.expiresAtMillis == null) {
+                    prefs.remove(PrefsKeys.SCHEDULE_EXPIRES_AT)
+                } else {
+                    prefs[PrefsKeys.SCHEDULE_EXPIRES_AT] = cleanSchedule.expiresAtMillis
+                }
             }
         }
     }
@@ -468,6 +475,10 @@ class SessionManager(
         resetEmergencyUnlocksIfNeeded()
 
         val schedule = _schedule.value
+        if (schedule.expiresAtMillis?.let { nowMillis >= it } == true) {
+            expireSchedule()
+            return
+        }
         if (!schedule.enabled) return
         if (isMinuteInWindow(minuteOfDay(nowMillis), schedule.startMinute, schedule.endMinute)) {
             activateBlank()
@@ -502,6 +513,20 @@ class SessionManager(
                 prefs[PrefsKeys.BLOCKED_PACKAGES] = _blockedPackages.value
             }
         }
+    }
+
+    fun expireSchedule() {
+        val schedule = _schedule.value
+        if (!schedule.enabled && schedule.expiresAtMillis == null) return
+
+        if (_isBlankActive.value) {
+            val savedStart = _blankActiveSince.value
+            _isBlankActive.value = false
+            _blankActiveSince.value = 0L
+            recordSessionCompleted(savedStart = savedStart)
+        }
+
+        updateSchedule(schedule.copy(enabled = false, expiresAtMillis = null))
     }
 
     private fun normalizeModeName(value: String): String {

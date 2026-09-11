@@ -3903,7 +3903,7 @@ struct ReportView: View {
             "\(window.name): \(minuteText(window.startMinute))-\(minuteText(window.endMinute))"
         }
         let summary = windowTexts.joined(separator: " · ")
-        if windows.contains(where: { windowOverlapsForecast(window, forecast: forecast) }) {
+        if windows.contains(where: { window in windowOverlapsForecast(window, forecast: forecast) }) {
             return "\(summary). This already covers the weak window."
         }
         return "\(summary). Next weak window to reinforce: \(forecast.windowText)."

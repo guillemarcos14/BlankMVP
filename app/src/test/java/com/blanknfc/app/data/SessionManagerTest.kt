@@ -204,6 +204,28 @@ class SessionManagerTest {
         )
     }
 
+    @Test
+    fun expiredScheduleStopsProtectionAndDisablesIt() = runTest {
+        val manager = createManager(backgroundScope)
+
+        manager.setBlockedPackages(setOf("com.example.blocked"))
+        manager.updateSchedule(
+            FocusSchedule(
+                enabled = true,
+                startMinute = 0,
+                endMinute = 23 * 60 + 59,
+                expiresAtMillis = 1L
+            )
+        )
+        manager.activateBlank()
+        manager.applyScheduleWindow(nowMillis = 2L)
+        advanceUntilIdle()
+
+        assertFalse(manager.isBlankActive.first())
+        assertFalse(manager.schedule.first().enabled)
+        assertEquals(null, manager.schedule.first().expiresAtMillis)
+    }
+
     private fun createManager(scope: CoroutineScope): SessionManager {
         val file = File(temporaryFolder.newFolder(), "prefs.preferences_pb")
         val dataStore = PreferenceDataStoreFactory.create(

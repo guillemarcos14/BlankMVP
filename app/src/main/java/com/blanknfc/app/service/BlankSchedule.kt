@@ -10,6 +10,7 @@ import java.util.Calendar
 object BlankSchedule {
     const val ACTION_START = "com.blanknfc.app.action.SCHEDULE_START"
     const val ACTION_END = "com.blanknfc.app.action.SCHEDULE_END"
+    const val ACTION_EXPIRE = "com.blanknfc.app.action.SCHEDULE_EXPIRE"
 
     fun schedule(context: Context, schedule: FocusSchedule) {
         cancel(context)
@@ -26,12 +27,20 @@ object BlankSchedule {
             nextTriggerAt(schedule.endMinute),
             pendingIntent(context, ACTION_END, 1002)
         )
+        schedule.expiresAtMillis?.takeIf { it > System.currentTimeMillis() }?.let { expiry ->
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                expiry,
+                pendingIntent(context, ACTION_EXPIRE, 1003)
+            )
+        }
     }
 
     fun cancel(context: Context) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         alarmManager.cancel(pendingIntent(context, ACTION_START, 1001))
         alarmManager.cancel(pendingIntent(context, ACTION_END, 1002))
+        alarmManager.cancel(pendingIntent(context, ACTION_EXPIRE, 1003))
     }
 
     private fun pendingIntent(context: Context, action: String, requestCode: Int): PendingIntent {

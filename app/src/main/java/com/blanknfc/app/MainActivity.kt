@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.blanknfc.app.data.SessionManager
+import com.blanknfc.app.data.FocusSchedule
+import com.blanknfc.app.service.BlankSchedule
 import com.blanknfc.app.ui.navigation.NavGraph
 import com.blanknfc.app.ui.navigation.Routes
 import com.blanknfc.app.ui.theme.BlankTheme
@@ -89,8 +91,35 @@ class MainActivity : ComponentActivity() {
     private fun handleDeepLinkIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
-        if (uri.scheme != "blank") return
-        val action = uri.host.orEmpty()
+        val action = if (uri.scheme == "blank") {
+            uri.host.orEmpty()
+        } else if (uri.scheme == "https" && uri.path?.startsWith("/open") == true) {
+            uri.getQueryParameter("action").orEmpty()
+        } else {
+            return
+        }
+
+        if (action == "apply-plan" || action == "setup-plan") {
+            val start = uri.getQueryParameter("start")?.toIntOrNull()
+            val end = uri.getQueryParameter("end")?.toIntOrNull()
+            if (start == null || end == null || start !in 0..1439 || end !in 0..1439) return
+            lifecycleScope.launch {
+                sessionManager.stateLoaded.filter { it }.first()
+                val durationDays = (uri.getQueryParameter("days")?.toLongOrNull() ?: 7L).coerceIn(1L, 14L)
+                val schedule = FocusSchedule(
+                    enabled = true,
+                    startMinute = start,
+                    endMinute = end,
+                    expiresAtMillis = System.currentTimeMillis() + durationDays * 24L * 60L * 60L * 1000L
+                )
+                sessionManager.updateSchedule(schedule)
+                BlankSchedule.schedule(this@MainActivity, schedule)
+                sessionManager.applyScheduleWindow()
+                Toast.makeText(this@MainActivity, "Protection schedule applied", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+
         if (action != "mode") return
         val name = uri.getQueryParameter("name").orEmpty()
         val activate = uri.getQueryParameter("activate").equals("true", ignoreCase = true)

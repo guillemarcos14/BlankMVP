@@ -21,6 +21,7 @@ class BootReceiver : BroadcastReceiver() {
                 try {
                     val sessionManager = com.blanknfc.app.BlankApp.get(context).container.sessionManager
                     sessionManager.stateLoaded.filter { it }.first()
+                    sessionManager.applyScheduleWindow()
                     BlankSchedule.schedule(context, sessionManager.schedule.value)
                 } finally {
                     pendingResult.finish()

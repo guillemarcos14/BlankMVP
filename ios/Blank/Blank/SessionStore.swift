@@ -97,6 +97,7 @@ final class SessionStore: ObservableObject {
             saveSelection(selection)
             updateCurrentModeSelection(selection)
             reloadBlankWidget()
+            syncRecurringSchedule()
         }
     }
 
@@ -117,7 +118,10 @@ final class SessionStore: ObservableObject {
     }
 
     @Published var schedule: BlankFocusSchedule {
-        didSet { saveSchedule(schedule) }
+        didSet {
+            saveSchedule(schedule)
+            syncRecurringSchedule()
+        }
     }
 
     @Published var schedulePausedUntil: Date? {
@@ -232,6 +236,8 @@ final class SessionStore: ObservableObject {
         if let currentSelection = Self.selection(from: currentMode.selectionData) {
             selection = currentSelection
         }
+
+        syncRecurringSchedule()
     }
 
     var currentMode: BlankFocusMode {
@@ -658,6 +664,11 @@ final class SessionStore: ObservableObject {
     }
 
     func applyAdaptivePlan(startMinute: Int, endMinute: Int, durationDays: Int, activateCurrentWindow: Bool = true) {
+        adaptiveScheduleExpiresAt = Calendar.current.date(
+            byAdding: .day,
+            value: max(1, min(14, durationDays)),
+            to: Date()
+        )
         schedule = BlankFocusSchedule(
             enabled: true,
             startMinute: startMinute,
@@ -667,11 +678,7 @@ final class SessionStore: ObservableObject {
             ]
         )
         schedulePausedUntil = nil
-        adaptiveScheduleExpiresAt = Calendar.current.date(
-            byAdding: .day,
-            value: max(1, min(14, durationDays)),
-            to: Date()
-        )
+        syncRecurringSchedule()
         if activateCurrentWindow {
             applyScheduleWindow()
         }
@@ -703,6 +710,10 @@ final class SessionStore: ObservableObject {
             return
         }
         _ = DeviceActivityTimerScheduler.startDailyLimit(selection: selection, thresholdMinutes: dailyLimitMinutes)
+    }
+
+    func syncRecurringSchedule() {
+        _ = DeviceActivityTimerScheduler.syncRecurringSchedule(schedule, until: adaptiveScheduleExpiresAt)
     }
 
     func recordRelapseReview(_ reason: RelapseReviewReason) {

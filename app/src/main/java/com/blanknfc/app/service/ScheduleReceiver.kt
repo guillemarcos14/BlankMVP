@@ -18,7 +18,11 @@ class ScheduleReceiver : BroadcastReceiver() {
             try {
                 val sessionManager = BlankApp.get(context).container.sessionManager
                 sessionManager.stateLoaded.filter { it }.first()
-                sessionManager.applyScheduleWindow()
+                if (intent.action == BlankSchedule.ACTION_EXPIRE) {
+                    sessionManager.expireSchedule()
+                } else {
+                    sessionManager.applyScheduleWindow()
+                }
                 BlankSchedule.schedule(context, sessionManager.schedule.value)
             } finally {
                 pendingResult.finish()

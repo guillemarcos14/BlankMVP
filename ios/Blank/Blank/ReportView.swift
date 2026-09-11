@@ -49,6 +49,11 @@ struct ReportView: View {
     var body: some View {
         let progress = report
         let weekly = progress.weeklyReport
+        let now = Date()
+        let todayStart = Calendar.current.startOfDay(for: now)
+        let todayFocusTime = focusTime(sessions: sessionStore.sessions, from: todayStart, to: now)
+        let todaySessionCount = sessionCount(sessions: sessionStore.sessions, from: todayStart, to: now)
+        let todaySavedTime = cappedSavedTime(totalFocusTime: todayFocusTime, sessionCount: todaySessionCount)
         let totalFocusTime = focusTime(sessions: sessionStore.sessions, from: .distantPast, to: Date())
         let totalSessionCount = sessionCount(sessions: sessionStore.sessions, from: .distantPast, to: Date())
         let savedTime = cappedSavedTime(totalFocusTime: totalFocusTime, sessionCount: totalSessionCount)
@@ -81,8 +86,8 @@ struct ReportView: View {
             if purchaseStore.hasPremiumAccess {
                 proControlTodayCapsule(
                     forecast: controlForecast,
-                    savedTime: savedTime,
-                    totalFocusTime: totalFocusTime,
+                    savedTime: todaySavedTime,
+                    totalFocusTime: todayFocusTime,
                     context: healthContext
                 )
 
@@ -101,8 +106,6 @@ struct ReportView: View {
                     progress: progress
                 )
 
-                proAIPlanCapsule(system: v3System)
-
                 wellnessDashboardCapsule(
                     system: v3System,
                     context: healthContext,
@@ -115,7 +118,6 @@ struct ReportView: View {
                         v3System: v3System,
                         progress: progress,
                         weekly: weekly,
-                        diagnosis: diagnosis,
                         healthContext: healthContext,
                         healthInsights: healthInsights,
                         controlForecast: controlForecast
@@ -126,7 +128,6 @@ struct ReportView: View {
                         v3System: v3System,
                         progress: progress,
                         weekly: weekly,
-                        diagnosis: diagnosis,
                         healthContext: healthContext,
                         healthInsights: healthInsights,
                         controlForecast: controlForecast
@@ -350,6 +351,7 @@ struct ReportView: View {
                 proSignalPill(title: "Recovery", value: recoveryValue(context.recoveryScore), symbol: "heart.fill", tint: recoveryGreen)
             }
 
+            plannedWindowsCard(forecast: forecast)
             todayPrimaryAction(forecast: forecast)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -394,6 +396,10 @@ struct ReportView: View {
 
     private func todayPrimaryAction(forecast: ControlForecast) -> some View {
         VStack(alignment: .leading, spacing: 10) {
+            Label("Reinforce weak window", systemImage: "target")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+
             Text(forecast.actionText)
                 .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
                 .foregroundStyle(reportPrimary.opacity(0.90))
@@ -408,11 +414,11 @@ struct ReportView: View {
                     .background { Capsule().fill(Color.white.opacity(0.16)) }
             } else {
                 Button {
-                    startBlank(durationMinutes: forecast.durationMinutes)
+                    scheduleForecastBlock(forecast, source: "stats_today_weak_window")
                 } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "shield.fill")
-                        Text("Start \(forecast.durationMinutes) min block")
+                        Image(systemName: "calendar.badge.clock")
+                        Text(forecastActivationButtonTitle(forecast))
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(reportPrimary)
@@ -427,6 +433,24 @@ struct ReportView: View {
         .background {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(forecastColor(forecast.level).opacity(0.07))
+        }
+    }
+
+    private func plannedWindowsCard(forecast: ControlForecast) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Protected windows", systemImage: "calendar.badge.checkmark")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(reportSecondary)
+
+            Text(protectedWindowsSummary(forecast: forecast))
+                .font(.caption)
+                .foregroundStyle(reportPrimary.opacity(0.86))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(13)
+        .background {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(reportPrimary.opacity(0.055))
         }
     }
 
@@ -1032,53 +1056,6 @@ struct ReportView: View {
             .replacingOccurrences(of: " to ", with: "-")
     }
 
-    private func proAIPlanCapsule(system: DigitalWellnessV3System) -> some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Protection plan")
-                    .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
-                Spacer()
-                Text("\(system.profile.adherenceScore)/100")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(accentBlue)
-            }
-
-            HStack(spacing: 10) {
-                proSignalPill(title: "Duration", value: "\(system.plan.recommendedDurationMinutes)m", symbol: "timer", tint: reportPrimary)
-                proSignalPill(title: "Risk", value: "\(system.forecast.riskScore)/100", symbol: "waveform.path.ecg", tint: activityOrange)
-                proSignalPill(title: "Window", value: compactWindowText(system.forecast.riskWindow), symbol: "clock.fill", tint: sleepBlue)
-            }
-
-            Text(system.forecast.recommendedAction)
-                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                .foregroundStyle(reportPrimary.opacity(0.90))
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                Button {
-                    sessionStore.applyAIPlan(durationMinutes: system.plan.recommendedDurationMinutes)
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "report_visual_ai_plan"]
-                        )
-                    }
-                } label: {
-                    Text("Apply")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(reportPrimary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background { Capsule().fill(accentBlue.opacity(0.24)) }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(17)
-        .liquidGlass(cornerRadius: 24)
-    }
-
     private func wellnessDashboardCapsule(
         system: DigitalWellnessV3System,
         context: HealthRecoveryContext,
@@ -1087,25 +1064,25 @@ struct ReportView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 15) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Wellness Dashboard")
+                Text("Wellness Signals")
                     .font(.blankInter(size: 21, weight: .semibold, relativeTo: .title3))
-                Text("Objective wellness signals only. No calendar, music, money, reading or TV.")
+                Text("Signals Blanked can use to adjust protection. No medical diagnosis.")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                proMetricTile(title: "Screen Control", value: "\(system.profile.adherenceScore)/100", symbol: "iphone.slash", tint: accentBlue)
                 proMetricTile(title: "Recovery", value: recoveryValue(context.recoveryScore), symbol: "heart.fill", tint: recoveryGreen)
-                proMetricTile(title: "Training", value: "Strava", symbol: "figure.run", tint: activityOrange)
-                proMetricTile(title: "Weather", value: "Context", symbol: "cloud.sun.fill", tint: sleepBlue)
+                proMetricTile(title: "Sleep", value: sleepValue(context.averageSleepMinutes), symbol: "moon.fill", tint: sleepBlue)
+                proMetricTile(title: "Activity", value: stepsValue(context.averageSteps), symbol: "figure.walk", tint: activityOrange)
+                proMetricTile(title: "Source depth", value: "\(context.signalCoveragePercent)%", symbol: "waveform.path.ecg.rectangle", tint: accentBlue)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Next risk forecast")
+                Text("What changes")
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                Text(forecast.actionText)
+                Text(wellnessAdjustmentText(context: context, forecast: forecast))
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1120,27 +1097,17 @@ struct ReportView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Experiment")
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                Text("\(system.profile.experimentName): \(system.profile.experimentHypothesis)")
-                    .font(.caption)
-                    .foregroundStyle(reportSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
             VStack(alignment: .leading, spacing: 9) {
                 Text("Quick check-in")
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                Text("Use this only when wearable data is missing or the day feels unusual.")
+                    .font(.caption)
+                    .foregroundStyle(reportSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     wellnessSignalButton("Mood", signal: "mood", value: 7)
                     wellnessSignalButton("Energy", signal: "energy", value: 7)
                     wellnessSignalButton("Stress", signal: "stress", value: 4)
-                }
-                HStack(spacing: 8) {
-                    wellnessSignalButton("Coffee", signal: "caffeine", value: 1)
-                    wellnessSignalButton("Alcohol", signal: "alcohol", value: 1)
-                    wellnessSignalButton("Meditation", signal: "meditation", value: 1)
                 }
                 if !lastQuickLog.isEmpty {
                     Text(lastQuickLog)
@@ -1257,50 +1224,16 @@ struct ReportView: View {
         v3System: DigitalWellnessV3System,
         progress: BlankProgressReport,
         weekly: BlankWeeklyReport,
-        diagnosis: DigitalWellnessDiagnosis,
         healthContext: HealthRecoveryContext,
         healthInsights: [String],
         controlForecast: ControlForecast
     ) -> some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 14) {
-                v3SystemCapsule(system: v3System)
-
-                aiWellnessExpansionCapsule(
-                    expansion: aiWellnessExpansion(
-                        system: v3System,
-                        progress: progress,
-                        context: healthContext,
-                        forecast: controlForecast,
-                        diagnosis: diagnosis
-                    )
-                )
-
-                healthAccessCapsule()
-
-                weeklyVisualCapsule(
-                    activityDays: progress.recentActivity,
-                    weekly: weekly
-                )
-
-                statsDetailsCapsule(
-                    summary: dailyAISummary(
-                        events: sessionStore.usageEvents,
-                        sessions: sessionStore.sessions,
-                        progress: progress
-                    ),
-                    report: weeklyAIReport(
-                        events: sessionStore.usageEvents,
-                        sessions: sessionStore.sessions,
-                        progress: progress,
-                        healthContext: healthContext
-                    ),
-                    forecast: controlForecast,
-                    healthInsights: healthInsights,
-                    weekly: weekly,
-                    progress: progress,
-                    emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining
-                )
+                moreModePerformance(progress: progress)
+                morePlanContext(system: v3System, forecast: controlForecast)
+                moreBreakSignals(weekly: weekly, progress: progress)
+                moreHealthDetail(context: healthContext, healthInsights: healthInsights)
             }
             .padding(.top, 10)
         } label: {
@@ -1308,13 +1241,60 @@ struct ReportView: View {
                 Label("More", systemImage: "ellipsis.circle")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("AI / Health / Details")
+                Text("Context / signals")
                     .font(.caption)
                     .foregroundStyle(reportSecondary)
             }
         }
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func moreModePerformance(progress: BlankProgressReport) -> some View {
+        VStack(spacing: 10) {
+            metricRow(title: "Modes configured", value: "\(sessionStore.focusModes.count)", caption: "Reusable app groups")
+            if !progress.modeActivity.isEmpty {
+                subtleDivider()
+                ForEach(progress.modeActivity.prefix(3).indices, id: \.self) { index in
+                    modeRow(progress.modeActivity[index])
+                    if index < min(progress.modeActivity.count, 3) - 1 {
+                        subtleDivider()
+                    }
+                }
+            }
+        }
+    }
+
+    private func morePlanContext(system: DigitalWellnessV3System, forecast: ControlForecast) -> some View {
+        aiReportSection(
+            title: "Plan context",
+            items: [
+                system.plan.weeklyGoal,
+                system.plan.secondaryAction,
+                protectedWindowsSummary(forecast: forecast)
+            ],
+            tint: accentBlue
+        )
+    }
+
+    private func moreBreakSignals(weekly: BlankWeeklyReport, progress: BlankProgressReport) -> some View {
+        VStack(spacing: 10) {
+            metricRow(title: "Average protected", value: formatDuration(weekly.averageSessionDuration), caption: "Per completed block this week")
+            subtleDivider()
+            metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(sessionStore.emergencyUnlocksRemaining))/3", caption: emergencyCaption(sessionStore.emergencyUnlocksRemaining))
+            subtleDivider()
+            metricRow(title: "Longest streak", value: "\(progress.longestStreakDays)d", caption: "Historical consistency")
+        }
+    }
+
+    private func moreHealthDetail(context: HealthRecoveryContext, healthInsights: [String]) -> some View {
+        aiReportSection(
+            title: "Health detail",
+            items: healthInsights.isEmpty
+                ? ["Connect Apple Health or a wearable to compare recovery with screen-control patterns."]
+                : Array(healthInsights.prefix(3)),
+            tint: recoveryGreen
+        )
     }
 
     private func v3SystemCapsule(system: DigitalWellnessV3System) -> some View {
@@ -3911,6 +3891,52 @@ struct ReportView: View {
             .split(separator: "\n")
             .map(String.init)
             .filter { !$0.isEmpty }
+    }
+
+    private func protectedWindowsSummary(forecast: ControlForecast) -> String {
+        let windows = sessionStore.schedule.activeWindows
+        guard sessionStore.schedule.enabled, !windows.isEmpty else {
+            return "No planned window yet. Next reinforcement: \(forecast.windowText)."
+        }
+
+        let windowTexts = windows.prefix(3).map { window in
+            "\(window.name): \(minuteText(window.startMinute))-\(minuteText(window.endMinute))"
+        }
+        let summary = windowTexts.joined(separator: " · ")
+        if windows.contains(where: { windowOverlapsForecast(window, forecast: forecast) }) {
+            return "\(summary). This already covers the weak window."
+        }
+        return "\(summary). Next weak window to reinforce: \(forecast.windowText)."
+    }
+
+    private func windowOverlapsForecast(_ window: BlankHabitWindow, forecast: ControlForecast) -> Bool {
+        let forecastStart = forecast.windowStartMinute
+        let forecastEnd = forecast.windowEndMinute
+        return minuteRange(window.startMinute, window.endMinute).contains { minute in
+            minuteRange(forecastStart, forecastEnd).contains(minute)
+        }
+    }
+
+    private func minuteRange(_ start: Int, _ end: Int) -> [Int] {
+        let safeStart = max(0, min(1439, start))
+        let safeEnd = max(0, min(1439, end))
+        if safeStart < safeEnd {
+            return Array(safeStart..<safeEnd)
+        }
+        return Array(safeStart..<1440) + Array(0..<safeEnd)
+    }
+
+    private func wellnessAdjustmentText(context: HealthRecoveryContext, forecast: ControlForecast) -> String {
+        if let recovery = context.recoveryScore, recovery < 45 {
+            return "Recovery is low, so Blanked should make the weak-window block easier rather than longer."
+        }
+        if let sleep = context.averageSleepMinutes, sleep < 6 * 60 {
+            return "Sleep is short, so the next plan should protect the weak window with lower friction."
+        }
+        if context.signalCoveragePercent == 0 {
+            return "No body signal yet. Blanked will rely on phone behavior until Apple Health or a wearable is connected."
+        }
+        return "Use these signals to tune \(forecast.windowText), not to create extra cards or generic wellness advice."
     }
 
     private var hasRemotePlanUpdate: Bool {

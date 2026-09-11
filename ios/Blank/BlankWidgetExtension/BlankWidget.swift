@@ -182,18 +182,9 @@ struct BlankWidgetView: View {
     private var timerBadge: some View {
         Link(destination: URL(string: "blank://timer")!) {
             timerBadgeContent
-            .foregroundStyle(timerBadgeForeground)
-            .padding(.horizontal, timerBadgeHorizontalPadding)
-            .frame(minWidth: timerBadgeMinWidth, maxWidth: 76, minHeight: 30)
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .fill(Color(red: 0.78, green: 0.78, blue: 0.76).opacity(isActive ? 0.28 : 0.82))
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .stroke(Color.white.opacity(isActive ? 0.10 : 0.22), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .foregroundStyle(timerBadgeForeground)
+                .frame(minWidth: 38, minHeight: 24, alignment: .leading)
+                .contentShape(Rectangle())
         }
     }
 
@@ -210,21 +201,13 @@ struct BlankWidgetView: View {
             Text(formatTimerBadge(minutes: pendingTimerMinutes))
                 .timerBadgeTextStyle()
         } else {
-            Image(systemName: "clock")
-                .font(.system(size: 14, weight: .semibold))
+            Text("Timer")
+                .timerBadgeTextStyle()
         }
     }
 
     private var timerBadgeForeground: Color {
         isActive ? Color.white : Color(red: 0.13, green: 0.13, blue: 0.12).opacity(0.86)
-    }
-
-    private var timerBadgeHorizontalPadding: CGFloat {
-        entry.pendingTimerMinutes == nil && !isActive ? 7 : 10
-    }
-
-    private var timerBadgeMinWidth: CGFloat {
-        entry.pendingTimerMinutes == nil && !isActive ? 30 : 42
     }
 
     private func compactRemainingText(until endsAt: Date) -> String {

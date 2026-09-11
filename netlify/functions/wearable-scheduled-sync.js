@@ -5,7 +5,7 @@ const {
 const { syncConnection } = require("./wearable-sync");
 
 const SYNCABLE_STATUSES = "connected,partial,no_data,stale,error";
-const DIRECT_PROVIDERS = "oura,whoop,fitbit_google_health,withings";
+const DIRECT_PROVIDERS = "oura,whoop,fitbit_google_health,withings,strava";
 
 function cleanText(value, maxLength = 160) {
   return String(value || "").trim().slice(0, maxLength);

@@ -9,7 +9,7 @@ const {
   revokeToken,
 } = require("./_wearable_oauth");
 
-const PROVIDERS = new Set(["apple_health", "health_connect", "oura", "whoop", "garmin", "fitbit_google_health", "withings"]);
+const PROVIDERS = new Set(["apple_health", "health_connect", "oura", "whoop", "garmin", "fitbit_google_health", "withings", "strava"]);
 const STATUSES = new Set(["connected", "partial", "no_data", "stale", "error", "disconnected"]);
 
 function cleanText(value, maxLength = 160) {

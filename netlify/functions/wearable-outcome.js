@@ -5,7 +5,7 @@ const {
   supabaseFetch,
 } = require("./_membership");
 
-const PROVIDERS = new Set(["apple_health", "health_connect", "oura", "whoop", "garmin", "fitbit_google_health", "withings"]);
+const PROVIDERS = new Set(["apple_health", "health_connect", "oura", "whoop", "garmin", "fitbit_google_health", "withings", "strava"]);
 const ACTIONS = new Set(["recovery_mode", "sleep_boundary", "preventive_block", "morning_report", "source_connect", "other"]);
 const OUTCOMES = new Set(["generated", "accepted", "ignored", "dismissed", "completed", "failed"]);
 

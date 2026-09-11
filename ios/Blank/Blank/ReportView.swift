@@ -9,6 +9,7 @@ struct ReportView: View {
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
     @State private var isSubmittingWellnessFeatures = false
+    @State private var showWearableProviders = false
     @State private var wellnessSyncMessage: String?
     @AppStorage("blankWeeklyAIGoal", store: BlankSharedState.defaults) private var storedWeeklyGoal = ""
     @AppStorage("blankWeeklyAIPlanFirst", store: BlankSharedState.defaults) private var storedPlanFirst = ""
@@ -830,7 +831,7 @@ struct ReportView: View {
                     Text("Connect health and wearables")
                         .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                         .foregroundStyle(reportPrimary)
-                    Text("Apple Health, Oura, WHOOP, Fitbit, Withings and Strava help Blanked adapt blocks to sleep, recovery and activity.")
+                    Text("Apple Health first. Add a direct wearable only when you want richer sleep, recovery or training signals.")
                         .font(.caption)
                         .foregroundStyle(reportSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -877,35 +878,35 @@ struct ReportView: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 8) {
-                wearableQuickConnectButton("Oura", provider: "oura")
-                wearableQuickConnectButton("WHOOP", provider: "whoop")
-                wearableQuickConnectButton("Fitbit", provider: "fitbit_google_health")
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    showWearableProviders.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Connect Wearable")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Image(systemName: showWearableProviders ? "chevron.up" : "chevron.down")
+                        .font(.caption2.weight(.bold))
+                }
+                .foregroundStyle(reportPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .padding(.horizontal, 14)
+                .background { Capsule().fill(Color.white.opacity(0.16)) }
+                .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
             }
+            .buttonStyle(.plain)
 
-            HStack(spacing: 8) {
-                wearableQuickConnectButton("Withings", provider: "withings")
-                wearableQuickConnectButton("Strava", provider: "strava")
+            if showWearableProviders {
+                wearableProviderList()
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 26)
-    }
-
-    private func wearableQuickConnectButton(_ title: String, provider: String) -> some View {
-        Button {
-            startWearableOAuth(provider: provider)
-        } label: {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(reportPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background { Capsule().fill(Color.white.opacity(0.14)) }
-                .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
-        }
-        .buttonStyle(.plain)
     }
 
     private func proPatternsCapsule(
@@ -1629,12 +1630,7 @@ struct ReportView: View {
 
             VStack(spacing: 8) {
                 wearableProviderRow(name: "Apple Health", provider: "apple_health", status: healthSourceStatus(context: context), detail: "Sleep, activity, heart and recovery context.", canConnect: false)
-                wearableProviderRow(name: "Strava", provider: "strava", status: "Connect", detail: "Training, load, cardio and outdoor activity.", canConnect: true)
-                wearableProviderRow(name: "Oura", provider: "oura", status: "Connect", detail: "Readiness, sleep contributors and recovery signals.", canConnect: true)
-                wearableProviderRow(name: "WHOOP", provider: "whoop", status: "Connect", detail: "Recovery, strain, sleep debt and cycle signals.", canConnect: true)
-                wearableProviderRow(name: "Garmin", status: "Partner gated", detail: "Body Battery, stress, training readiness and HRV status.")
-                wearableProviderRow(name: "Google Health / Fitbit", provider: "fitbit_google_health", status: "Connect", detail: "Fitbit, Pixel Watch and Google Health metrics.", canConnect: true)
-                wearableProviderRow(name: "Withings", provider: "withings", status: "Connect", detail: "Weight, body composition, blood pressure and temperature context.", canConnect: true)
+                wearableProviderList()
                 wearableProviderRow(name: "Weather", status: "Ready", detail: "Temperature, rain, daylight and UV context.")
             }
 
@@ -1717,6 +1713,17 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(17)
         .liquidGlass(cornerRadius: 28)
+    }
+
+    private func wearableProviderList() -> some View {
+        VStack(spacing: 8) {
+            wearableProviderRow(name: "Oura", provider: "oura", status: "Connect", detail: "Readiness, sleep contributors and recovery signals.", canConnect: true)
+            wearableProviderRow(name: "Google Health / Fitbit", provider: "fitbit_google_health", status: "Connect", detail: "Fitbit, Pixel Watch and Google Health metrics.", canConnect: true)
+            wearableProviderRow(name: "Withings", provider: "withings", status: "Connect", detail: "Weight, body composition, blood pressure and temperature context.", canConnect: true)
+            wearableProviderRow(name: "Strava", provider: "strava", status: "Connect", detail: "Training, load, cardio and outdoor activity.", canConnect: true)
+            wearableProviderRow(name: "WHOOP", status: "Not ready", detail: "Backend wiring exists, but production connection is not verified yet.")
+            wearableProviderRow(name: "Garmin", status: "Partner gated", detail: "Waiting for Garmin partner access before users can connect.")
+        }
     }
 
     private func wearableProviderRow(name: String, provider: String = "", status: String, detail: String, canConnect: Bool = false) -> some View {

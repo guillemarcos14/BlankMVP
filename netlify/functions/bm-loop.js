@@ -468,20 +468,33 @@ async function persistState({ body = {}, loop, event = {}, transition, expectedS
     outcome_score: Number.isFinite(Number(event.outcome_score)) ? Number(event.outcome_score) : null,
   };
   const state = persistenceState(loop);
+  const rpcBody = JSON.stringify({
+    p_loop_id: loop.loop_id,
+    p_anonymous_user_id: persistedUserId,
+    p_expected_state_version: Number.isInteger(expectedStateVersion) ? expectedStateVersion : 0,
+    p_transition: clean(transition || "planned", 80),
+    p_event_id: eventIdValue,
+    p_event_type: payload.type,
+    p_event_payload: payload,
+    p_next_state: state,
+  });
   try {
-    const result = await supabaseFetch("rpc/bm_append_loop_event", {
-      method: "POST",
-      body: JSON.stringify({
-        p_loop_id: loop.loop_id,
-        p_anonymous_user_id: persistedUserId,
-        p_expected_state_version: Number.isInteger(expectedStateVersion) ? expectedStateVersion : 0,
-        p_transition: clean(transition || "planned", 80),
-        p_event_id: eventIdValue,
-        p_event_type: payload.type,
-        p_event_payload: payload,
-        p_next_state: state,
-      }),
-    });
+    let result;
+    let completed = false;
+    let lastError = null;
+    for (let attempt = 0; attempt < 2 && !completed; attempt += 1) {
+      try {
+        result = await supabaseFetch("rpc/bm_append_loop_event", {
+          method: "POST",
+          body: rpcBody,
+        });
+        completed = true;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+    }
+    if (!completed) throw lastError || new Error("bm_loop_persistence_failed");
     const resultValue = Array.isArray(result) ? result[0] : result;
     if (resultValue?.status === "conflict") {
       return { persisted: false, reason: "state_conflict", state_version: resultValue.state_version || null };

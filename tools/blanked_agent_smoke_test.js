@@ -164,6 +164,22 @@ function baseContext(overrides = {}) {
   assert.match(explicitWindow.message_text, /protect Instagram from 10:00 PM to 7:00 AM/i);
   assert.doesNotMatch(explicitWindow.message_text, /I can help|apply it in Blanked|Read:|Pattern:|Move:/i);
 
+  const immediateBlock = await call("I want to block Instagram now.", baseContext());
+  assert.strictEqual(immediateBlock.actions[0].type, "start_protection");
+  assert.strictEqual(immediateBlock.actions[0].minutes, 30);
+  assert.match(immediateBlock.message_text, /30-minute block now|block Instagram now for 30 minutes/i);
+
+  const claimedSelectionImmediate = await call(
+    "I have already selected the app. Now block it.",
+    baseContext({ has_selected_apps: false, selection_count: 0 })
+  );
+  assert.strictEqual(claimedSelectionImmediate.actions[0].type, "start_protection");
+  assert.strictEqual(claimedSelectionImmediate.actions[0].minutes, 35);
+  assert.doesNotMatch(claimedSelectionImmediate.message_text, /choose (the )?app|choose selected apps/i);
+
+  const explicitDailyLimit = await call("Set a 25-minute daily limit for Instagram.", baseContext());
+  assert.ok(explicitDailyLimit.actions.some((action) => action.type === "set_daily_limit"));
+
   const appSpanishLocale = await call("Block Instagram from 10 to 7.", baseContext({ locale: "es-ES", channel: "app" }));
   assert.match(appSpanishLocale.message_text, /protect Instagram/i);
   assert.doesNotMatch(appSpanishLocale.message_text, /Protegería|bloqueo|franja/i);

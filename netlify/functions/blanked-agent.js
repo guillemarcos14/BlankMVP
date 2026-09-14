@@ -528,6 +528,35 @@ function hasExplicitBlockRequest(prompt) {
     /\bfrom\s+\d{1,2}(:\d{2})?\s*(am|pm)?\s+to\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b/i.test(text);
 }
 
+function asksForDailyLimit(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, ["daily limit", "per day", "each day", "every day", "límite diario", "limite diario", "por día", "por dia"])
+    || (/\b(limit|límite|limite|cap|tope)\b/i.test(text) && /\b\d+\s*(minutes?|mins?|minutos?)\b/i.test(text));
+}
+
+function asksForImmediateBlock(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  if (!hasExplicitBlockRequest(prompt) || asksForAdvice(prompt) || asksForPlan(prompt) || asksForDailyLimit(prompt)) return false;
+  if (explicitTimeWindow(prompt, {}) || promptHasFutureTiming(prompt)) return false;
+  return contains(text, ["now", "right now", "immediately", "ahora", "ya", "en este momento", "at the moment"])
+    || contains(text, ["block", "bloquea", "bloquear", "shield"]);
+}
+
+function claimsSelectedApps(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, [
+    "already selected",
+    "already chose",
+    "selected the app",
+    "selected apps",
+    "ya he seleccionado",
+    "ya seleccioné",
+    "ya seleccione",
+    "ya elegí",
+    "ya elegi",
+  ]);
+}
+
 function isGeneralWellnessPrompt(prompt) {
   const text = paddedText(prompt, 700);
   const digitalMoment = contains(text, [
@@ -847,7 +876,7 @@ function requestedUnknownApp(prompt) {
   if (!match) return "";
   const raw = match[1];
   const lowered = raw.toLowerCase();
-  const blockedWords = new Set(["everything", "all", "todos", "todas", "adult", "websites", "apps", "app", "social", "media", "networks", "redes", "my", "me", "now", "for", "from", "during", "strict", "hard", "distractions", "distracciones"]);
+  const blockedWords = new Set(["everything", "all", "todos", "todas", "adult", "websites", "apps", "app", "social", "media", "networks", "redes", "my", "me", "it", "this", "that", "now", "for", "from", "during", "strict", "hard", "distractions", "distracciones"]);
   if (blockedWords.has(lowered)) return "";
   if (namedApp(raw) !== "the app") return "";
   return raw.charAt(0).toUpperCase() + raw.slice(1);
@@ -1844,8 +1873,10 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   const unknownApp = requestedUnknownApp(prompt);
-  if (intent === "social" && appCategory && hasExplicitBlockRequest(prompt) && (!selected || !authorized)) {
-    const setupAction = !selected ? "open_app_picker" : "request_screen_time_permission";
+  const appSelectionClaimed = claimsSelectedApps(prompt);
+  const effectiveSelected = selected || appSelectionClaimed;
+  if (intent === "social" && appCategory && hasExplicitBlockRequest(prompt) && (!effectiveSelected || !authorized)) {
+    const setupAction = !effectiveSelected ? "open_app_picker" : "request_screen_time_permission";
     return {
       intent: "social",
       title: "Choose Apps",
@@ -1880,8 +1911,8 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
 
-  if (intent === "social" && promptApp !== "the app" && hasExplicitBlockRequest(prompt) && (!selected || !authorized)) {
-    const setupAction = !selected ? "open_app_picker" : "request_screen_time_permission";
+  if (intent === "social" && promptApp !== "the app" && hasExplicitBlockRequest(prompt) && (!effectiveSelected || !authorized)) {
+    const setupAction = !effectiveSelected ? "open_app_picker" : "request_screen_time_permission";
     return {
       intent: "social",
       title: "Choose App",
@@ -1896,6 +1927,34 @@ function fallbackPlan(prompt, context = {}) {
       actions: [action(setupAction)],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
+    };
+  }
+
+  if (intent === "social" && asksForImmediateBlock(prompt) && !timeWindow && (promptApp !== "the app" || appCategory || appSelectionClaimed)) {
+    const requestedDuration = explicitDurationMinutes(prompt) || 30;
+    const target = promptApp !== "the app" ? promptApp : "your selected apps";
+    return {
+      intent: "social",
+      title: "Immediate Protection",
+      response_text: language === "es"
+        ? `Bloquearía ${target} ahora durante ${requestedDuration} minutos.`
+        : `I’d block ${target} now for ${requestedDuration} minutes.`,
+      bullets: language === "es"
+        ? [
+          `Movimiento: bloquear ${target} ahora durante ${requestedDuration} minutos.`,
+          "Mantener la selección actual de apps protegidas.",
+          "Resultado: comprobar el bloqueo y revisar el resultado al terminar."
+        ]
+        : [
+          `Move: block ${target} now for ${requestedDuration} minutes.`,
+          "Keep the current protected app selection.",
+          "Result: verify the block and review the outcome when it ends."
+        ],
+      primary_label: language === "es" ? "Bloquear ahora" : "Start now",
+      secondary_label: language === "es" ? "Elegir apps" : "Choose apps",
+      actions: [action("start_protection", { minutes: requestedDuration, hard_mode: wantsHardMode(prompt) })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
     };
   }
 
@@ -2518,6 +2577,7 @@ function deterministicActionTitle(title) {
     "Allow Only",
     "Focus Protection",
     "Strict Focus Protection",
+    "Immediate Protection",
     "Pause Rules",
     "Resume Rules",
     "Weekly Read",
@@ -2534,7 +2594,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const proposed = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map(normalizeAction).filter(Boolean) : [];
   const hasClearFutureWindow = Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
   const fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map(normalizeAction).filter(Boolean) : [];
-  const selected = context.has_selected_apps === true;
+  const selected = context.has_selected_apps === true || claimsSelectedApps(prompt);
   const authorized = context.screen_time_authorized === true;
   const promptIntent = classify(prompt, context);
   const adviceOnly = asksForAdvice(prompt) && ["sleep", "social", "general"].includes(promptIntent) && !hasExplicitBlockRequest(prompt) && !proactiveTrigger(prompt, context);

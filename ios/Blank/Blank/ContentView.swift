@@ -1072,9 +1072,9 @@ private struct ConversationalHomeView: View {
                     loop: activeLoop,
                     type: "outcome_recorded",
                     success: verification.passed,
+                    reason: verification.reason,
                     outcome: verification.passed ? "held" : "failed",
                     outcomeScore: verification.passed ? 24 : -28,
-                    reason: verification.reason,
                     evidence: verification.evidence
                 ) ?? activeLoop
                 loop = activeLoop

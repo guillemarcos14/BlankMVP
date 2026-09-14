@@ -303,7 +303,13 @@ fun HomeScreen(
                     } else if (!AccessibilityHelper.isServiceEnabled(context)) {
                         AccessibilityHelper.openAccessibilitySettings(context)
                     } else {
-                        sessionManager.activateBlank()
+                        val result = sessionManager.activateBlank()
+                        digitalWellnessStore.recordExecution(
+                            recommendationId = aiPlan.recommendationId,
+                            plan = aiPlan,
+                            success = result == SessionManager.NfcResult.BLANKED,
+                            outcome = if (result == SessionManager.NfcResult.BLANKED) "activated" else "failed"
+                        )
                     }
                 },
                 onMainAction = {
@@ -312,7 +318,13 @@ fun HomeScreen(
                     } else if (!AccessibilityHelper.isServiceEnabled(context)) {
                         AccessibilityHelper.openAccessibilitySettings(context)
                     } else {
-                        sessionManager.activateBlank()
+                        val result = sessionManager.activateBlank()
+                        digitalWellnessStore.recordExecution(
+                            recommendationId = aiPlan.recommendationId,
+                            plan = aiPlan,
+                            success = result == SessionManager.NfcResult.BLANKED,
+                            outcome = if (result == SessionManager.NfcResult.BLANKED) "activated" else "failed"
+                        )
                     }
                 }
             )
@@ -571,7 +583,7 @@ private fun AiPlanHomeCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Blanked AI now",
+                    text = "BM now",
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                     color = BlankOnSurface.copy(alpha = 0.74f)
                 )
@@ -1010,6 +1022,12 @@ private fun WellnessDashboardCard(
                 color = textColor.copy(alpha = 0.66f),
                 style = MaterialTheme.typography.bodyMedium
             )
+            Spacer(modifier = Modifier.height(14.dp))
+            SummaryLine("Next risk", "${aiPlan.riskScore}/100", aiPlan.riskWindow, textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Behavior chain", aiPlan.behaviorChain, aiPlan.forecastReasons.firstOrNull() ?: "Blanked is learning your baseline.", textColor)
+            ProgressDivider(textColor)
+            SummaryLine("Experiment", aiPlan.experimentName, aiPlan.experimentWhy, textColor)
             Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = "Quick check-in",

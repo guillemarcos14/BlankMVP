@@ -63,7 +63,12 @@ function incomingMessages(body) {
     for (const change of entry.changes || []) {
       const value = change.value || {};
       for (const message of value.messages || []) {
-        const text = cleanText(message.text && message.text.body);
+        const text = cleanText(
+          (message.text && message.text.body)
+          || (message.button && (message.button.text || message.button.payload))
+          || (message.interactive && message.interactive.button_reply && (message.interactive.button_reply.title || message.interactive.button_reply.id))
+          || (message.interactive && message.interactive.list_reply && (message.interactive.list_reply.title || message.interactive.list_reply.id))
+        );
         if (!text) continue;
         messages.push({
           from: cleanText(message.from, 40),
@@ -74,6 +79,10 @@ function incomingMessages(body) {
     }
   }
   return messages;
+}
+
+function acceptsProactiveUpdate(text) {
+  return /^(yes|yes,?\s*(show|please)|show( me)?|tell me|show update|sure|go ahead|okay|ok)$/i.test(cleanText(text, 120));
 }
 
 function requestedAppNames(text) {
@@ -215,9 +224,9 @@ function minuteOfDay(hour, minute, meridiem) {
   return normalized * 60 + minute;
 }
 
-function lunchEndMinute(text) {
+function mealEndMinute(text, terms) {
   const value = cleanText(text, 800).toLowerCase();
-  if (!/(lunch|comida|comer|almuerzo)/i.test(value)) return null;
+  if (!terms.test(value)) return null;
   const matches = [...value.matchAll(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/gi)];
   if (!matches.length) return null;
   const match = matches[matches.length - 1];
@@ -226,9 +235,18 @@ function lunchEndMinute(text) {
   return minuteOfDay(hour, Number(match[2] || 0), meridiem);
 }
 
+function breakfastEndMinute(text) {
+  return mealEndMinute(text, /(breakfast|desayuno|desayunar)/i);
+}
+
+function lunchEndMinute(text) {
+  return mealEndMinute(text, /(lunch|comida|comer|almuerzo)/i);
+}
+
 function memoryFactsFromText(text) {
   const value = cleanText(text, 800).toLowerCase();
   const apps = requestedAppNames(text);
+  const breakfastMinute = breakfastEndMinute(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
   if (/(sleep|bed|night|dormir|duermo|cama|noche)/i.test(value)) facts.last_topic = "sleep";
@@ -238,6 +256,10 @@ function memoryFactsFromText(text) {
   if (lunchMinute != null) {
     facts.lunch_end_minute = lunchMinute;
     facts.weak_hours = [Math.floor(lunchMinute / 60)];
+  }
+  if (breakfastMinute != null) {
+    facts.breakfast_end_minute = breakfastMinute;
+    facts.weak_hours = [Math.floor(breakfastMinute / 60)];
   }
   return facts;
 }
@@ -302,6 +324,12 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
       connectCode,
       channelUser: from,
     });
+    await recordAssistantMemory({
+      channel,
+      channelUser: from,
+      memory: { proactive_updates_paused: false },
+      source: "assistant_channel_connected",
+    });
   } catch (_) {
     return;
   }
@@ -319,7 +347,29 @@ async function processMessage(message) {
 
   const command = message.text.toLowerCase();
   if (command === "stop" || command === "disconnect") {
+    await recordAssistantMemory({
+      channel: "whatsapp",
+      channelUser: message.from,
+      memory: { proactive_updates_paused: true, pending_proactive_message: "" },
+      source: "assistant_channel_paused",
+    });
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
+  }
+  let pendingMemory = {};
+  try {
+    pendingMemory = await getAssistantMemory("whatsapp", message.from);
+  } catch (_) {
+    pendingMemory = {};
+  }
+  const pendingMessage = cleanText(pendingMemory.pending_proactive_message, 900);
+  if (pendingMessage && acceptsProactiveUpdate(message.text)) {
+    await recordAssistantMemory({
+      channel: "whatsapp",
+      channelUser: message.from,
+      memory: { pending_proactive_message: "", pending_proactive_update_key: "", pending_proactive_sent_at: "" },
+      source: "assistant_proactive_opened",
+    });
+    return sendWhatsAppMessage(message.from, pendingMessage);
   }
   const plan = await callBlankedAgent(message.text, message.from);
   return sendPlanReply(message.from, plan, message.text);

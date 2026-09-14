@@ -291,20 +291,20 @@ function buildLearningChange({ previousDecision, record }) {
 
   if (personalOverride) {
     changeType = "personal_override";
-    title = "BAI applied a personal override";
+    title = "BM applied a personal override";
     summary = "A user's own outcomes now override the segment pattern for this recommendation.";
     severity = "important";
   } else if (explorationStarted) {
     changeType = "exploration_started";
-    title = "BAI started a bounded experiment";
-    summary = "Evidence is weak, so BAI applied a reversible variation to learn faster.";
+    title = "BM started a bounded experiment";
+    summary = "Evidence is weak, so BM applied a reversible variation to learn faster.";
   } else if (sourceChanged) {
     changeType = "decision_source_changed";
-    title = "BAI changed its decision source";
+    title = "BM changed its decision source";
     summary = `Decision source changed from ${previousDecision.decision_source} to ${record.decision_source}.`;
   } else if (recommendationChanged) {
     changeType = "recommendation_changed";
-    title = "BAI changed a recommendation";
+    title = "BM changed a recommendation";
     summary = "The final recommendation changed because new evidence changed the ranking.";
   }
 

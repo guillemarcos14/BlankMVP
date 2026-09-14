@@ -26,6 +26,7 @@ struct ReportView: View {
     @AppStorage("blankRemotePlanEndMinute", store: BlankSharedState.defaults) private var remotePlanEndMinute = -1
     @AppStorage("blankRemotePlanDurationDays", store: BlankSharedState.defaults) private var remotePlanDurationDays = 5
     @AppStorage("blankRemotePlanActionLabel", store: BlankSharedState.defaults) private var remotePlanActionLabel = "Apply preventive block"
+    @AppStorage("blankRemoteRecommendationId", store: BlankSharedState.defaults) private var remoteRecommendationId = ""
     @AppStorage("blankRemoteWellnessLastSyncAt", store: BlankSharedState.defaults) private var remoteWellnessLastSyncAt = 0.0
     @AppStorage("blankWellnessLastMood", store: BlankSharedState.defaults) private var lastMood = 0
     @AppStorage("blankWellnessLastEnergy", store: BlankSharedState.defaults) private var lastEnergy = 0
@@ -1841,7 +1842,7 @@ struct ReportView: View {
     private func remoteWellnessInsightCard() -> some View {
         VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
-                Label("Blanked AI", systemImage: "sparkles")
+                Label("BM", systemImage: "sparkles")
                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .headline))
                     .foregroundStyle(reportPrimary)
 
@@ -3954,7 +3955,7 @@ struct ReportView: View {
 
     private var aiPlanStatusText: String {
         guard remoteWellnessLastSyncAt > 0 else {
-            return "Blanked AI will update your plan daily."
+            return "BM will update your plan daily."
         }
 
         let lastSync = Date(timeIntervalSince1970: remoteWellnessLastSyncAt)
@@ -4058,6 +4059,7 @@ struct ReportView: View {
         remoteWellnessSummary = insight.summary
         remoteWellnessNextStep = insight.next_step
         remoteWellnessRecommendations = insight.recommendations.joined(separator: "\n")
+        remoteRecommendationId = insight.recommendation_id ?? ""
 
         guard let plan = insight.plan_update else { return }
         remotePlanTitle = plan.title
@@ -4088,6 +4090,15 @@ struct ReportView: View {
                     "duration_days": remotePlanDurationDays
                 ]
             )
+            if !remoteRecommendationId.isEmpty {
+                try? await DigitalWellnessFeaturesClient().recordOutcome(
+                    anonymousUserId: currentAnonymousUserId(),
+                    recommendationId: remoteRecommendationId,
+                    outcome: "activated",
+                    outcomeScore: 16,
+                    metadata: ["source": "ios", "surface": "wellness_report"]
+                )
+            }
         }
     }
 

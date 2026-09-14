@@ -28,6 +28,97 @@ function cleanBoolean(value: unknown) {
   return null;
 }
 
+function ageBand(age: unknown) {
+  const value = cleanNumber(age);
+  if (value == null || value < 13) return "age_unknown";
+  if (value < 18) return "age_u18";
+  if (value < 25) return "age_18_24";
+  if (value < 35) return "age_25_34";
+  if (value < 45) return "age_35_44";
+  if (value < 55) return "age_45_54";
+  return "age_55_plus";
+}
+
+function normalizeGender(value: unknown) {
+  const text = cleanText(value, 40).toLowerCase();
+  if (["female", "woman", "women", "f", "mujer"].includes(text)) return "female";
+  if (["male", "man", "men", "m", "hombre"].includes(text)) return "male";
+  return text ? "other" : "gender_unknown";
+}
+
+function segmentKey(profile: Record<string, any> = {}) {
+  const goal = cleanText(profile.goal || profile.motivation_cluster || "goal_unknown", 40)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "") || "goal_unknown";
+  return [ageBand(profile.age), `gender_${normalizeGender(profile.gender)}`, `goal_${goal}`].join("|");
+}
+
+function patternKey(planUpdate: Record<string, any> = {}) {
+  const raw = cleanText(`${planUpdate.title || ""} ${planUpdate.evidence || ""}`, 160).toLowerCase();
+  if (/(sleep|bed|night|dormir|noche|recovery)/.test(raw)) return "sleep_night_scroll";
+  if (/(lunch|comida|comer|almuerzo)/.test(raw)) return "lunch_scroll";
+  if (/(work|trabaj|focus|foco)/.test(raw)) return "work_focus";
+  if (/(study|estudi|exam|opos)/.test(raw)) return "study_focus";
+  if (/(social|scroll|tiktok|instagram|youtube|reddit|reels|shorts)/.test(raw)) return "social_scroll";
+  return "general";
+}
+
+function recommendationKind(planUpdate: Record<string, any> = {}) {
+  const raw = cleanText(`${planUpdate.title || ""} ${planUpdate.evidence || ""}`, 160).toLowerCase();
+  return /(sleep|bed|night|dormir|noche|recovery)/.test(raw) ? "sleep_boundary" : "preventive_block";
+}
+
+function proposedValue(planUpdate: Record<string, any> = {}) {
+  const value: Record<string, number> = {};
+  const start = cleanNumber(planUpdate.proposed_start_minute);
+  const end = cleanNumber(planUpdate.proposed_end_minute);
+  const duration = cleanNumber(planUpdate.duration_days);
+  if (start != null) value.start_minute = Math.min(1439, Math.max(0, Math.round(start)));
+  if (end != null) value.end_minute = Math.min(1439, Math.max(0, Math.round(end)));
+  if (duration != null) value.duration_days = Math.min(30, Math.max(1, Math.round(duration)));
+  return value;
+}
+
+async function recommendationId(anonymousUserId: string, payload: Record<string, any>, insight: Record<string, any>) {
+  const pattern = patternKey(insight.plan_update || {});
+  const kind = recommendationKind(insight.plan_update || {});
+  const source = [anonymousUserId, payload.period_start, payload.period_end, pattern, kind].join("|");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(source));
+  const hex = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `dw_${hex.slice(0, 24)}`;
+}
+
+async function persistGeneratedOutcome(
+  supabase: ReturnType<typeof createClient>,
+  anonymousUserId: string,
+  payload: Record<string, any>,
+  insight: Record<string, any>,
+  id: string,
+) {
+  const planUpdate = insight.plan_update || {};
+  const { error } = await supabase.from("bai_user_plan_outcomes").insert({
+    anonymous_user_id: anonymousUserId,
+    segment_key: segmentKey(payload.profile || {}),
+    pattern_key: patternKey(planUpdate),
+    recommendation_kind: recommendationKind(planUpdate),
+    recommendation_id: id,
+    proposed_value: proposedValue(planUpdate),
+    outcome: "generated",
+    outcome_score: 0,
+    metadata: {
+      generated_key: id,
+      source: "digital_wellness_features_edge",
+      risk_score: insight.behavior_forecast?.risk_score || null,
+      forecast_window: insight.behavior_forecast?.window || null,
+      experiment: insight.experiment?.name || null,
+    },
+  });
+  if (error && error.code !== "23505") {
+    console.warn("bai_generated_outcome_skipped", error.message);
+  }
+}
+
 function requireSafePrivacy(payload: Record<string, any>) {
   const privacy = payload?.privacy || {};
   const blocked = [
@@ -113,6 +204,7 @@ function buildInsight(payload: Record<string, any>) {
 
   const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
   const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 6 + (weekly.active_days_7d || 0) * 8));
+  const behaviorForecast = buildBehaviorForecast(payload, weakWindow, confidence);
 
   return {
     schema_version: 1,
@@ -124,7 +216,64 @@ function buildInsight(payload: Record<string, any>) {
     recommendations: recommendations.slice(0, 3),
     next_step: nextStep,
     risk_window: weakWindow || null,
+    behavior_forecast: behaviorForecast,
+    experiment: buildExperiment(payload),
     plan_update: buildPlanUpdate(payload, weakWindow),
+  };
+}
+
+function buildBehaviorForecast(payload: Record<string, any>, weakWindow: string | null, confidence: number) {
+  const weekly = payload.weekly || {};
+  const correlations = payload.correlations || {};
+  const unlockPressure = Number(weekly.unlock_pressure_score || weekly.pickup_pressure_score || 0);
+  const relapseRate = Number(weekly.relapse_rate || 0);
+  const lowRecovery = Number(weekly.avg_recovery_score || 100) < 45;
+  const riskScore = Math.min(96, Math.max(18,
+    28 + Math.round(relapseRate * 32) + Math.round(unlockPressure / 3)
+      + (Number(weekly.plan_adherence_percent || 0) < 60 ? 12 : 0)
+      + (lowRecovery ? 14 : 0)
+      + (correlations.screen_risk_after_bad_sleep === "high" ? 10 : 0),
+  ));
+  const reasons: string[] = [];
+  if (unlockPressure >= 50) reasons.push("Pickup pressure is above baseline.");
+  if (weekly.dominant_app_sequence || weekly.behavior_chain) reasons.push("A repeated app-category chain is visible.");
+  if (Number(weekly.plan_adherence_percent || 0) < 60) reasons.push("Recent plans are not holding cleanly.");
+  if (lowRecovery) reasons.push("Recovery context is low.");
+  if (!reasons.length) reasons.push("Blanked is still learning baseline timing and outcomes.");
+  return {
+    window: weakWindow || hourWindow(weekly.weakest_hour) || "Learning",
+    risk_score: riskScore,
+    confidence,
+    reasons: reasons.slice(0, 4),
+    action_label: riskScore >= 70 ? "Protect before the risk window" : "Test a light preventive block",
+  };
+}
+
+function buildExperiment(payload: Record<string, any>) {
+  const weekly = payload.weekly || {};
+  const correlations = payload.correlations || {};
+  const unlockPressure = Number(weekly.unlock_pressure_score || weekly.pickup_pressure_score || 0);
+  if (unlockPressure >= 65 || /high|medium/i.test(String(weekly.app_sequence_risk || weekly.sequence_risk || ""))) {
+    return {
+      name: "Chain Intercept",
+      hypothesis: "Stopping the second quick check prevents the longer scroll loop.",
+      variant: "warning_then_short_block",
+      success_metric: "Fewer blocked attempts and fewer emergency exits in the same window.",
+    };
+  }
+  if (Number(weekly.plan_adherence_percent || 0) < 60 || correlations.screen_risk_after_bad_sleep === "high") {
+    return {
+      name: "Lighter Earlier Block",
+      hypothesis: "A shorter block before the weak window will hold better than a strict late block.",
+      variant: "25_min_before_window",
+      success_metric: "Completed block without manual or emergency exit.",
+    };
+  }
+  return {
+    name: "Stable Repeat",
+    hypothesis: "Repeating the same window creates a cleaner baseline before increasing difficulty.",
+    variant: "same_window_same_apps",
+    success_metric: "Three completed sessions with no relapse.",
   };
 }
 
@@ -160,6 +309,8 @@ const insightSchema = {
     "recommendations",
     "next_step",
     "risk_window",
+    "behavior_forecast",
+    "experiment",
     "plan_update",
   ],
   properties: {
@@ -180,6 +331,29 @@ const insightSchema = {
     },
     next_step: { type: "string", maxLength: 140 },
     risk_window: { type: ["string", "null"], maxLength: 40 },
+    behavior_forecast: {
+      type: "object",
+      additionalProperties: false,
+      required: ["window", "risk_score", "confidence", "reasons", "action_label"],
+      properties: {
+        window: { type: "string", maxLength: 40 },
+        risk_score: { type: "integer", minimum: 18, maximum: 96 },
+        confidence: { type: "integer", minimum: 20, maximum: 100 },
+        reasons: { type: "array", minItems: 1, maxItems: 4, items: { type: "string", maxLength: 100 } },
+        action_label: { type: "string", maxLength: 60 },
+      },
+    },
+    experiment: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "hypothesis", "variant", "success_metric"],
+      properties: {
+        name: { type: "string", maxLength: 60 },
+        hypothesis: { type: "string", maxLength: 140 },
+        variant: { type: "string", maxLength: 60 },
+        success_metric: { type: "string", maxLength: 140 },
+      },
+    },
     plan_update: {
       type: "object",
       additionalProperties: false,
@@ -215,6 +389,12 @@ function normalizeInsight(candidate: Record<string, any>, fallback: Record<strin
     recommendations: (recommendations.length ? recommendations : fallback.recommendations).slice(0, 3),
     next_step: cleanInsightText(source.next_step, 140) || fallback.next_step,
     risk_window: source.risk_window === null ? null : normalizeClockText(cleanText(source.risk_window, 40)) || fallback.risk_window || null,
+    behavior_forecast: source.behavior_forecast && typeof source.behavior_forecast === "object"
+      ? source.behavior_forecast
+      : fallback.behavior_forecast,
+    experiment: source.experiment && typeof source.experiment === "object"
+      ? source.experiment
+      : fallback.experiment,
     plan_update: normalizePlanUpdate(source.plan_update, fallback.plan_update),
   };
 }
@@ -292,7 +472,7 @@ async function buildModelInsight(payload: Record<string, any>, fallback: Record<
     return { insight: fallback, source: "deterministic_fallback" };
   }
 
-  const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1-mini";
+  const model = Deno.env.get("OPENAI_MODEL") || "gpt-5.6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -305,7 +485,7 @@ async function buildModelInsight(payload: Record<string, any>, fallback: Record<
         {
           role: "system",
           content:
-            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided. Do not claim medical diagnosis, therapy, or health treatment. Do not use the word coach. Every summary, pattern, recommendation, and next_step must be a complete sentence ending with punctuation. plan_update must propose one preventive daily blocking window that can reduce screen time based on the signals. Return practical, specific, non-alarming English.",
+            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided, including pickup pressure, app-category chains, check-ins, outcomes, Health/wearable signals, and baseline timing. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely digital risk window. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive daily blocking window. Return practical, specific, non-alarming English.",
         },
         {
           role: "user",
@@ -371,11 +551,14 @@ serve(async (request) => {
       const message = error instanceof Error ? error.message : String(error);
       modelResult = { insight: fallbackInsight, source: "deterministic_fallback_after_model_error", error: message };
     }
-    const insight = {
+    const insightWithoutId = {
       ...modelResult.insight,
       source: modelResult.source,
     };
+    const generatedRecommendationId = await recommendationId(anonymousUserId, payload, insightWithoutId);
+    const insight = { ...insightWithoutId, recommendation_id: generatedRecommendationId };
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    await persistGeneratedOutcome(supabase, anonymousUserId, payload, insight, generatedRecommendationId);
 
     const { data, error } = await supabase
       .from("digital_wellness_feature_payloads")

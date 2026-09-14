@@ -13,7 +13,13 @@ data class DigitalWellnessPlan(
     val primaryAction: String,
     val secondaryAction: String,
     val reportInsight: String,
-    val healthContext: String
+    val healthContext: String,
+    val forecastReasons: List<String> = emptyList(),
+    val behaviorChain: String = "Learning",
+    val experimentName: String = "Stable Repeat",
+    val experimentWhy: String = "Repeat the same window before increasing difficulty.",
+    val experimentMetric: String = "Completed sessions without emergency exits.",
+    val recommendationId: String? = null
 )
 
 object DigitalWellnessEngine {
@@ -35,7 +41,9 @@ object DigitalWellnessEngine {
         }
         val sessions = stats.sessionsThisWeek
         val breaks = 3 - emergencyUnlocksRemaining
-        val baseScore = 72 + min(14, sessions * 3) - min(28, breaks * 9) - min(18, stats.blockedAttemptsThisWeek * 3)
+        val pickupPressure = pickupPressureScore(stats, breaks)
+        val behaviorChain = behaviorChain(stats, schedule)
+        val baseScore = 72 + min(14, sessions * 3) - min(28, breaks * 9) - min(18, stats.blockedAttemptsThisWeek * 3) - min(10, pickupPressure / 12)
         val healthPenalty = when {
             healthSummary.recoveryScore != null && healthSummary.recoveryScore < 45 -> 12
             healthSummary.lowRecoverySignal -> 8
@@ -43,7 +51,7 @@ object DigitalWellnessEngine {
             else -> 0
         }
         val score = (baseScore - healthPenalty).coerceIn(0, 100)
-        val riskScore = (100 - score + if (minutesUntilHour(weakHour, now) <= 60) 18 else 0).coerceIn(18, 96)
+        val riskScore = (100 - score + pickupPressure / 5 + if (minutesUntilHour(weakHour, now) <= 60) 18 else 0).coerceIn(18, 96)
         val duration = when {
             breaks >= 2 || healthSummary.lowRecoverySignal -> 25
             sessions >= 4 && score >= 78 -> 60
@@ -58,13 +66,26 @@ object DigitalWellnessEngine {
         }
         val riskWindow = hourRange(weakHour)
         val healthText = healthSummary.readableContext
+        val forecastReasons = forecastReasons(
+            pickupPressure = pickupPressure,
+            behaviorChain = behaviorChain,
+            breaks = breaks,
+            healthSummary = healthSummary,
+            riskWindow = riskWindow
+        )
+        val experiment = experimentFor(
+            pickupPressure = pickupPressure,
+            breaks = breaks,
+            adherenceGood = sessions >= 3 && breaks == 0,
+            lowRecovery = healthSummary.lowRecoverySignal
+        )
         return DigitalWellnessPlan(
             archetype = archetype,
             score = score,
             riskWindow = riskWindow,
             riskScore = riskScore,
             recommendedDurationMinutes = duration,
-            primaryAction = "Start $duration min before $riskWindow.",
+            primaryAction = "Next risk: $riskWindow. Start $duration min before it.",
             secondaryAction = if (selectedAppCount < 3) {
                 "Add at least 3 apps before judging results."
             } else {
@@ -75,8 +96,76 @@ object DigitalWellnessEngine {
             } else {
                 "Score $score/100. Next risk: $riskWindow."
             },
-            healthContext = healthText
+            healthContext = healthText,
+            forecastReasons = forecastReasons,
+            behaviorChain = behaviorChain,
+            experimentName = experiment.name,
+            experimentWhy = experiment.hypothesis,
+            experimentMetric = experiment.metric
         )
+    }
+
+    private data class Experiment(val name: String, val hypothesis: String, val metric: String)
+
+    private fun pickupPressureScore(stats: FocusStats, breaks: Int): Int {
+        val recentPressure = stats.activityDays.takeLast(7).sumOf { day ->
+            day.blockedAttempts * 14 + if (day.sessions == 0 && day.blockedAttempts > 0) 10 else 0
+        }
+        return (recentPressure + breaks * 12).coerceIn(0, 100)
+    }
+
+    private fun behaviorChain(stats: FocusStats, schedule: FocusSchedule): String {
+        val recent = stats.activityDays.takeLast(7)
+        val attempts = recent.sumOf { it.blockedAttempts }
+        val sessions = recent.sumOf { it.sessions }
+        return when {
+            attempts >= 3 && schedule.enabled -> "scheduled window -> blocked app urge"
+            attempts >= 3 -> "quick check -> blocked app urge"
+            attempts > sessions -> "urge before planned block"
+            sessions >= 3 -> "planned block -> clean session"
+            else -> "learning"
+        }
+    }
+
+    private fun forecastReasons(
+        pickupPressure: Int,
+        behaviorChain: String,
+        breaks: Int,
+        healthSummary: HealthConnectSummary,
+        riskWindow: String
+    ): List<String> {
+        val reasons = mutableListOf<String>()
+        if (pickupPressure >= 50) reasons += "Pickup pressure is above baseline."
+        if (behaviorChain != "learning") reasons += "Repeated chain: $behaviorChain."
+        if (breaks > 0) reasons += "Recent exits increase risk in $riskWindow."
+        if (healthSummary.lowRecoverySignal) reasons += "Recovery suggests using lighter protection."
+        if (reasons.isEmpty()) reasons += "Blanked is learning baseline timing and outcomes."
+        return reasons.take(4)
+    }
+
+    private fun experimentFor(pickupPressure: Int, breaks: Int, adherenceGood: Boolean, lowRecovery: Boolean): Experiment {
+        return when {
+            pickupPressure >= 65 -> Experiment(
+                name = "Chain Intercept",
+                hypothesis = "Stop the second quick check before it becomes a longer scroll loop.",
+                metric = "Fewer blocked attempts in the same window."
+            )
+            breaks >= 2 || lowRecovery -> Experiment(
+                name = "Lighter Earlier Block",
+                hypothesis = "A shorter earlier block should hold better than strict late friction.",
+                metric = "Completed block without emergency exit."
+            )
+            adherenceGood -> Experiment(
+                name = "Progressive Window",
+                hypothesis = "A stable user can extend one protected window safely.",
+                metric = "Three completed sessions without relapse."
+            )
+            else -> Experiment(
+                name = "Stable Repeat",
+                hypothesis = "Repeat the same window to build a clean baseline.",
+                metric = "Completed sessions without emergency exits."
+            )
+        }
     }
 
     private fun minutesUntilHour(hour: Int, now: Calendar): Int {

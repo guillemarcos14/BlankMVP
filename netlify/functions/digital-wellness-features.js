@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const {
   json,
   parseJsonBody,
@@ -8,6 +9,7 @@ const {
   decide: decidePlanIntelligence,
   bestMacro: bestMacroEvidence,
   bestMicro: bestMicroEvidence,
+  candidateValue,
   patternKey: intelligencePatternKey,
   recommendationKind,
   segmentKey,
@@ -28,6 +30,49 @@ function cleanNumber(value) {
 
 function cleanBoolean(value) {
   return value === true ? true : value === false ? false : null;
+}
+
+function recommendationId(anonymousUserId, payload, insight) {
+  const { pattern, kind } = recommendationKeys(payload, insight);
+  const source = [anonymousUserId, payload.period_start, payload.period_end, pattern, kind].join("|");
+  return `dw_${crypto.createHash("sha256").update(source).digest("hex").slice(0, 24)}`;
+}
+
+function recommendationKeys(payload, insight) {
+  const candidate = planUpdateCandidate(insight?.plan_update || {});
+  return {
+    pattern: intelligencePatternKey({ key: candidate.kind }, `${insight?.plan_update?.title || ""} ${insight?.plan_update?.evidence || ""}`),
+    kind: recommendationKind(candidate),
+  };
+}
+
+async function persistGeneratedOutcome(anonymousUserId, payload, insight, id) {
+  try {
+    const { pattern, kind } = recommendationKeys(payload, insight);
+    await supabaseFetch("bai_user_plan_outcomes", {
+      method: "POST",
+      headers: { prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({
+        anonymous_user_id: anonymousUserId,
+        segment_key: segmentKey(payload.profile || {}),
+        pattern_key: pattern,
+        recommendation_kind: kind,
+        recommendation_id: id,
+        proposed_value: candidateValue(insight?.plan_update || {}),
+        outcome: "generated",
+        outcome_score: 0,
+        metadata: {
+          generated_key: id,
+          source: "digital_wellness_features",
+          risk_score: insight?.behavior_forecast?.risk_score || null,
+          forecast_window: insight?.behavior_forecast?.window || null,
+          experiment: insight?.experiment?.name || null,
+        },
+      }),
+    });
+  } catch (error) {
+    console.warn("bai_generated_outcome_skipped", error.message);
+  }
 }
 
 function requireSafePrivacy(payload) {
@@ -108,6 +153,10 @@ function buildInsight(payload, memory = {}) {
   const freshness = payload.freshness || {};
   const sourceConfidence = payload.source_confidence || {};
   const wellnessSignals = payload.wellness_signals || {};
+  const unlockPressure = cleanNumber(weekly.unlock_pressure_score) || cleanNumber(weekly.pickup_pressure_score) || 0;
+  const appSequence = cleanText(weekly.dominant_app_sequence || weekly.behavior_chain || "", 120);
+  const sequenceRisk = cleanText(weekly.app_sequence_risk || weekly.sequence_risk || "", 40);
+  const recentCheckIn = wellnessSignals.latest_check_in || {};
   const recommendations = [];
   const patterns = [];
 
@@ -139,6 +188,18 @@ function buildInsight(payload, memory = {}) {
     patterns.push(`Best wearable context is ${resolvedWearable.data_quality.status} with ${resolvedWearable.data_quality.confidence || 0}/100 confidence.`);
   } else if (common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect) {
     patterns.push(`Wearable confidence is ${common.confidence || sourceConfidence.apple_health || sourceConfidence.health_connect}/100 with ${freshness.status || "unknown"} freshness.`);
+  }
+
+  if (unlockPressure >= 65) {
+    patterns.push(`Pickup pressure is elevated at ${unlockPressure}/100, so short checks are becoming a risk signal.`);
+    recommendations.push("Intervene before the second quick check, not after the full scroll session starts.");
+  }
+
+  if (appSequence) {
+    patterns.push(`Dominant behavior chain is ${appSequence}${sequenceRisk ? ` with ${sequenceRisk} risk` : ""}.`);
+    if (/high|medium/i.test(sequenceRisk)) {
+      recommendations.push("Protect the second step of the chain so harmless checks do not become scroll sessions.");
+    }
   }
 
   const weakWindow = weekly.worst_focus_window || hourWindow(weekly.weakest_hour);
@@ -178,6 +239,10 @@ function buildInsight(payload, memory = {}) {
     patterns.push(`Latest check-in is ${wellnessSignals.latest_check_in.signal_type} ${wellnessSignals.latest_check_in.value_number || ""}.`.replace(/\s+\./, "."));
   }
 
+  if (["stress", "energy", "mood"].includes(recentCheckIn.signal_type) && Number(recentCheckIn.value_number) <= 4) {
+    recommendations.push("Use a lighter block today because the latest check-in points to lower control capacity.");
+  }
+
   if (memory.acceptedActions?.includes("sleep_boundary")) {
     recommendations.push("Keep the sleep boundary stable; this is already a pattern you accepted.");
   }
@@ -205,7 +270,77 @@ function buildInsight(payload, memory = {}) {
     recommendations: recommendations.slice(0, 3),
     next_step: nextStep,
     risk_window: weakWindow || null,
+    behavior_forecast: buildBehaviorForecast(payload, weakWindow, confidence),
+    experiment: buildExperiment(payload),
     plan_update: buildPlanUpdate(payload, weakWindow),
+  };
+}
+
+function buildBehaviorForecast(payload, weakWindow, confidence) {
+  const weekly = payload.weekly || {};
+  const correlations = payload.correlations || {};
+  const wearableDecision = payload.wearable_decision_context || {};
+  const wellnessSignals = payload.wellness_signals || {};
+  const reasons = [];
+  const unlockPressure = cleanNumber(weekly.unlock_pressure_score) || cleanNumber(weekly.pickup_pressure_score) || 0;
+  const relapseRate = cleanNumber(weekly.relapse_rate) || 0;
+  const recovery = cleanNumber(weekly.avg_recovery_score);
+  const riskScore = Math.min(96, Math.max(18,
+    28 +
+    Math.round(relapseRate * 32) +
+    Math.round(unlockPressure / 3) +
+    ((weekly.plan_adherence_percent || 0) < 60 ? 12 : 0) +
+    (recovery && recovery < 45 ? 14 : 0) +
+    (correlations.screen_risk_after_bad_sleep === "high" ? 10 : 0) +
+    (wearableDecision.flags?.includes("low_recovery") ? 8 : 0)
+  ));
+
+  if (unlockPressure >= 50) reasons.push("pickup pressure is above baseline");
+  if (weekly.dominant_app_sequence || weekly.behavior_chain) reasons.push("a repeated app-category chain is visible");
+  if ((weekly.plan_adherence_percent || 0) < 60) reasons.push("recent plans are not holding cleanly");
+  if (recovery && recovery < 45) reasons.push("recovery is low");
+  if (wellnessSignals.latest_check_in?.signal_type) reasons.push(`latest check-in: ${wellnessSignals.latest_check_in.signal_type}`);
+  if (!reasons.length) reasons.push("baseline, timing and block history are still being learned");
+
+  return {
+    window: weakWindow || hourWindow(weekly.weakest_hour) || "Learning",
+    risk_score: riskScore,
+    confidence,
+    reasons: reasons.slice(0, 4),
+    action_label: riskScore >= 70 ? "Protect before the risk window" : "Test a light preventive block",
+  };
+}
+
+function buildExperiment(payload) {
+  const weekly = payload.weekly || {};
+  const correlations = payload.correlations || {};
+  const unlockPressure = cleanNumber(weekly.unlock_pressure_score) || cleanNumber(weekly.pickup_pressure_score) || 0;
+  const lowAdherence = (weekly.plan_adherence_percent || 0) < 60;
+  const chainRisk = /high|medium/i.test(String(weekly.app_sequence_risk || weekly.sequence_risk || ""));
+
+  if (unlockPressure >= 65 || chainRisk) {
+    return {
+      name: "Chain Intercept",
+      hypothesis: "Stopping the second quick check prevents the longer scroll loop.",
+      variant: "warning_then_short_block",
+      success_metric: "Fewer blocked attempts and fewer emergency exits in the same window.",
+    };
+  }
+
+  if (lowAdherence || correlations.screen_risk_after_bad_sleep === "high") {
+    return {
+      name: "Lighter Earlier Block",
+      hypothesis: "A shorter block before the weak window will hold better than a strict late block.",
+      variant: "25_min_before_window",
+      success_metric: "Completed block without manual or emergency exit.",
+    };
+  }
+
+  return {
+    name: "Stable Repeat",
+    hypothesis: "Repeating the same window creates a cleaner baseline before increasing difficulty.",
+    variant: "same_window_same_apps",
+    success_metric: "Three completed sessions with no relapse.",
   };
 }
 
@@ -246,6 +381,8 @@ const insightSchema = {
     "recommendations",
     "next_step",
     "risk_window",
+    "behavior_forecast",
+    "experiment",
     "plan_update",
   ],
   properties: {
@@ -266,6 +403,34 @@ const insightSchema = {
     },
     next_step: { type: "string", maxLength: 140 },
     risk_window: { type: ["string", "null"], maxLength: 40 },
+    behavior_forecast: {
+      type: "object",
+      additionalProperties: false,
+      required: ["window", "risk_score", "confidence", "reasons", "action_label"],
+      properties: {
+        window: { type: "string", maxLength: 40 },
+        risk_score: { type: "integer", minimum: 18, maximum: 96 },
+        confidence: { type: "integer", minimum: 20, maximum: 100 },
+        reasons: {
+          type: "array",
+          minItems: 1,
+          maxItems: 4,
+          items: { type: "string", maxLength: 100 },
+        },
+        action_label: { type: "string", maxLength: 60 },
+      },
+    },
+    experiment: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "hypothesis", "variant", "success_metric"],
+      properties: {
+        name: { type: "string", maxLength: 60 },
+        hypothesis: { type: "string", maxLength: 140 },
+        variant: { type: "string", maxLength: 60 },
+        success_metric: { type: "string", maxLength: 140 },
+      },
+    },
     plan_update: {
       type: "object",
       additionalProperties: false,
@@ -299,7 +464,31 @@ function normalizeInsight(candidate, fallback) {
     recommendations: (recommendations.length ? recommendations : fallback.recommendations).slice(0, 3),
     next_step: cleanInsightText(source.next_step, 140) || fallback.next_step,
     risk_window: source.risk_window === null ? null : normalizeClockText(cleanText(source.risk_window, 40)) || fallback.risk_window || null,
+    behavior_forecast: normalizeBehaviorForecast(source.behavior_forecast, fallback.behavior_forecast),
+    experiment: normalizeExperiment(source.experiment, fallback.experiment),
     plan_update: normalizePlanUpdate(source.plan_update, fallback.plan_update),
+  };
+}
+
+function normalizeBehaviorForecast(candidate, fallback = {}) {
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  const reasons = Array.isArray(source.reasons) ? source.reasons.map((item) => cleanInsightText(item, 100)).filter(Boolean) : [];
+  return {
+    window: normalizeClockText(cleanText(source.window, 40)) || fallback.window || "Learning",
+    risk_score: Math.min(96, Math.max(18, Math.round(cleanNumber(source.risk_score) || fallback.risk_score || 40))),
+    confidence: Math.min(100, Math.max(20, Math.round(cleanNumber(source.confidence) || fallback.confidence || 20))),
+    reasons: (reasons.length ? reasons : fallback.reasons || ["Blanked is learning your baseline."]).slice(0, 4),
+    action_label: cleanText(source.action_label, 60) || fallback.action_label || "Test preventive protection",
+  };
+}
+
+function normalizeExperiment(candidate, fallback = {}) {
+  const source = candidate && typeof candidate === "object" ? candidate : {};
+  return {
+    name: cleanText(source.name, 60) || fallback.name || "Stable Repeat",
+    hypothesis: cleanInsightText(source.hypothesis, 140) || fallback.hypothesis || "Repeating the same window creates a cleaner baseline.",
+    variant: cleanText(source.variant, 60) || fallback.variant || "same_window_same_apps",
+    success_metric: cleanInsightText(source.success_metric, 140) || fallback.success_metric || "Completed sessions without manual or emergency exits.",
   };
 }
 
@@ -442,7 +631,7 @@ async function buildModelInsight(payload, fallback, memory = {}) {
         {
           role: "system",
           content:
-            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided. Do not claim medical diagnosis, therapy, or health treatment. Do not use the word coach. Every summary, pattern, recommendation, and next_step must be a complete sentence ending with punctuation. plan_update must propose one preventive daily blocking window that can reduce screen time based on the signals. Return practical, specific, non-alarming English.",
+            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided, including pickup pressure, app-category chains, check-ins, outcomes, Health/wearable signals, and baseline timing when present. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely risk window with reasons and an action label. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive daily blocking window that can reduce screen time based on the signals. Return practical, specific, non-alarming English.",
         },
         {
           role: "user",
@@ -586,10 +775,13 @@ exports.handler = async (event) => {
     } catch (error) {
       modelResult = { insight: fallbackInsight, source: "deterministic_fallback_after_model_error", error: error.message };
     }
-    const insight = await applyPlanIntelligence(anonymousUserId, payload, {
+    let insight = await applyPlanIntelligence(anonymousUserId, payload, {
       ...modelResult.insight,
       source: modelResult.source,
     });
+    const generatedRecommendationId = recommendationId(anonymousUserId, payload, insight);
+    insight = { ...insight, recommendation_id: generatedRecommendationId };
+    await persistGeneratedOutcome(anonymousUserId, payload, insight, generatedRecommendationId);
 
     const rows = await supabaseFetch("digital_wellness_feature_payloads?select=*", {
       method: "POST",

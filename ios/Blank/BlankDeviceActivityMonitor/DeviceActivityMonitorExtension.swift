@@ -93,7 +93,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         let selectionCount = Self.loadSelection()?.applicationTokens.count ?? 0
         let prompt = "proactive signal: selected distracting apps reached \(thresholdMinutes) minutes today"
 
-        let fallback = "BAI noticed your distracting app limit was reached. Keep the block on now and review whether this time window needs stronger protection."
+    let fallback = "BM noticed your distracting app limit was reached. Keep the block on now and review whether this time window needs stronger protection."
         let body = await resolveBAIMessage(
             prompt: prompt,
             thresholdMinutes: thresholdMinutes,
@@ -169,7 +169,7 @@ final class DeviceActivityMonitorExtension: DeviceActivityMonitor {
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "BAI"
+        content.title = "BM"
         content.body = body
         content.sound = .default
         content.userInfo = ["blank_url": "blank://bai-alert"]

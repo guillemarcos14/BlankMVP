@@ -1,0 +1,65 @@
+name: BM Harness Gate
+
+on:
+  pull_request:
+    paths:
+      - "netlify/functions/**"
+      - "tools/**"
+      - "docs/**"
+      - "app/**"
+      - "ios/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/**"
+      - "PRODUCTION_CHECKLIST.md"
+  push:
+    branches: [main, master]
+    paths:
+      - "netlify/functions/**"
+      - "tools/**"
+      - "docs/**"
+      - "app/**"
+      - "ios/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/**"
+      - "PRODUCTION_CHECKLIST.md"
+  workflow_dispatch:
+
+jobs:
+  harness:
+    name: Contract and runtime gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Verify scope and run product harness
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --diff-base "origin/${{ github.base_ref }}" --enforce-scope --report tmp/product-harness/ci.json
+          else
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --enforce-scope --report tmp/product-harness/ci.json
+          fi
+      - name: Verify repository whitespace
+        run: git diff --check
+
+  android:
+    name: Android compile and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Compile and test Android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon

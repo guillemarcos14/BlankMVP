@@ -979,6 +979,21 @@ struct DigitalWellnessPlanUpdate: Codable, Equatable {
     var action_label: String
 }
 
+struct DigitalWellnessBehaviorForecast: Codable, Equatable {
+    var window: String
+    var risk_score: Int
+    var confidence: Int
+    var reasons: [String]
+    var action_label: String
+}
+
+struct DigitalWellnessExperiment: Codable, Equatable {
+    var name: String
+    var hypothesis: String
+    var variant: String
+    var success_metric: String
+}
+
 struct DigitalWellnessRemoteInsight: Codable, Equatable {
     var schema_version: Int
     var generated_at: Date
@@ -991,6 +1006,9 @@ struct DigitalWellnessRemoteInsight: Codable, Equatable {
     var risk_window: String?
     var source: String?
     var plan_update: DigitalWellnessPlanUpdate?
+    var behavior_forecast: DigitalWellnessBehaviorForecast?
+    var experiment: DigitalWellnessExperiment?
+    var recommendation_id: String?
 }
 
 private struct DigitalWellnessFeatureEnvelope: Encodable {
@@ -1030,6 +1048,20 @@ struct DigitalWellnessFeaturesClient {
                 recommendations: ["Configure the backend URL to sync wellness features."],
                 next_step: "Run a release-configured build.",
                 risk_window: payload.weekly.worst_focus_window,
+                behavior_forecast: DigitalWellnessBehaviorForecast(
+                    window: payload.weekly.worst_focus_window ?? "Learning",
+                    risk_score: 40,
+                    confidence: 20,
+                    reasons: ["Blanked is learning your baseline timing."],
+                    action_label: "Test a light preventive block"
+                ),
+                experiment: DigitalWellnessExperiment(
+                    name: "Stable Repeat",
+                    hypothesis: "Repeat the same window to build a clean baseline.",
+                    variant: "same_window_same_apps",
+                    success_metric: "Completed sessions without emergency exits."
+                ),
+                recommendation_id: nil,
                 plan_update: DigitalWellnessPlanUpdate(
                     title: "Protect your next risk window.",
                     evidence: "Debug build generated a local plan proposal.",
@@ -1072,6 +1104,34 @@ struct DigitalWellnessFeaturesClient {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .blankFlexibleISO8601
         return try decoder.decode(DigitalWellnessFeatureSubmitResponse.self, from: data).insight
+    }
+
+    func recordOutcome(
+        anonymousUserId: String,
+        recommendationId: String,
+        outcome: String,
+        outcomeScore: Int,
+        metadata: [String: Any] = [:]
+    ) async throws {
+        guard let baseURL else { return }
+        let url = baseURL.appendingPathComponent("bai-outcome")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = [
+            "anonymous_user_id": anonymousUserId,
+            "data_consent": true,
+            "recommendation_id": recommendationId,
+            "outcome": outcome,
+            "outcome_score": outcomeScore,
+            "metadata": metadata,
+        ]
+        body["locale"] = Locale.current.identifier
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
     }
 
     private static func configuredBaseURL() -> URL? {

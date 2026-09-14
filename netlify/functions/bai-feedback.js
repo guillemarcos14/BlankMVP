@@ -121,7 +121,7 @@ exports.handler = async (event) => {
 
     await supabaseFetch("bai_recommendation_feedback", {
       method: "POST",
-      headers: { prefer: "return=minimal" },
+      headers: { prefer: "resolution=ignore-duplicates,return=minimal" },
       body: JSON.stringify({
         ...baseRecord,
         feedback_type: feedbackType,

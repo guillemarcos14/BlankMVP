@@ -1578,7 +1578,7 @@ private struct ScheduleEditorContent: View {
             VStack(alignment: .center, spacing: 16) {
                 TopSheetHeader(
                     title: "Routines",
-                    subtitle: "BAI schedules routines.\nYou review and override them here.",
+                    subtitle: "BM schedules routines.\nYou review and override them here.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -1697,7 +1697,7 @@ private struct ScheduleEditorContent: View {
                     .background(Circle().fill(textColor.opacity(0.10)))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Recurring BAI routines")
+                    Text("Recurring BM routines")
                         .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
                     Text(habitSummaryText)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -1728,7 +1728,7 @@ private struct ScheduleEditorContent: View {
 
     private var habitSummaryText: String {
         guard let first = enabledWindows.first else {
-            return "No active routine yet. Ask BAI to create one, then approve it here."
+            return "No active routine yet. Ask BM to create one, then approve it here."
         }
         return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
     }

@@ -1,6 +1,8 @@
-# BAI Training Plan
+# BM Training Plan
 
-This is the operating plan for improving Blanked AI before production scale.
+> Naming decision 2026-09-13: the assistant is now called **BM**, short for Blankmind. Technical legacy names such as `bai_*`, `bai-` and this filename remain temporarily for compatibility.
+
+This is the operating plan for improving BM before production scale.
 
 ## Principle
 
@@ -15,7 +17,7 @@ BAI is not trained by changing model weights today. It improves through:
 
 ## Product Rule
 
-BAI Web and BAI Messaging are the same product.
+BAI Web and BAI Messaging are the same digital wellness product.
 
 They must share the same brain, tone, memory, context rules, and recommendation logic. The only difference is capability:
 
@@ -25,6 +27,33 @@ They must share the same brain, tone, memory, context rules, and recommendation 
 
 The evaluation must penalize any behavior that makes web feel like a weaker or different assistant.
 
+## Scope Rule
+
+Blanked only talks about digital wellness.
+
+BAI must stay inside:
+
+- Phone behavior.
+- Screens.
+- Apps.
+- Scrolling.
+- Focus and attention as affected by digital habits.
+- Notifications.
+- App blocking and phone boundaries.
+- Screen-related sleep disruption.
+- Wearable, Health, recovery, and activity signals only when they improve digital risk windows, phone-use predictions, or blocking decisions.
+
+BAI must not provide generic:
+
+- Training plans.
+- Running plans.
+- Nutrition advice.
+- General sleep plans.
+- Generic stress-management plans.
+- Medical, therapy, or recovery advice.
+
+If a generic wellness question is not connected to phone, screens, apps, or digital behavior, BAI redirects briefly to digital wellness and asks for the phone/screen part of the problem.
+
 ## Conversation Style Guide
 
 Product direction from Guillem:
@@ -33,6 +62,7 @@ Product direction from Guillem:
 - Do not add text just to make the answer feel complete.
 - If BAI lacks context, it should ask one clear question and avoid giving advice too early.
 - When the user's problem is app scrolling, distraction, focus blocks, phone boundaries or app control, BAI can naturally explain that Blanked App can solve it by blocking apps or creating a plan.
+- When the user's problem is generic wellness, BAI does not answer as a generic wellness assistant. It redirects to the digital part.
 - Web can explain and plan, but only Blanked App can ask for permissions and execute blocking.
 - Do not recommend competing phone-control solutions such as built-in Screen Time or Digital Wellbeing.
 - Avoid internal wording such as `context`, `old app`, `pattern`, `useful move`, `backend`, `schema`, or `I will not use the old app as context`.
@@ -81,11 +111,53 @@ Each candidate model is scored on:
 - Action fit: does it ask when information is missing and act when intent is clear?
 - Channel fit: web explains/app CTA only when useful; messaging stays short and executable.
 - Same-product consistency: web and messaging should feel like the same assistant.
-- Safety/scope: stays inside wellness and digital wellness.
+- Safety/scope: stays inside digital wellness only.
+
+## Release Gate
+
+Before any BAI production deploy, run:
+
+```bash
+node tools/bai_release_gate.js
+```
+
+If `OPENAI_API_KEY` is available, the gate measures `gpt-5.6-luna`. If no API key is available, synthetic checks run in `--dry-run` so contracts and scenario generation can be validated without accidental model spend.
+
+The gate runs:
+
+- Legacy BAI eval: `tools/blanked_agent_eval.js`.
+- Golden set: 25 deterministic conversations, seed `20260910`.
+- Wide synthetic suite: 125 deterministic conversations by default.
+- BAI web/app smoke.
+- WhatsApp smoke.
+- SMS/voice smoke.
+
+Blocking rule:
+
+- `real_behavior_issue` must be `0`.
+- Weighted pass rate must be at least `99%`.
+- `rubric_miss` is reported but does not block release unless explicitly capped.
+
+Failure classes:
+
+- `real_behavior_issue`: safety, tone, copy quality, same-product framing, wrong context, action fit, or channel fit.
+- `rubric_miss`: strict context/editorial expectations where the answer may still be usable but misses the exact expected shape.
+
+For a full model run with saved reports:
+
+```bash
+node tools/bai_release_gate.js --save --count 125
+```
+
+For a cheap local verification:
+
+```bash
+node tools/bai_release_gate.js --quick
+```
 
 ## Synthetic Conversation Suite
 
-Use `tools/bai_synthetic_conversation_suite.js` for the 50-conversation pre-production loop.
+Use `tools/bai_synthetic_conversation_suite.js` for the deterministic pre-production loop.
 
 The suite generates deterministic multi-turn conversations across:
 
@@ -93,7 +165,7 @@ The suite generates deterministic multi-turn conversations across:
 - User corrections.
 - Web/app same-product consistency.
 - Messaging brevity.
-- General wellness.
+- Digital wellness scope.
 - Action fit.
 - Scope and privacy.
 - Spanish.
@@ -101,7 +173,13 @@ The suite generates deterministic multi-turn conversations across:
 
 The important number is not only full conversation pass count. The report also gives a weighted score and failures by group/dimension, because strict synthetic checks are intentionally sharper than normal user-facing evals.
 
-Latest cycle:
+Current required coverage:
+
+- Golden set: 25 conversations before every BAI deploy.
+- Wide suite: 100-150 conversations before every BAI deploy. Default gate count is 125.
+- Reports split failures into `real_behavior_issue` and `rubric_miss`.
+
+Latest historical cycle:
 
 - Baseline after adding the suite: 24/50 strict conversations, 718/752, 95.5%.
 - After the first debugging pass: 43/50 strict conversations, 745/752, 99.1%.
@@ -109,6 +187,20 @@ Latest cycle:
 - Zero failures in safety, natural tone, copy quality, same-product consistency, wrong context, action fit, and channel fit.
 - Remaining failures are 1-point context/editorial misses where the answer is usable but not yet exact enough for the expected conversation shape.
 - Human-readable review file: `docs/BAI_SYNTHETIC_CONVERSATIONS_REVIEW.md`.
+
+Latest real gate run:
+
+- Date: 2026-09-11.
+- Model: `gpt-5.6-luna`.
+- Scope: digital wellness only.
+- Legacy eval: 111/111.
+- Golden set: 25/25, 384/384, 100%, 0 `real_behavior_issue`, 0 `rubric_miss`.
+- Wide suite: 125/125, 1880/1880, 100%, 0 `real_behavior_issue`, 0 `rubric_miss`.
+- Smokes: BAI web/app, WhatsApp, SMS/voice and digital-wellness wearable loop all passed.
+- Android compile and unit tests passed.
+- Digital scope cases verify that generic sleep/running/energy/stress prompts redirect to digital wellness instead of giving generic plans.
+- Generated recommendations now carry a stable `recommendation_id`; refreshes are idempotent and activations feed `bai_user_plan_outcomes` from Android/iOS.
+- Production release: migration applied in Supabase `blank-membership`; Netlify `getblank` deployed and remotely smoke-tested; Supabase Edge `digital-wellness-features` also deployed. Both production paths are live.
 
 Fixes from the debugging passes:
 
@@ -154,9 +246,8 @@ Recommended rollout:
 
 ## Next Work
 
-Next debugging pass:
+The implementation and release cycle is complete. The remaining learning step is operational rather than model-weight training:
 
-1. Run 100-150 synthetic conversations with the same seed discipline.
-2. Split failures into real behavior issues vs rubric misses.
-3. Promote only real repeated failures into permanent eval cases.
-4. Build a small "golden set" of 25 conversations that must never regress before production pushes.
+1. Accumulate real-user activations, completions, breaks and feedback.
+2. Review the learning dashboard periodically and promote only repeated real behavior issues into permanent evals.
+3. Do not fabricate training volume or train model weights yet.

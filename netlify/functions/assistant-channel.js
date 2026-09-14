@@ -5,6 +5,7 @@ const {
   findAssistantConnection,
   normalizeConnectCode,
   recordAssistantChannel,
+  proactiveGate,
   sendAssistantMessage,
 } = require("./_assistant_channel");
 
@@ -35,14 +36,48 @@ async function sendProactive(body) {
   }
 
   const connection = await findAssistantConnection(connectCode, preferredChannel);
-  const result = await sendAssistantMessage(connection, message);
+  const gate = await proactiveGate(connectCode, message, connection?.channel || preferredChannel, body.update_key || body.signal_id || "", connection?.channelUser || "");
+  if (!gate.allowed) {
+    await recordAssistantChannel({
+      event: "assistant_proactive_delivery_skipped",
+      channel: connection?.channel || preferredChannel,
+      preferredChannel,
+      connectCode,
+      channelUser: connection?.channelUser || "",
+      metadata: { reason: gate.reason },
+    });
+    return json(200, { ok: true, delivered: false, channel: connection?.channel || preferredChannel || "", reason: gate.reason });
+  }
+  if (connection?.channel === "whatsapp" && !gate.contentSid) {
+    return json(200, { ok: true, delivered: false, channel: "whatsapp", reason: "missing_proactive_template" });
+  }
+  const result = await sendAssistantMessage(connection, message, gate.contentSid ? { contentSid: gate.contentSid } : {});
   await recordAssistantChannel({
     event: result.skipped ? "assistant_proactive_delivery_skipped" : "assistant_proactive_delivered",
     channel: connection?.channel || preferredChannel,
     preferredChannel,
     connectCode,
     channelUser: connection?.channelUser || "",
+    metadata: {
+      proactive_fingerprint: gate.proactiveFingerprint,
+      update_key: cleanText(body.update_key || body.signal_id, 120),
+      template_index: gate.templateIndex,
+      content_sid: gate.contentSid,
+    },
   });
+
+  if (!result.skipped && connection?.channel === "whatsapp") {
+    await require("./_assistant_channel").recordAssistantMemory({
+      channel: "whatsapp",
+      channelUser: connection.channelUser,
+      memory: {
+        pending_proactive_message: message,
+        pending_proactive_update_key: cleanText(body.update_key || body.signal_id, 120),
+        pending_proactive_sent_at: new Date().toISOString(),
+      },
+      source: "assistant_proactive_template",
+    });
+  }
 
   return json(200, {
     ok: true,

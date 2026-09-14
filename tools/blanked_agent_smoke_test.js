@@ -15,6 +15,17 @@ async function call(prompt, context = {}) {
   return body.plan;
 }
 
+async function callRaw(prompt, context = {}) {
+  const response = await handler({
+    httpMethod: "POST",
+    body: JSON.stringify({ prompt, context }),
+  });
+  assert.strictEqual(response.statusCode, 200, response.body);
+  const body = JSON.parse(response.body);
+  assert.strictEqual(body.ok, true);
+  return body;
+}
+
 function baseContext(overrides = {}) {
   return {
     is_blank_active: false,
@@ -69,7 +80,8 @@ function baseContext(overrides = {}) {
   }));
   assert.strictEqual(webSleepAdvice.intent, "general");
   assert.strictEqual(webSleepAdvice.actions.length, 0);
-  assert.match(webSleepAdvice.message_text, /wake|daylight|caffeine|meal|lights|screen|bed/i);
+  assert.match(webSleepAdvice.message_text, /digital wellness|phone|screen|apps|móvil|pantallas/i);
+  assert.doesNotMatch(webSleepAdvice.message_text, /caffeine|meal|daylight|training|runs/i);
   assert.doesNotMatch(webSleepAdvice.message_text, /download|App Store|get the app|Free Access/i);
 
   const webRunningAdvice = await call("How can I run more?", baseContext({
@@ -79,7 +91,8 @@ function baseContext(overrides = {}) {
   }));
   assert.strictEqual(webRunningAdvice.intent, "general");
   assert.strictEqual(webRunningAdvice.actions.length, 0);
-  assert.match(webRunningAdvice.message_text, /runs|volume|strength|recovery|intervals|hill/i);
+  assert.match(webRunningAdvice.message_text, /digital wellness|phone|screen|apps|móvil|pantallas/i);
+  assert.doesNotMatch(webRunningAdvice.message_text, /runs|volume|strength|intervals|hill/i);
   assert.doesNotMatch(webRunningAdvice.message_text, /download|App Store|get the app|Free Access|block apps|blocking apps/i);
 
   const webProductivity = await call("I want to boost productivity", baseContext({
@@ -99,7 +112,7 @@ function baseContext(overrides = {}) {
   }));
   assert.strictEqual(webPolitics.intent, "general");
   assert.strictEqual(webPolitics.actions.length, 0);
-  assert.match(webPolitics.message_text, /wellness|habits|sleep|energy|focus|bienestar|hábitos|habitos/i);
+  assert.match(webPolitics.message_text, /digital wellness|phone|screen|apps|móvil|pantallas|bienestar digital/i);
   assert.doesNotMatch(webPolitics.message_text, /history|politic|conflict|identity|affected|israel|palestin/i);
 
   const missingBedtime = await call("How can I not scroll at night?", baseContext());
@@ -115,6 +128,28 @@ function baseContext(overrides = {}) {
   const missingApp = await call("I keep doomscrolling.", baseContext());
   assert.strictEqual(missingApp.actions.length, 0);
   assert.match(missingApp.response_text, /where|app|loop/i);
+
+  const breakfastWithoutTime = await call("I usually use social media after breakfast", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+  }));
+  assert.strictEqual(breakfastWithoutTime.actions.length, 0);
+  assert.match(breakfastWithoutTime.message_text, /finish breakfast/i);
+  assert.strictEqual(breakfastWithoutTime.message_text, breakfastWithoutTime.response_text);
+  assert.doesNotMatch(`${breakfastWithoutTime.message_text} ${breakfastWithoutTime.response_text}`, /Social mode|30 minutes|Start Social/i);
+
+  const breakfastWithRememberedApp = await call("I usually use social media after breakfast", baseContext({
+    memory: { main_apps: ["Instagram"] },
+  }));
+  assert.strictEqual(breakfastWithRememberedApp.actions.length, 0);
+  assert.match(breakfastWithRememberedApp.message_text, /finish breakfast/i);
+  assert.strictEqual(breakfastWithRememberedApp.message_text, breakfastWithRememberedApp.response_text);
+
+  const breakfastWithTime = await call("I usually use social media after breakfast", baseContext({
+    memory: { breakfast_end_minute: 8 * 60 },
+  }));
+  assert.ok(breakfastWithTime.actions.some((item) => item.type === "apply_schedule"));
+  assert.strictEqual(breakfastWithTime.actions.find((item) => item.type === "apply_schedule").start_minute, 8 * 60);
 
   const rememberedApp = await call("I keep doomscrolling.", baseContext({
     memory: { main_apps: ["Instagram"], weak_hours: [21], last_plan_outcome: "broke" },
@@ -141,6 +176,15 @@ function baseContext(overrides = {}) {
   assert.strictEqual(sleepGoalWindow.actions[0].start_minute, 22 * 60 + 45);
   assert.strictEqual(sleepGoalWindow.actions[0].end_minute, 23 * 60);
   assert.match(sleepGoalWindow.message_text, /before 11:00 PM|10:45 PM|last 15/i);
+
+  const rawContract = await callRaw("Block Instagram from 10 to 7.", baseContext());
+  assert.match(rawContract.harness.run_id, /^bm_/);
+  assert.strictEqual(rawContract.harness.harness_version, "bm-harness-v2");
+  assert.strictEqual(rawContract.harness.status, "completed");
+  assert.strictEqual(rawContract.loop.loop_version, "bm-loop-excellence-v1");
+  assert.strictEqual(rawContract.loop.schema_version, 1);
+  assert.ok(rawContract.loop.action_types.includes("apply_schedule"));
+  assert.doesNotMatch(JSON.stringify(rawContract.harness), /Block Instagram from 10 to 7/i);
 
   const serialized = JSON.stringify([missingBedtime, rememberedBedtime, missingApp, rememberedApp, explicitWindow, sleepGoalWindow]);
   assert.doesNotMatch(serialized, /source|model_error|openai|debug|QA/i);

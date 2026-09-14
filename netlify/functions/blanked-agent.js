@@ -1,4 +1,18 @@
+const crypto = require("crypto");
 const { json, parseJsonBody, requireMethod } = require("./_membership");
+const {
+  createRun,
+  recordStage,
+  finishRun,
+  publicMeta,
+  planSummary,
+} = require("./bm-harness");
+const {
+  createLoop,
+  publicLoop,
+  loopSummary,
+} = require("./bm-loop");
+const { buildAgentContext } = require("./bm-context");
 
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -100,9 +114,14 @@ function asksAboutBlankedDataOrPrediction(prompt) {
   return (product && (prediction || signals)) || (prediction && signals);
 }
 
+function isDigitalWellnessScope(prompt) {
+  return isPhoneControlConversionPrompt(prompt) || isProductivityPrompt(prompt) || asksAboutBlankedDataOrPrediction(prompt);
+}
+
 function isOutOfWellnessScope(prompt) {
   const text = paddedText(prompt, 700);
-  if (isGeneralWellnessPrompt(prompt) || isProductivityPrompt(prompt) || isPhoneControlConversionPrompt(prompt) || asksAboutBlankedDataOrPrediction(prompt)) return false;
+  if (isDigitalWellnessScope(prompt)) return false;
+  if (isGeneralWellnessPrompt(prompt)) return true;
   return contains(text, [
     " israel", " palestine", " palestina", " gaza", " hamas", " netanyahu", " trump", " biden",
     " election", " elecciones", " politics", " politica", " política", " war ", " guerra",
@@ -120,7 +139,7 @@ function isPhoneControlConversionPrompt(prompt) {
     " distract", " distraccion", " distracción", " redes", " social media", " social apps",
     " instagram", " tiktok", " tik tok", " youtube", " shorts", " reels", " reddit", " twitter", " snapchat",
     " block", " bloquear", " bloquea", " limit", " límite", " limite", " protect", " proteger",
-    " focus", " foco", " concentrate", " concentrarme", " work", " study", " estudiar", " trabajar",
+    " focus", " foco", " concentrate", " concentrarme", " study", " estudiar",
     " app ", " apps ", " aplicación", " aplicaciones",
   ]);
 }
@@ -298,7 +317,7 @@ function localizeText(value, language, maxLength = 420) {
     "Read: this is about future focus, not an immediate block.": "Lectura: esto va de foco futuro, no de un bloqueo inmediato.",
     "Pattern: scheduled protection works better when the start time is clear.": "Patrón: la protección programada funciona mejor con hora de inicio clara.",
     "Move: tell me the time window, then I can set the plan.": "Movimiento: dime la franja horaria y podré preparar el plan.",
-    "Read: you want BAi to act with more initiative.": "Lectura: quieres que BAi actúe con más iniciativa.",
+    "Read: you want BM to act with more initiative.": "Lectura: quieres que BM actúe con más iniciativa.",
     "Pattern: automatic changes need a clear rule and a safe exit.": "Patrón: los cambios automáticos necesitan una regla clara y una salida segura.",
     "Move: tell me what to protect first, then I can recommend the right automation.": "Movimiento: dime qué proteger primero y podré recomendar la automatización adecuada.",
   };
@@ -511,11 +530,19 @@ function hasExplicitBlockRequest(prompt) {
 
 function isGeneralWellnessPrompt(prompt) {
   const text = paddedText(prompt, 700);
+  const digitalMoment = contains(text, [
+    " lose control", " losing control", " can't stop", " cannot stop", " no puedo parar",
+    " scroll", " scrolling", " doomscroll", " check my phone", " checking my phone",
+    " open instagram", " open tiktok", " open youtube", " open reddit", " notifications",
+    " app ", " apps ", " screen", " phone", " móvil", " movil", " pantallas",
+  ]);
+  if (digitalMoment) return false;
   return contains(text, [
     " sleep", " dormir", " descanso", " run", " running", " correr", " workout", " training", " entren",
     " exercise", " ejercicio", " energy", " energia", " energía", " tired", " cansado", " cansada",
     " stress", " estrés", " estres", " anxiety", " ansiedad", " recovery", " recuperacion", " recuperación",
-    " wellness", " wellbeing", " bienestar", " habit", " hábito", " habito", " nutrition", " comida", " dinner", " cena",
+    " wellness", " wellbeing", " bienestar", " habit", " hábito", " habito", " nutrition", " diet ", " dieta ",
+    " eating better", " comer mejor", " alimentación", " alimentacion",
     " productivity", " productive", " productividad", " productivo", " productiva",
   ]);
 }
@@ -568,15 +595,15 @@ function asksForPlan(prompt) {
 
 function isSimpleGreeting(prompt) {
   const text = cleanText(prompt, 120).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
-  return /^(hey|hi|hello|yo|hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai)?$/.test(text);
+  return /^(hey|hi|hello|yo|hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai|\s+bm)?$/.test(text);
 }
 
 function isConversationalOnly(prompt) {
   const text = cleanText(prompt, 180).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
   if (!text) return false;
   if (hasExplicitBlockRequest(prompt) || asksForAdvice(prompt) || asksForPlan(prompt) || asksAboutAssistantCapabilities(prompt)) return false;
-  return /^(hey|hi|hello|yo|hola|buenas|good morning|good afternoon|good evening|gm|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai)?$/.test(text) ||
-    /^(how are you|how are u|how you doing|how's it going|hows it going|what's up|whats up|qué tal|que tal|cómo estás|como estas)(\s+blanked|\s+bai)?$/.test(text) ||
+  return /^(hey|hi|hello|yo|hola|buenas|good morning|good afternoon|good evening|gm|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai|\s+bm)?$/.test(text) ||
+    /^(how are you|how are u|how you doing|how's it going|hows it going|what's up|whats up|qué tal|que tal|cómo estás|como estas)(\s+blanked|\s+bai|\s+bm)?$/.test(text) ||
     /^(thanks|thank you|thx|gracias|ok|okay|vale|perfect|perfecto|cool|nice|great|genial)$/.test(text);
 }
 
@@ -629,7 +656,7 @@ function asksWhereToStart(prompt) {
 
 function lastConversationTopic(context = {}) {
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
-  return cleanText(memory.last_topic || memory.last_intent || memory.last_bai_topic, 40).toLowerCase();
+  return cleanText(memory.last_topic || memory.last_intent || memory.last_bm_topic || memory.last_bai_topic, 40).toLowerCase();
 }
 
 function hasSleepConversationContext(context = {}) {
@@ -673,6 +700,14 @@ function asksForBroadAutomation(prompt) {
 
 function relativeMoment(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
+  if (contains(text, ["breakfast", "desayuno", "desayunar", "after breakfast", "right after breakfast", "despues de desayunar", "después de desayunar"])) {
+    return {
+      key: "breakfast",
+      label: "after breakfast",
+      question: "What time do you usually finish breakfast?",
+      move: "tell me when you usually finish breakfast, then I can place the boundary without guessing.",
+    };
+  }
   if (contains(text, ["lunch", "comida", "comer", "almuerzo", "after lunch", "right after lunch", "despues de comer", "después de comer", "despues de lunch", "después de lunch"])) {
     return {
       key: "lunch",
@@ -848,6 +883,11 @@ function requestedModeName(prompt, context = {}) {
   return "";
 }
 
+function hasExplicitModeActionRequest(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return /\b(?:start|activate|switch\s+to|use|inicia|activa|cambia\s+a|usa)\s+(?:the\s+|el\s+|la\s+)?[a-z0-9][a-z0-9 _-]{0,32}\s+(?:mode|modo)\b/i.test(text);
+}
+
 function hasWorkAppConflict(prompt) {
   const text = paddedText(prompt, 600);
   return contains(text, ["but i need", "but need", "need it", "need this app", "except i need", "for work", "for studying", "for study", "work tutorials", "para trabajar", "para estudiar", "lo necesito", "la necesito"]) &&
@@ -868,16 +908,14 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
   const promptApp = namedApp(prompt).toLowerCase();
   const sameRememberedApp = promptApp !== "the app" && rememberedApps.includes(promptApp);
   const appCategory = requestedAppCategory(prompt);
-  const hasApps = promptApp !== "the app" || rememberedApps.length > 0;
-  const hasLunchTime = Number.isFinite(Number(memory.lunch_end_minute)) || Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
-  if (intent === "social" && appCategory && moment?.key === "lunch" && (!hasApps || !hasLunchTime)) {
-    return "apps_and_lunch_time";
-  }
-  const momentContextSatisfied = moment?.key === "lunch" && hasApps && hasLunchTime;
+  const hasApps = promptApp !== "the app" || Boolean(appCategory) || rememberedApps.length > 0;
+  const momentEndMinute = moment ? memory[`${moment.key}_end_minute`] : null;
+  const hasMomentTime = Number.isFinite(Number(momentEndMinute)) || Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
+  const momentContextSatisfied = Boolean(moment && hasApps && hasMomentTime);
   if (moment && !momentContextSatisfied && !explicitTimeWindow(prompt, context) && (!hasKnownWeakHour(context) || !sameRememberedApp) && (hasExplicitBlockRequest(prompt) || intent === "social")) {
     return moment.key;
   }
-  if (intent === "sleep" && !explicitTimeWindow(prompt, context) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt)) {
+  if (intent === "sleep" && !explicitTimeWindow(prompt, context) && !hasBedtime(prompt, context) && !hasExplicitBlockRequest(prompt) && !hasExplicitModeActionRequest(prompt)) {
     return "bedtime";
   }
   if (intent === "sleep" && scrollUntilSleepTime(prompt) && !hasBedtime(prompt, context)) {
@@ -980,6 +1018,20 @@ function anchorWindow(prompt) {
   return { start, end: (start + duration) % (24 * 60) };
 }
 
+function rememberedRoutineWindow(prompt, context = {}) {
+  const moment = relativeMoment(prompt);
+  const text = cleanText(prompt, 600).toLowerCase();
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  if (!moment || !contains(text, ["after", "right after", "despues", "después"])) return null;
+  const rememberedEnd = Number(memory[`${moment.key}_end_minute`]);
+  if (!Number.isFinite(rememberedEnd) || rememberedEnd < 0 || rememberedEnd >= 24 * 60) return null;
+  const duration = moment.key === "breakfast" ? 60 : moment.key === "lunch" ? 60 : moment.key === "dinner" ? 90 : 60;
+  return {
+    start: rememberedEnd,
+    end: (rememberedEnd + duration) % (24 * 60),
+  };
+}
+
 function explicitSingleTime(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
   if (scrollUntilSleepTime(prompt)) return null;
@@ -1038,6 +1090,60 @@ function recentRelativeTimeQuestion(context = {}) {
   return { ...moment, app };
 }
 
+function recentAppTiming(context = {}) {
+  const messages = recentMessages(context);
+  for (const message of [...messages].reverse()) {
+    if (message.role !== "user") continue;
+    const app = namedApp(message.content);
+    if (app === "the app") continue;
+    const match = message.content.match(/\b(?:usually|around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    if (!match) continue;
+    const timeText = `${match[1]}:${String(match[2] || "00").padStart(2, "0")}${match[3] ? ` ${match[3].toUpperCase()}` : ""}`;
+    return { app, timeText };
+  }
+  return null;
+}
+
+function ambiguousDigitalMomentPlan(prompt, language = "en") {
+  const text = cleanText(prompt, 700).toLowerCase();
+  const moment = relativeMoment(prompt);
+  if (!moment || !contains(text, ["lose control", "losing control", "perdiendo el control", "can't stop", "cannot stop", "no puedo parar"])) return null;
+  if (namedApp(prompt) !== "the app" || explicitTimeWindow(prompt) || /\b(?:usually|around|at|sobre|a las)\s*\d{1,2}/i.test(text)) return null;
+  const question = moment.key === "lunch"
+    ? language === "es"
+      ? "¿Qué haces con el móvil después de comer: te pones a hacer scroll, revisas mensajes o abres una app concreta?"
+      : "What happens with your phone after lunch: do you get stuck scrolling, keep checking messages, or open a specific app?"
+    : moment.key === "dinner"
+      ? language === "es"
+        ? "¿Qué haces con el móvil después de cenar: scroll, mensajes o una app concreta?"
+        : "What happens with your phone after dinner: scrolling, messages, or a specific app?"
+      : moment.key === "work_end"
+        ? language === "es"
+          ? "¿Qué pasa con el móvil después de trabajar: scroll, mensajes o una app concreta?"
+          : "What happens with your phone after work: scrolling, messages, or a specific app?"
+        : language === "es"
+          ? "¿Qué haces con el móvil al despertarte: scroll, mensajes o una app concreta?"
+          : "What happens with your phone when you wake up: scrolling, messages, or a specific app?";
+  return {
+    intent: "social",
+    title: "Digital Context",
+    response_text: question,
+    bullets: [
+      "Read: the weak moment is clear, but the digital behavior is not.",
+      "Pattern: the app or phone behavior comes before choosing a boundary.",
+      "Move: ask one clear question before suggesting protection.",
+    ],
+    primary_label: "Tell me",
+    secondary_label: "Not now",
+    actions: [],
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+    message_text: question,
+    speech_text: question,
+    followup_text: "",
+  };
+}
+
 function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const messages = recentMessages(context);
   const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
@@ -1045,6 +1151,30 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const timeMatch = cleanText(prompt, 120).match(/\b(?:around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   const timeText = timeMatch ? `${timeMatch[1]}:${String(timeMatch[2] || "00").padStart(2, "0")}${timeMatch[3] ? ` ${timeMatch[3].toUpperCase()}` : ""}` : "";
   const hasRecentAmbiguousLoss = /lose control|what do you lose control|do you mean|a qué te refieres|qué quieres decir/i.test(recentText);
+  const recentTiming = recentAppTiming(context);
+  if (recentTiming && asksForAdvice(prompt) && /what should i do|what do i do|how would you handle|qué hago|qué debería hacer/i.test(cleanText(prompt, 120))) {
+    const message = language === "es"
+      ? `Protegería ${recentTiming.app} justo antes de las ${recentTiming.timeText}, para cortar el bucle antes de que empiece. Blanked App puede aplicar esa franja.`
+      : `I’d protect ${recentTiming.app} just before ${recentTiming.timeText}, so the loop is interrupted before it starts. Blanked App can apply that window.`;
+    return {
+      intent: "social",
+      title: "App Timing",
+      response_text: message,
+      bullets: [
+        `Read: ${recentTiming.app} around ${recentTiming.timeText} is the current target.`,
+        "Pattern: the boundary belongs before the automatic opening.",
+        "Move: use one short recurring block and measure whether the loop weakens.",
+      ],
+      primary_label: "Plan block",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
   if (app !== "the app" && timeText && hasRecentAmbiguousLoss) {
     const message = language === "es"
       ? `Entendido: ${app} sobre las ${timeText}. Yo lo convertiría en una franja de bloqueo en Blanked App justo antes de ese momento. Desde la web puedo planearlo, pero solo Blanked App puede pedir permisos y bloquear apps automáticamente.`
@@ -1332,6 +1462,8 @@ function fallbackPlan(prompt, context = {}) {
   const proactive = proactivePlan(prompt, context, language);
   if (proactive) return proactive;
   if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
+  const deterministicContext = ambiguousDigitalMomentPlan(prompt, language);
+  if (deterministicContext) return deterministicContext;
   const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
@@ -1339,7 +1471,9 @@ function fallbackPlan(prompt, context = {}) {
   const riskWindow = cleanText(context.risk_window, 60) || "your next risk window";
   const cluster = behaviorCluster(prompt);
   const targetSleepWindow = sleepGoalWindow(prompt);
-  const timeWindow = targetSleepWindow ? null : explicitTimeWindow(prompt, context) || anchorWindow(prompt);
+  const timeWindow = targetSleepWindow
+    ? null
+    : explicitTimeWindow(prompt, context) || anchorWindow(prompt) || rememberedRoutineWindow(prompt, context);
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const lastOutcome = cleanText(memory.last_plan_outcome, 40);
   const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
@@ -1363,7 +1497,8 @@ function fallbackPlan(prompt, context = {}) {
   const availableModeMatch = availableModeNames(context).some((mode) => mode.toLowerCase() === modeName.toLowerCase());
   const explicitModeRequest = contains(promptText, [" mode", "modo", "profile", "perfil", "i'm in", "im in", "estoy en", "deep focus", "deep work"]);
   const socialModeFromMemory = modeName.toLowerCase() === "social" && selected && authorized && Array.isArray(memory.main_apps) && memory.main_apps.length > 0;
-  if (modeName && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
+  const socialModeFromCategory = modeName.toLowerCase() === "social" && appCategory && selected && authorized && hasExplicitBlockRequest(prompt);
+  if (modeName && !missingContext && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory || socialModeFromCategory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
     const requestedDuration = explicitDurationMinutes(prompt) || duration;
     const hardMode = wantsHardMode(prompt);
     const modeAction = action("activate_mode", { name: modeName, minutes: requestedDuration, hard_mode: hardMode });
@@ -1486,7 +1621,7 @@ function fallbackPlan(prompt, context = {}) {
       title: "Automation Setup",
       response_text: "I can help automate protection, but first I need the pattern to optimize: app, weak moment, goal or risk window.",
       bullets: [
-        "Read: you want BAi to act with more initiative.",
+        "Read: you want BM to act with more initiative.",
         "Pattern: automatic changes need a clear rule and a safe exit.",
         "Move: tell me what to protect first, then I can recommend the right automation."
       ],
@@ -1805,7 +1940,7 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
 
-  if (modeName && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
+  if (modeName && !missingContext && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory || socialModeFromCategory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
     const requestedDuration = explicitDurationMinutes(prompt) || duration;
     const hardMode = wantsHardMode(prompt);
     const modeAction = action("activate_mode", { name: modeName, minutes: requestedDuration, hard_mode: hardMode });
@@ -2044,24 +2179,33 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "social") {
-    const lunch = contains(promptText, ["lunch", "comida", "comer", "almuerzo"]);
-    const lunchEnd = memory.lunch_end_minute == null ? null : cleanNumber(memory.lunch_end_minute, 13 * 60, 0, 1439);
-    const momentText = lunch ? "around lunch" : rememberedRisk || "before the usual scroll window";
-    const startMinute = lunch && lunchEnd != null ? lunchEnd : lunch ? 13 * 60 : 1230;
+    const relative = relativeMoment(prompt);
+    const meal = relative && ["breakfast", "lunch", "dinner"].includes(relative.key) ? relative.key : "";
+    const mealEnd = meal && memory[`${meal}_end_minute`] != null
+      ? cleanNumber(memory[`${meal}_end_minute`], 13 * 60, 0, 1439)
+      : null;
+    const rememberedMealStart = mealEnd == null && weakHours.length > 0 ? weakHours[0] * 60 : null;
+    const resolvedMealStart = mealEnd ?? rememberedMealStart;
+    const mealDefault = meal === "breakfast" ? 8 * 60 : meal === "dinner" ? 20 * 60 : 13 * 60;
+    const mealDuration = meal === "dinner" ? 90 : 60;
+    const momentText = meal ? `after ${meal}` : rememberedRisk || "before the usual scroll window";
+    const startMinute = resolvedMealStart ?? (meal ? mealDefault : 1230);
     return {
       ...base,
       title: "Scroll Loop",
-      response_text: lunch
-        ? lunchEnd != null
-          ? `I’d protect the lunch reset window from ${minuteText(startMinute)} to ${minuteText((startMinute + 60) % (24 * 60))}, when social apps are most likely to become automatic.`
-          : "Lunch is a common weak spot: you stop working, your energy dips, and the phone becomes the easiest reset."
+      response_text: meal
+        ? resolvedMealStart != null
+          ? `I’d protect the ${meal} reset window from ${minuteText(startMinute)} to ${minuteText((startMinute + mealDuration) % (24 * 60))}, when social apps are most likely to become automatic.`
+          : `${meal.charAt(0).toUpperCase()}${meal.slice(1)} can be a weak spot, but I need the usual finish time before setting a boundary.`
         : `That sounds less like free time and more like automatic scrolling.`,
       bullets: [
         "Pattern: the trigger matters more than total screen time.",
         `Move: add friction ${momentText}, before the scroll has momentum.`,
         "Start with a 25 minute daily limit plus a short protective window."
       ],
-      actions: [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: lunch ? "Lunch Protection" : "Scroll Control", start_minute: startMinute, end_minute: (startMinute + (lunch ? 60 : 150)) % (24 * 60), weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
+      actions: meal && resolvedMealStart == null
+        ? []
+        : [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: meal ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} Protection` : "Scroll Control", start_minute: startMinute, end_minute: (startMinute + (meal ? mealDuration : 150)) % (24 * 60), weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
     };
   }
 
@@ -2224,29 +2368,31 @@ function conversationFallbackPlan(prompt, language = "en") {
   const lower = cleanText(prompt, 700).toLowerCase();
   let fallbackText = language === "es" ? "Estoy aquí. Cuéntame qué ha pasado." : "I'm here. Tell me what's on your mind.";
   if (isOutOfWellnessScope(prompt)) {
-    fallbackText = language === "es"
-      ? "Solo puedo ayudarte con bienestar, hábitos, sueño, energía, foco y relación con el móvil. Si quieres, dime qué parte de tu bienestar quieres mejorar hoy."
-      : "I can only help with wellness, habits, sleep, energy, focus, and your relationship with your phone. If you want, tell me what part of your wellbeing you want to improve today.";
+    if (contains(lower, ["sleep", "dormir", "descanso"])) {
+      fallbackText = language === "es"
+        ? "Puedo ayudarte desde el ángulo de bienestar digital: reducir móvil en la cama, cortar scroll nocturno o crear una barrera antes de dormir. ¿Qué parte del sueño te está rompiendo el móvil?"
+        : "I can help from the digital wellness angle: less phone in bed, less night scrolling, or a pre-sleep app boundary. What part of your sleep is your phone affecting?";
+    } else if (contains(lower, ["run", "running", "correr", "training", "entren"])) {
+      fallbackText = language === "es"
+        ? "No haría un plan de entrenamiento, pero sí puedo ayudarte con la parte digital: quitar distracciones antes de salir, proteger la franja de entreno o evitar que el móvil corte la constancia. ¿Dónde te interfiere el móvil?"
+        : "I would not make a training plan, but I can help with the digital part: removing distractions before you go, protecting the training window, or stopping your phone from breaking consistency. Where does your phone get in the way?";
+    } else if (contains(lower, ["energy", "energia", "energía", "tired", "cansado", "cansada", "stress", "estrés", "estres", "anxiety", "ansiedad"])) {
+      fallbackText = language === "es"
+        ? "Puedo ayudarte si lo miramos como bienestar digital: qué momentos de móvil, scroll o notificaciones te drenan energía o aumentan estrés. ¿En qué momento notas que la pantalla lo empeora?"
+        : "I can help if we frame it as digital wellness: which phone, scroll, or notification moments drain your energy or raise stress. When do screens make it worse?";
+    } else {
+      fallbackText = language === "es"
+        ? "Solo puedo ayudarte con bienestar digital: móvil, pantallas, apps, foco y hábitos de uso. Si hay una parte digital en el problema, cuéntame esa parte."
+        : "I can only help with digital wellness: your phone, screens, apps, focus, and usage habits. If there is a digital part of the problem, tell me that part.";
+    }
   } else if (asksAboutBlankedDataOrPrediction(prompt)) {
     fallbackText = language === "es"
-      ? "No lo adivinamos de la nada. Blanked puede estimarlo combinando señales como sueño, recuperación, actividad, uso del móvil y tu baseline personal. Si duermes peor, baja tu recuperación y sube el scroll nocturno frente a tu patrón normal, la predicción es probabilística: mañana puede haber menos energía o control, no un diagnóstico médico."
-      : "We do not guess it from thin air. Blanked can estimate it from signals like sleep, recovery, activity, phone-use patterns and your personal baseline. If sleep drops, recovery weakens and night scrolling rises versus your normal pattern, the forecast is probabilistic: tomorrow may be a lower-energy or lower-control day, not a medical diagnosis.";
-  } else if (contains(lower, ["sleep", "dormir", "descanso"])) {
-    fallbackText = language === "es"
-      ? "Para dormir mejor, empezaría por una hora fija para levantarte, luz natural por la mañana, cafeína solo temprano, cenas más ligeras, bajar luces por la noche y una rutina corta sin pantalla antes de la cama. Si tu problema es el scroll nocturno, Blanked puede añadir una barrera 15-45 minutos antes de dormir para que el móvil no entre contigo en la cama."
-      : "To sleep better, start with a consistent wake time, morning daylight, caffeine earlier in the day, lighter late meals, dimmer lights at night, and a short screen-free wind-down before bed. If the problem is night scrolling, Blanked can add a 15-45 minute pre-bed barrier so the phone does not follow you into bed.";
-  } else if (contains(lower, ["run", "running", "correr"])) {
-    fallbackText = language === "es"
-      ? "Para correr más, sube volumen poco a poco: 2-3 salidas fáciles por semana, una tirada algo más larga, fuerza básica de piernas y descanso suficiente. Cuando eso sea estable, añade series cortas o cuestas una vez por semana. Blanked solo entra si el móvil te rompe la constancia, por ejemplo bloqueando distracciones antes de la hora de entrenar."
-      : "To run more, build volume gradually: 2-3 easy runs per week, one slightly longer run, basic leg strength, and enough recovery. Once that is stable, add short intervals or hill work once a week. Blanked only matters if the phone breaks consistency, for example by blocking distractions before your training window.";
+      ? "No lo adivinamos de la nada. Blanked estima ventanas de riesgo combinando sueño, recuperación, actividad, presión de desbloqueos, cadenas de apps por categoría, check-ins rápidos, resultados de planes y tu baseline personal. La predicción es probabilística y explica el porqué; no es diagnóstico médico ni vigilancia exacta."
+      : "We do not guess it from thin air. Blanked estimates risk windows from sleep, recovery, activity, pickup pressure, app-category chains, quick check-ins, plan outcomes and your personal baseline. The forecast is probabilistic and explains why; it is not a medical diagnosis or exact surveillance.";
   } else if (isProductivityPrompt(prompt)) {
     fallbackText = language === "es"
       ? "Para producir más, elige una sola prioridad para el siguiente bloque y reduce decisiones antes de empezar. Trabaja 25-50 minutos, descansa poco y quita notificaciones. Este sí es un buen caso para Blanked: en la app podrías bloquear redes y apps de scroll durante ese bloque."
       : "To boost productivity, choose one priority for the next work block and remove decisions before you start. Work for 25-50 minutes, take a short break, and turn off nonessential notifications. This is a good Blanked use case: in the app, you could block social and scroll apps during that block.";
-  } else if (isGeneralWellnessPrompt(prompt) && asksForAdvice(prompt)) {
-    fallbackText = language === "es"
-      ? "Primero separaría energía, sueño, movimiento y móvil. Elige una palanca pequeña para esta semana: dormir y levantarte a horas parecidas, caminar o entrenar suave, comer algo más estable, y quitar fricción digital en el momento que más te arrastra. Si el móvil es parte del problema, Blanked puede convertir esa parte en bloqueos o alertas."
-      : "I would separate energy, sleep, movement, and phone behavior first. Pick one small lever for this week: steadier sleep and wake times, light movement, more stable meals, and less digital friction at the moment that pulls you off track. If the phone is part of the problem, Blanked can turn that part into blocks or alerts.";
   }
   return {
     intent: "general",
@@ -2271,6 +2417,8 @@ function conversationFallbackPlan(prompt, language = "en") {
 async function modelConversationPlan(prompt, context = {}, language = "en") {
   const fallback = conversationFallbackPlan(prompt, language);
   if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
+  const deterministicContext = ambiguousDigitalMomentPlan(prompt, language);
+  if (deterministicContext) return { plan: deterministicContext, source: "deterministic_digital_context" };
   const contextual = conversationalFollowupPlan(prompt, context, language);
   if (contextual) return { plan: contextual, source: "deterministic_conversation_context" };
   const apiKey = process.env.OPENAI_API_KEY;
@@ -2284,7 +2432,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
       input: [
         {
           role: "system",
-          content: "You are BAI, a ChatGPT-level personal wellness assistant for Blanked. Stay strictly inside wellness, habits, sleep, energy, stress, focus, attention, recovery, training, digital wellness, screen habits, and phone control. If the user asks about politics, war, history, religion, finance, entertainment, general trivia, or anything outside wellness, do not answer the topic; briefly say you can only help with wellness and invite a wellness-related question. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough context, ask one clear question and do not add advice yet. The main answer must be valuable even if Blanked did not exist. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. If the user asks how to sleep better, run more, improve energy, reduce stress, build habits, recover better, scroll less, use the phone less, focus, improve productivity, or understand wellness, answer the actual question first with practical, contextual guidance. Do not make the reply primarily about downloading an app. When the problem is apps, scrolling, focus blocks, distraction control, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blanked App executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blanked App that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain the logic with useful detail and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, phone-use patterns, personal baseline, recent routines, global behavioral patterns, and AI forecasts; be clear this is probabilistic behavioral forecasting, not medical diagnosis. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
+          content: "You are BM, Blankmind's digital wellness assistant. Stay strictly inside digital wellness: phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and phone-control actions. Do not provide generic wellness, training, running, nutrition, stress-management, recovery, or sleep plans unless the user's question clearly connects the problem to phones, screens, apps, or digital behavior. If the user asks about general wellness or anything outside digital wellness, briefly say you can only help with digital wellness and invite them to share the phone/screen part of the problem. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough digital context, ask one clear question and do not add advice yet. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blanked App executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blanked App that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain only how those signals improve digital wellness decisions and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, phone-use patterns, pickup pressure, app-category chains, quick check-ins, plan outcomes, personal baseline, recent routines, global behavioral patterns, and AI forecasts to estimate digital risk windows; be clear this is probabilistic behavioral forecasting, not medical diagnosis or exact app/location surveillance. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
         },
         {
           role: "user",
@@ -2478,6 +2626,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     actions,
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
+    recommendation_id: cleanText(plan.recommendation_id, 120) || cleanText(context.recommendation_id, 120) || `bm_rec_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
   };
   const messageText = conversationalMessage(normalizedPlan, language, prompt);
   const modelSpeechText = shouldUseFallbackPresentation || shouldUseLanguageFallback
@@ -2567,7 +2716,7 @@ async function modelPlan(prompt, context, fallback, language) {
         {
           role: "system",
           content:
-              "You are BAI, Blanked's personal assistant for healthier screen habits. Naturalness is the top priority. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward Blanked App when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the question fully before any conversion line, never replace an explanation with 'download the app', and mention Blanked App only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying pattern, go one useful step beyond the literal request, and propose the best next move only when useful. When the person corrects the app, timing, or situation, treat that correction as the current truth and explicitly carry the corrected app or moment into the next answer. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. If the person has not given enough context, ask one clear question and do not add advice yet. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: activate_mode when the user says they are in a named mode or asks to block a category that likely maps to a saved profile, start_protection for immediate blocks without a named profile, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only when they want to change profile without starting protection, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. When the problem is apps, scrolling, focus blocks, distraction control, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete solution. Do not force blocks for vague inputs, but do not be passive when a sensible next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when it is relevant. Stay inside digital wellness, phone behavior, focus, sleep, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+              "You are BM, Blankmind's personal assistant for digital wellness and healthier screen habits. Naturalness is the top priority. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message, but only inside digital wellness. Digital wellness means phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and app blocking. Do not provide generic wellness, running, training, nutrition, recovery, stress-management, or sleep plans unless the user clearly connects the problem to phones, screens, apps, or digital behavior. If the message is outside digital wellness, briefly say you can only help with digital wellness and ask for the phone/screen part of the problem. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward Blanked App when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the digital-wellness question fully before any conversion line, never replace an explanation with 'download the app', and mention Blanked App only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying digital pattern, go one useful step beyond the literal request, and propose the best next move only when useful. When the person corrects the app, timing, or situation, treat that correction as the current truth and explicitly carry the corrected app or moment into the next answer. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. If the person has not given enough digital context, ask one clear question and do not add advice yet. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Recommend executable actions only when they are clearly useful or explicitly requested: activate_mode when the user says they are in a named mode or asks to block a category that likely maps to a saved profile, start_protection for immediate blocks without a named profile, apply_schedule for blocking/protection time windows, set_daily_limit for caps, enable_allow_only for essentials-only, enable_adult_filter for adult web protection, pause_rules/disable_pause, switch_mode only when they want to change profile without starting protection, open_app_picker/request_screen_time_permission for setup, apply_ai_plan for adaptive plan/report. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete digital solution. Do not force blocks for vague inputs, but do not be passive when a sensible digital next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when phone behavior is relevant. Stay inside digital wellness, phone behavior, focus, screen-related sleep disruption, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
         },
         {
           role: "user",
@@ -2579,6 +2728,7 @@ async function modelPlan(prompt, context, fallback, language) {
             app_capabilities: appCapabilities(context),
             memory_rules: [
               "Use context.memory.main_apps, bedtime_minute, weak_hours, pattern_cluster, and last_plan_outcome when present.",
+              "If a relative moment such as breakfast is present without its actual end time, ask for that time and return no actions. Never invent a default clock time or start a generic mode.",
               "If last_plan_outcome is broke, reduce intensity or move protection earlier instead of making the plan stricter.",
               "If last_plan_outcome is held, repeat the stable plan before increasing difficulty.",
               "For broad questions, use memory as background but do not invent exact app details."
@@ -2615,33 +2765,106 @@ async function modelPlan(prompt, context, fallback, language) {
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
+  let harnessRun = null;
   try {
     const body = parseJsonBody(event);
     const prompt = cleanText(body.prompt, 600);
     if (!prompt) return json(400, { error: "missing_prompt" });
-    const context = body.context && typeof body.context === "object" ? body.context : {};
+    const context = buildAgentContext(body.context && typeof body.context === "object" ? body.context : {});
     const language = responseLanguage(prompt, context);
-    if (!shouldUseAppLayer(prompt, context)) {
+    const useAppLayer = shouldUseAppLayer(prompt, context);
+    harnessRun = createRun({ prompt, context });
+    harnessRun.route = useAppLayer ? "app" : "conversation";
+    recordStage(harnessRun, "received", {
+      route: harnessRun.route,
+      language,
+    });
+    if (!useAppLayer) {
       let conversationResult;
       try {
+        recordStage(harnessRun, "planner_started", { mode: "conversation" });
         conversationResult = await modelConversationPlan(prompt, context, language);
+        recordStage(harnessRun, "planner_completed", { source: conversationResult.source });
       } catch (error) {
+        recordStage(harnessRun, "planner_fallback", { error_code: error.name || "planner_error" });
         conversationResult = { plan: conversationFallbackPlan(prompt, language), source: "deterministic_conversation_fallback_after_model_error", error: error.message };
       }
       conversationResult.plan = appendWebConversionNote(conversationResult.plan, prompt, context, language);
       conversationResult.plan = localizePlan(conversationResult.plan, language);
-      return json(200, { ok: true, plan: conversationResult.plan, source: conversationResult.source, model_error: conversationResult.error || null });
+      const gatedSummary = planSummary(conversationResult.plan);
+      recordStage(harnessRun, "action_gate", {
+        decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
+        action_types: gatedSummary.action_types,
+        action_count: gatedSummary.action_count,
+        warnings: gatedSummary.warnings,
+      });
+      const loop = createLoop({
+        prompt,
+        context,
+        plan: conversationResult.plan,
+        runId: harnessRun.run_id,
+        promptHash: harnessRun.prompt_hash,
+        contextFingerprint: harnessRun.context_fingerprint,
+      });
+      recordStage(harnessRun, "loop_planned", loopSummary(loop));
+      finishRun(harnessRun, {
+        plan: conversationResult.plan,
+        source: conversationResult.source,
+        error: conversationResult.error ? new Error(conversationResult.error) : null,
+      });
+      return json(200, {
+        ok: true,
+        plan: conversationResult.plan,
+        source: conversationResult.source,
+        model_error: conversationResult.error || null,
+        harness: publicMeta(harnessRun),
+        loop: publicLoop(loop),
+      });
     }
     const fallback = fallbackPlan(prompt, context);
     let result;
     try {
+      recordStage(harnessRun, "planner_started", { mode: "app" });
       result = await modelPlan(prompt, context, fallback, language);
+      recordStage(harnessRun, "planner_completed", { source: result.source });
     } catch (error) {
+      recordStage(harnessRun, "planner_fallback", { error_code: error.name || "planner_error" });
       result = { plan: fallback, source: "deterministic_fallback_after_model_error", error: error.message };
     }
     result.plan = localizePlan(result.plan, language);
-    return json(200, { ok: true, plan: result.plan, source: result.source, model_error: result.error || null });
+    const gatedSummary = planSummary(result.plan);
+    recordStage(harnessRun, "action_gate", {
+      decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
+      action_types: gatedSummary.action_types,
+      action_count: gatedSummary.action_count,
+      warnings: gatedSummary.warnings,
+    });
+    const loop = createLoop({
+      prompt,
+      context,
+      plan: result.plan,
+      runId: harnessRun.run_id,
+      promptHash: harnessRun.prompt_hash,
+      contextFingerprint: harnessRun.context_fingerprint,
+    });
+    recordStage(harnessRun, "loop_planned", loopSummary(loop));
+    finishRun(harnessRun, {
+      plan: result.plan,
+      source: result.source,
+      error: result.error ? new Error(result.error) : null,
+    });
+    return json(200, {
+      ok: true,
+      plan: result.plan,
+      source: result.source,
+      model_error: result.error || null,
+      harness: publicMeta(harnessRun),
+      loop: publicLoop(loop),
+    });
   } catch (error) {
+    if (harnessRun) {
+      finishRun(harnessRun, { source: "handler_error", error });
+    }
     return json(500, { error: "blanked_agent_failed", detail: error.message });
   }
 };

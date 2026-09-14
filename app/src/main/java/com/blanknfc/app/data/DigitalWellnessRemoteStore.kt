@@ -55,6 +55,135 @@ class DigitalWellnessRemoteStore(
         }
     }
 
+    fun recordOutcome(recommendationId: String?, outcome: String) {
+        recordExecution(recommendationId, null, outcome == "activated" || outcome == "completed", outcome)
+    }
+
+    fun recordExecution(
+        recommendationId: String?,
+        plan: DigitalWellnessPlan?,
+        success: Boolean,
+        outcome: String = if (success) "completed" else "failed"
+    ) {
+        if (recommendationId.isNullOrBlank()) return
+        scope.launch {
+            var loop: JSONObject? = null
+            var loopStatus: String? = null
+            var loopId: String? = null
+            runCatching {
+                loop = startLoop(recommendationId, plan)
+                loop = advanceLoop(loop, "confirm")
+                loop = advanceLoop(loop, "execution_started")
+                loop = advanceLoop(
+                    loop,
+                    "executed",
+                    success = success,
+                    verification = if (success) "passed" else null,
+                    reason = if (success) "Android local app state matched the requested action." else "Android local app did not confirm the requested action."
+                )
+                if (success) {
+                    loop = advanceLoop(
+                        loop,
+                        "verified",
+                        success = true,
+                        verification = "passed",
+                        reason = "Android local app verification passed."
+                    )
+                }
+                loop = advanceLoop(
+                    loop,
+                    "outcome_recorded",
+                    success = success,
+                    outcome = if (success) "held" else "failed",
+                    outcomeScore = if (success) 24 else -28,
+                    verification = if (success) "passed" else "failed",
+                    reason = if (success) "Android local outcome recorded after device verification." else "Android local outcome recorded after failed device verification."
+                )
+                loopStatus = loop?.optString("status")?.takeIf { it.isNotBlank() }
+                loopId = loop?.optString("loop_id")?.takeIf { it.isNotBlank() }
+            }.onFailure {
+                Log.w("BlankedAI", "BM loop sync failed; recording outcome without loop", it)
+            }
+            runCatching {
+                backendClient.post(
+                    "bai-outcome",
+                    backendClient.commonEnvelope(JSONObject().apply {
+                        put("recommendation_id", recommendationId)
+                        put("outcome", outcome)
+                        put("outcome_score", when (outcome) {
+                            "activated" -> 16
+                            "completed" -> 24
+                            "held" -> 30
+                            "broke" -> -30
+                            "relapse_after" -> -26
+                            else -> JSONObject.NULL
+                        })
+                        put("metadata", JSONObject().apply {
+                            put("source", "android")
+                            put("surface", "wellness_dashboard")
+                            loopId?.let { put("loop_id", it) }
+                            loopStatus?.let { put("loop_status", it) }
+                        })
+                    })
+                )
+            }.onFailure {
+                Log.w("BlankedAI", "BM outcome sync failed", it)
+            }
+        }
+    }
+
+    private fun startLoop(recommendationId: String, plan: DigitalWellnessPlan?): JSONObject? {
+        val response = backendClient.post(
+            "bm-loop",
+            backendClient.commonEnvelope(JSONObject().apply {
+                put("operation", "start")
+                put("prompt_hash", recommendationId)
+                put("context", JSONObject().apply {
+                    put("mode", "android")
+                    put("has_selected_apps", true)
+                    put("screen_time_authorized", true)
+                })
+                put("plan", JSONObject().apply {
+                    put("title", plan?.archetype ?: "digital_wellness")
+                    put("intent", "apply_ai_plan")
+                    put("actions", JSONArray().put(JSONObject().put("type", "apply_ai_plan")))
+                })
+            })
+        )
+        return response.optJSONObject("loop")
+    }
+
+    private fun advanceLoop(
+        loop: JSONObject?,
+        type: String,
+        success: Boolean = false,
+        verification: String? = null,
+        reason: String? = null,
+        outcome: String? = null,
+        outcomeScore: Int? = null
+    ): JSONObject? {
+        if (loop == null) return null
+        val event = JSONObject().apply {
+            put("type", type)
+            put("event_id", "bme_${java.util.UUID.randomUUID()}")
+            put("success", success)
+            put("source", "android")
+            verification?.let { put("verification", it) }
+            reason?.let { put("reason", it) }
+            outcome?.let { put("outcome", it) }
+            outcomeScore?.let { put("outcome_score", it) }
+        }
+        val response = backendClient.post(
+            "bm-loop",
+            backendClient.commonEnvelope(JSONObject().apply {
+                put("operation", "advance")
+                put("loop", loop)
+                put("event", event)
+            })
+        )
+        return response.optJSONObject("loop") ?: loop
+    }
+
     private fun buildPayload(
         stats: FocusStats,
         selectedAppCount: Int,
@@ -69,6 +198,8 @@ class DigitalWellnessRemoteStore(
         val blockedMinutes = (stats.protectedMsThisWeek / 60000L).toInt()
         val weakestHour = if (schedule.enabled) schedule.startMinute / 60 else 22
         val usedEmergency = (3 - emergencyUnlocksRemaining).coerceIn(0, 3)
+        val pickupPressure = pickupPressureScore(stats, usedEmergency)
+        val behaviorChain = behaviorChain(stats, schedule)
         return JSONObject().apply {
             put("schema_version", 1)
             put("generated_at", now.toString())
@@ -106,6 +237,11 @@ class DigitalWellnessRemoteStore(
                     put("blocks_completed", stats.sessionsThisWeek)
                     put("blocked_attempts", stats.blockedAttemptsThisWeek)
                     put("emergency_unlocks_used", usedEmergency)
+                    put("pickup_pressure_score", pickupPressure)
+                    put("unlock_pressure_score", pickupPressure)
+                    put("dominant_app_sequence", behaviorChain)
+                    put("behavior_chain", behaviorChain)
+                    put("app_sequence_risk", sequenceRisk(pickupPressure, stats.blockedAttemptsThisWeek))
                     put("selection_count", selectedAppCount)
                     put("weakest_hour", weakestHour)
                     put("worst_focus_window", hourWindow(weakestHour))
@@ -144,6 +280,8 @@ class DigitalWellnessRemoteStore(
                     put("screen_risk_after_bad_sleep", if (healthSummary.lowRecoverySignal) "high" else "unknown")
                     put("relapses_after_short_sleep", if (healthSummary.lowRecoverySignal) usedEmergency else 0)
                     put("night_scroll_after_late_bedtime", weakestHour >= 21 || weakestHour <= 1)
+                    put("rapid_pickups_before_relapse", pickupPressure >= 65)
+                    put("sequence_risk_after_harmless_check", pickupPressure >= 50)
                 }
             )
             put(
@@ -162,6 +300,7 @@ class DigitalWellnessRemoteStore(
 
     private fun JSONObject.toPlan(fallback: DigitalWellnessPlan): DigitalWellnessPlan {
         val planUpdate = optJSONObject("plan_update")
+        val forecast = optJSONObject("behavior_forecast")
         val start = planUpdate?.optInt("proposed_start_minute", -1)?.takeIf { it >= 0 }
         val end = planUpdate?.optInt("proposed_end_minute", -1)?.takeIf { it >= 0 }
         val duration = if (start != null && end != null) {
@@ -173,13 +312,53 @@ class DigitalWellnessRemoteStore(
             archetype = optString("motivation_cluster", fallback.archetype).replace('_', ' ').replaceFirstChar { it.uppercase() },
             score = optInt("confidence", fallback.score),
             riskWindow = optString("risk_window", fallback.riskWindow).ifBlank { fallback.riskWindow },
-            riskScore = (100 - optInt("confidence", 70)).coerceIn(10, 95),
+            riskScore = forecast?.optInt("risk_score", fallback.riskScore) ?: (100 - optInt("confidence", 70)).coerceIn(10, 95),
             recommendedDurationMinutes = duration.coerceIn(15, 540),
-            primaryAction = planUpdate?.takeIf { it.has("action_label") }?.optString("action_label") ?: fallback.primaryAction,
+            primaryAction = forecast?.optString("action_label")?.takeIf { it.isNotBlank() }?.let { "$it: ${optString("risk_window", fallback.riskWindow).ifBlank { fallback.riskWindow }}" }
+                ?: planUpdate?.takeIf { it.has("action_label") }?.optString("action_label")
+                ?: fallback.primaryAction,
             secondaryAction = optJSONArray("recommendations")?.optString(1) ?: fallback.secondaryAction,
             reportInsight = optString("summary", fallback.reportInsight),
-            healthContext = optJSONArray("patterns")?.optString(0) ?: fallback.healthContext
+            healthContext = optJSONArray("patterns")?.optString(0) ?: fallback.healthContext,
+            forecastReasons = forecast?.optJSONArray("reasons")?.toStringList() ?: fallback.forecastReasons,
+            behaviorChain = fallback.behaviorChain,
+            experimentName = optJSONObject("experiment")?.optString("name")?.takeIf { it.isNotBlank() } ?: fallback.experimentName,
+            experimentWhy = optJSONObject("experiment")?.optString("hypothesis")?.takeIf { it.isNotBlank() } ?: fallback.experimentWhy,
+            experimentMetric = optJSONObject("experiment")?.optString("success_metric")?.takeIf { it.isNotBlank() } ?: fallback.experimentMetric,
+            recommendationId = optString("recommendation_id").takeIf { it.isNotBlank() } ?: fallback.recommendationId
         )
+    }
+
+    private fun JSONArray.toStringList(): List<String> {
+        return (0 until length()).mapNotNull { index -> optString(index).takeIf { it.isNotBlank() } }
+    }
+
+    private fun pickupPressureScore(stats: FocusStats, usedEmergency: Int): Int {
+        val recentPressure = stats.activityDays.takeLast(7).sumOf { day ->
+            day.blockedAttempts * 14 + if (day.sessions == 0 && day.blockedAttempts > 0) 10 else 0
+        }
+        return (recentPressure + usedEmergency * 12).coerceIn(0, 100)
+    }
+
+    private fun behaviorChain(stats: FocusStats, schedule: FocusSchedule): String {
+        val recent = stats.activityDays.takeLast(7)
+        val attempts = recent.sumOf { it.blockedAttempts }
+        val sessions = recent.sumOf { it.sessions }
+        return when {
+            attempts >= 3 && schedule.enabled -> "scheduled window -> blocked app urge"
+            attempts >= 3 -> "quick check -> blocked app urge"
+            attempts > sessions -> "urge before planned block"
+            sessions >= 3 -> "planned block -> clean session"
+            else -> "learning"
+        }
+    }
+
+    private fun sequenceRisk(pickupPressure: Int, blockedAttempts: Int): String {
+        return when {
+            pickupPressure >= 70 || blockedAttempts >= 5 -> "high"
+            pickupPressure >= 40 || blockedAttempts >= 2 -> "medium"
+            else -> "low"
+        }
     }
 
     private fun hourWindow(hour: Int): String {

@@ -31,7 +31,7 @@ function assistantChannelUserId(channel, channelUser) {
   return `assistant:${hash}`;
 }
 
-async function recordAssistantChannel({ event, channel, connectCode, channelUser = "", userPhone = "", preferredChannel = "" }) {
+async function recordAssistantChannel({ event, channel, connectCode, channelUser = "", userPhone = "", preferredChannel = "", metadata = {} }) {
   const normalizedCode = normalizeConnectCode(connectCode);
   if (!normalizedCode) return;
   const now = new Date().toISOString();
@@ -49,6 +49,7 @@ async function recordAssistantChannel({ event, channel, connectCode, channelUser
           connect_code: normalizedCode,
           channel_user: cleanText(channelUser, 120),
           user_phone: cleanText(userPhone, 80),
+          ...(metadata && typeof metadata === "object" ? metadata : {}),
         },
       },
       insight: { event },
@@ -65,6 +66,77 @@ async function recordAssistantChannel({ event, channel, connectCode, channelUser
       submitted_at: now,
     }),
   });
+}
+
+function proactiveTemplateSids() {
+  const configured = cleanText(process.env.TWILIO_WHATSAPP_PROACTIVE_CONTENT_SIDS, 600);
+  const values = configured
+    ? configured.split(",").map((value) => cleanText(value, 80)).filter(Boolean)
+    : [];
+  return Array.from({ length: 5 }, (_, index) => values[index] || cleanText(process.env[`TWILIO_WHATSAPP_PROACTIVE_CONTENT_SID_${index + 1}`], 80)).filter(Boolean);
+}
+
+function proactiveFingerprint(message) {
+  return crypto.createHash("sha256").update(cleanText(message, 900).toLowerCase()).digest("hex");
+}
+
+async function approvedProactiveTemplateSids() {
+  const configured = proactiveTemplateSids();
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!configured.length || !sid || !token) return [];
+  const authorization = `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`;
+  const approved = [];
+  for (const contentSid of configured) {
+    try {
+      const response = await fetch(`https://content.twilio.com/v1/Content/${encodeURIComponent(contentSid)}/ApprovalRequests`, {
+        headers: { authorization },
+      });
+      if (!response.ok) continue;
+      const approval = await response.json();
+      if (String(approval.whatsapp?.status || "").toLowerCase() === "approved") approved.push(contentSid);
+    } catch (_) {
+      // An unavailable approval check must never turn into an unapproved send.
+    }
+  }
+  return approved;
+}
+
+async function proactiveGate(connectCode, message, channel, updateKey = "", channelUser = "") {
+  const normalizedCode = normalizeConnectCode(connectCode);
+  if (!normalizedCode || !cleanText(message, 900)) return { allowed: false, reason: "missing_proactive_input" };
+  if (channelUser) {
+    try {
+      if ((await getAssistantMemory(channel, channelUser)).proactive_updates_paused === true) {
+        return { allowed: false, reason: "proactive_updates_paused" };
+      }
+    } catch (_) {
+      return { allowed: false, reason: "proactive_state_unavailable" };
+    }
+  }
+  const rows = await supabaseFetch(
+    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantUserId(normalizedCode))}&select=payload,submitted_at&order=submitted_at.desc&limit=100`,
+    { method: "GET" }
+  );
+  const delivered = rows.filter((row) => row.payload?.properties?.event === "assistant_proactive_delivered");
+  const now = Date.now();
+  const latest = delivered.find((row) => now - new Date(row.submitted_at || 0).getTime() < 24 * 60 * 60 * 1000);
+  if (latest) return { allowed: false, reason: "daily_limit" };
+  const fingerprintValue = proactiveFingerprint(message);
+  const duplicate = delivered.find((row) => {
+    const properties = row.payload?.properties || {};
+    return properties.proactive_fingerprint === fingerprintValue || (updateKey && properties.update_key === cleanText(updateKey, 120));
+  });
+  if (duplicate) return { allowed: false, reason: "duplicate_update" };
+  const hour = new Date().getUTCHours();
+  const quietStart = Number(process.env.ASSISTANT_PROACTIVE_QUIET_START_UTC || 21);
+  const quietEnd = Number(process.env.ASSISTANT_PROACTIVE_QUIET_END_UTC || 8);
+  const inQuietHours = quietStart > quietEnd ? hour >= quietStart || hour < quietEnd : hour >= quietStart && hour < quietEnd;
+  if (inQuietHours) return { allowed: false, reason: "quiet_hours" };
+  const sids = channel === "whatsapp" ? await approvedProactiveTemplateSids() : [];
+  if (channel === "whatsapp" && !sids.length) return { allowed: false, reason: "no_approved_proactive_template" };
+  const templateIndex = delivered.length % Math.max(sids.length, 1);
+  return { allowed: true, templateIndex, contentSid: sids[templateIndex] || "", proactiveFingerprint: fingerprintValue };
 }
 
 async function findAssistantConnection(connectCode, preferredChannel = "") {
@@ -212,6 +284,7 @@ async function sendWhatsAppMessage(to, body, options = {}) {
 
   const token = process.env.WHATSAPP_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (options.contentSid) return { skipped: true, reason: "template_requires_twilio" };
   if (!token || !phoneNumberId) {
     return { skipped: true, reason: "missing_whatsapp_credentials" };
   }
@@ -237,10 +310,10 @@ async function sendWhatsAppMessage(to, body, options = {}) {
   return response.json();
 }
 
-async function sendAssistantMessage(connection, body) {
+async function sendAssistantMessage(connection, body, options = {}) {
   if (!connection) return { skipped: true, reason: "missing_connection" };
   if (connection.channel === "sms") return sendSmsMessage(connection.channelUser, body);
-  if (connection.channel === "whatsapp") return sendWhatsAppMessage(connection.channelUser, body);
+  if (connection.channel === "whatsapp") return sendWhatsAppMessage(connection.channelUser, body, options);
   return { skipped: true, reason: "unsupported_channel" };
 }
 
@@ -251,6 +324,10 @@ module.exports = {
   findAssistantConnection,
   getAssistantMemory,
   normalizeConnectCode,
+  proactiveGate,
+  proactiveTemplateSids,
+  proactiveFingerprint,
+  approvedProactiveTemplateSids,
   recordAssistantChannel,
   recordAssistantMemory,
   sendAssistantMessage,

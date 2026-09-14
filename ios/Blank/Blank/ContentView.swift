@@ -156,7 +156,7 @@ private struct ConversationalHomeView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("WhatsApp messages are handled by WhatsApp/Meta. Blanked uses this channel only for messages you send and replies from Blanked AI.")
+            Text("WhatsApp messages are handled by WhatsApp/Meta. Blanked uses this channel only for messages you send and replies from BM.")
         }
         .sheet(isPresented: $showingWidgetTimerSelector) {
             WidgetTimerSelectionSheet(
@@ -783,6 +783,19 @@ private struct ConversationalHomeView: View {
             return
         }
 
+        let context = currentAgentContext()
+        Task { @MainActor in
+            let persistedLoop = await BMLoopClient().startLoop(
+                loop: plan.loop,
+                plan: plan,
+                context: context
+            )
+            applyLocally(plan, persistedLoop: persistedLoop)
+        }
+    }
+
+    private func applyLocally(_ plan: AgentPlan, persistedLoop: AgentLoop?) {
+
         var appliedLabels: [String] = []
 
         for action in plan.actions {
@@ -857,6 +870,12 @@ private struct ConversationalHomeView: View {
             }
         }
 
+        screenTimeBlocker.updateAdvancedControls(
+            allowOnlyModeEnabled: sessionStore.allowOnlyModeEnabled,
+            adultContentBlockingEnabled: sessionStore.adultContentBlockingEnabled
+        )
+        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+
         Task {
             await BlankFunnelAnalytics.track(
                 "agent_plan_applied",
@@ -868,10 +887,229 @@ private struct ConversationalHomeView: View {
             )
         }
         BlankedAgentMemory.recordAppliedPlan(plan, context: currentAgentContext())
+        let verification = verifyAgentExecution(plan)
+        reportAgentExecution(
+            plan,
+            verification: verification,
+            resultLabels: appliedLabels,
+            persistedLoop: persistedLoop
+        )
 
         let confirmation = appliedLabels.isEmpty ? "Done." : "Done. \(appliedLabels.joined(separator: ". "))."
         messages.append(AgentMessage(role: .blanked, text: confirmation))
         activePlan = nil
+    }
+
+    private func verifyAgentExecution(_ plan: AgentPlan) -> AgentExecutionVerification {
+        let checks = plan.actions.map { action -> AgentExecutionCheck in
+            switch action {
+            case .startProtection(let minutes, let hardMode):
+                let passed = sessionStore.isBlankActive
+                    && sessionStore.hardBlankActive == hardMode
+                    && (minutes <= 0 || sessionStore.blankActiveUntil != nil)
+                return AgentExecutionCheck(
+                    name: "protection_active",
+                    expected: "active=true hard_mode=\(hardMode)",
+                    actual: "active=\(sessionStore.isBlankActive) hard_mode=\(sessionStore.hardBlankActive)",
+                    passed: passed
+                )
+            case .applySchedule(let name, let startMinute, let endMinute, let weekdays, _):
+                let matchingWindow = sessionStore.schedule.enabled
+                    && sessionStore.schedule.windows.contains {
+                        $0.enabled
+                            && $0.name == name
+                            && $0.startMinute == startMinute
+                            && $0.endMinute == endMinute
+                            && Set($0.weekdays) == Set(weekdays)
+                    }
+                return AgentExecutionCheck(
+                    name: "schedule_persisted",
+                    expected: "enabled schedule with \(name) at \(startMinute)-\(endMinute)",
+                    actual: "enabled=\(sessionStore.schedule.enabled) windows=\(sessionStore.schedule.windows.count)",
+                    passed: matchingWindow
+                )
+            case .enableAllowOnly:
+                return AgentExecutionCheck(
+                    name: "allow_only_enabled",
+                    expected: "allow_only=true",
+                    actual: "allow_only=\(sessionStore.allowOnlyModeEnabled)",
+                    passed: sessionStore.allowOnlyModeEnabled
+                )
+            case .enableAdultFilter:
+                return AgentExecutionCheck(
+                    name: "adult_filter_enabled",
+                    expected: "adult_filter=true",
+                    actual: "adult_filter=\(sessionStore.adultContentBlockingEnabled)",
+                    passed: sessionStore.adultContentBlockingEnabled
+                )
+            case .setDailyLimit(let minutes):
+                let passed = sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes
+                return AgentExecutionCheck(
+                    name: "daily_limit_persisted",
+                    expected: "enabled=true minutes=\(minutes)",
+                    actual: "enabled=\(sessionStore.dailyLimitEnabled) minutes=\(sessionStore.dailyLimitMinutes)",
+                    passed: passed
+                )
+            case .pauseRules:
+                return AgentExecutionCheck(
+                    name: "vacation_mode_enabled",
+                    expected: "vacation_mode=true",
+                    actual: "vacation_mode=\(sessionStore.isVacationModeActive)",
+                    passed: sessionStore.isVacationModeActive
+                )
+            case .disablePause:
+                return AgentExecutionCheck(
+                    name: "vacation_mode_disabled",
+                    expected: "vacation_mode=false",
+                    actual: "vacation_mode=\(sessionStore.isVacationModeActive)",
+                    passed: !sessionStore.isVacationModeActive
+                )
+            case .switchMode(let name):
+                let passed = sessionStore.currentMode.name.caseInsensitiveCompare(name) == .orderedSame
+                return AgentExecutionCheck(
+                    name: "mode_selected",
+                    expected: name,
+                    actual: sessionStore.currentMode.name,
+                    passed: passed
+                )
+            case .activateMode(let name, _, _):
+                let passed = sessionStore.isBlankActive
+                    && sessionStore.currentMode.name.caseInsensitiveCompare(name) == .orderedSame
+                return AgentExecutionCheck(
+                    name: "mode_active",
+                    expected: "active mode \(name)",
+                    actual: "active=\(sessionStore.isBlankActive) mode=\(sessionStore.currentMode.name)",
+                    passed: passed
+                )
+            case .openAppPicker:
+                return AgentExecutionCheck(
+                    name: "app_selection_ready",
+                    expected: "selection completed",
+                    actual: "selection_count=\(sessionStore.selectionCount)",
+                    passed: false
+                )
+            case .requestScreenTimePermission:
+                let passed = screenTimeBlocker.authorizationStatus == .approved
+                return AgentExecutionCheck(
+                    name: "screen_time_authorized",
+                    expected: "approved",
+                    actual: screenTimeBlocker.authorizationStatusLabel,
+                    passed: passed
+                )
+            case .applyAIPlan:
+                let passed = sessionStore.schedule.enabled && !sessionStore.schedule.windows.isEmpty
+                return AgentExecutionCheck(
+                    name: "adaptive_plan_persisted",
+                    expected: "enabled schedule with at least one window",
+                    actual: "enabled=\(sessionStore.schedule.enabled) windows=\(sessionStore.schedule.windows.count)",
+                    passed: passed
+                )
+            case .none:
+                return AgentExecutionCheck(
+                    name: "no_action",
+                    expected: "no executable action",
+                    actual: "none",
+                    passed: true
+                )
+            }
+        }
+        let passed = !checks.isEmpty && checks.allSatisfy(\.passed)
+        let state = [
+            "blank_active=\(sessionStore.isBlankActive)",
+            "selected_apps=\(sessionStore.selectionCount)",
+            "screen_time=\(screenTimeBlocker.authorizationStatusLabel)",
+            "schedule_enabled=\(sessionStore.schedule.enabled)",
+            "schedule_windows=\(sessionStore.schedule.windows.count)"
+        ].joined(separator: ";")
+        return AgentExecutionVerification(
+            passed: passed,
+            reason: passed ? "Local device state matched every requested action." : "Local device state did not match every requested action.",
+            evidence: AgentExecutionEvidence(
+                source: "ios_device_state",
+                deviceState: state,
+                checks: checks,
+                observedAt: ISO8601DateFormatter().string(from: Date())
+            )
+        )
+    }
+
+    private func reportAgentExecution(
+        _ plan: AgentPlan,
+        verification: AgentExecutionVerification,
+        resultLabels: [String],
+        persistedLoop: AgentLoop?
+    ) {
+        let anonymousUserId = agentAnonymousUserId()
+        let recommendationId = plan.recommendationId
+        let actionTypes = (persistedLoop ?? plan.loop)?.actionTypes ?? []
+        Task {
+            let client = BMLoopClient()
+            var loop = persistedLoop
+            if loop == nil, let proposedLoop = plan.loop {
+                loop = await client.startLoop(loop: proposedLoop, plan: plan, context: currentAgentContext())
+            }
+            if var activeLoop = loop {
+                activeLoop = await client.advance(loop: activeLoop, type: "confirm") ?? activeLoop
+                activeLoop = await client.advance(loop: activeLoop, type: "execution_started") ?? activeLoop
+                activeLoop = await client.advance(
+                    loop: activeLoop,
+                    type: "executed",
+                    success: verification.passed,
+                    reason: verification.reason,
+                    evidence: verification.evidence
+                ) ?? activeLoop
+                if verification.passed {
+                    activeLoop = await client.advance(
+                        loop: activeLoop,
+                        type: "verified",
+                        success: true,
+                        verification: "passed",
+                        reason: "Local device verification passed.",
+                        evidence: verification.evidence
+                    ) ?? activeLoop
+                }
+                activeLoop = await client.advance(
+                    loop: activeLoop,
+                    type: "outcome_recorded",
+                    success: verification.passed,
+                    outcome: verification.passed ? "held" : "failed",
+                    outcomeScore: verification.passed ? 24 : -28,
+                    reason: verification.reason,
+                    evidence: verification.evidence
+                ) ?? activeLoop
+                loop = activeLoop
+            }
+
+            if let recommendationId, !recommendationId.isEmpty {
+                try? await DigitalWellnessFeaturesClient().recordOutcome(
+                    anonymousUserId: anonymousUserId,
+                    recommendationId: recommendationId,
+                    outcome: verification.passed ? "completed" : "failed",
+                    outcomeScore: verification.passed ? 24 : -28,
+                    metadata: [
+                        "source": "ios",
+                        "surface": "agent",
+                        "loop_id": loop?.loopId ?? "",
+                        "loop_status": loop?.status ?? "not_persisted",
+                        "action_types": actionTypes,
+                        "result_labels": resultLabels,
+                        "verified": verification.passed,
+                        "verification_source": verification.evidence.source,
+                    ]
+                )
+            }
+        }
+    }
+
+    private func agentAnonymousUserId() -> String {
+        let defaults = BlankSharedState.defaults
+        let key = "blankOnboardingAnonymousUserId"
+        if let existing = defaults.string(forKey: key), !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString
+        defaults.set(created, forKey: key)
+        return created
     }
 
     private func handleSecondary(_ plan: AgentPlan) {
@@ -1082,6 +1320,157 @@ private enum AgentAction: Equatable {
     case none
 }
 
+private struct AgentLoopVerification: Codable, Equatable {
+    var required: Bool
+    var method: String
+    var status: String
+}
+
+private struct AgentLoopLastEvent: Codable, Equatable {
+    var type: String
+    var at: String
+    var reason: String?
+}
+
+private struct AgentLoopConsent: Codable, Equatable {
+    var required: Bool
+    var status: String
+    var source: String
+
+    enum CodingKeys: String, CodingKey {
+        case required
+        case status
+        case source
+    }
+}
+
+private struct AgentLoopEventHistory: Codable, Equatable {
+    var eventId: String
+    var type: String
+    var at: String
+    var transition: String
+    var accepted: Bool
+    var iteration: Int
+    var eventFingerprint: String?
+    var success: Bool
+    var verification: String?
+    var source: String?
+    var evidenceHash: String?
+
+    enum CodingKeys: String, CodingKey {
+        case eventId = "event_id"
+        case type
+        case at
+        case transition
+        case accepted
+        case iteration
+        case eventFingerprint = "event_fingerprint"
+        case success
+        case verification
+        case source
+        case evidenceHash = "evidence_hash"
+    }
+}
+
+private struct AgentExecutionCheck: Encodable {
+    var name: String
+    var expected: String
+    var actual: String
+    var passed: Bool
+}
+
+private struct AgentExecutionEvidence: Encodable {
+    var source: String
+    var deviceState: String
+    var checks: [AgentExecutionCheck]
+    var observedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case source
+        case deviceState = "device_state"
+        case checks
+        case observedAt = "observed_at"
+    }
+}
+
+private struct AgentExecutionVerification {
+    var passed: Bool
+    var reason: String
+    var evidence: AgentExecutionEvidence
+}
+
+private struct AgentLoop: Codable, Equatable {
+    var loopVersion: String
+    var loopId: String
+    var idempotencyKey: String
+    var runId: String?
+    var contextFingerprint: String?
+    var status: String
+    var phase: String
+    var goal: String
+    var iteration: Int
+    var maxIterations: Int
+    var nextStep: String
+    var actionTypes: [String]
+    var trigger: String
+    var consent: AgentLoopConsent?
+    var verification: AgentLoopVerification
+    var stopConditions: [String]
+    var lastEvent: AgentLoopLastEvent
+    var eventIds: [String]
+    var eventHistory: [AgentLoopEventHistory]
+    var stateVersion: Int
+    var eventSequence: Int
+
+    enum CodingKeys: String, CodingKey {
+        case loopVersion = "loop_version"
+        case loopId = "loop_id"
+        case idempotencyKey = "idempotency_key"
+        case runId = "run_id"
+        case contextFingerprint = "context_fingerprint"
+        case status
+        case phase
+        case goal
+        case iteration
+        case maxIterations = "max_iterations"
+        case nextStep = "next_step"
+        case actionTypes = "action_types"
+        case trigger
+        case consent
+        case verification
+        case stopConditions = "stop_conditions"
+        case lastEvent = "last_event"
+        case eventIds = "event_ids"
+        case eventHistory = "event_history"
+        case stateVersion = "state_version"
+        case eventSequence = "event_sequence"
+    }
+}
+
+private struct AgentLoopEvent: Encodable {
+    var type: String
+    var eventId: String
+    var success: Bool = false
+    var verification: String?
+    var reason: String?
+    var outcome: String?
+    var outcomeScore: Int?
+    var source: String = "ios"
+    var evidence: AgentExecutionEvidence?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case eventId = "event_id"
+        case success
+        case verification
+        case reason
+        case outcome
+        case outcomeScore = "outcome_score"
+        case source
+        case evidence
+    }
+}
+
 private struct AgentPlan: Identifiable, Equatable {
     var id = UUID()
     var intent: AgentIntent
@@ -1096,6 +1485,8 @@ private struct AgentPlan: Identifiable, Equatable {
     var requiresScreenTimeAuthorization: Bool
     var source: String? = nil
     var modelError: String? = nil
+    var recommendationId: String? = nil
+    var loop: AgentLoop? = nil
 
     var executableActionCount: Int {
         actions.filter { $0 != .none }.count
@@ -1440,7 +1831,7 @@ private enum BlankedAgentPlanner {
         return AgentPlan(
             intent: .sleep,
             title: "Bedtime Boundary",
-            responseText: "That sleep target gives us the missing boundary.",
+            responseText: "That bedtime gives us the missing boundary.",
             bullets: [
                 "Read: your target bedtime is \(agentMinuteText(bedtime)).",
                 "Pattern: the phone needs to become less available before the final scroll starts.",
@@ -1595,7 +1986,7 @@ private enum BlankedAgentPlanner {
             return AgentPlan(
                 intent: .social,
                 title: "Choose Apps",
-                responseText: "Choose the social apps in Screen Time first, then I can apply the block.",
+                responseText: "Choose the social apps in Blanked App first, then I can apply the block.",
                 bullets: [
                     "Read: this is a category of apps, not one exact app.",
                     "Pattern: iOS needs you to choose the apps before Blanked can shield them.",
@@ -1612,7 +2003,7 @@ private enum BlankedAgentPlanner {
             return AgentPlan(
                 intent: .social,
                 title: "Choose App",
-                responseText: "Choose \(mainApp) in Screen Time first, then I can apply the block.",
+                responseText: "Choose \(mainApp) in Blanked App first, then I can apply the block.",
                 bullets: [
                     "Read: \(mainApp) is the app you want to control.",
                     "Pattern: iOS needs that app inside your authorized selection before Blanked can shield it.",
@@ -1634,7 +2025,7 @@ private enum BlankedAgentPlanner {
             return AgentPlan(
                 intent: .social,
                 title: "Scroll Context",
-                responseText: "I can help, but I need the real loop before creating a block. Which app or moment does the scrolling usually start with?",
+                responseText: "I can help, but I need the real trigger before creating a block. Which app or moment does the scrolling usually start with?",
                 bullets: [
                     "Read: you want to stop scrolling, but the target is still broad.",
                     "Pattern: useful protection needs the app, trigger or time window.",
@@ -1839,7 +2230,10 @@ private struct BlankedAgentClient {
         }
 
         let decoded = try JSONDecoder().decode(RemoteAgentResponse.self, from: data)
-        var plan = decoded.plan.toAgentPlan(fallback: BlankedAgentPlanner.plan(for: prompt, context: context))
+        var plan = decoded.plan.toAgentPlan(
+            fallback: BlankedAgentPlanner.plan(for: prompt, context: context),
+            loop: decoded.loop
+        )
         plan.source = decoded.source
         plan.modelError = decoded.model_error
         return plan
@@ -1888,10 +2282,200 @@ private struct BlankedAgentClient {
     }
 }
 
+private struct BMLoopAdvanceRequest: Encodable {
+    var operation = "advance"
+    var loop: AgentLoop
+    var event: AgentLoopEvent
+    var anonymousUserId: String
+    var dataConsent: Bool
+    var platform = "ios"
+
+    enum CodingKeys: String, CodingKey {
+        case operation
+        case loop
+        case event
+        case anonymousUserId = "anonymous_user_id"
+        case dataConsent = "data_consent"
+        case platform
+    }
+}
+
+private struct BMLoopAdvanceResponse: Decodable {
+    var loop: AgentLoop
+}
+
+private struct BMLoopClient {
+    func startLoop(
+        loop: AgentLoop?,
+        plan: AgentPlan,
+        context: AgentContext
+    ) async -> AgentLoop? {
+        guard let loop, let baseURL = configuredBaseURL() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("bm-loop"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let actionTypes = loop.actionTypes.isEmpty
+            ? plan.actions.compactMap(Self.actionType).filter { $0 != "none" }
+            : loop.actionTypes
+        let requestedActions = plan.actions.compactMap(Self.actionPayload)
+        let startActions: [[String: Any]] = requestedActions.isEmpty
+            ? actionTypes.map { ["type": $0] }
+            : requestedActions
+        let body: [String: Any] = [
+            "operation": "start",
+            "prompt": String(plan.displayMessageText.prefix(500)),
+            "prompt_hash": loop.idempotencyKey,
+            "context": [
+                "loop_id": loop.loopId,
+                "mode_name": context.modeName,
+                "available_modes": context.availableModes,
+                "has_selected_apps": context.hasSelectedApps,
+                "screen_time_authorized": context.screenTimeAuthorized,
+                "device_execution_ready": context.hasSelectedApps && context.screenTimeAuthorized,
+                "autonomy_consent": false,
+                "authorized_action_types": []
+            ],
+            "plan": [
+                "intent": plan.intent.rawValue,
+                "title": plan.title,
+                "response_text": plan.responseText,
+                "actions": startActions,
+                "requires_selected_apps": plan.requiresSelectedApps,
+                "requires_screen_time_authorization": plan.requiresScreenTimeAuthorization
+            ],
+            "anonymous_user_id": BlankSharedState.defaults.string(forKey: "blankOnboardingAnonymousUserId") ?? "ios-anonymous",
+            "data_consent": true,
+            "platform": "ios"
+        ]
+        if let runId = loop.runId, !runId.isEmpty {
+            var mutableBody = body
+            mutableBody["run_id"] = runId
+            request.httpBody = try? JSONSerialization.data(withJSONObject: mutableBody)
+        } else {
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        }
+        guard request.httpBody != nil else { return nil }
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                return nil
+            }
+            return try JSONDecoder().decode(BMLoopAdvanceResponse.self, from: data).loop
+        } catch {
+            return nil
+        }
+    }
+
+    func advance(
+        loop: AgentLoop,
+        type: String,
+        success: Bool = false,
+        verification: String? = nil,
+        reason: String? = nil,
+        outcome: String? = nil,
+        outcomeScore: Int? = nil,
+        evidence: AgentExecutionEvidence? = nil
+    ) async -> AgentLoop? {
+        guard let baseURL = configuredBaseURL() else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent("bm-loop"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let event = AgentLoopEvent(
+            type: type,
+            eventId: "bme_\(UUID().uuidString)",
+            success: success,
+            verification: verification,
+            reason: reason,
+            outcome: outcome ?? (success && type != "outcome_recorded" ? "completed" : nil),
+            outcomeScore: outcomeScore,
+            evidence: evidence
+        )
+        let anonymousUserId = BlankSharedState.defaults.string(forKey: "blankOnboardingAnonymousUserId") ?? "ios-anonymous"
+        do {
+            request.httpBody = try JSONEncoder().encode(BMLoopAdvanceRequest(
+                loop: loop,
+                event: event,
+                anonymousUserId: anonymousUserId,
+                dataConsent: true
+            ))
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode) else {
+                return nil
+            }
+            return try JSONDecoder().decode(BMLoopAdvanceResponse.self, from: data).loop
+        } catch {
+            return nil
+        }
+    }
+
+    private func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return URL(string: trimmed)
+    }
+
+    private static func actionType(_ action: AgentAction) -> String? {
+        switch action {
+        case .startProtection: return "start_protection"
+        case .applySchedule: return "apply_schedule"
+        case .enableAllowOnly: return "enable_allow_only"
+        case .enableAdultFilter: return "enable_adult_filter"
+        case .setDailyLimit: return "set_daily_limit"
+        case .pauseRules: return "pause_rules"
+        case .disablePause: return "disable_pause"
+        case .switchMode: return "switch_mode"
+        case .activateMode: return "activate_mode"
+        case .openAppPicker: return "open_app_picker"
+        case .requestScreenTimePermission: return "request_screen_time_permission"
+        case .applyAIPlan: return "apply_ai_plan"
+        case .none: return "none"
+        }
+    }
+
+    private static func actionPayload(_ action: AgentAction) -> [String: Any]? {
+        switch action {
+        case .startProtection(let minutes, let hardMode):
+            return ["type": "start_protection", "minutes": minutes, "hard_mode": hardMode]
+        case .applySchedule(let name, let startMinute, let endMinute, let weekdays, let durationDays):
+            return ["type": "apply_schedule", "name": name, "start_minute": startMinute, "end_minute": endMinute, "weekdays": weekdays, "duration_days": durationDays]
+        case .enableAllowOnly:
+            return ["type": "enable_allow_only"]
+        case .enableAdultFilter:
+            return ["type": "enable_adult_filter"]
+        case .setDailyLimit(let minutes):
+            return ["type": "set_daily_limit", "minutes": minutes]
+        case .pauseRules(let hours):
+            return ["type": "pause_rules", "hours": hours]
+        case .disablePause:
+            return ["type": "disable_pause"]
+        case .switchMode(let name):
+            return ["type": "switch_mode", "name": name]
+        case .activateMode(let name, let minutes, let hardMode):
+            var payload: [String: Any] = ["type": "activate_mode", "name": name, "hard_mode": hardMode]
+            if let minutes { payload["minutes"] = minutes }
+            return payload
+        case .openAppPicker:
+            return ["type": "open_app_picker"]
+        case .requestScreenTimePermission:
+            return ["type": "request_screen_time_permission"]
+        case .applyAIPlan:
+            return ["type": "apply_ai_plan"]
+        case .none:
+            return nil
+        }
+    }
+}
+
 private struct RemoteAgentResponse: Decodable {
     var plan: RemoteAgentPlan
     var source: String?
     var model_error: String?
+    var loop: AgentLoop?
 }
 
 private struct RemoteAgentPlan: Decodable {
@@ -1905,8 +2489,9 @@ private struct RemoteAgentPlan: Decodable {
     var actions: [RemoteAgentAction]
     var requires_selected_apps: Bool
     var requires_screen_time_authorization: Bool
+    var recommendation_id: String?
 
-    func toAgentPlan(fallback: AgentPlan) -> AgentPlan {
+    func toAgentPlan(fallback: AgentPlan, loop: AgentLoop?) -> AgentPlan {
         let mappedActions = actions.compactMap(\.agentAction)
         let cleanedBullets = bullets.map { clean($0, "") }.filter { !$0.isEmpty }
         return AgentPlan(
@@ -1919,7 +2504,9 @@ private struct RemoteAgentPlan: Decodable {
             secondaryLabel: clean(secondary_label, fallback.secondaryLabel),
             actions: mappedActions,
             requiresSelectedApps: requires_selected_apps,
-            requiresScreenTimeAuthorization: requires_screen_time_authorization
+            requiresScreenTimeAuthorization: requires_screen_time_authorization,
+            recommendationId: recommendation_id ?? fallback.recommendationId,
+            loop: loop ?? fallback.loop
         )
     }
 

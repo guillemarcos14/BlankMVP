@@ -1855,7 +1855,7 @@
     }
   },
   {
-    "id": "web_general_wellness_stays_conversational",
+    "id": "web_general_wellness_redirects_to_digital_wellness",
     "prompt": "How can I improve my sleep?",
     "context": {
       "channel": "web_preview",
@@ -1868,10 +1868,34 @@
       "intent": "general",
       "action_types": [],
       "ui_text_matches": [
-        "sleep|wake|light|caffeine|routine|bed"
+        "digital wellness|phone|screen|apps|móvil|pantallas"
       ],
       "ui_text_not_matches": [
-        "download|App Store|automatic blocks|cannot block apps"
+        "caffeine|meal|daylight|training|runs|download|App Store|automatic blocks|cannot block apps"
+      ],
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 2
+    }
+  },
+  {
+    "id": "web_running_plan_redirects_to_digital_wellness",
+    "prompt": "Can you make me a running plan?",
+    "context": {
+      "channel": "web_preview",
+      "assistant_channel": "web",
+      "web_preview": true,
+      "has_selected_apps": false,
+      "screen_time_authorized": false
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "ui_text_matches": [
+        "digital wellness|phone|screen|apps|móvil|pantallas"
+      ],
+      "ui_text_not_matches": [
+        "run plan|runs|volume|strength|intervals|hill|pace|weekly|download|App Store"
       ],
       "min_message_length": 30,
       "min_quality_score": 2,
@@ -1900,6 +1924,80 @@
       "min_message_length": 30,
       "min_quality_score": 2,
       "min_utility_score": 2
+    }
+  },
+  {
+    "id": "ambiguous_after_dinner_stays_digital",
+    "prompt": "I lose control after dinner.",
+    "context": {
+      "channel": "web_preview",
+      "assistant_channel": "web",
+      "web_preview": true,
+      "has_selected_apps": false,
+      "screen_time_authorized": false
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "ui_text_matches": [
+        "phone|scroll|messages|app"
+      ],
+      "ui_text_not_matches": [
+        "only help with digital wellness|caffeine|meal|daylight|training|running"
+      ],
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "ambiguous_after_lunch_stays_digital",
+    "prompt": "I lose control after lunch.",
+    "context": {
+      "channel": "web_preview",
+      "assistant_channel": "web",
+      "web_preview": true,
+      "has_selected_apps": false,
+      "screen_time_authorized": false
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [],
+      "ui_text_matches": [
+        "phone|scroll|messages|app"
+      ],
+      "ui_text_not_matches": [
+        "only help with digital wellness|caffeine|meal|daylight|training|running"
+      ],
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 3
+    }
+  },
+  {
+    "id": "explicit_schedule_names_requested_app",
+    "prompt": "Block YouTube from 10 pm to 7 am.",
+    "context": {
+      "channel": "whatsapp",
+      "assistant_channel": "whatsapp",
+      "has_selected_apps": true,
+      "screen_time_authorized": true
+    },
+    "expect": {
+      "intent": "social",
+      "action_types": [
+        "apply_schedule"
+      ],
+      "text_matches": [
+        "YouTube|10:00 PM|7:00 AM"
+      ],
+      "first_action": {
+        "start_minute": 1320,
+        "end_minute": 420
+      },
+      "min_message_length": 30,
+      "min_quality_score": 2,
+      "min_utility_score": 3
     }
   }
 ]

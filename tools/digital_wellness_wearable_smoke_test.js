@@ -17,6 +17,7 @@ function response(status, data) {
 
 async function resolvesWearableSourcesBeforePlanGeneration() {
   let storedPayload = null;
+  let generatedOutcome = null;
   global.fetch = async (url, options = {}) => {
     const target = String(url);
     if (target.includes("/rest/v1/wearable_feature_snapshots") && options.method === "POST") {
@@ -37,6 +38,10 @@ async function resolvesWearableSourcesBeforePlanGeneration() {
     }
     if (target.includes("/rest/v1/bai_global_plan_patterns")) return response(200, []);
     if (target.includes("/rest/v1/bai_user_plan_preferences")) return response(200, []);
+    if (target.includes("/rest/v1/bai_user_plan_outcomes") && options.method === "POST") {
+      generatedOutcome = JSON.parse(options.body);
+      return response(201, null);
+    }
     if (target.includes("/rest/v1/digital_wellness_feature_payloads") && options.method === "POST") {
       storedPayload = JSON.parse(options.body);
       return response(201, [{ id: "payload-1" }]);
@@ -74,6 +79,11 @@ async function resolvesWearableSourcesBeforePlanGeneration() {
 
   assert.strictEqual(result.statusCode, 200, result.body);
   assert.strictEqual(body.insight.plan_update.duration_days, 3);
+  assert.ok(body.insight.recommendation_id);
+  assert.ok(body.insight.behavior_forecast);
+  assert.ok(body.insight.experiment);
+  assert.strictEqual(generatedOutcome.outcome, "generated");
+  assert.strictEqual(generatedOutcome.recommendation_id, body.insight.recommendation_id);
   assert.match(body.insight.plan_update.evidence, /Recovery context is low/i);
   assert.strictEqual(storedPayload.payload.resolved_wearable.source_map.recovery, "oura");
   assert.ok(storedPayload.payload.wearable_decision_context.flags.includes("low_recovery"));

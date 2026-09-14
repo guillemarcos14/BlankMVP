@@ -16,7 +16,7 @@ exports.handler = async (event) => {
   } catch (error) {
     return xml(
       200,
-      `<Response><Say>BAI voice is not available right now.</Say><Hangup/></Response><!-- ${String(error.message || "call_failed").replace(/--/g, "")} -->`
+      `<Response><Say>BM voice is not available right now.</Say><Hangup/></Response><!-- ${String(error.message || "call_failed").replace(/--/g, "")} -->`
     );
   }
 };

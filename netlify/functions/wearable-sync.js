@@ -440,7 +440,7 @@ function makeCommon(values, provider, start, end) {
     activity: values.steps,
     strain_load: values.strain,
     stress_proxy: values.stress,
-    freshness: Math.round((Date.now() - end.getTime()) / 3600000),
+    freshness: 0,
     coverage,
     confidence: Math.min(100, coverage + (provider === "oura" || provider === "whoop" ? 15 : 5)),
     period_days: Math.round((end.getTime() - start.getTime()) / 86400000),

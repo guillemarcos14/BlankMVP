@@ -1,4 +1,4 @@
-# Blanked AI WhatsApp/SMS Setup
+# BM WhatsApp/SMS Setup
 
 ## Netlify function
 
@@ -29,6 +29,12 @@ TWILIO_ACCOUNT_SID=replace-me
 TWILIO_AUTH_TOKEN=replace-me
 TWILIO_FROM_NUMBER=+13478366767
 TWILIO_WHATSAPP_FROM_NUMBER=+13478366767
+# Five approved Utility templates, comma-separated or individually configured.
+TWILIO_WHATSAPP_PROACTIVE_CONTENT_SIDS=HX...,HX...,HX...,HX...,HX...
+# Optional individual form: TWILIO_WHATSAPP_PROACTIVE_CONTENT_SID_1 through _5
+# Optional UTC quiet-hours guard. Defaults to 21:00-08:00 UTC.
+ASSISTANT_PROACTIVE_QUIET_START_UTC=21
+ASSISTANT_PROACTIVE_QUIET_END_UTC=8
 # Optional instead of TWILIO_FROM_NUMBER:
 TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
@@ -68,9 +74,10 @@ BLANK_SMS_PHONE_NUMBER=+13478366767
 - WhatsApp receives user messages and sends them to `blanked-agent`.
 - WhatsApp replies with guidance and, when there is an executable action, uses a Twilio CTA template button when `TWILIO_WHATSAPP_ACTION_CONTENT_SID` is configured.
 - The WhatsApp button should point to a Universal Link such as `https://getblank.netlify.app/open?action=start-focus...`; move `BLANKED_PUBLIC_APP_LINK_BASE` to `https://blanked.app` only when `/open` and AASA are served there.
-- Twilio WhatsApp can receive voice notes, transcribe them with OpenAI, answer with BAI text, and attach an ElevenLabs-generated MP3 when the inbound message was audio or explicitly asks for voice.
+- Twilio WhatsApp can receive voice notes, transcribe them with OpenAI, answer with BM text, and attach an ElevenLabs-generated MP3 when the inbound message was audio or explicitly asks for voice.
 - iOS is still the authority for Screen Time actions.
-- `/.netlify/functions/assistant-channel` stores the user's preferred BAI interface (`whatsapp` or `sms`) by `CONNECT <code>` and sends proactive BAI alerts through the selected channel after the external thread has sent `CONNECT`.
+- `/.netlify/functions/assistant-channel` stores the user's preferred BM interface (`whatsapp` or `sms`) by `CONNECT <code>` and sends proactive BM alerts through the selected channel after the external thread has sent `CONNECT`.
+- Proactive WhatsApp alerts are only sent when BM supplies a meaningful update. The backend checks that the selected SID is actually `Approved` in Twilio, enforces one delivery per 24 hours, suppresses duplicate updates for the same user, respects quiet hours, rotates the five templates, and sends the full update only after the user taps/replies positively.
 - SMS uses `/.netlify/functions/sms-agent` as an inbound SMS webhook. It accepts Twilio-style form posts, sends the message to `blanked-agent`, replies first with commands like `Reply BLOCK` instead of raw URLs, stores the pending action, and sends the Universal Link only after the user replies with `BLOCK`, `START` or `OPEN`.
 - Users can send `stop` or `disconnect` in WhatsApp to pause this channel.
 
@@ -126,12 +133,12 @@ Voice smoke expected result: `sms-agent voice smoke tests passed`.
 - Send a WhatsApp voice note or a text asking for a voice note.
 - Confirm Twilio receives TwiML with `<Media>` pointing to `/.netlify/functions/assistant-audio`.
 - Confirm the WhatsApp reply includes playable audio plus the text/deep link fallback.
-- Trigger a BAI proactive alert and confirm `assistant-channel` attempts delivery through the selected channel.
+- Trigger a BM proactive alert and confirm `assistant-channel` attempts delivery through the selected channel.
 - Tap the link, confirm Blanked opens the native app picker, and select the apps.
 
 ## ElevenLabs calls
 
-BAI calls use Twilio for the phone number and ElevenLabs Agents for the spoken conversation.
+BM calls use Twilio for the phone number and ElevenLabs Agents for the spoken conversation.
 Blanked remains the authority for reasoning through:
 
 ```txt

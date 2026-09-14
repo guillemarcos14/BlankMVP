@@ -191,7 +191,7 @@ function escapeXml(value) {
 
 function connectReply(from, channel) {
   const label = channel === "whatsapp" ? "WhatsApp" : "SMS";
-  return `Hey! Blanked here 👋 Connected. BAI will use ${label} for this number${from ? ` (${from})` : ""}.`;
+  return `Hey! Blanked here 👋 Connected. BM will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
 function detectedLanguage(text) {
@@ -382,7 +382,7 @@ function naturalReplyText(text) {
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
     .replace(/\bI prepared a Blanked link\b/gi, "This Blanked link")
-    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I can help you apply it in Blanked.")
+    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
     .trim();
 }
@@ -494,7 +494,7 @@ async function askBAI(prompt, from, channel) {
   }
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
-    const fallback = "BAI could not read that yet. Try again in a moment.";
+    const fallback = "BM could not read that yet. Try again in a moment.";
     return { text: fallback, speechText: fallback };
   }
   const parsed = JSON.parse(response.body || "{}");

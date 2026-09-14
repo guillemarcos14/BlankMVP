@@ -682,7 +682,7 @@
 				BLANK_WHATSAPP_PHONE_NUMBER = 13478366767;
 				CODE_SIGN_ENTITLEMENTS = Blank/Blank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -693,7 +693,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -715,7 +715,7 @@
 				BLANK_WHATSAPP_PHONE_NUMBER = 13478366767;
 				CODE_SIGN_ENTITLEMENTS = Blank/Blank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_ASSET_PATHS = "";
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -726,7 +726,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -744,7 +744,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
@@ -754,7 +754,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.deviceactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -773,7 +773,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankDeviceActivityMonitor/BlankDeviceActivityMonitor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankDeviceActivityMonitor/Info.plist;
@@ -783,7 +783,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.deviceactivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -802,7 +802,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankWidgetExtension/BlankWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankWidgetExtension/Info.plist;
@@ -812,7 +812,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -831,7 +831,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankWidgetExtension/BlankWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankWidgetExtension/Info.plist;
@@ -841,7 +841,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -860,7 +860,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
@@ -870,7 +870,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldconfiguration;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -889,7 +889,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldConfiguration/BlankShieldConfiguration.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldConfiguration/Info.plist;
@@ -899,7 +899,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldconfiguration;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -918,7 +918,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldAction/Info.plist;
@@ -928,7 +928,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldaction;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -947,7 +947,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = BlankShieldAction/BlankShieldAction.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 67;
 				DEVELOPMENT_TEAM = GS54UV79RG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = BlankShieldAction/Info.plist;
@@ -957,7 +957,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.8;
+				MARKETING_VERSION = 1.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.blanknfc.app.ios.shieldaction;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

@@ -26,7 +26,7 @@ Checks:
 - Confirm `Health Sources / Wearables` shows one of: `Connected`, `No data`, `Stale`, or `Partial`.
 - Confirm visible metrics when available: sleep, steps, workouts, HR, resting HR, HRV, respiratory rate, oxygen saturation, VO2 max, energy and flights.
 - Confirm Digital Wellness report changes plan/recovery context when real Health signals exist.
-- Confirm low recovery can trigger BAI proactive alert only when signal is useful.
+- Confirm low recovery can trigger a BM proactive alert only when the signal is useful.
 - Revoke some Health permissions in iOS Settings and confirm the app does not crash.
 - Disable Health access and confirm the app works normally without wearable data.
 

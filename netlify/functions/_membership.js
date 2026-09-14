@@ -149,6 +149,46 @@ async function supabaseFetch(path, options = {}) {
   return data;
 }
 
+function bearerToken(event) {
+  const headers = event?.headers || {};
+  const value = headers.authorization || headers.Authorization || "";
+  return /^Bearer\s+(.+)$/i.exec(value)?.[1]?.trim() || null;
+}
+
+async function supabaseAuthFetch(path, options = {}) {
+  const url = requireEnv("SUPABASE_URL").replace(/\/$/, "");
+  const key = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const response = await fetch(`${url}/auth/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: key,
+      authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+      ...options.headers,
+    },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const detail = data?.msg || data?.message || response.statusText;
+    throw new Error(`Supabase auth request failed: ${detail}`);
+  }
+  return data;
+}
+
+async function getSupabaseUser(event) {
+  const token = bearerToken(event);
+  if (!token) return null;
+  try {
+    return await supabaseAuthFetch("user", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 async function findMembershipByCode(code) {
   const hash = codeHash(code);
   const rows = await supabaseFetch(
@@ -406,9 +446,12 @@ module.exports = {
   patchMembership,
   planFromOrder,
   recordGrantsAccess,
+  bearerToken,
+  getSupabaseUser,
   requireMethod,
   sendActivationEmail,
   supabaseFetch,
+  supabaseAuthFetch,
   timingSafeEqual,
   touchDevice,
   verifyShopifyWebhook,

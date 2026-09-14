@@ -1,0 +1,83 @@
+{
+  "contract_version": "bm-loop-contract-excellence-v1",
+  "architecture": "loop-engineering-excellence",
+  "loop_version": "bm-loop-excellence-v1",
+  "states": [
+    "awaiting_input",
+    "awaiting_setup",
+    "awaiting_confirmation",
+    "awaiting_execution",
+    "retryable",
+    "completed",
+    "stopped",
+    "failed"
+  ],
+  "terminal_states": ["completed", "stopped", "failed"],
+  "events": [
+    "confirm",
+    "setup_completed",
+    "execution_started",
+    "executed",
+    "verified",
+    "outcome_recorded",
+    "declined",
+    "cancelled",
+    "failed"
+  ],
+  "limits": {
+    "max_iterations": 3,
+    "max_events": 32,
+    "max_actions": 4,
+    "max_notifications": 3,
+    "max_duration_hours": 168
+  },
+  "required_fields": [
+    "loop_version",
+    "schema_version",
+    "contract_version",
+    "loop_id",
+    "idempotency_key",
+    "run_id",
+    "trace_id",
+    "hypothesis",
+    "intervention",
+    "success_criteria",
+    "budget",
+    "consent",
+    "behavioral_outcome",
+    "adaptation",
+    "state_version",
+    "event_sequence",
+    "plan_fingerprint",
+    "status",
+    "phase",
+    "goal",
+    "trigger",
+    "action_types",
+    "iteration",
+    "max_iterations",
+    "next_step",
+    "stop_conditions",
+    "verification",
+    "contract_warnings",
+    "last_event"
+  ],
+  "transition_policy": {
+    "awaiting_input": ["declined", "cancelled", "failed"],
+    "awaiting_setup": ["setup_completed", "declined", "cancelled", "failed"],
+    "awaiting_confirmation": ["confirm", "declined", "cancelled", "failed"],
+    "awaiting_execution": ["execution_started", "executed", "verified", "outcome_recorded", "declined", "cancelled", "failed"],
+    "retryable": ["confirm", "outcome_recorded", "declined", "cancelled", "failed"],
+    "completed": ["outcome_recorded"],
+    "stopped": ["outcome_recorded"],
+    "failed": ["outcome_recorded"]
+  },
+  "invariants": [
+    "An action loop never completes without verification passed.",
+    "An execution event must follow confirmation and execution_started in the current iteration.",
+    "A repeated event is idempotent; the same event_id cannot carry a different payload.",
+    "Unknown actions fail closed and are never silently discarded.",
+    "Terminal states reject execution events and accept only one outcome_recorded event for learning.",
+    "At most max_iterations execution failures are accepted before stopping."
+  ]
+}

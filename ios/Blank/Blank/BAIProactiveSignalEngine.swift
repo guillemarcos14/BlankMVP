@@ -61,7 +61,7 @@ struct BAIProactiveSignalEngine {
                 kind: "repeated_relapses",
                 priority: 95,
                 prompt: "proactive signal: repeated breaks today",
-                fallbackMessage: "BAI noticed repeated breaks. Use a shorter protected block now and review your escape rule before the next weak window.",
+                fallbackMessage: "BM noticed repeated breaks. Use a shorter protected block now and review your escape rule before the next weak window.",
                 context: [
                     "weekly_break_count": profile.weeklyBreakCount,
                     "relapse_risk_score": profile.relapseRiskScore,
@@ -75,7 +75,7 @@ struct BAIProactiveSignalEngine {
                 kind: "weak_window_near",
                 priority: 80 + system.forecast.riskScore / 5,
                 prompt: "proactive signal: weak window is approaching",
-                fallbackMessage: "BAI sees your weak window approaching. Start a short block before the pattern starts.",
+                fallbackMessage: "BM sees your weak window approaching. Start a short block before the pattern starts.",
                 context: [
                     "risk_window": system.forecast.riskWindow,
                     "risk_score": system.forecast.riskScore,
@@ -132,7 +132,7 @@ struct BAIProactiveSignalEngine {
             kind: "low_recovery",
             priority: priority + min(20, system.profile.relapseRiskScore / 5),
             prompt: "proactive signal: low recovery increases phone risk today",
-            fallbackMessage: "BAI sees lower recovery today. Keep your next block short and earlier, before scrolling becomes harder to stop.",
+                fallbackMessage: "BM sees lower recovery today. Keep your next block short and earlier, before scrolling becomes harder to stop.",
             context: [
                 "health_signal_reasons": reasons.joined(separator: "|"),
                 "sleep_minutes": today.sleepMinutes ?? -1,
@@ -226,7 +226,7 @@ struct BAIProactiveSignalEngine {
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
         let content = UNMutableNotificationContent()
-        content.title = "BAI"
+        content.title = "BM"
         content.body = body
         content.sound = .default
         content.userInfo = ["blank_url": "blank://bai-alert", "signal_type": signal.kind]

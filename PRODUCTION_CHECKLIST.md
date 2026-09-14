@@ -4,6 +4,11 @@
 
 - Install JDK 17 and set `JAVA_HOME`.
 - Install Android SDK Platform 36.
+- Before any BM production deploy, run `node tools/bai_release_gate.js --save --count 125` and require zero `real_behavior_issue` failures.
+- Before product release, run `node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate` and require `product_harness passed`.
+- Require the BM Harness Gate CI workflow to pass on the exact commit.
+- Before enabling loop persistence, apply `supabase/migrations/012_bm_loop_engineering.sql` and verify the RPC, RLS tables, and `bm_loop_learning_summary` view.
+- Run one remote `bm-loop` start/advance smoke with a duplicate event and a conflicting event. Require idempotent duplicate handling and rejection of the conflict.
 - Run `.\gradlew.bat testDebugUnitTest`.
 - Run `.\gradlew.bat assembleDebug`.
 - Configure a release keystore outside the repository using `docs/ANDROID_BETA_RELEASE.md`.

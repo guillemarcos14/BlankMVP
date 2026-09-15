@@ -74,30 +74,7 @@ struct HomeView: View {
                         .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
                 }
 
-                if let activeSection {
-                    HomeSectionScreen(
-                        showingPicker: $showingPicker,
-                        section: activeSection,
-                        screenWidth: viewportWidth,
-                        screenHeight: viewportHeight,
-                        intervention: relapseIntervention,
-                        onEmergencyUnlock: performEmergencyUnlock,
-                        onTimedBlank: startTimedBlank,
-                        onOpenSection: openSection,
-                        onOpenAssistant: { showingAssistantConnect = true },
-                        onRequestScreenTimePermission: requestScreenTimePermission,
-                        onRequestHealthAccess: { healthKitStore.requestAccess() },
-                        onRelinkBlank: { showingRelink = true },
-                        onForgetBlank: { showingForgetConfirm = true },
-                        screenTimeStatus: screenTimePermissionLabel,
-                        healthStatus: healthPermissionLabel
-                    ) {
-                        closeSection()
-                    }
-                    .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                    .transition(.opacity)
-                    .zIndex(5)
-                }
+                homeSectionScreen(viewportWidth: viewportWidth, viewportHeight: viewportHeight)
             }
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
@@ -294,6 +271,34 @@ struct HomeView: View {
                 }
             )
             .preferredColorScheme(.light)
+        }
+    }
+
+    @ViewBuilder
+    private func homeSectionScreen(viewportWidth: CGFloat, viewportHeight: CGFloat) -> some View {
+        if let activeSection {
+            HomeSectionScreen(
+                showingPicker: $showingPicker,
+                section: activeSection,
+                screenWidth: viewportWidth,
+                screenHeight: viewportHeight,
+                intervention: relapseIntervention,
+                onEmergencyUnlock: performEmergencyUnlock,
+                onTimedBlank: startTimedBlank,
+                onOpenSection: openSection,
+                onOpenAssistant: { showingAssistantConnect = true },
+                onRequestScreenTimePermission: requestScreenTimePermission,
+                onRequestHealthAccess: { healthKitStore.requestAccess() },
+                onRelinkBlank: { showingRelink = true },
+                onForgetBlank: { showingForgetConfirm = true },
+                screenTimeStatus: screenTimePermissionLabel,
+                healthStatus: healthPermissionLabel
+            ) {
+                closeSection()
+            }
+            .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+            .transition(.opacity)
+            .zIndex(5)
         }
     }
 

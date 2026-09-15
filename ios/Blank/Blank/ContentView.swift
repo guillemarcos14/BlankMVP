@@ -2782,7 +2782,7 @@ enum BlankedAgentMemory {
         }
     }
 
-    static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
+    fileprivate static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
         defaults.removeObject(forKey: lastPromptKey)
         defaults.set(inferredIntent.rawValue, forKey: lastIntentKey)
         if let bedtime = explicitBedtimeMinute(in: prompt) {

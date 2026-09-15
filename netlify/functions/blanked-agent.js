@@ -1090,16 +1090,22 @@ function requestedModeName(prompt, context = {}) {
   return "";
 }
 
+function explicitModeName(prompt) {
+  const text = cleanText(prompt, 600);
+  const prefix = "(?:start|activate|switch\\s+to|use|inicia|activa|cambia\\s+a|usa|i['’]?m\\s+in|estoy\\s+en)";
+  const beforeMode = new RegExp(`\\b${prefix}\\s+(?:the\\s+|el\\s+|la\\s+|al\\s+)?([a-z0-9][a-z0-9 _-]{0,32}?)\\s+(?:mode|modo)\\b`, "i").exec(text);
+  if (beforeMode?.[1]) return cleanText(beforeMode[1], 50);
+  const afterMode = new RegExp(`\\b${prefix}\\s+(?:the\\s+|el\\s+|la\\s+|al\\s+)?(?:mode|modo)\\s+(?:of\\s+|de\\s+)?([a-z0-9][a-z0-9 _-]{0,32}?)(?=\\s+(?:for|during|durante|now|ahora|from|at|a|por)\\b|[.!?,]|$)`, "i").exec(text);
+  return cleanText(afterMode?.[1], 50);
+}
+
 function hasExplicitModeActionRequest(prompt) {
-  const text = cleanText(prompt, 600).toLowerCase();
-  return /\b(?:start|activate|switch\s+to|use|inicia|activa|cambia\s+a|usa)\s+(?:the\s+|el\s+|la\s+)?[a-z0-9][a-z0-9 _-]{0,32}\s+(?:mode|modo)\b/i.test(text);
+  return Boolean(explicitModeName(prompt));
 }
 
 function unavailableModeRequest(prompt, context = {}) {
   const modes = availableModeNames(context);
-  if (!hasExplicitModeActionRequest(prompt)) return "";
-  const match = cleanText(prompt, 600).match(/\b(?:start|activate|switch\s+to|use|inicia|activa|cambia\s+a|usa)\s+(?:the\s+|el\s+|la\s+)?([a-z][a-z0-9 _-]{0,32})\s+(?:mode|modo)\b/i);
-  const requested = cleanText(match?.[1], 50);
+  const requested = explicitModeName(prompt);
   return requested && (!modes.length || !modes.some((mode) => mode.toLowerCase() === requested.toLowerCase())) ? requested : "";
 }
 
@@ -2769,6 +2775,7 @@ function conversationFallbackPlan(prompt, language = "en") {
 async function modelConversationPlan(prompt, context = {}, language = "en") {
   const fallback = conversationFallbackPlan(prompt, language);
   if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
+  if (asksAboutExactAppList(prompt)) return { plan: fallbackPlan(prompt, context), source: "deterministic_privacy" };
   if (appCorrection(prompt)) {
     const correction = fallbackPlan(prompt, context);
     if (correction && correction.title === "Context Corrected") return { plan: correction, source: "deterministic_context_correction" };

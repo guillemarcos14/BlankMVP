@@ -4,14 +4,14 @@ const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
 const {
   attachAssistantUserContext,
+  claimAssistantInboundMessage,
   connectCodeFromText,
+  completeAssistantInboundMessage,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
-  hasProcessedAssistantMessage,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
-  recordProcessedAssistantMessage,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 
@@ -739,7 +739,8 @@ exports.handler = async (event) => {
   if (!from) return json(400, { error: "missing_sms_sender" });
   if (messageSid) {
     try {
-      if (await hasProcessedAssistantMessage(channelFromSender(from), from, messageSid)) {
+      const claim = await claimAssistantInboundMessage(channelFromSender(from), from, messageSid);
+      if (!claim.claimed) {
         return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
       }
     } catch (_) {
@@ -753,7 +754,7 @@ exports.handler = async (event) => {
       prompt = await transcribeAudio(audio);
     } catch (error) {
       if (messageSid) {
-        try { await recordProcessedAssistantMessage(channelFromSender(from), from, messageSid); } catch (_) { /* best effort */ }
+        try { await completeAssistantInboundMessage(channelFromSender(from), from, messageSid); } catch (_) { /* best effort */ }
       }
       return text(200, twiml("I could not understand that voice note yet. Send it as text or try another audio."), "application/xml; charset=utf-8");
     }
@@ -793,13 +794,13 @@ exports.handler = async (event) => {
       }
     }
     if (messageSid) {
-      try { await recordProcessedAssistantMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+      try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
     }
     return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
   }
   const replyText = audio ? withVoiceInputContext(reply.text, prompt) : reply.text;
   if (messageSid) {
-    try { await recordProcessedAssistantMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+    try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
   }
   return text(200, twiml(replyText), "application/xml; charset=utf-8");
 };

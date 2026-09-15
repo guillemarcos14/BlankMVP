@@ -274,7 +274,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
   }
 }
 
-async function modePhraseOpensActivateModeLink() {
+async function modePhraseRejectsUnknownModeWithoutCatalog() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
   let outboundText = "";
@@ -313,7 +313,7 @@ async function modePhraseOpensActivateModeLink() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /review-action/);
-    assert.match(outboundText, /Which apps|Should it start now|How long/i);
+    assert.match(outboundText, /not.*saved|not.*created|create it|create.*blankmind/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
@@ -430,6 +430,7 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   const previousPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const originalFetch = global.fetch;
   const rows = [];
+  const atomicClaims = new Set();
   let outboundCount = 0;
   process.env.SUPABASE_URL = "https://supabase.test";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -438,6 +439,16 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   global.fetch = async (target, options = {}) => {
     const url = String(target);
     if (url.startsWith("https://supabase.test/rest/v1/")) {
+      if (url.endsWith("/rpc/claim_assistant_inbound_message")) {
+        const input = JSON.parse(options.body || "{}");
+        const key = `${input.p_anonymous_user_id}:${input.p_message_id}`;
+        if (atomicClaims.has(key)) return { ok: true, status: 200, text: async () => JSON.stringify([{ claimed: false, status: "duplicate" }]), json: async () => [{ claimed: false, status: "duplicate" }] };
+        atomicClaims.add(key);
+        return { ok: true, status: 200, text: async () => JSON.stringify([{ claimed: true, status: "claimed" }]), json: async () => [{ claimed: true, status: "claimed" }] };
+      }
+      if (url.endsWith("/rpc/complete_assistant_inbound_message")) {
+        return { ok: true, status: 200, text: async () => "true", json: async () => true };
+      }
       if ((options.method || "GET").toUpperCase() === "POST") {
         const row = JSON.parse(options.body || "{}");
         rows.push(row);
@@ -461,11 +472,11 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
     }),
   };
   try {
-    const first = await handler(event);
-    const second = await handler(event);
+    const [first, second] = await Promise.all([handler(event), handler(event)]);
     assert.strictEqual(first.statusCode, 200, first.body);
     assert.strictEqual(second.statusCode, 200, second.body);
-    assert.strictEqual(JSON.parse(second.body).results[0].reason, "duplicate_inbound");
+    const results = [JSON.parse(first.body).results[0], JSON.parse(second.body).results[0]];
+    assert.strictEqual(results.filter((item) => item.reason === "duplicate_inbound").length, 1);
     assert.strictEqual(outboundCount, 1);
   } finally {
     global.fetch = originalFetch;
@@ -483,7 +494,7 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   await connectGreeting();
   await linkIncludesRequestedApps();
   await twilioButtonTemplateHidesRawUrlFromMainReply();
-  await modePhraseOpensActivateModeLink();
+  await modePhraseRejectsUnknownModeWithoutCatalog();
   await categoryRequestOpensActivateModeLink();
   await whatsappAudioInputGetsTranscribedTextReply();
   await duplicateInboundIsIgnoredAcrossRetries();

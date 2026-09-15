@@ -34,6 +34,9 @@
       "netlify/functions/bm-context.js",
       "netlify/functions/bm-blocking-contract.js",
       "netlify/functions/bm-loop-contract.json",
+      "netlify/functions/_assistant_channel.js",
+      "netlify/functions/whatsapp-agent.js",
+      "netlify/functions/sms-agent.js",
       "netlify/functions/bm-contracts.js",
       "netlify/functions/bm-context.js",
       "netlify/functions/bm-policy.js",
@@ -46,7 +49,8 @@
       "docs/BM_HARNESS.md",
       "docs/BM_LOOP.md",
       "docs/BM_EXCELLENCE_ARCHITECTURE.md",
-      "supabase/migrations/012_bm_loop_engineering.sql"
+      "supabase/migrations/012_bm_loop_engineering.sql",
+      "supabase/migrations/014_assistant_inbound_idempotency.sql"
     ]
   },
   "validation": {

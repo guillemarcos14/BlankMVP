@@ -1278,6 +1278,34 @@
     }
   },
   {
+    "id": "missing_mode_phrase_without_catalog_does_not_switch",
+    "prompt": "I'm in Social mode now for 45 minutes.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not.*created|not.*saved|available mode|create.*mode"
+      ]
+    }
+  },
+  {
+    "id": "missing_mode_spanish_without_catalog_does_not_switch",
+    "prompt": "Activa el modo Gaming durante 45 minutos.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "no veo|no.*modo|crear|crea"
+      ]
+    }
+  },
+  {
     "id": "general_advice_only_when_asked",
     "prompt": "What should I do to have a healthier relationship with my phone?",
     "expect": {

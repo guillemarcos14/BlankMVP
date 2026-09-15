@@ -2,14 +2,14 @@ const crypto = require("crypto");
 const { json, parseJsonBody } = require("./_membership");
 const {
   attachAssistantUserContext,
+  claimAssistantInboundMessage,
   connectCodeFromText,
+  completeAssistantInboundMessage,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
-  hasProcessedAssistantMessage,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
-  recordProcessedAssistantMessage,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
@@ -613,7 +613,8 @@ exports.handler = async (event) => {
         }
         seenInRequest.add(message.id);
         try {
-          if (await hasProcessedAssistantMessage("whatsapp", message.from, message.id)) {
+          const claim = await claimAssistantInboundMessage("whatsapp", message.from, message.id);
+          if (!claim.claimed) {
             results.push({ skipped: true, reason: "duplicate_inbound" });
             continue;
           }
@@ -627,7 +628,7 @@ exports.handler = async (event) => {
         || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");
       if (message.id && !deliveryFailed) {
         try {
-          await recordProcessedAssistantMessage("whatsapp", message.from, message.id);
+          await completeAssistantInboundMessage("whatsapp", message.from, message.id);
         } catch (_) {
           // Inbound idempotency is best effort when memory persistence is unavailable.
         }

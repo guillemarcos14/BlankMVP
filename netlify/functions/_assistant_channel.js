@@ -264,6 +264,38 @@ async function hasProcessedAssistantMessage(channel, channelUser, messageId) {
   return Array.isArray(memory.processed_inbound_ids) && memory.processed_inbound_ids.includes(normalizedId);
 }
 
+async function claimAssistantInboundMessage(channel, channelUser, messageId) {
+  const normalizedChannel = cleanChannel(channel);
+  const normalizedUser = cleanText(channelUser, 160);
+  const normalizedId = inboundMessageId(messageId);
+  if (!normalizedChannel || !normalizedUser || !normalizedId) return { claimed: true, atomic: false, status: "unkeyed" };
+  try {
+    const result = await supabaseFetch("rpc/claim_assistant_inbound_message", {
+      method: "POST",
+      body: JSON.stringify({
+        p_anonymous_user_id: assistantChannelUserId(normalizedChannel, normalizedUser),
+        p_channel: normalizedChannel,
+        p_message_id: normalizedId,
+        p_lease_seconds: 300,
+      }),
+    });
+    const row = Array.isArray(result) ? result[0] : result;
+    if (row && typeof row.claimed === "boolean") {
+      return { claimed: row.claimed, atomic: true, status: cleanText(row.status, 32) || "unknown" };
+    }
+  } catch (_) {
+    // Older environments may not have migration 014 yet. Fall back to the
+    // legacy event-store marker until the RPC is available.
+  }
+  try {
+    const duplicate = await hasProcessedAssistantMessage(normalizedChannel, normalizedUser, normalizedId);
+    return { claimed: !duplicate, atomic: false, status: duplicate ? "duplicate_legacy" : "claimed_legacy" };
+  } catch (_) {
+    // A memory outage must not turn a provider retry into a 500 response.
+    return { claimed: true, atomic: false, status: "claim_unavailable" };
+  }
+}
+
 async function recordProcessedAssistantMessage(channel, channelUser, messageId) {
   const normalizedId = inboundMessageId(messageId);
   if (!normalizedId) return;
@@ -276,6 +308,32 @@ async function recordProcessedAssistantMessage(channel, channelUser, messageId) 
     memory: { processed_inbound_ids: processed },
     source: "assistant_inbound_processed",
   });
+}
+
+async function completeAssistantInboundMessage(channel, channelUser, messageId) {
+  const normalizedChannel = cleanChannel(channel);
+  const normalizedUser = cleanText(channelUser, 160);
+  const normalizedId = inboundMessageId(messageId);
+  if (!normalizedChannel || !normalizedUser || !normalizedId) return { completed: false, atomic: false };
+  let atomic = false;
+  try {
+    const result = await supabaseFetch("rpc/complete_assistant_inbound_message", {
+      method: "POST",
+      body: JSON.stringify({
+        p_anonymous_user_id: assistantChannelUserId(normalizedChannel, normalizedUser),
+        p_message_id: normalizedId,
+      }),
+    });
+    if (typeof result === "boolean" || (Array.isArray(result) && typeof result[0] === "boolean")) atomic = true;
+  } catch (_) {
+    // The legacy marker below keeps retries safe while migration 014 rolls out.
+  }
+  try {
+    await recordProcessedAssistantMessage(normalizedChannel, normalizedUser, normalizedId);
+  } catch (error) {
+    if (!atomic) throw error;
+  }
+  return { completed: true, atomic };
 }
 
 function pendingConversationSlot(text) {
@@ -493,6 +551,8 @@ module.exports = {
   cleanChannel,
   cleanText,
   connectCodeFromText,
+  claimAssistantInboundMessage,
+  completeAssistantInboundMessage,
   findAssistantConnection,
   ensureAssistantConnectionForPhone,
   getAssistantUserContext,

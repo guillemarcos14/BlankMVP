@@ -67,7 +67,7 @@ BLANK_SMS_PHONE_NUMBER=+13478366767
 
 - WhatsApp receives user messages and sends them to `blanked-agent`.
 - Both channels keep the same short conversational shape: up to eight recent turns, with a two-hour expiry for follow-up context. Long-lived facts (selected apps, risk windows and user context) remain separate from that short-term thread.
-- Meta `message.id` and Twilio `MessageSid` are deduplicated before planning so provider retries do not normally create a second reply or action. The durable check is best-effort while the assistant memory still uses the event store; concurrent duplicate deliveries remain a release-hardening item.
+- Meta `message.id` and Twilio `MessageSid` are claimed before planning so provider retries and concurrent duplicate deliveries cannot both enter the planner. Migration `014_assistant_inbound_idempotency.sql` provides the unique reservation plus a five-minute lease; the older event-store marker remains as a compatibility fallback during rollout.
 - WhatsApp replies with guidance and, when there is an executable action, uses a review-and-confirm link. A Twilio CTA template is optional through `TWILIO_WHATSAPP_REVIEW_CONTENT_SID`; set `TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED=true` only after verifying that its button label is exactly `Review and confirm`. Otherwise BM sends the precise text link and never falls back to a stale `Open Blanked` button.
 - The WhatsApp button should point to a Universal Link such as `https://getblank.netlify.app/open?action=start-focus...`; move `BLANKED_PUBLIC_APP_LINK_BASE` to `https://blanked.app` only when `/open` and AASA are served there.
 - Twilio WhatsApp/SMS can receive audio inputs, transcribe them with OpenAI, and answer with BM text. BM never attaches audio or generates a spoken reply.
@@ -107,6 +107,7 @@ Audio-input smoke expected result: `sms-agent audio input smoke tests passed`.
 - In Twilio, configure the number's Messaging webhook: `A message comes in` -> `Webhook` -> `POST` -> `https://getblank.netlify.app/.netlify/functions/sms-agent`.
 - Keep `TWILIO_WEBHOOK_URL` byte-for-byte equal to the URL configured in Twilio; production rejects unsigned or incorrectly signed requests.
 - In Netlify, add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and either `TWILIO_FROM_NUMBER` or `TWILIO_MESSAGING_SERVICE_SID`.
+- Apply `supabase/migrations/014_assistant_inbound_idempotency.sql` before enabling the production webhook claims.
 - For WhatsApp senders registered through Twilio, add `TWILIO_WHATSAPP_FROM_NUMBER`.
 - Set `BLANK_SMS_PHONE_NUMBER` in the iOS build settings to the Twilio number in dialable format.
 - Send `CONNECT <code>` from a real phone to the Twilio number and confirm Twilio receives TwiML `Connected`.

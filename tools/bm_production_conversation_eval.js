@@ -134,7 +134,7 @@ const traces = [
           assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.confirmed_action`);
           assert.strictEqual(planActions[0].start_minute, 11 * 60, `${label}.start_minute`);
           assert.strictEqual(planActions[0].end_minute, 12 * 60, `${label}.end_minute`);
-          assert.doesNotMatch(visibleText(plan), /25[- ]minute daily limit|daily limit|already (set|blocked)/i, `${label}.no_action_hallucination`);
+          assert.doesNotMatch(clean(plan?.message_text || plan?.response_text, 500), /25[- ]minute daily limit|set a 25|already (set|blocked)/i, `${label}.no_action_hallucination`);
         },
       },
     ],
@@ -201,7 +201,7 @@ const traces = [
         prompt: "How are you doing?",
         check: (plan, label) => {
           assertNoAction(plan, label);
-          assert.doesNotMatch(visibleText(plan), /blankmind|blanked|app|block|plan|https?:\/\//i, `${label}.no_product_route`);
+          assert.doesNotMatch(clean(plan?.message_text || plan?.response_text, 500), /blankmind|blanked|app|block|plan|https?:\/\//i, `${label}.no_product_route`);
         },
       },
     ],

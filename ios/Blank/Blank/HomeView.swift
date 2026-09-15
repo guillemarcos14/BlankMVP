@@ -439,7 +439,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: -3) {
+            VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
                 minimalHomeRow("stats", color: BlankColors.minimalSecondary) {
@@ -475,7 +475,7 @@ struct HomeView: View {
                     }
                     #endif
                 }
-                .padding(.top, 14)
+                .padding(.top, 7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -497,7 +497,7 @@ struct HomeView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: -3) {
+            VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Button("emergency") {
@@ -637,7 +637,7 @@ struct HomeView: View {
         .font(.blankInter(size: 13, relativeTo: .footnote))
         .foregroundStyle(BlankColors.minimalSecondary)
         .fixedSize(horizontal: false, vertical: true)
-        .padding(.top, 12)
+        .padding(.top, 6)
     }
 
     private func minimalUtilityRow(_ title: String, action: @escaping () -> Void) -> some View {
@@ -2185,7 +2185,7 @@ struct HomeSectionScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: 46, y: 58)
+            .position(x: 64, y: 84)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3057,12 +3057,12 @@ private struct EmergencyScreen: View {
 
             VStack(spacing: 12) {
                 if isConfirming {
-                    Button("Keep blocking") {
+                    Button(minimalAppearance ? "keep blocking" : "Keep blocking") {
                         isConfirming = false
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
 
-                    Button("Confirm unlock") {
+                    Button(minimalAppearance ? "confirm unlock" : "Confirm unlock") {
                         _ = onUnlock()
                     }
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
@@ -3070,7 +3070,7 @@ private struct EmergencyScreen: View {
                     .foregroundStyle(secondaryColor)
                     .disabled(emergencyUnlocksRemaining <= 0)
                 } else {
-                    Button("Spend emergency") {
+                    Button(minimalAppearance ? "spend emergency" : "Spend emergency") {
                         isConfirming = true
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
@@ -3089,15 +3089,17 @@ private struct EmergencyScreen: View {
 
     private var bodyText: String {
         if isConfirming {
-            return "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
+            return minimalAppearance
+                ? "this unlocks blankmind now. you will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
+                : "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
         }
         guard sessionStore.isBlankActive else {
-            return "No active block right now."
+            return minimalAppearance ? "no active block right now." : "No active block right now."
         }
         guard emergencyUnlocksRemaining > 0 else {
-            return "No emergency unlocks left."
+            return minimalAppearance ? "no emergency unlocks left." : "No emergency unlocks left."
         }
-        return "Use one unlock only if access is necessary now."
+        return minimalAppearance ? "use one unlock only if access is necessary now." : "Use one unlock only if access is necessary now."
     }
 
     private var emergencyAllowance: some View {
@@ -3558,7 +3560,7 @@ private struct AssistantConnectSheet: View {
                         }
 
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("Your phone")
+                            Text(minimalAppearance ? "your phone" : "Your phone")
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
                             TextField("+1 555 000 0000", text: $phoneNumber)
@@ -3568,11 +3570,11 @@ private struct AssistantConnectSheet: View {
                                 .padding(.horizontal, 16)
                                 .frame(height: 52)
                                 .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
-                            Text("Used to match your CONNECT message.")
+                            Text(minimalAppearance ? "used to match your connect message." : "Used to match your CONNECT message.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
 
-                            Button("Sign in with your phone") {
+                            Button(minimalAppearance ? "sign in with your phone" : "Sign in with your phone") {
                                 showingPhoneSignIn = true
                             }
                             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
@@ -3582,8 +3584,8 @@ private struct AssistantConnectSheet: View {
 
                         VStack(spacing: 10) {
                             AssistantChannelButton(
-                                title: "Connect WhatsApp",
-                                subtitle: "Recommended",
+                                title: minimalAppearance ? "connect whatsapp" : "Connect WhatsApp",
+                                subtitle: minimalAppearance ? "recommended" : "Recommended",
                                 systemImage: "message.fill",
                                 usesWhatsAppLogo: true,
                                 enabled: whatsAppNumber != nil,
@@ -3594,8 +3596,8 @@ private struct AssistantConnectSheet: View {
                             }
 
                             AssistantChannelButton(
-                                title: "Connect SMS",
-                                subtitle: "Same code, same assistant",
+                                title: minimalAppearance ? "connect sms" : "Connect SMS",
+                                subtitle: minimalAppearance ? "same code, same assistant" : "Same code, same assistant",
                                 systemImage: "message",
                                 usesWhatsAppLogo: false,
                                 enabled: smsNumber != nil,
@@ -3608,11 +3610,11 @@ private struct AssistantConnectSheet: View {
 
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(alignment: .firstTextBaseline) {
-                                Text("Code")
+                                Text(minimalAppearance ? "code" : "Code")
                                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
                                     .foregroundStyle(secondaryColor)
                                 Spacer()
-                                Button(copiedCode ? "Copied" : "Copy") {
+                                Button(copiedCode ? (minimalAppearance ? "copied" : "Copied") : (minimalAppearance ? "copy" : "Copy")) {
                                     UIPasteboard.general.string = connectMessage
                                     copiedCode = true
                                 }
@@ -3665,9 +3667,11 @@ private struct AssistantConnectSheet: View {
 
     private var statusText: String {
         guard !connectedAt.isEmpty else {
-            return "Send this code once to verify Assistant."
+            return minimalAppearance ? "send this code once to verify assistant." : "Send this code once to verify Assistant."
         }
-        return "Finish in \(preferredChannelName) by sending the CONNECT code."
+        return minimalAppearance
+            ? "finish in \(preferredChannelName.lowercased()) by sending the connect code."
+            : "Finish in \(preferredChannelName) by sending the CONNECT code."
     }
 
     private var preferredChannelName: String {

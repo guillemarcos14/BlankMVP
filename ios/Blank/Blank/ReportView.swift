@@ -253,9 +253,9 @@ struct ReportView: View {
                     .padding(.top, 28)
                     .padding(.bottom, 4)
 
-                newLookReportRow(title: "today", value: formatDuration(todayFocusTime), detail: "(formatDuration(todaySavedTime)) recovered")
-                newLookReportRow(title: "this week", value: formatDuration(weekly.totalFocusTime), detail: "(weekly.completedSessionCount) sessions")
-                newLookReportRow(title: "all time", value: formatDuration(totalFocusTime), detail: "(totalSessionCount) starts")
+                newLookReportRow(title: "today", value: formatDuration(todayFocusTime), detail: "\(formatDuration(todaySavedTime)) recovered")
+                newLookReportRow(title: "this week", value: formatDuration(weekly.totalFocusTime), detail: "\(weekly.completedSessionCount) sessions")
+                newLookReportRow(title: "all time", value: formatDuration(totalFocusTime), detail: "\(totalSessionCount) starts")
                 newLookReportRow(title: "next", value: forecast.windowText, detail: forecast.riskLabel)
 
                 if totalSessionCount == 0 && todayFocusTime == 0 {
@@ -373,7 +373,7 @@ struct ReportView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.50)
 
-                Text("Time Recovered")
+                Text("time recovered")
                     .font(.body)
                     .foregroundStyle(reportSecondary)
             }

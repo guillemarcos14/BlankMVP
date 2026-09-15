@@ -71,16 +71,19 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     func makeBody(configuration: Configuration) -> some View {
+        let minimalTextColor = light ? Color.white : BlankColors.minimalInk
+        let minimalSurfaceColor = light ? BlankColors.minimalInk : Color.white
+
         configuration.label
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
             .frame(maxWidth: 342)
             .frame(height: minimalAppearance ? 52 : 50)
-            .foregroundStyle(light ? BlankColors.ink : Color.white)
+            .foregroundStyle(minimalAppearance ? minimalTextColor : (light ? BlankColors.ink : Color.white))
             .background {
                 ZStack {
                     if minimalAppearance {
                         Rectangle()
-                            .fill(light ? BlankColors.minimalInk.opacity(configuration.isPressed ? 0.78 : 1) : Color.white.opacity(configuration.isPressed ? 0.72 : 0.94))
+                            .fill(light ? minimalSurfaceColor.opacity(configuration.isPressed ? 0.78 : 1) : minimalSurfaceColor.opacity(configuration.isPressed ? 0.72 : 0.94))
                     } else {
                         Capsule().fill(.ultraThinMaterial)
                         Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))

@@ -50,13 +50,14 @@ function fail(message, code = 1) {
 }
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const executable = process.platform === "win32" && command === "npx" ? "npx.cmd" : command;
+  const result = spawnSync(executable, args, {
     cwd: ROOT,
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
     stdio: options.inherit ? "inherit" : "pipe",
   });
-  if (result.error) fail(`${command} ${args.join(" ")}: ${result.error.message}`);
+  if (result.error) fail(`${executable} ${args.join(" ")}: ${result.error.message}`);
   if (result.status !== 0 && !options.allowFailure) {
     const output = `${result.stdout || ""}${result.stderr || ""}`.trim();
     fail(`${command} ${args.join(" ")} failed (${result.status})${output ? `\n${output}` : ""}`);

@@ -35,6 +35,8 @@ enum BlankColors {
     static let minimalInk = Color(red: 0.115, green: 0.118, blue: 0.115)
     static let minimalSecondary = Color(red: 0.390, green: 0.395, blue: 0.390)
     static let minimalFaded = Color(red: 0.730, green: 0.732, blue: 0.716)
+    static let minimalCardSurface = Color.white
+    static let darkCardSurface = Color.white.opacity(0.08)
     static let newLookDarkBackground = Color(red: 0.105, green: 0.105, blue: 0.115)
     static let newLookDarkSecondary = Color(red: 0.290, green: 0.290, blue: 0.305)
     static let newLookRule = Color(red: 0.115, green: 0.118, blue: 0.115).opacity(0.12)
@@ -179,13 +181,14 @@ private struct BlankGlassCardModifier: ViewModifier {
     let cornerRadius: CGFloat
     let tintOpacity: Double
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .background {
                 if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.clear)
+                        .fill(colorScheme == .dark ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface)
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -210,12 +213,13 @@ private struct BlankControlSurfaceModifier: ViewModifier {
     let tintOpacity: Double
     let emphasized: Bool
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(minimalAppearance ? Color.clear : Color.white.opacity(tintOpacity))
+                    .fill(minimalAppearance ? (colorScheme == .dark ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface) : Color.white.opacity(tintOpacity))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

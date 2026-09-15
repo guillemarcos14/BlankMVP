@@ -30,8 +30,6 @@ struct HomeView: View {
     @State private var showingAssistantConnect = false
     @State private var showingContextualAppPicker = false
     @State private var contextualPlanSelection = FamilyActivitySelection()
-    @State private var showingRelink = false
-    @State private var showingForgetConfirm = false
     @State private var nfcReader = NFCReader()
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
@@ -227,17 +225,6 @@ struct HomeView: View {
                 initialContext: assistantContextPayload()
             )
         }
-        .sheet(isPresented: $showingRelink) {
-            RelinkSheet(message: $message, messageAction: $messageAction)
-                .presentationDetents([.medium])
-        }
-        .sheet(isPresented: $showingForgetConfirm) {
-            ForgetBlankConfirmSheet {
-                sessionStore.forgetNfcTag()
-                screenTimeBlocker.clear()
-            }
-            .presentationDetents([.medium])
-        }
         .confirmationDialog(
             "Review and confirm",
             isPresented: Binding(
@@ -290,8 +277,6 @@ struct HomeView: View {
                 onOpenAssistant: { showingAssistantConnect = true },
                 onRequestScreenTimePermission: requestScreenTimePermission,
                 onRequestHealthAccess: { healthKitStore.requestAccess() },
-                onRelinkBlank: { showingRelink = true },
-                onForgetBlank: { showingForgetConfirm = true },
                 screenTimeStatus: screenTimePermissionLabel,
                 healthStatus: healthPermissionLabel
             ) {
@@ -454,7 +439,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: -3) {
                 minimalStartRow
 
                 minimalHomeRow("stats", color: BlankColors.minimalSecondary) {
@@ -512,18 +497,17 @@ struct HomeView: View {
 
             Spacer(minLength: 0)
 
-            HStack(alignment: .bottom, spacing: 18) {
-                Button("again") {
-                    openSection(.timer)
+            VStack(alignment: .leading, spacing: -3) {
+                minimalStartRow
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button("emergency") {
+                    openSection(.emergency)
                 }
                 .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .tracking(-0.8)
-                .foregroundStyle(Color.white)
-                .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+                .foregroundStyle(BlankColors.newLookDarkSecondary)
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                 .buttonStyle(.plain)
-
-                minimalStartRow
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, layout.horizontalPadding)
@@ -549,7 +533,7 @@ struct HomeView: View {
     private var minimalStartRow: some View {
         let isActive = sessionStore.isBlankActive
         let title = isActive
-            ? (sessionStore.hardBlankActive ? "blank active" : "quit")
+            ? (sessionStore.hardBlankActive ? "blank active" : "unblank")
             : "blank"
         let titleColor = isActive ? BlankColors.newLookDarkSecondary : BlankColors.minimalInk
 
@@ -571,6 +555,7 @@ struct HomeView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityHint(isActive && !sessionStore.hardBlankActive ? "hold for 20 seconds to unblank" : "")
         .overlay(alignment: .bottomLeading) {
             if isActive, !sessionStore.hardBlankActive {
                 GeometryReader { proxy in
@@ -1337,8 +1322,6 @@ struct HomeView: View {
                 message = approved ? nil : "Screen Time is still pending."
                 messageAction = approved ? nil : .screenTime
             }
-        case .relinkNfc:
-            showingRelink = true
         case .selectApps:
             showingPicker = true
         }
@@ -1525,7 +1508,6 @@ private struct GlassCornerHighlight: View {
 
 private enum HomeMessageAction {
     case screenTime
-    case relinkNfc
     case selectApps
 }
 
@@ -2159,8 +2141,6 @@ struct HomeSectionScreen: View {
     let onOpenAssistant: () -> Void
     let onRequestScreenTimePermission: () -> Void
     let onRequestHealthAccess: () -> Void
-    let onRelinkBlank: () -> Void
-    let onForgetBlank: () -> Void
     let screenTimeStatus: String
     let healthStatus: String
     let onClose: () -> Void
@@ -2205,7 +2185,7 @@ struct HomeSectionScreen: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: 46, y: screenHeight - 48)
+            .position(x: 46, y: 58)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -2238,8 +2218,6 @@ struct HomeSectionScreen: View {
                 onOpenAssistant: onOpenAssistant,
                 onRequestScreenTimePermission: onRequestScreenTimePermission,
                 onRequestHealthAccess: onRequestHealthAccess,
-                onRelinkBlank: onRelinkBlank,
-                onForgetBlank: onForgetBlank,
                 screenTimeStatus: screenTimeStatus,
                 healthStatus: healthStatus
             )
@@ -2254,8 +2232,6 @@ private struct SettingsScreen: View {
     let onOpenAssistant: () -> Void
     let onRequestScreenTimePermission: () -> Void
     let onRequestHealthAccess: () -> Void
-    let onRelinkBlank: () -> Void
-    let onForgetBlank: () -> Void
     let screenTimeStatus: String
     let healthStatus: String
 
@@ -2293,19 +2269,6 @@ private struct SettingsScreen: View {
                     title: "assistant",
                     detail: "whatsapp · sms · connection code",
                     action: onOpenAssistant
-                )
-
-                settingsRow(
-                    title: "relink blank",
-                    detail: "change the linked nfc tag",
-                    action: onRelinkBlank
-                )
-
-                settingsRow(
-                    title: "forget blank",
-                    detail: "return to setup",
-                    color: secondaryColor,
-                    action: onForgetBlank
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -9,6 +9,7 @@ Blankmind behaves like an editorial list, not a dashboard. Content is sparse, al
 ## Tokens
 
 - `light.background`: `#F3F3EF`
+- `light.card`: `#FFFFFF` flat utility surfaces only
 - `light.ink`: `#1D1E1D`
 - `light.secondary`: `#636560`
 - `light.faded`: `#BABBB6`
@@ -22,7 +23,7 @@ Blankmind behaves like an editorial list, not a dashboard. Content is sparse, al
 
 ## Surface grammar
 
-Home and section screens are full-bleed fields with a single editorial column. Rows are transparent and separated by rhythm rather than boxes. Primary actions are text-first. Native toggles, pickers, alerts, permission sheets, and forms remain native controls so behavior and accessibility are preserved.
+Home remains a transparent editorial list. Section screens use a single editorial column with flat white utility cards where the previous product relied on card surfaces; the cards have no glass, border, or shadow. Primary actions are text-first. Native toggles, pickers, alerts, permission sheets, and forms remain native controls so behavior and accessibility are preserved.
 
 ## State grammar
 

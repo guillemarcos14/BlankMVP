@@ -4363,13 +4363,14 @@ private extension View {
 private struct LiquidGlassModifier: ViewModifier {
     let cornerRadius: CGFloat
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.colorScheme) private var colorScheme
 
     func body(content: Content) -> some View {
         content
             .background {
                 if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.clear)
+                        .fill(colorScheme == .dark ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface)
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

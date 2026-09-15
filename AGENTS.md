@@ -16,6 +16,13 @@
 - No presentes un build firmado o un archive como completado si solo se ha verificado `CODE_SIGNING_ALLOWED=NO`.
 - No digas que TestFlight esta listo mientras `Family Controls (Distribution)` siga pendiente de aprobacion por Apple.
 
+## Integracion Backend Cloud
+
+- Las conversaciones de implementación trabajan en ramas `codex/...` y no despliegan producción.
+- Para reunir varias ramas usa `docs/BACKEND_INTEGRATION_WORKFLOW.md` y `node tools/backend_release.js`.
+- La release debe vivir en `codex/backend-release-*`, tener baseline del product harness y pasar la validación con `--enforce-scope` antes de cualquier deploy.
+- Netlify/Supabase solo se mutan desde la conversación de integración y con `--confirm` explícito.
+
 ## Compilacion en MacinCloud
 - Cuando el usuario pida compilar en MacinCloud, el agente debe encargarse de la Terminal por RDP web usando pulsaciones individuales, no pegado ni atajos de teclado, porque el cliente puede transformar `Cmd/Ctrl+V` en caracteres de control y perder texto.
 - Secuencia esperada:

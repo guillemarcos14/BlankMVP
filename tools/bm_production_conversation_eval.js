@@ -335,7 +335,7 @@ const traces = [
         prompt: "Block Instagram now for 30 minutes.",
         check: (plan, label) => {
           assertNoAction(plan, label);
-          assertContains(plan, /open|download|Blankmind|permissions/i, `${label}.explains_presence_requirement`);
+          assertContains(plan, /once|recurring|which days|open|download|Blankmind|permissions/i, `${label}.keeps_execution_gated`);
         },
       },
     ],

@@ -158,6 +158,7 @@ struct SetupView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.scenePhase) private var scenePhase
 
     @State private var currentStep: OnboardingStep = .awareness
@@ -210,7 +211,7 @@ struct SetupView: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.86))
+                                .foregroundStyle(minimalAppearance ? BlankColors.minimalInk.opacity(0.86) : Color.white.opacity(0.86))
                                 .frame(width: 42, height: 42)
                         }
                         .buttonStyle(.plain)
@@ -226,7 +227,7 @@ struct SetupView: View {
                         skipToHomeForQA()
                     }
                     .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.78))
+                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.78))
                     .frame(height: 42)
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip onboarding and open Home")
@@ -262,10 +263,12 @@ struct SetupView: View {
             .padding(.horizontal, 32)
             .padding(.bottom, 0)
 
-            OnboardingTopBreathingLight(palette: currentStep.bottomGlowPalette)
+            if !minimalAppearance {
+                OnboardingTopBreathingLight(palette: currentStep.bottomGlowPalette)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(Color.white)
+        .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : Color.white)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
             dailyHours = storedDailyHours
@@ -1874,6 +1877,7 @@ private struct ReferenceOnboardingScene: View {
 }
 
 private struct ReferenceOnboardingText: View {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let eyebrow: String?
     let lines: [ReferenceTextLine]
     let bodyText: String?
@@ -1893,7 +1897,7 @@ private struct ReferenceOnboardingText: View {
             if let eyebrow, !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.78))
+                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.78))
                     .padding(.bottom, 2)
             }
 
@@ -1949,6 +1953,7 @@ private struct ReferenceOnboardingText: View {
 }
 
 private struct ReferenceAnimatedLine: View {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let line: ReferenceTextLine
     let delay: Double
     let iconAfterText: Bool
@@ -1962,15 +1967,15 @@ private struct ReferenceAnimatedLine: View {
 
             Text(line.text)
                 .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
+                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : Color.white) : (minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.96)))
                 .lineLimit(line.icon == nil ? 2 : 1)
                 .minimumScaleFactor(line.icon == nil ? 0.68 : 0.46)
                 .multilineTextAlignment(.leading)
                 .lineSpacing(0)
                 .tracking(0)
-                .shadow(color: line.isAccent ? Color.white.opacity(0.68) : .clear, radius: 10, x: 0, y: 0)
-                .shadow(color: line.isAccent ? BlankColors.airMist.opacity(0.52) : .clear, radius: 22, x: 0, y: 0)
-                .shadow(color: line.isAccent ? BlankColors.airBlue.opacity(0.34) : .clear, radius: 34, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? Color.white.opacity(0.68) : .clear), radius: 10, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airMist.opacity(0.52) : .clear), radius: 22, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airBlue.opacity(0.34) : .clear), radius: 34, x: 0, y: 0)
 
             if iconAfterText {
                 iconView
@@ -1994,28 +1999,37 @@ private struct ReferenceAnimatedLine: View {
         if let icon = line.icon {
             Image(systemName: icon)
                 .font(.system(size: 25, weight: .bold))
-                .foregroundStyle(line.isAccent ? Color.white : Color.white.opacity(0.96))
+                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : Color.white) : (minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.96)))
                 .frame(width: 28, height: 28)
-                .shadow(color: line.isAccent ? Color.white.opacity(0.62) : .clear, radius: 10, x: 0, y: 0)
-                .shadow(color: line.isAccent ? BlankColors.airMist.opacity(0.38) : .clear, radius: 18, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? Color.white.opacity(0.62) : .clear), radius: 10, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airMist.opacity(0.38) : .clear), radius: 18, x: 0, y: 0)
         }
     }
 }
 
 private struct ReferenceOnboardingButtonStyle: ButtonStyle {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
-            .foregroundStyle(Color.white.opacity(configuration.isPressed ? 0.78 : 0.92))
+            .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : Color.white.opacity(configuration.isPressed ? 0.78 : 0.92))
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(Color.black.opacity(configuration.isPressed ? 0.54 : 0.42))
+                if minimalAppearance {
+                    Rectangle()
+                        .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.03))
+                } else {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .fill(Color.black.opacity(configuration.isPressed ? 0.54 : 0.42))
+                }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                if !minimalAppearance {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                }
             }
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
@@ -2271,30 +2285,35 @@ private struct OnboardingChoiceButton: View {
 
 private struct BlankOnboardingBackground: View {
     let palette: BottomGlowPalette
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     var body: some View {
         ZStack {
-            BlankColors.ink.ignoresSafeArea()
+            if minimalAppearance {
+                BlankColors.minimalBackground.ignoresSafeArea()
+            } else {
+                BlankColors.ink.ignoresSafeArea()
 
-            Image("blank_home_background_active")
-                .resizable()
-                .scaledToFill()
-                .opacity(0.52)
-                .blur(radius: 2)
-                .overlay(BlankColors.ink.opacity(0.46))
+                Image("blank_home_background_active")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(0.52)
+                    .blur(radius: 2)
+                    .overlay(BlankColors.ink.opacity(0.46))
+                    .ignoresSafeArea()
+
+                ReferenceBottomGlow(palette: palette)
+                LinearGradient(
+                    colors: [
+                        BlankColors.ink.opacity(0.12),
+                        BlankColors.ink.opacity(0.24),
+                        BlankColors.ink.opacity(0.36)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
                 .ignoresSafeArea()
-
-            ReferenceBottomGlow(palette: palette)
-            LinearGradient(
-                colors: [
-                    BlankColors.ink.opacity(0.12),
-                    BlankColors.ink.opacity(0.24),
-                    BlankColors.ink.opacity(0.36)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            }
         }
         .animation(.easeInOut(duration: 0.42), value: palette.id)
     }

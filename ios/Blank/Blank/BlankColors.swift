@@ -35,6 +35,9 @@ enum BlankColors {
     static let minimalInk = Color(red: 0.115, green: 0.118, blue: 0.115)
     static let minimalSecondary = Color(red: 0.390, green: 0.395, blue: 0.390)
     static let minimalFaded = Color(red: 0.730, green: 0.732, blue: 0.716)
+    static let newLookDarkBackground = Color(red: 0.105, green: 0.105, blue: 0.115)
+    static let newLookDarkSecondary = Color(red: 0.290, green: 0.290, blue: 0.305)
+    static let newLookRule = Color(red: 0.115, green: 0.118, blue: 0.115).opacity(0.12)
     static let glassBorder = LinearGradient(
         colors: [
             Color.white.opacity(0.48),
@@ -63,67 +66,85 @@ extension Font {
 
 struct BlankPrimaryButtonStyle: ButtonStyle {
     var light: Bool = false
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
             .frame(maxWidth: 342)
-            .frame(height: 50)
+            .frame(height: minimalAppearance ? 52 : 50)
             .foregroundStyle(light ? BlankColors.ink : Color.white)
             .background {
-                ZStack {
-                    Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
-                    BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
-                        .clipShape(Capsule())
-                    Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                if minimalAppearance {
+                    Rectangle()
+                        .fill(light ? BlankColors.minimalInk.opacity(configuration.isPressed ? 0.78 : 1) : Color.white.opacity(configuration.isPressed ? 0.72 : 0.94))
+                } else {
+                    ZStack {
+                        Capsule().fill(.ultraThinMaterial)
+                        Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
+                        BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
+                            .clipShape(Capsule())
+                        Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                    }
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
 struct BlankSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
             .frame(maxWidth: .infinity)
-            .frame(height: 48)
+            .frame(height: minimalAppearance ? 52 : 48)
             .foregroundStyle(BlankColors.ink)
             .background {
-                ZStack {
-                    Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.42 : 0.30))
-                    Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                if minimalAppearance {
+                    Rectangle()
+                        .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.04))
+                } else {
+                    ZStack {
+                        Capsule().fill(.ultraThinMaterial)
+                        Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.42 : 0.30))
+                        Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                    }
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : Color.black.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
 
 struct BlankAtmosphericBackground: View {
     var dimmed: Bool = false
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     var body: some View {
         ZStack {
-            Image(dimmed ? "blank_home_background_active" : "blank_home_background_idle")
-                .resizable()
-                .scaledToFill()
-                .opacity(dimmed ? 1 : 0.94)
+            if minimalAppearance {
+                (dimmed ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+            } else {
+                Image(dimmed ? "blank_home_background_active" : "blank_home_background_idle")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(dimmed ? 1 : 0.94)
 
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(dimmed ? 0.02 : 0.14),
-                    BlankColors.airMist.opacity(dimmed ? 0.10 : 0.20),
-                    BlankColors.airStone.opacity(dimmed ? 0.06 : 0.16)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(dimmed ? 0.02 : 0.14),
+                        BlankColors.airMist.opacity(dimmed ? 0.10 : 0.20),
+                        BlankColors.airStone.opacity(dimmed ? 0.06 : 0.16)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
         }
         .ignoresSafeArea()
     }
@@ -257,26 +278,33 @@ struct TopSheetHeader: View {
 }
 
 struct TopSheetPrimaryButtonLabel: View {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let title: String
 
     var body: some View {
         Text(title)
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-            .foregroundStyle(BlankColors.ink)
+            .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : BlankColors.ink)
             .padding(.horizontal, 26)
-            .frame(height: 46)
+            .frame(height: minimalAppearance ? 52 : 46)
             .background {
-                ZStack {
-                    Capsule().fill(.ultraThinMaterial)
-                    Capsule().fill(Color.white.opacity(0.34))
-                    BlankGlassCornerHighlight(width: 74, height: 28, xOffset: -44, yOffset: -15)
-                        .clipShape(Capsule())
+                if minimalAppearance {
+                    Rectangle().fill(BlankColors.minimalInk.opacity(0.08))
+                } else {
+                    ZStack {
+                        Capsule().fill(.ultraThinMaterial)
+                        Capsule().fill(Color.white.opacity(0.34))
+                        BlankGlassCornerHighlight(width: 74, height: 28, xOffset: -44, yOffset: -15)
+                            .clipShape(Capsule())
+                    }
                 }
                 .allowsHitTesting(false)
             }
             .overlay {
-                Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                if !minimalAppearance {
+                    Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
+                }
             }
-            .shadow(color: BlankColors.ink.opacity(0.045), radius: 12, x: 0, y: 7)
+            .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.045), radius: 12, x: 0, y: 7)
     }
 }

@@ -33,6 +33,7 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: showingOnboardingDemo)
+        .environment(\.blankMinimalAppearance, true)
     }
 }
 

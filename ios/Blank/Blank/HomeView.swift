@@ -60,7 +60,7 @@ struct HomeView: View {
 
             ZStack(alignment: .topLeading) {
                 if activeSection == nil {
-                    BlankColors.minimalBackground
+                    (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
                         .frame(width: viewportWidth, height: viewportHeight)
                         .ignoresSafeArea()
                 } else {
@@ -81,7 +81,8 @@ struct HomeView: View {
         .ignoresSafeArea()
         .foregroundStyle(activeSection == nil ? BlankColors.minimalInk : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(activeSection == nil ? .light : (sessionStore.isBlankActive ? .dark : .light))
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .environment(\.blankMinimalAppearance, true)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .animation(.easeInOut(duration: 0.35), value: activeSection)
         .navigationBarBackButtonHidden()
@@ -441,6 +442,14 @@ struct HomeView: View {
     }
 
     private func minimalHome(layout: HomeLayoutMetrics) -> some View {
+        if sessionStore.isBlankActive {
+            activeMinimalHome(layout: layout)
+        } else {
+            idleMinimalHome(layout: layout)
+        }
+    }
+
+    private func idleMinimalHome(layout: HomeLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
@@ -489,6 +498,38 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
+    private func activeMinimalHome(layout: HomeLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            Text("blank is active.")
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-1.1)
+                .foregroundStyle(Color.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+
+            Spacer(minLength: 0)
+
+            HStack(alignment: .bottom, spacing: 18) {
+                Button("again") {
+                    openSection(.timer)
+                }
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .tracking(-0.8)
+                .foregroundStyle(Color.white)
+                .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+                .buttonStyle(.plain)
+
+                minimalStartRow
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.bottom, layout.bottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
     private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -507,9 +548,9 @@ struct HomeView: View {
     private var minimalStartRow: some View {
         let isActive = sessionStore.isBlankActive
         let title = isActive
-            ? (sessionStore.hardBlankActive ? "blank active" : "hold to unblank")
+            ? (sessionStore.hardBlankActive ? "blank active" : "quit")
             : "blank"
-        let titleColor = isActive ? BlankColors.minimalSecondary : BlankColors.minimalInk
+        let titleColor = isActive ? BlankColors.newLookDarkSecondary : BlankColors.minimalInk
 
         return Button {
             guard !isActive else { return }
@@ -533,7 +574,7 @@ struct HomeView: View {
             if isActive, !sessionStore.hardBlankActive {
                 GeometryReader { proxy in
                     Rectangle()
-                        .fill(BlankColors.minimalInk.opacity(0.16))
+                        .fill(Color.white.opacity(0.16))
                         .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
                         .frame(maxHeight: .infinity, alignment: .bottomLeading)
                 }
@@ -1504,6 +1545,7 @@ struct AppBackground: View {
 
 private struct ModesList: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
     @State private var newModeName = ""
@@ -1513,7 +1555,10 @@ private struct ModesList: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        List {
+        if minimalAppearance {
+            newLookPlan
+        } else {
+            List {
             TopSheetHeader(
                 title: "Plan",
                 subtitle: "Protection, routines, safeguards.",
@@ -1557,18 +1602,90 @@ private struct ModesList: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+            }
+            .tint(textColor)
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .scrollIndicators(.hidden)
+            .background(Color.clear)
         }
         .tint(textColor)
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
-        .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             windows = sessionStore.schedule.windows.isEmpty
                 ? [BlankHabitWindow(name: "Routine 1", enabled: false)]
                 : sessionStore.schedule.windows
         }
+    }
+
+    private var newLookPlan: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                TopSheetHeader(
+                    title: "Plan",
+                    subtitle: "",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 34)
+
+                Text(sessionStore.currentMode.name.lowercased())
+                    .font(.blankInter(size: 32, weight: .bold, relativeTo: .title2))
+                    .tracking(-0.8)
+                    .foregroundStyle(textColor)
+
+                Text(blockedAppsText)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(secondaryColor)
+                    .padding(.top, 4)
+
+                newLookRule
+
+                newLookPlanRow(title: "protected apps", detail: blockedAppsText) {
+                    showingPicker = true
+                    onFinish()
+                }
+
+                newLookPlanRow(title: "routines", detail: routineSummaryText) {}
+
+                planRoutineEditor
+                    .padding(.top, 20)
+
+                planAdvancedControls
+                    .padding(.top, 24)
+                    .padding(.bottom, 34)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var newLookRule: some View {
+        Rectangle()
+            .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+            .frame(height: 1)
+            .padding(.top, 26)
+            .padding(.bottom, 8)
+    }
+
+    private func newLookPlanRow(title: String, detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                Text(title)
+                    .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
+                    .tracking(-0.45)
+                    .foregroundStyle(textColor)
+                Spacer(minLength: 8)
+                Text(detail)
+                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func modeButton(_ mode: BlankFocusMode) -> some View {
@@ -2050,11 +2167,11 @@ struct HomeSectionScreen: View {
         let contentTop: CGFloat = 94
         let contentHeight = max(0, screenHeight - contentTop)
         let contentWidth = min(max(0, screenWidth - 32), 360)
-        let minimalAppearance = !sessionStore.isBlankActive
+        let minimalAppearance = true
 
         ZStack(alignment: .topLeading) {
             if minimalAppearance {
-                BlankColors.minimalBackground
+                (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
                     .ignoresSafeArea()
             } else {
                 AppBackground(isActive: true)
@@ -2080,12 +2197,12 @@ struct HomeSectionScreen: View {
                             .font(.system(size: 22, weight: .regular))
                     }
                 }
-                .foregroundStyle(minimalAppearance ? BlankColors.premiumBlue : textColor)
+                .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
                 .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: minimalAppearance ? 46 : 34, y: 64)
+            .position(x: 46, y: screenHeight - 48)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3157,7 +3274,11 @@ private struct TimerScreen: View {
     private var recommendedMinutes: Int { sessionStore.digitalWellnessV3.plan.recommendedDurationMinutes }
 
     var body: some View {
-        VStack(spacing: 22) {
+        Group {
+            if minimalAppearance {
+                newLookTimer
+            } else {
+                VStack(spacing: 22) {
             Spacer(minLength: 0)
 
             TopSheetHeader(
@@ -3235,12 +3356,97 @@ private struct TimerScreen: View {
             .padding(18)
             .blankControlSurface(cornerRadius: 24, tintOpacity: 0.08, emphasized: true)
 
-            Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.clear)
+            }
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private var newLookTimer: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TopSheetHeader(
+                title: "Timer",
+                subtitle: "",
+                titleColor: textColor,
+                subtitleColor: secondaryColor
+            )
+
+            Spacer(minLength: 38)
+
+            Text(durationNumber(selectedMinutes))
+                .font(.blankInter(size: 92, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-3)
+                .foregroundStyle(textColor)
+                .monospacedDigit()
+                .lineLimit(1)
+
+            Text(durationUnit(selectedMinutes))
+                .font(.blankInter(size: 20, weight: .bold, relativeTo: .title3))
+                .foregroundStyle(secondaryColor)
+
+            Rectangle()
+                .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+                .frame(height: 1)
+                .padding(.top, 28)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                ForEach(options, id: \.self) { minutes in
+                    Button {
+                        selectedMinutes = minutes
+                    } label: {
+                        HStack {
+                            Text(formatDuration(minutes))
+                                .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
+                                .tracking(-0.4)
+                            Spacer()
+                            if selectedMinutes == minutes {
+                                Text("selected")
+                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                                    .foregroundStyle(secondaryColor)
+                            }
+                        }
+                        .foregroundStyle(selectedMinutes == minutes ? textColor : secondaryColor)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Toggle("hard mode", isOn: $hardMode)
+                .font(.blankInter(size: 18, weight: .bold, relativeTo: .headline))
+                .foregroundStyle(textColor)
+                .tint(textColor.opacity(0.75))
+                .padding(.top, 16)
+
+            Spacer(minLength: 26)
+
+            Button {
+                if !sessionStore.isBlankActive {
+                    onStart(selectedMinutes, hardMode)
+                }
+            } label: {
+                Text(sessionStore.isBlankActive ? "blank is active" : "start blank")
+                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
+                    .tracking(-0.6)
+                    .foregroundStyle(textColor)
+                    .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(sessionStore.isBlankActive)
+            .opacity(sessionStore.isBlankActive ? 0.52 : 1)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var timerDurationRing: some View {

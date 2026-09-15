@@ -1,0 +1,24 @@
+{
+  "name": "Blankmind NewLook",
+  "platform": "ios",
+  "visualDirection": "editorial text-first minimalism",
+  "tokens": {
+    "lightBackground": "#F3F3EF",
+    "lightInk": "#1D1E1D",
+    "lightSecondary": "#636560",
+    "lightFaded": "#BABBB6",
+    "darkBackground": "#1B1B1D",
+    "darkInk": "#FFFFFF",
+    "darkSecondary": "#4A4A4E",
+    "interaction": "system blue",
+    "primaryTypeScale": "32-92pt",
+    "supportTypeScale": "12-20pt",
+    "minimumTouchTarget": "44pt"
+  },
+  "rules": [
+    "Prefer full-bleed surfaces and text hierarchy over cards.",
+    "Do not use decorative number 1 or asterisk on Blankmind surfaces.",
+    "Preserve native controls and product behavior.",
+    "Use restrained color and no gradients or glass in NewLook surfaces."
+  ]
+}

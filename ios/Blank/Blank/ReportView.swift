@@ -81,7 +81,21 @@ struct ReportView: View {
         )
         let v3System = sessionStore.digitalWellnessV3
 
-        let content = VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
+        let content = AnyView(
+            Group {
+                if minimalAppearance {
+                    newLookReport(
+                        progress: progress,
+                        weekly: weekly,
+                        todayFocusTime: todayFocusTime,
+                        todaySavedTime: todaySavedTime,
+                        totalFocusTime: totalFocusTime,
+                        totalSessionCount: totalSessionCount,
+                        savedTime: savedTime,
+                        forecast: controlForecast
+                    )
+                } else {
+        VStack(alignment: .center, spacing: usesMainBackground ? 18 : 22) {
             reportHeader()
             wearableConnectEntryCapsule(context: healthContext)
 
@@ -159,6 +173,9 @@ struct ReportView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
         }
+                }
+            }
+        )
 
         Group {
             if usesMainBackground {
@@ -203,10 +220,105 @@ struct ReportView: View {
         }
     }
 
+    private func newLookReport(
+        progress: BlankProgressReport,
+        weekly: BlankWeeklyReport,
+        todayFocusTime: TimeInterval,
+        todaySavedTime: TimeInterval,
+        totalFocusTime: TimeInterval,
+        totalSessionCount: Int,
+        savedTime: TimeInterval,
+        forecast: ControlForecast
+    ) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                reportHeader()
+
+                Spacer(minLength: 42)
+
+                Text(formatDuration(savedTime))
+                    .font(.blankInter(size: 64, weight: .bold, relativeTo: .largeTitle))
+                    .tracking(-2.2)
+                    .foregroundStyle(reportPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.60)
+
+                Text("time recovered")
+                    .font(.blankInter(size: 20, weight: .bold, relativeTo: .title3))
+                    .foregroundStyle(reportSecondary)
+
+                Rectangle()
+                    .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+                    .frame(height: 1)
+                    .padding(.top, 28)
+                    .padding(.bottom, 4)
+
+                newLookReportRow(title: "today", value: formatDuration(todayFocusTime), detail: "(formatDuration(todaySavedTime)) recovered")
+                newLookReportRow(title: "this week", value: formatDuration(weekly.totalFocusTime), detail: "(weekly.completedSessionCount) sessions")
+                newLookReportRow(title: "all time", value: formatDuration(totalFocusTime), detail: "(totalSessionCount) starts")
+                newLookReportRow(title: "next", value: forecast.windowText, detail: forecast.riskLabel)
+
+                if totalSessionCount == 0 && todayFocusTime == 0 {
+                    Text("start blank to build your first signal.")
+                        .font(.blankInter(size: 17, weight: .bold, relativeTo: .headline))
+                        .foregroundStyle(reportSecondary)
+                        .padding(.top, 24)
+                }
+
+                if !sessionStore.isBlankActive {
+                    Button {
+                        startBlank()
+                    } label: {
+                        Text("start blank")
+                            .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
+                            .tracking(-0.6)
+                            .foregroundStyle(reportPrimary)
+                            .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 20)
+                }
+
+                Text("for digital wellness only.")
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(reportSecondary.opacity(0.68))
+                    .padding(.top, 34)
+                    .padding(.bottom, 30)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func newLookReportRow(title: String, value: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(.blankInter(size: 22, weight: .bold, relativeTo: .title3))
+                .tracking(-0.35)
+                .foregroundStyle(reportPrimary)
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(value)
+                    .font(.blankInter(size: 17, weight: .bold, relativeTo: .headline))
+                    .foregroundStyle(reportPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                Text(detail)
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(reportSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
     @ViewBuilder
     private var reportBackground: some View {
         if minimalAppearance {
-            BlankColors.minimalBackground
+            (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
                 .ignoresSafeArea()
         } else if usesMainBackground {
             Color.clear

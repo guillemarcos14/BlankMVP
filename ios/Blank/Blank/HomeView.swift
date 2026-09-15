@@ -1610,7 +1610,6 @@ private struct ModesList: View {
             .scrollIndicators(.hidden)
             .background(Color.clear)
         }
-        .tint(textColor)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             windows = sessionStore.schedule.windows.isEmpty

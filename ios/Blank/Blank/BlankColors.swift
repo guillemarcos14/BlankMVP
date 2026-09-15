@@ -1,5 +1,16 @@
 import SwiftUI
 
+private struct BlankMinimalAppearanceKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var blankMinimalAppearance: Bool {
+        get { self[BlankMinimalAppearanceKey.self] }
+        set { self[BlankMinimalAppearanceKey.self] = newValue }
+    }
+}
+
 enum BlankColors {
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
     static let redDark = Color(red: 0.125, green: 0.129, blue: 0.141)
@@ -146,25 +157,59 @@ struct BlankGlassCornerHighlight: View {
 private struct BlankGlassCardModifier: ViewModifier {
     let cornerRadius: CGFloat
     let tintOpacity: Double
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     func body(content: Content) -> some View {
         content
             .background {
-                ZStack {
+                if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(tintOpacity))
-                    BlankGlassCornerHighlight(width: 104, height: 40, xOffset: -112, yOffset: -22)
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                        .fill(BlankColors.minimalBackground)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(tintOpacity))
+                        BlankGlassCornerHighlight(width: 104, height: 40, xOffset: -112, yOffset: -22)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                    }
                 }
                 .allowsHitTesting(false)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 1)
+                    .stroke(minimalAppearance ? BlankColors.line : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0.8 : 1)
             )
-            .shadow(color: BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
+            .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
+    }
+}
+
+private struct BlankControlSurfaceModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    let tintOpacity: Double
+    let emphasized: Bool
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(minimalAppearance ? BlankColors.minimalBackground : Color.white.opacity(tintOpacity))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        minimalAppearance ? BlankColors.line : Color.white.opacity(emphasized ? 0.34 : 0.18),
+                        lineWidth: minimalAppearance ? 0.8 : 0.8
+                    )
+            }
+            .shadow(
+                color: minimalAppearance ? .clear : BlankColors.ink.opacity(emphasized ? 0.05 : 0.025),
+                radius: emphasized ? 18 : 10,
+                x: 0,
+                y: emphasized ? 10 : 5
+            )
     }
 }
 
@@ -174,48 +219,41 @@ extension View {
     }
 
     func blankControlSurface(cornerRadius: CGFloat = 18, tintOpacity: Double = 0.12, emphasized: Bool = false) -> some View {
-        self
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(tintOpacity))
-                    }
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(emphasized ? 0.34 : 0.18), lineWidth: 0.8)
-            }
-            .shadow(color: BlankColors.ink.opacity(emphasized ? 0.05 : 0.025), radius: emphasized ? 18 : 10, x: 0, y: emphasized ? 10 : 5)
+        modifier(BlankControlSurfaceModifier(cornerRadius: cornerRadius, tintOpacity: tintOpacity, emphasized: emphasized))
     }
 }
 
 struct TopSheetHeader: View {
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let title: String
     let subtitle: String
     var titleColor: Color = BlankColors.ink
     var subtitleColor: Color = BlankColors.mutedInk
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text(title)
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+        VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 5 : 10) {
+            Text(minimalAppearance ? title.lowercased() : title)
+                .font(.blankInter(
+                    size: minimalAppearance ? 40 : 34,
+                    weight: minimalAppearance ? .bold : .medium,
+                    relativeTo: .largeTitle
+                ))
                 .foregroundStyle(titleColor)
-                .multilineTextAlignment(.center)
+                .tracking(minimalAppearance ? -0.6 : 0)
+                .multilineTextAlignment(minimalAppearance ? .leading : .center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.86)
 
-            Text(subtitle)
-                .font(.body)
+            Text(minimalAppearance ? subtitle.lowercased() : subtitle)
+                .font(minimalAppearance ? .blankInter(size: 13, weight: .medium, relativeTo: .caption) : .body)
                 .foregroundStyle(subtitleColor)
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
+                .multilineTextAlignment(minimalAppearance ? .leading : .center)
+                .lineSpacing(minimalAppearance ? 0 : 2)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 330)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: minimalAppearance ? .leading : .center)
     }
 }
 

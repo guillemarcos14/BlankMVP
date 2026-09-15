@@ -2050,9 +2050,19 @@ struct HomeSectionScreen: View {
         let contentTop: CGFloat = 94
         let contentHeight = max(0, screenHeight - contentTop)
         let contentWidth = min(max(0, screenWidth - 32), 360)
+        let minimalAppearance = !sessionStore.isBlankActive
 
         ZStack(alignment: .topLeading) {
+            if minimalAppearance {
+                BlankColors.minimalBackground
+                    .ignoresSafeArea()
+            } else {
+                AppBackground(isActive: true)
+                    .ignoresSafeArea()
+            }
+
             routeContent
+                .environment(\.blankMinimalAppearance, minimalAppearance)
                 .frame(width: contentWidth, height: contentHeight, alignment: .top)
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
                 .offset(x: horizontalOffset, y: contentTop)
@@ -2060,14 +2070,22 @@ struct HomeSectionScreen: View {
             Button {
                 onClose()
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(textColor)
-                    .frame(width: 32, height: 32)
+                Group {
+                    if minimalAppearance {
+                        Text("back")
+                            .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                            .tracking(-0.3)
+                    } else {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 22, weight: .regular))
+                    }
+                }
+                .foregroundStyle(minimalAppearance ? BlankColors.premiumBlue : textColor)
+                .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: 34, y: 64)
+            .position(x: minimalAppearance ? 46 : 34, y: 64)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -2910,6 +2928,7 @@ private struct RelapseReasonButtonStyle: ButtonStyle {
 
 private struct EmergencyScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let emergencyUnlocksRemaining: Int
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
@@ -2918,30 +2937,38 @@ private struct EmergencyScreen: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 18 : 22) {
             Spacer(minLength: 0)
 
-            VStack(spacing: 10) {
-                Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(textColor)
-                    .frame(width: 52, height: 52)
-                    .background {
-                        Circle().fill(textColor.opacity(0.08))
-                    }
+            VStack(alignment: minimalAppearance ? .leading : .center, spacing: 10) {
+                if !minimalAppearance {
+                    Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(textColor)
+                        .frame(width: 52, height: 52)
+                        .background {
+                            Circle().fill(textColor.opacity(0.08))
+                        }
+                }
 
-                Text(isConfirming ? "Spend emergency?" : "Emergency")
-                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                Text(isConfirming ? "spend emergency?" : "emergency")
+                    .font(.blankInter(
+                        size: minimalAppearance ? 40 : 34,
+                        weight: minimalAppearance ? .bold : .medium,
+                        relativeTo: .largeTitle
+                    ))
+                    .tracking(minimalAppearance ? -0.6 : 0)
                     .foregroundStyle(textColor)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(minimalAppearance ? .leading : .center)
 
                 Text(bodyText)
-                    .font(.blankInter(size: 16, weight: .regular, relativeTo: .body))
+                    .font(.blankInter(size: minimalAppearance ? 14 : 16, weight: .regular, relativeTo: .body))
                     .foregroundStyle(secondaryColor)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
+                    .multilineTextAlignment(minimalAppearance ? .leading : .center)
+                    .lineSpacing(minimalAppearance ? 0 : 3)
                     .frame(maxWidth: 300)
             }
+            .frame(maxWidth: .infinity, alignment: minimalAppearance ? .leading : .center)
 
             emergencyAllowance
 
@@ -3120,6 +3147,7 @@ private struct TechnicalSheetActions<Content: View>: View {
 
 private struct TimerScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @State private var hardMode = false
     @State private var selectedMinutes = 30
     let onStart: (Int, Bool) -> Void
@@ -3156,7 +3184,10 @@ private struct TimerScreen: View {
                     .foregroundStyle(textColor)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background { Capsule().fill(textColor.opacity(0.10)) }
+                    .background {
+                        RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 20, style: .continuous)
+                            .fill(textColor.opacity(0.10))
+                    }
                 }
                 .buttonStyle(.plain)
 
@@ -3257,8 +3288,14 @@ private struct TimerScreen: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 42)
                 .background {
-                    Capsule()
+                    RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 21, style: .continuous)
                         .fill(selectedMinutes == minutes ? BlankColors.premiumBlue.opacity(0.24) : textColor.opacity(0.08))
+                }
+                .overlay {
+                    if minimalAppearance {
+                        Rectangle()
+                            .stroke(BlankColors.line, lineWidth: 0.8)
+                    }
                 }
         }
         .buttonStyle(.plain)
@@ -3288,6 +3325,7 @@ private struct TimerScreen: View {
 
 private struct AssistantConnectSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.dismiss) private var dismiss
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
@@ -3306,19 +3344,29 @@ private struct AssistantConnectSheet: View {
             let contentWidth = min(max(0, proxy.size.width - 48), 360)
 
             ZStack {
-                AppBackground(isActive: sessionStore.isBlankActive)
-                    .ignoresSafeArea()
+                if minimalAppearance {
+                    BlankColors.minimalBackground
+                        .ignoresSafeArea()
+                } else {
+                    AppBackground(isActive: sessionStore.isBlankActive)
+                        .ignoresSafeArea()
+                }
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 22) {
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 7) {
-                                Text("Assistant")
-                                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                                Text(minimalAppearance ? "assistant" : "Assistant")
+                                    .font(.blankInter(
+                                        size: minimalAppearance ? 40 : 34,
+                                        weight: minimalAppearance ? .bold : .medium,
+                                        relativeTo: .largeTitle
+                                    ))
+                                    .tracking(minimalAppearance ? -0.6 : 0)
                                     .lineLimit(1)
 
-                                Text("Use Blanked from WhatsApp or SMS.")
-                                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                                Text(minimalAppearance ? "use blanked from whatsapp or sms." : "Use Blanked from WhatsApp or SMS.")
+                                    .font(.blankInter(size: minimalAppearance ? 13 : 15, weight: .medium, relativeTo: .subheadline))
                                     .foregroundStyle(secondaryColor)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
@@ -3429,6 +3477,7 @@ private struct AssistantConnectSheet: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(textColor)
+        .environment(\.blankMinimalAppearance, !sessionStore.isBlankActive)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             ensureConnectCode()

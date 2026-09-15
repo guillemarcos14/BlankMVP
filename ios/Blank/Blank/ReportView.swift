@@ -5,6 +5,7 @@ struct ReportView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     var usesMainBackground = false
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
@@ -204,7 +205,10 @@ struct ReportView: View {
 
     @ViewBuilder
     private var reportBackground: some View {
-        if usesMainBackground {
+        if minimalAppearance {
+            BlankColors.minimalBackground
+                .ignoresSafeArea()
+        } else if usesMainBackground {
             Color.clear
         } else {
             ReportLiquidBackground(isActive: sessionStore.isBlankActive)
@@ -4240,24 +4244,38 @@ private struct ReportLiquidBackground: View {
 
 private extension View {
     func liquidGlass(cornerRadius: CGFloat) -> some View {
-        self
+        modifier(LiquidGlassModifier(cornerRadius: cornerRadius))
+    }
+}
+
+private struct LiquidGlassModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
+
+    func body(content: Content) -> some View {
+        content
             .background {
-                ZStack {
+                if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.12))
-                    BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
-                        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                        .opacity(0.34)
+                        .fill(BlankColors.minimalBackground)
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.12))
+                        BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
+                            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+                            .opacity(0.34)
+                    }
                 }
                 .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.20), lineWidth: 0.7)
+                    .stroke(minimalAppearance ? BlankColors.line : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0.8 : 0.7)
             }
-            .shadow(color: BlankColors.ink.opacity(0.026), radius: 14, x: 0, y: 8)
+            .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.026), radius: 14, x: 0, y: 8)
     }
 }
 

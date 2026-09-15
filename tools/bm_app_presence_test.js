@@ -87,6 +87,11 @@ async function run() {
   assert.match(installGuidance.message_text, /If you already have it|Si ya la tienes/);
   assert.doesNotMatch(installGuidance.message_text, /review-action/);
 
+  const incompleteRequest = await request("Block Instagram", { channel: "whatsapp" });
+  assert.strictEqual(incompleteRequest.actions.length, 0);
+  assert.match(incompleteRequest.message_text, /what time|Should it start|a qué hora|hora/i);
+  assert.doesNotMatch(incompleteRequest.message_text, /apps\.apple\.com|download|descarga/i);
+
   const staleGuidance = await request(
     "Block Instagram from 10 pm to 7 am every day",
     {

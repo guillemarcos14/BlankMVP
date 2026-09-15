@@ -5,9 +5,11 @@ const {
   connectCodeFromText,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  hasProcessedAssistantMessage,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordProcessedAssistantMessage,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
@@ -48,9 +50,66 @@ function rawBody(event) {
   return event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body;
 }
 
+function isProductionEnvironment() {
+  return process.env.NODE_ENV === "production"
+    || process.env.CONTEXT === "production"
+    || process.env.NETLIFY === "true";
+}
+
+function audioExtension(contentType) {
+  const type = cleanText(contentType, 120).toLowerCase();
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+  if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+  if (type.includes("wav")) return "wav";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("amr")) return "amr";
+  return "audio";
+}
+
+async function transcribeMetaAudio(message) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const mediaId = cleanText(message.audio_id, 160);
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!token || !mediaId) throw new Error("whatsapp_audio_media_not_configured");
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || "v26.0";
+  const mediaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(mediaId)}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!mediaResponse.ok) throw new Error(`whatsapp_media_metadata_failed_${mediaResponse.status}`);
+  const media = await mediaResponse.json();
+  const mediaUrl = cleanText(media.url, 1600);
+  if (!mediaUrl) throw new Error("whatsapp_media_url_missing");
+  const audioResponse = await fetch(mediaUrl, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!audioResponse.ok) throw new Error(`whatsapp_media_download_failed_${audioResponse.status}`);
+  const contentLength = Number(audioResponse.headers?.get?.("content-length") || 0);
+  if (contentLength > 24 * 1024 * 1024) throw new Error("whatsapp_audio_too_large");
+  const audio = Buffer.from(await audioResponse.arrayBuffer());
+  if (audio.length > 24 * 1024 * 1024) throw new Error("whatsapp_audio_too_large");
+  const contentType = cleanText(message.audio_content_type, 120) || "audio/ogg";
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_TRANSCRIPTION_MODEL || "whisper-1");
+  form.append("file", new Blob([audio], { type: contentType }), `whatsapp-audio.${audioExtension(contentType)}`);
+  const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const raw = await transcriptionResponse.text();
+  let parsed = {};
+  try { parsed = raw ? JSON.parse(raw) : {}; } catch (_) { parsed = {}; }
+  if (!transcriptionResponse.ok) throw new Error(`openai_transcription_failed_${transcriptionResponse.status}:${cleanText(parsed.error?.message || raw, 180)}`);
+  const transcript = cleanText(parsed.text, 800);
+  if (!transcript) throw new Error("whatsapp_transcription_empty");
+  return transcript;
+}
+
 function verifySignature(event) {
   const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret) return true;
+  if (!secret) return !isProductionEnvironment() && process.env.WHATSAPP_REQUIRE_SIGNATURE !== "true";
   const signature = header(event, "x-hub-signature-256");
   if (!signature.startsWith("sha256=")) return false;
   const expected = `sha256=${crypto.createHmac("sha256", secret).update(rawBody(event), "utf8").digest("hex")}`;
@@ -75,21 +134,29 @@ function verifyChallenge(event) {
 
 function incomingMessages(body) {
   const messages = [];
-  for (const entry of body.entry || []) {
-    for (const change of entry.changes || []) {
+  for (const entry of Array.isArray(body?.entry) ? body.entry : []) {
+    if (!entry || typeof entry !== "object") continue;
+    for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+      if (!change || typeof change !== "object") continue;
       const value = change.value || {};
-      for (const message of value.messages || []) {
+      for (const message of Array.isArray(value.messages) ? value.messages : []) {
+        if (!message || typeof message !== "object") continue;
         const text = cleanText(
           (message.text && message.text.body)
           || (message.button && (message.button.text || message.button.payload))
           || (message.interactive && message.interactive.button_reply && (message.interactive.button_reply.title || message.interactive.button_reply.id))
           || (message.interactive && message.interactive.list_reply && (message.interactive.list_reply.title || message.interactive.list_reply.id))
         );
-        if (!text) continue;
+        const from = cleanText(message.from, 40);
+        const audioId = cleanText(message.audio && message.audio.id, 160);
+        const audioContentType = cleanText(message.audio && (message.audio.mime_type || message.audio.mimeType), 120);
+        if ((!text && !audioId) || !from) continue;
         messages.push({
-          from: cleanText(message.from, 40),
+          from,
           id: cleanText(message.id, 120),
           text,
+          audio_id: audioId,
+          audio_content_type: audioContentType,
         });
       }
     }
@@ -124,9 +191,18 @@ function requestedAppNames(text) {
 
 function detectedLanguage(text) {
   const value = cleanText(text, 800).toLowerCase();
-  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
     ? "es"
     : "en";
+}
+
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^es|^en/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
 }
 
 function appsQuery(appNames) {
@@ -254,17 +330,41 @@ async function sendPlanReply(to, plan, prompt = "") {
   // The previous template contained a misleading static CTA label. Only use a
   // separately approved review template, never the legacy action template.
   const contentSid = cleanText(process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID, 80);
-  const templateEnabled = process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED === "true";
+  const templateEnabled = process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED === "true"
+    && Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM_NUMBER);
   // A template can contain a stale static button label that the backend cannot inspect.
   // Keep the safe text link as the default until the approved template is explicitly verified.
   if (!link || !contentSid || !templateEnabled) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
 
-  const textResult = await sendWhatsAppMessage(to, text);
-  const buttonResult = await sendWhatsAppMessage(to, "", {
-    contentSid,
-    contentVariables: whatsappActionButtonVariables(link),
-  });
-  return { text: textResult, button: buttonResult };
+  let textResult;
+  try {
+    textResult = await sendWhatsAppMessage(to, text);
+  } catch (error) {
+    // Outside the WhatsApp session window, the approved template may still be deliverable.
+    const buttonResult = await sendWhatsAppMessage(to, "", {
+      contentSid,
+      contentVariables: whatsappActionButtonVariables(link),
+    });
+    if (!buttonResult?.skipped) return { text: { skipped: true, reason: "session_window_closed" }, button: buttonResult };
+    throw error;
+  }
+  try {
+    const buttonResult = await sendWhatsAppMessage(to, "", {
+      contentSid,
+      contentVariables: whatsappActionButtonVariables(link),
+    });
+    return { text: textResult, button: buttonResult };
+  } catch (_) {
+    // If the approved button is misconfigured, keep the already delivered
+    // reply useful while the session window still permits a text fallback.
+    try {
+      const fallback = await sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
+      return { text: textResult, button: { skipped: true, reason: "review_template_failed" }, fallback };
+    } catch (_) {
+      // The text reply was already delivered; do not make the provider retry it.
+      return { text: textResult, button: { skipped: true, reason: "review_template_failed" } };
+    }
+  }
 }
 
 function minuteOfDay(hour, minute, meridiem) {
@@ -331,7 +431,7 @@ async function agentContext(from, prompt) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt, savedMemory);
-  const language = savedMemory.language || detectedLanguage(prompt);
+  const language = messageLanguage(prompt, savedMemory.language);
   const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
@@ -409,7 +509,17 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
 }
 
 async function processMessage(message) {
-  const connectCode = connectCodeFromText(message.text);
+  let prompt = message.text;
+  if (message.audio_id) {
+    try {
+      const transcript = await transcribeMetaAudio(message);
+      prompt = prompt ? `${prompt}\n${transcript}` : transcript;
+    } catch (_) {
+      return sendWhatsAppMessage(message.from, "I could not understand that voice note yet. Send it as text or try another audio.");
+    }
+  }
+  if (!prompt) return sendWhatsAppMessage(message.from, "I could not read that message yet. Send it as text or try another audio.");
+  const connectCode = connectCodeFromText(prompt);
   if (connectCode) {
     await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
     return sendWhatsAppMessage(
@@ -424,7 +534,7 @@ async function processMessage(message) {
     // Automatic identity matching is additive; legacy CONNECT remains available.
   }
 
-  const command = message.text.toLowerCase();
+  const command = prompt.toLowerCase();
   if (command === "stop" || command === "disconnect") {
     await recordAssistantMemory({
       channel: "whatsapp",
@@ -441,7 +551,7 @@ async function processMessage(message) {
     pendingMemory = {};
   }
   const pendingMessage = cleanText(pendingMemory.pending_proactive_message, 900);
-  if (pendingMessage && acceptsProactiveUpdate(message.text)) {
+  if (pendingMessage && acceptsProactiveUpdate(prompt)) {
     await recordAssistantMemory({
       channel: "whatsapp",
       channelUser: message.from,
@@ -450,14 +560,14 @@ async function processMessage(message) {
     });
     return sendWhatsAppMessage(message.from, pendingMessage);
   }
-  const result = await callBlankedAgent(message.text, message.from);
+  const result = await callBlankedAgent(prompt, message.from);
   const plan = result.plan;
   try {
     await recordAssistantConversationTurn({
       channel: "whatsapp",
       channelUser: message.from,
       previousState: result.context.memory?.conversation_state,
-      userMessage: message.text,
+      userMessage: prompt,
       assistantMessage: plan.message_text || plan.response_text || "",
       topic: result.context.memory?.last_topic || "",
     });
@@ -470,7 +580,9 @@ async function processMessage(message) {
         channel: "whatsapp",
         channelUser: message.from,
         memory: {
-          pending_blocking: plan.blocking_ready === false ? plan.blocking_data : null,
+          pending_blocking: plan.blocking_ready === false
+            ? { ...(plan.blocking_data || {}), updated_at: new Date().toISOString() }
+            : null,
         },
         source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
       });
@@ -478,7 +590,7 @@ async function processMessage(message) {
       // Pending blocking state must never block the user-facing reply.
     }
   }
-  return sendPlanReply(message.from, plan, message.text);
+  return sendPlanReply(message.from, plan, prompt);
 }
 
 exports.handler = async (event) => {
@@ -489,12 +601,39 @@ exports.handler = async (event) => {
 
   try {
     const body = parseJsonBody(event);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return json(400, { error: "invalid_whatsapp_payload" });
     const messages = incomingMessages(body);
     const results = [];
+    const seenInRequest = new Set();
     for (const message of messages.slice(0, 5)) {
-      results.push(await processMessage(message));
+      if (message.id) {
+        if (seenInRequest.has(message.id)) {
+          results.push({ skipped: true, reason: "duplicate_inbound" });
+          continue;
+        }
+        seenInRequest.add(message.id);
+        try {
+          if (await hasProcessedAssistantMessage("whatsapp", message.from, message.id)) {
+            results.push({ skipped: true, reason: "duplicate_inbound" });
+            continue;
+          }
+        } catch (_) {
+          // A temporary memory outage must not discard an inbound message.
+        }
+      }
+      const result = await processMessage(message);
+      results.push(result);
+      const deliveryFailed = result?.skipped === true && /credentials|template_requires/i.test(result.reason || "")
+        || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");
+      if (message.id && !deliveryFailed) {
+        try {
+          await recordProcessedAssistantMessage("whatsapp", message.from, message.id);
+        } catch (_) {
+          // Inbound idempotency is best effort when memory persistence is unavailable.
+        }
+      }
     }
-    return json(200, { ok: true, received: messages.length, results });
+    return json(200, { ok: true, received: Math.min(messages.length, 5), results });
   } catch (error) {
     return json(500, { error: "whatsapp_agent_failed", detail: error.message });
   }

@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { json, requireMethod } = require("./_membership");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
@@ -6,9 +7,11 @@ const {
   connectCodeFromText,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  hasProcessedAssistantMessage,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordProcessedAssistantMessage,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 
@@ -167,7 +170,9 @@ async function transcribeAudio(item) {
   if (!response.ok) {
     throw new Error(`openai_transcription_failed_${response.status}:${cleanText(parsed.error?.message || raw, 180)}`);
   }
-  return cleanText(parsed.text, 800);
+  const transcript = cleanText(parsed.text, 800);
+  if (!transcript) throw new Error("twilio_transcription_empty");
+  return transcript;
 }
 
 function twiml(message) {
@@ -190,9 +195,63 @@ function connectReply(from, channel) {
 
 function detectedLanguage(text) {
   const value = cleanText(text, 800).toLowerCase();
-  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
     ? "es"
     : "en";
+}
+
+function isProductionEnvironment() {
+  return process.env.NODE_ENV === "production"
+    || process.env.CONTEXT === "production"
+    || process.env.NETLIFY === "true";
+}
+
+function header(event, name) {
+  const target = name.toLowerCase();
+  const match = Object.entries(event.headers || {}).find(([key]) => key.toLowerCase() === target);
+  return match ? String(match[1] || "") : "";
+}
+
+function timingSafeEqual(left, right) {
+  const leftBuffer = Buffer.from(left || "");
+  const rightBuffer = Buffer.from(right || "");
+  if (!leftBuffer.length || leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function twilioWebhookUrl(event) {
+  const configured = cleanText(process.env.TWILIO_WEBHOOK_URL, 600);
+  if (configured) return configured;
+  const protocol = header(event, "x-forwarded-proto") || "https";
+  const host = header(event, "x-forwarded-host") || header(event, "host");
+  const path = event.path || "/.netlify/functions/sms-agent";
+  return host ? `${protocol}://${host}${path}` : "";
+}
+
+function verifyTwilioSignature(event) {
+  const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
+  const shouldValidate = configured === "true" || (isProductionEnvironment() && configured !== "false");
+  if (!shouldValidate) return true;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const signature = header(event, "x-twilio-signature");
+  const url = twilioWebhookUrl(event);
+  if (!token || !signature || !url) return false;
+  const params = new URLSearchParams(rawBody(event));
+  const canonical = Array.from(params.entries())
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
+    .map(([key, value]) => `${key}${value}`)
+    .join("");
+  const expected = crypto.createHmac("sha1", token).update(`${url}${canonical}`, "utf8").digest("base64");
+  return timingSafeEqual(signature, expected);
+}
+
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^es|^en/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
 }
 
 function actionIntro(actions) {
@@ -446,7 +505,7 @@ async function askBAI(prompt, from, channel) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt);
-  const language = savedMemory.language || detectedLanguage(prompt);
+  const language = messageLanguage(prompt, savedMemory.language);
   const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
@@ -500,7 +559,9 @@ async function askBAI(prompt, from, channel) {
         channel,
         channelUser: from,
         memory: {
-          pending_blocking: plan.blocking_ready === false ? plan.blocking_data : null,
+          pending_blocking: plan.blocking_ready === false
+            ? { ...(plan.blocking_data || {}), updated_at: new Date().toISOString() }
+            : null,
           language,
         },
         source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
@@ -556,7 +617,9 @@ async function askBAI(prompt, from, channel) {
     };
   }
   if (channel === "whatsapp" && actionLink) {
-    const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
+    const contentSid = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM_NUMBER
+      ? cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80)
+      : "";
     return {
       text: contentSid ? message : `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
       actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
@@ -610,8 +673,8 @@ function actionDeepLink(actions, appNames = [], blockingData = null) {
     });
   }
   if (first.type === "apply_schedule") {
-    const start = clamp(first.start_minute || 1260, 0, 1439);
-    const end = clamp(first.end_minute || 1380, 0, 1439);
+    const start = clamp(Number.isFinite(first.start_minute) ? first.start_minute : 1260, 0, 1439);
+    const end = clamp(Number.isFinite(first.end_minute) ? first.end_minute : 1380, 0, 1439);
     const days = clamp(first.duration_days || 7, 1, 14);
     const route = Array.isArray(appNames) && appNames.length ? "setup-plan" : "apply-plan";
     return publicOpenLink(route, {
@@ -669,14 +732,29 @@ function clamp(value, lower, upper) {
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
+  if (!verifyTwilioSignature(event)) return text(403, "invalid_twilio_signature");
 
-  const { from, body, media } = parseSmsBody(event);
+  const parsedBody = parseSmsBody(event);
+  const { from, body, media, messageSid } = parsedBody;
+  if (!from) return json(400, { error: "missing_sms_sender" });
+  if (messageSid) {
+    try {
+      if (await hasProcessedAssistantMessage(channelFromSender(from), from, messageSid)) {
+        return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
+      }
+    } catch (_) {
+      // A temporary memory outage must not discard an inbound message.
+    }
+  }
   const audio = audioMedia(media);
   let prompt = body;
   if (!prompt && audio) {
     try {
       prompt = await transcribeAudio(audio);
     } catch (error) {
+      if (messageSid) {
+        try { await recordProcessedAssistantMessage(channelFromSender(from), from, messageSid); } catch (_) { /* best effort */ }
+      }
       return text(200, twiml("I could not understand that voice note yet. Send it as text or try another audio."), "application/xml; charset=utf-8");
     }
   }
@@ -702,11 +780,29 @@ exports.handler = async (event) => {
     : await askBAI(prompt, from, channel);
 
   if (channel === "whatsapp" && reply.actionButton) {
-    await sendWhatsAppMessage(from, reply.text);
-    await sendWhatsAppMessage(from, "", reply.actionButton);
+    try {
+      await sendWhatsAppMessage(from, reply.text);
+      await sendWhatsAppMessage(from, "", reply.actionButton);
+    } catch (error) {
+      // A failed template must not leave the user without the actionable link
+      // or cause a retry to duplicate the already delivered text.
+      try {
+        await sendWhatsAppMessage(from, reply.actionText || reply.text);
+      } catch (_) {
+        if (!String(error?.message || "").includes("twilio_whatsapp_send_failed")) throw error;
+      }
+    }
+    if (messageSid) {
+      try { await recordProcessedAssistantMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+    }
     return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
   }
   const replyText = audio ? withVoiceInputContext(reply.text, prompt) : reply.text;
-
+  if (messageSid) {
+    try { await recordProcessedAssistantMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+  }
   return text(200, twiml(replyText), "application/xml; charset=utf-8");
 };
+
+exports.actionDeepLink = actionDeepLink;
+exports.verifyTwilioSignature = verifyTwilioSignature;

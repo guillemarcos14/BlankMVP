@@ -251,6 +251,8 @@ function normalizePendingBlocking(value) {
     result[field] = { ...value[field] };
   }
   if (value.apps_confirmed === true) result.apps_confirmed = true;
+  const updatedAt = clean(value.updated_at, 64);
+  if (updatedAt && Number.isFinite(Date.parse(updatedAt))) result.updated_at = updatedAt;
   return Object.keys(result).length ? result : null;
 }
 

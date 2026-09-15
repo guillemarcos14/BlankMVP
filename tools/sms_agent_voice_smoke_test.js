@@ -1,4 +1,5 @@
 const assert = require("assert");
+const crypto = require("crypto");
 
 process.env.OPENAI_API_KEY = "";
 process.env.BLANKED_PUBLIC_APP_LINK_BASE = "https://getblank.netlify.app";
@@ -7,7 +8,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 delete process.env.TWILIO_ACCOUNT_SID;
 delete process.env.TWILIO_AUTH_TOKEN;
 
-const { handler: smsHandler } = require("../netlify/functions/sms-agent");
+const { handler: smsHandler, actionDeepLink } = require("../netlify/functions/sms-agent");
 const { handler: audioHandler } = require("../netlify/functions/assistant-audio");
 
 async function withAssistantMemoryMock(callback) {
@@ -91,7 +92,7 @@ async function whatsappVoiceRequestStaysText() {
   assert.match(response.body, /<Body>/);
   assert.doesNotMatch(response.body, /Action:/i);
   assert.doesNotMatch(response.body, /I prepared a Blanked link/i);
-  assert.match(response.body, /Choose Instagram in Blankmind first\./);
+  assert.match(response.body, /Choose Instagram in Blankmind first(?:\.|,)/i);
   assert.match(response.body, /Blankmind/);
   assert.match(response.body, /apps\.apple\.com/);
   assert.doesNotMatch(response.body, /Open Blanked to apply the protection window:/);
@@ -162,7 +163,7 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       }).toString(),
     });
     assert.strictEqual(first.statusCode, 200, first.body);
-    assert.match(first.body, /Should it start now or at an exact time/);
+    assert.match(first.body, /Should it start now or at an exact time/i);
     assert.doesNotMatch(first.body, /https?:\/\//);
 
     const second = await smsHandler({
@@ -254,6 +255,54 @@ async function audioEndpointIsDisabled() {
   assert.strictEqual(response.body, "audio_replies_disabled");
 }
 
+async function smsSignatureAndMidnightLinkChecks() {
+  const link = actionDeepLink([
+    { type: "apply_schedule", start_minute: 0, end_minute: 60, duration_days: 7 },
+  ], ["Instagram"]);
+  assert.match(link, /start=0/);
+  assert.match(link, /end=60/);
+
+  const previousValidation = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
+  const previousToken = process.env.TWILIO_AUTH_TOKEN;
+  process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "true";
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  const body = new URLSearchParams({ From: "+34600000000", Body: "Hi", MessageSid: "SMsigned" }).toString();
+  const canonical = Array.from(new URLSearchParams(body).entries())
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
+    .map(([key, value]) => `${key}${value}`)
+    .join("");
+  const signature = crypto.createHmac("sha1", process.env.TWILIO_AUTH_TOKEN)
+    .update(`https://getblank.netlify.app/.netlify/functions/sms-agent${canonical}`)
+    .digest("base64");
+  try {
+    const valid = await smsHandler({
+      httpMethod: "POST",
+      headers: {
+        host: "getblank.netlify.app",
+        "content-type": "application/x-www-form-urlencoded",
+        "x-twilio-signature": signature,
+      },
+      path: "/.netlify/functions/sms-agent",
+      body,
+    });
+    assert.notStrictEqual(valid.statusCode, 403, valid.body);
+    const invalid = await smsHandler({
+      httpMethod: "POST",
+      headers: {
+        host: "getblank.netlify.app",
+        "content-type": "application/x-www-form-urlencoded",
+        "x-twilio-signature": "invalid",
+      },
+      path: "/.netlify/functions/sms-agent",
+      body,
+    });
+    assert.strictEqual(invalid.statusCode, 403, invalid.body);
+  } finally {
+    if (previousValidation) process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = previousValidation; else delete process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
+    if (previousToken) process.env.TWILIO_AUTH_TOKEN = previousToken; else delete process.env.TWILIO_AUTH_TOKEN;
+  }
+}
+
 (async () => {
   await whatsappVoiceRequestStaysText();
   await smsDoesNotAttachVoice();
@@ -262,6 +311,7 @@ async function audioEndpointIsDisabled() {
   await whatsappTextHasNoAudioAttachment();
   await whatsappInputAudioGetsTranscribedTextReply();
   await audioEndpointIsDisabled();
+  await smsSignatureAndMidnightLinkChecks();
   console.log("sms-agent audio input smoke tests passed");
 })().catch((error) => {
   console.error(error);

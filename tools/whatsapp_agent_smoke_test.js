@@ -368,6 +368,114 @@ async function categoryRequestOpensActivateModeLink() {
   }
 }
 
+async function whatsappAudioInputGetsTranscribedTextReply() {
+  const previousApiKey = process.env.OPENAI_API_KEY;
+  const previousAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const previousPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const originalFetch = global.fetch;
+  let outboundText = "";
+  let transcriptionCalled = false;
+  process.env.OPENAI_API_KEY = "test-openai-key";
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  global.fetch = async (target, options = {}) => {
+    const url = String(target);
+    if (url === "https://graph.facebook.com/v26.0/audio-media") {
+      return { ok: true, status: 200, json: async () => ({ url: "https://media.test/audio.ogg" }) };
+    }
+    if (url === "https://media.test/audio.ogg") {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        arrayBuffer: async () => Buffer.from("fake-audio"),
+      };
+    }
+    if (url === "https://api.openai.com/v1/audio/transcriptions") {
+      transcriptionCalled = true;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ text: "Hi, I need help with my focus." }) };
+    }
+    outboundText = JSON.parse(options.body).text.body;
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [{ changes: [{ value: { messages: [{
+          from: "34600000002",
+          id: "wamid.audio",
+          audio: { id: "audio-media", mime_type: "audio/ogg" },
+        }] } }] }],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.strictEqual(JSON.parse(response.body).ok, true);
+    assert.strictEqual(transcriptionCalled, true);
+    assert.ok(outboundText);
+  } finally {
+    global.fetch = originalFetch;
+    if (previousApiKey) process.env.OPENAI_API_KEY = previousApiKey; else delete process.env.OPENAI_API_KEY;
+    if (previousAccessToken) process.env.WHATSAPP_ACCESS_TOKEN = previousAccessToken; else delete process.env.WHATSAPP_ACCESS_TOKEN;
+    if (previousPhoneId) process.env.WHATSAPP_PHONE_NUMBER_ID = previousPhoneId; else delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
+async function duplicateInboundIsIgnoredAcrossRetries() {
+  const previousSupabaseUrl = process.env.SUPABASE_URL;
+  const previousSupabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const previousAccessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const previousPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const originalFetch = global.fetch;
+  const rows = [];
+  let outboundCount = 0;
+  process.env.SUPABASE_URL = "https://supabase.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  global.fetch = async (target, options = {}) => {
+    const url = String(target);
+    if (url.startsWith("https://supabase.test/rest/v1/")) {
+      if ((options.method || "GET").toUpperCase() === "POST") {
+        const row = JSON.parse(options.body || "{}");
+        rows.push(row);
+        return { ok: true, status: 201, text: async () => "", json: async () => ({}) };
+      }
+      return { ok: true, status: 200, text: async () => JSON.stringify(rows), json: async () => rows };
+    }
+    outboundCount += 1;
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+
+  const event = {
+    httpMethod: "POST",
+    headers: {},
+    body: JSON.stringify({
+      entry: [{ changes: [{ value: { messages: [{
+        from: "34600000003",
+        id: "wamid.retry",
+        text: { body: "Hi" },
+      }] } }] }],
+    }),
+  };
+  try {
+    const first = await handler(event);
+    const second = await handler(event);
+    assert.strictEqual(first.statusCode, 200, first.body);
+    assert.strictEqual(second.statusCode, 200, second.body);
+    assert.strictEqual(JSON.parse(second.body).results[0].reason, "duplicate_inbound");
+    assert.strictEqual(outboundCount, 1);
+  } finally {
+    global.fetch = originalFetch;
+    if (previousSupabaseUrl) process.env.SUPABASE_URL = previousSupabaseUrl; else delete process.env.SUPABASE_URL;
+    if (previousSupabaseKey) process.env.SUPABASE_SERVICE_ROLE_KEY = previousSupabaseKey; else delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (previousAccessToken) process.env.WHATSAPP_ACCESS_TOKEN = previousAccessToken; else delete process.env.WHATSAPP_ACCESS_TOKEN;
+    if (previousPhoneId) process.env.WHATSAPP_PHONE_NUMBER_ID = previousPhoneId; else delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
 (async () => {
   await verifyWebhook();
   await receiveMessage();
@@ -377,6 +485,8 @@ async function categoryRequestOpensActivateModeLink() {
   await twilioButtonTemplateHidesRawUrlFromMainReply();
   await modePhraseOpensActivateModeLink();
   await categoryRequestOpensActivateModeLink();
+  await whatsappAudioInputGetsTranscribedTextReply();
+  await duplicateInboundIsIgnoredAcrossRetries();
   console.log("whatsapp-agent smoke tests passed");
 })().catch((error) => {
   console.error(error);

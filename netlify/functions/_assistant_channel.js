@@ -238,6 +238,12 @@ async function getAssistantMemory(channel, channelUser) {
       main_apps: Array.isArray(next.main_apps) ? next.main_apps : memory.main_apps,
       weak_hours: Array.isArray(next.weak_hours) ? next.weak_hours : memory.weak_hours,
     };
+    if (next.pending_blocking && typeof next.pending_blocking === "object" && !Array.isArray(next.pending_blocking)) {
+      merged.pending_blocking = {
+        ...next.pending_blocking,
+        updated_at: next.pending_blocking.updated_at || row.submitted_at || "",
+      };
+    }
     if (next.conversation_state !== undefined) {
       const state = normalizeConversationState(next.conversation_state);
       if (state) merged.conversation_state = state;
@@ -245,6 +251,31 @@ async function getAssistantMemory(channel, channelUser) {
     }
     return merged;
   }, {});
+}
+
+function inboundMessageId(value) {
+  return cleanText(value, 160);
+}
+
+async function hasProcessedAssistantMessage(channel, channelUser, messageId) {
+  const normalizedId = inboundMessageId(messageId);
+  if (!normalizedId) return false;
+  const memory = await getAssistantMemory(channel, channelUser);
+  return Array.isArray(memory.processed_inbound_ids) && memory.processed_inbound_ids.includes(normalizedId);
+}
+
+async function recordProcessedAssistantMessage(channel, channelUser, messageId) {
+  const normalizedId = inboundMessageId(messageId);
+  if (!normalizedId) return;
+  const memory = await getAssistantMemory(channel, channelUser);
+  const previous = Array.isArray(memory.processed_inbound_ids) ? memory.processed_inbound_ids : [];
+  const processed = Array.from(new Set([...previous, normalizedId])).slice(-48);
+  await recordAssistantMemory({
+    channel,
+    channelUser,
+    memory: { processed_inbound_ids: processed },
+    source: "assistant_inbound_processed",
+  });
 }
 
 function pendingConversationSlot(text) {
@@ -466,6 +497,7 @@ module.exports = {
   ensureAssistantConnectionForPhone,
   getAssistantUserContext,
   getAssistantMemory,
+  hasProcessedAssistantMessage,
   normalizeConnectCode,
   proactiveGate,
   proactiveTemplateSids,
@@ -474,6 +506,7 @@ module.exports = {
   recordAssistantChannel,
   recordAssistantMemory,
   recordAssistantConversationTurn,
+  recordProcessedAssistantMessage,
   recordAssistantUserContext,
   sendAssistantMessage,
   sendSmsMessage,

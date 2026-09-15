@@ -138,6 +138,18 @@ function channelContext(channel) {
   return { channel: "whatsapp", assistant_channel: "whatsapp" };
 }
 
+function readyMessagingContext() {
+  return {
+    ...channelContext("whatsapp"),
+    app_presence: {
+      app_present: true,
+      app_ready: true,
+      last_seen_at: new Date().toISOString(),
+      platform: "synthetic",
+    },
+  };
+}
+
 const socialApps = ["Instagram", "TikTok", "YouTube Shorts", "Reels", "Reddit"];
 const weakMoments = [
   { key: "lunch", phrase: "after lunch", detail: "2:30", match: /lunch|2:\d\d|post-lunch/i, wrong: /bedtime|sleep target/i },
@@ -204,24 +216,24 @@ function buildActionFit(index) {
   const kind = pick(["clear_window", "missing_time", "immediate", "work_conflict"]);
   if (kind === "clear_window") {
     return scenario(`synthetic_action_${index}_window`, "action_fit", "whatsapp", [
-      user(`Block ${app} from 10 pm to 7 am.`, expect([new RegExp(app, "i"), /10|7|block|protect/i], [], { mustAction: ["apply_schedule"] })),
+      user(`Block ${app} from 10 pm to 7 am.`, expect([new RegExp(app, "i"), /10|7|block|protect/i], [], { mustAction: ["open_app_picker"] })),
       user("Will that start automatically?", expect([/app|confirm|apply|automatic|permission/i], [/already done|I set/i])),
-    ], channelContext("whatsapp"));
+    ], readyMessagingContext());
   }
   if (kind === "missing_time") {
     return scenario(`synthetic_action_${index}_missing`, "action_fit", "whatsapp", [
       user(`Can you block ${app} after dinner?`, expect([/dinner|what time|when|finish/i], [], { mustNotAction: ["apply_schedule", "start_protection"] })),
-      user("Usually 9.", expect([new RegExp(app, "i"), /9|block|protect|dinner/i], [], { mustAction: ["apply_schedule"] })),
-    ], channelContext("whatsapp"));
+      user("Usually 9.", expect([new RegExp(app, "i"), /9|block|protect|dinner/i], [], { mustAction: ["open_app_picker"] })),
+    ], readyMessagingContext());
   }
   if (kind === "immediate") {
     return scenario(`synthetic_action_${index}_immediate`, "action_fit", "whatsapp", [
-      user("Start a strict block for 45 minutes now.", expect([/45|strict|block|now|start/i], [], { mustAction: ["start_protection"] })),
-    ], channelContext("whatsapp"));
+      user("Start a strict block for 45 minutes now.", expect([/45|strict|block|now|start/i], [], { mustAction: ["open_app_picker"] })),
+    ], readyMessagingContext());
   }
   return scenario(`synthetic_action_${index}_conflict`, "action_fit", "whatsapp", [
     user(`Block ${app}, but I need it for work.`, expect([new RegExp(app, "i"), /work|when|non-work|boundary|need/i], [/full block now|already done/i], { mustNotAction: ["apply_schedule", "start_protection"] })),
-  ], channelContext("whatsapp"));
+  ], readyMessagingContext());
 }
 
 function buildScopePrivacy(index) {
@@ -252,8 +264,8 @@ function buildSpanish(index) {
   const kind = pick(["lunch", "window", "correction"]);
   if (kind === "window") {
     return scenario(`synthetic_spanish_${index}_window`, "spanish", "whatsapp", [
-      user(`Bloquea ${app} de 22 a 7.`, expect([new RegExp(app, "i"), /22|7|bloque|prote/i], [/hecho|ya está/i], { mustAction: ["apply_schedule"] })),
-    ], channelContext("whatsapp"));
+      user(`Bloquea ${app} de 22 a 7.`, expect([new RegExp(app, "i"), /22|7|bloque|prote/i], [/hecho|ya está/i], { mustAction: ["open_app_picker"] })),
+    ], readyMessagingContext());
   }
   if (kind === "correction") {
     return scenario(`synthetic_spanish_${index}_correction`, "spanish", "whatsapp", [
@@ -274,7 +286,7 @@ function buildMode(index) {
   }
   return scenario(`synthetic_mode_${index}_${mode.toLowerCase()}`, "modes", "whatsapp", [
     user(`Start ${mode} mode for 45 minutes.`, expect([new RegExp(`${mode} mode`, "i"), /45|start/i], [/download|install/i], { mustAction: ["activate_mode"] })),
-  ], { ...channelContext("whatsapp"), available_modes: ["Routine", "Work", "Sleep"] });
+  ], { ...readyMessagingContext(), available_modes: ["Routine", "Work", "Sleep"] });
 }
 
 const builders = [

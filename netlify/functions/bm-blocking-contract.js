@@ -25,6 +25,7 @@ const BLOCKING_ACTION_TYPES = new Set([
 ]);
 
 const MISSING_FIELD_ORDER = ["apps", "action", "start", "end", "recurrence"];
+const PENDING_BLOCKING_TTL_MS = 2 * 60 * 60 * 1000;
 
 function clean(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -78,7 +79,19 @@ function userConversationText(prompt, context = {}) {
   const messages = Array.isArray(context.recent_messages)
     ? context.recent_messages
     : Array.isArray(context.conversation) ? context.conversation : [];
+  const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
+  const pending = context.pending_blocking || memory.pending_blocking;
+  const conversationState = context.conversation_state || memory.conversation_state;
+  const stateUpdatedAt = Date.parse(conversationState?.updated_at || "");
+  const recentAssistant = [...messages].reverse().find((message) => lower(message && message.role, 20) === "assistant");
+  const recentAssistantQuestion = /\b(?:what time|when do you|should it|which apps|how long|a qué hora|cuándo|qué aplicaciones|durante cuánto)\b/i.test(
+    clean(recentAssistant && (recentAssistant.content || recentAssistant.text || recentAssistant.message), 800),
+  );
+  const activeShortTermContext = Boolean(pending && typeof pending === "object" && Object.keys(pending).length)
+    || (Number.isFinite(stateUpdatedAt) && Date.now() - stateUpdatedAt <= 2 * 60 * 60 * 1000)
+    || recentAssistantQuestion;
   const userMessages = messages
+    .filter(() => activeShortTermContext)
     .filter((message) => lower(message && message.role, 20) === "user")
     .map((message) => message && (message.content || message.text || message.message))
     .map((message) => clean(message, 800))
@@ -89,19 +102,34 @@ function userConversationText(prompt, context = {}) {
 function pendingState(context = {}) {
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const candidate = context.pending_blocking || memory.pending_blocking;
-  return candidate && typeof candidate === "object" && !Array.isArray(candidate) ? candidate : {};
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return {};
+  const updatedAt = Date.parse(candidate.updated_at || "");
+  if (Number.isFinite(updatedAt) && (updatedAt > Date.now() + 5 * 60 * 1000 || Date.now() - updatedAt > PENDING_BLOCKING_TTL_MS)) return {};
+  const conversationState = context.conversation_state || memory.conversation_state;
+  const stateUpdatedAt = Date.parse(conversationState?.updated_at || "");
+  if (Number.isFinite(stateUpdatedAt) && Date.now() - stateUpdatedAt > PENDING_BLOCKING_TTL_MS) return {};
+  return candidate;
 }
 
 function isBlockingRequest(prompt, context = {}) {
-  const text = lower(userConversationText(prompt, context));
-  if (Object.keys(pendingState(context)).length > 0) return true;
-  const webOnly = /\b(?:adult websites?|websites?|porn|porno|contenido adulto|p[aá]ginas? web)\b/i.test(text)
-    && !/\b(?:app|apps|aplicaci[oó]n|aplicaciones|instagram|tiktok|youtube|reddit|twitter|facebook|snapchat)\b/i.test(text);
+  const currentText = lower(prompt);
+  const blockingTerms = ["block", "bloquea", "bloquear", "limit", "protect", "proteger", "instagram", "tiktok", "tik tok", "youtube", "reddit", "twitter", "facebook", "snapchat"];
+  const workConflict = hasAny(currentText, ["but i need", "but need", "need it", "for work", "for studying", "for study", "para trabajar", "para estudiar", "lo necesito", "la necesito"])
+    && hasAny(currentText, blockingTerms);
+  if (workConflict) return false;
+  const webOnly = /\b(?:adult websites?|websites?|porn|porno|contenido adulto|p[aá]ginas? web)\b/i.test(currentText)
+    && !/\b(?:app|apps|aplicaci[oó]n|aplicaciones|instagram|tiktok|youtube|reddit|twitter|facebook|snapchat)\b/i.test(currentText);
   if (webOnly) return false;
-  const nonBlockingProductAction = /\b(?:allow only|essentials?-only|solo esenciales|s[oó]lo esenciales|everything except|todo excepto|except essentials|excepto lo esencial|only allow|solo permitir|reminder|recordatorio|notification|notificaci[oó]n)\b/i.test(text);
+  const nonBlockingProductAction = /\b(?:allow only|essentials?-only|solo esenciales|s[oó]lo esenciales|everything except|todo excepto|except essentials|excepto lo esencial|only allow|solo permitir|reminder|recordatorio|notification|notificaci[oó]n)\b/i.test(currentText);
   if (nonBlockingProductAction) return false;
-  if (hasAny(text, ["resume", "reanuda", "resume my rules", "resume rules", "quita la pausa", "quitar la pausa", "remove pause", "disable pause"]) &&
-      !hasAny(text, ["block", "bloquea", "bloquear", "protect", "proteger"])) return false;
+  if (hasAny(currentText, ["resume", "reanuda", "resume my rules", "resume rules", "quita la pausa", "quitar la pausa", "remove pause", "disable pause"]) &&
+      !hasAny(currentText, ["block", "bloquea", "bloquear", "protect", "proteger"])) return false;
+  if (isStandaloneNonBlockingTurn(currentText)) return false;
+  if (Object.keys(pendingState(context)).length > 0) return true;
+  const text = lower(userConversationText(prompt, context));
+  const permanent = hasAny(currentText, ["forever", "permanently", "para siempre", "ever again", "impossible to use"])
+    && hasAny(currentText, ["block", "bloquea", "bloquear", "everything", "todo", "phone", "distractions"]);
+  if (permanent) return false;
   const imperative = hasAny(text, [
     "block", "bloquea", "bloquear", "bloqueo", "protect", "proteger", "protection",
     "shield", "start protection", "start a block", "inicia un bloqueo", "activa un bloqueo",
@@ -109,10 +137,22 @@ function isBlockingRequest(prompt, context = {}) {
     "schedule", "programa", "programar", "activate", "activa", "inicia", "start ",
   ]);
   const modeRequest = /\b(?:mode|modo|profile|perfil)\b/i.test(text) && hasAny(text, ["now", "ahora", "start", "activate", "inicia", "activa", "use", "usa", "i'm in", "im in", "estoy en"]);
+  const knownModes = modeCatalog(context);
+  if (modeRequest && knownModes.length === 0) return false;
+  if (modeRequest && knownModes.length > 0 && !knownModes.some((mode) => text.includes(mode.name.toLowerCase()))) return false;
   if (!imperative && !modeRequest) return false;
   const adviceOnly = /\b(?:how can i|what should i|can you explain|como puedo|qué debería|que deberia|puedes explicar)\b/i.test(text)
     && !/\b(?:i want|quiero|block|bloquea|bloquear|start|inicia|activa|programa)\b/i.test(text);
   return !adviceOnly || /\b(?:use|usa)\b[^.?!]{0,40}\b(?:mode|modo|profile|perfil)\b/i.test(text);
+}
+
+function isStandaloneNonBlockingTurn(text) {
+  if (!text) return false;
+  if (hasAny(text, ["block", "bloquea", "bloquear", "limit", "protect", "proteger", "schedule", "programa", "programar", "start", "inicia", "activa"])) return false;
+  if (/^(?:hey|hi|hello|yo|hola|buenas|good morning|good afternoon|good evening|buenos d[ií]as|buenas tardes|buenas noches|thanks|thank you|thx|gracias|ok|okay|vale|perfect|perfecto|cool|nice|great|genial)\b/i.test(text)) return true;
+  if (/^(?:how are you|how are u|how you doing|what's up|whats up|qué tal|que tal|cómo estás|como estas)\b/i.test(text)) return true;
+  if (/^(?:how can i|how do i|what should i|what can i do|can you explain|why do i|como puedo|qué debería|que deberia|puedes explicar)\b/i.test(text)) return true;
+  return false;
 }
 
 function parseApps(text, context = {}) {
@@ -220,13 +260,45 @@ function parseTimeParts(value, expression) {
   return parsed == null ? null : { parsed, raw: match[0] };
 }
 
+function relativeMomentKey(text) {
+  const value = lower(text);
+  if (hasAny(value, ["after breakfast", "right after breakfast", "despues de desayunar", "después de desayunar"])) return "breakfast";
+  if (hasAny(value, ["after lunch", "right after lunch", "despues de comer", "después de comer", "despues de lunch", "después de lunch"])) return "lunch";
+  if (hasAny(value, ["after dinner", "right after dinner", "despues de cenar", "después de cenar", "despues de dinner", "después de dinner"])) return "dinner";
+  if (hasAny(value, ["after work", "right after work", "despues de trabajar", "después de trabajar", "despues de work", "después de work"])) return "work";
+  return "";
+}
+
+function relativeMomentDefaults(text) {
+  const key = relativeMomentKey(text);
+  if (!key) return null;
+  const value = lower(text);
+  const matches = [...value.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/gi)];
+  const match = matches[matches.length - 1];
+  if (!match) return null;
+  const rawHour = Number(match[1]);
+  const meridiem = match[3] || (key === "breakfast" ? "am" : "pm");
+  const minute = parseClock(rawHour, match[2], meridiem, "");
+  if (typeof minute !== "number") return null;
+  const duration = key === "dinner" ? 90 : key === "work" ? 60 : 60;
+  return {
+    start: { type: "time", value: minute, source: "relative_followup" },
+    end: { type: "duration", value: duration, source: "relative_default" },
+    recurrence: { type: "daily", value: [1, 2, 3, 4, 5, 6, 7], source: "relative_default" },
+  };
+}
+
 function parseTimeWindow(text) {
   const value = lower(text);
   const expression = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|de la mañana|de la manana|de la tarde|de la noche)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|de la mañana|de la manana|de la tarde|de la noche)?/i;
   const match = value.match(expression);
   if (!match) return null;
   const start = parseClock(match[1], match[2], match[3], "");
-  const end = parseClock(match[4], match[5], match[6], "");
+  let end = parseClock(match[4], match[5], match[6], "");
+  if (typeof start === "number" && end && typeof end === "object" && end.ambiguous && !match[6]) {
+    const endCandidate = Number(end.hour) * 60 + Number(end.minute || 0);
+    if (start >= 12 * 60 && start > endCandidate) end = parseClock(match[4], match[5], "am", "");
+  }
   if (start == null || end == null || typeof start !== "number" || typeof end !== "number" || start === end) {
     return { ambiguous: true };
   }
@@ -318,6 +390,16 @@ function resolveBlockingContract(prompt, context = {}, plan = null) {
   let start = mergePending("start", parseStart(combinedText, context), pending);
   let end = mergePending("end", parseEnd(combinedText, start), pending);
   let recurrence = mergePending("recurrence", parseRecurrence(combinedText, start), pending);
+  const explicitWindow = parseTimeWindow(combinedText);
+  if (explicitWindow && !explicitWindow.ambiguous && recurrence && recurrence.type === "missing" && explicitWindow.start > explicitWindow.end) {
+    recurrence = { type: "daily", value: [1, 2, 3, 4, 5, 6, 7], source: "overnight_default" };
+  }
+  const relativeDefaults = relativeMomentDefaults(combinedText);
+  if (relativeDefaults) {
+    if (!start || start.type === "missing") start = relativeDefaults.start;
+    if (!end || end.type === "missing") end = relativeDefaults.end;
+    if (!recurrence || recurrence.type === "missing") recurrence = relativeDefaults.recurrence;
+  }
   if (actionType === "daily_limit") {
     if (!start || start.type === "missing") start = { type: "now", value: "now", source: "daily_limit_default" };
     if (!recurrence || recurrence.type === "missing") recurrence = { type: "daily", value: [1, 2, 3, 4, 5, 6, 7], source: "daily_limit_default" };
@@ -393,9 +475,36 @@ function publicBlockingData(data) {
   };
 }
 
-function incompleteBlockingPlan(contract, language = "en") {
+function incompleteBlockingPlan(contract, language = "en", prompt = "", context = {}) {
   if (!contract.is_blocking_request || !contract.user_request || contract.ready) return null;
-  const question = missingQuestion(contract, language);
+  const data = contract.data || {};
+  const apps = Array.isArray(data.apps) ? data.apps.filter((app) => app && app !== "selected_apps") : [];
+  const combinedText = userConversationText(prompt, context);
+  const requestedMode = combinedText.match(/\b(?:start|activate|use|inicia|activa|usa)\s+([a-z][a-z0-9 _-]{0,30})\s+(?:mode|modo)\b/i)?.[1]?.trim() || "";
+  const target = apps.length
+    ? apps.map((app) => String(app).replace(/^mode:/, "")).join(" and ")
+    : requestedMode ? `${requestedMode} mode` : "the selected apps";
+  const windowMatch = String(prompt || "").match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  const knownWindow = windowMatch ? ` from ${windowMatch[1]}${windowMatch[3] ? ` ${windowMatch[3].toUpperCase()}` : ""} to ${windowMatch[4]}${windowMatch[6] ? ` ${windowMatch[6].toUpperCase()}` : ""}` : "";
+  const webChannel = context && (context.web_preview === true || context.channel === "web" || context.assistant_channel === "web");
+  const webNote = webChannel
+    ? language === "es"
+      ? " Desde la web puedo planearlo, pero Blankmind App es quien puede ejecutarlo automáticamente porque ahí están los permisos."
+      : " I can plan it here, but Blankmind App is what executes it automatically because the permissions live there."
+    : "";
+  const relativeKey = relativeMomentKey(combinedText);
+  const relativeQuestions = {
+    breakfast: language === "es" ? "¿a qué hora sueles terminar de desayunar?" : "what time do you usually finish breakfast?",
+    lunch: language === "es" ? "¿a qué hora sueles terminar de comer?" : "what time do you usually finish eating?",
+    dinner: language === "es" ? "¿a qué hora sueles terminar de cenar?" : "what time do you usually finish dinner?",
+    work: language === "es" ? "¿a qué hora sueles terminar de trabajar?" : "what time do you usually finish work?",
+  };
+  const missing = relativeKey && !relativeMomentDefaults(combinedText)
+    ? relativeQuestions[relativeKey]
+    : missingQuestion(contract, language);
+  const question = language === "es"
+    ? `Puedo preparar un bloqueo para ${target}${knownWindow}, pero ${missing}${webNote}`
+    : `I can prepare a block for ${target}${knownWindow}, but ${missing.charAt(0).toLowerCase()}${missing.slice(1)}${webNote}`;
   return {
     intent: "social",
     title: language === "es" ? "Detalles del bloqueo" : "Blocking details",

@@ -32,7 +32,7 @@ function baseContext(overrides = {}) {
   const memory = {
     ...(overrides.memory || {}),
   };
-  return {
+  const context = {
     is_blank_active: false,
     has_selected_apps: true,
     selection_count: 3,
@@ -48,6 +48,15 @@ function baseContext(overrides = {}) {
     ...overrides,
     memory,
   };
+  const channel = String(context.channel || context.assistant_channel || "").toLowerCase();
+  if (["whatsapp", "sms"].includes(channel) && context.app_presence === undefined) {
+    context.app_presence = {
+      app_present: true,
+      app_ready: true,
+      last_seen_at: new Date().toISOString(),
+    };
+  }
+  return context;
 }
 
 async function callAgent(testCase) {

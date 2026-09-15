@@ -1256,13 +1256,24 @@
       ]
     },
     "expect": {
-      "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "intent": "general",
+      "action_types": [],
       "text_matches": [
-        "screen habit|Pattern|Move"
+        "not.*saved|available mode|create.*mode"
+      ]
+    }
+  },
+  {
+    "id": "missing_mode_without_catalog_does_not_switch",
+    "prompt": "Start Gaming mode.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not.*created|not.*saved|available mode|create.*mode"
       ]
     }
   },
@@ -1986,7 +1997,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "text_matches": [
         "YouTube|10:00 PM|7:00 AM"

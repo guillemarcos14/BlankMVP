@@ -175,7 +175,6 @@ private struct BlankGlassCardModifier: ViewModifier {
                             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     }
                 }
-                .allowsHitTesting(false)
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

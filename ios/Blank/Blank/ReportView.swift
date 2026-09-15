@@ -4269,7 +4269,6 @@ private struct LiquidGlassModifier: ViewModifier {
                             .opacity(0.34)
                     }
                 }
-                .allowsHitTesting(false)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)

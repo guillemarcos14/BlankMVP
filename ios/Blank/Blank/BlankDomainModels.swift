@@ -372,8 +372,13 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
-        name = try container.decodeIfPresent(String.self, forKey: .name)?.trimmingCharacters(in: .whitespacesAndNewlines)
-            .flatMap { $0.isEmpty ? nil : $0 } ?? "Mode"
+        let decodedName = try container.decodeIfPresent(String.self, forKey: .name)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let decodedName, !decodedName.isEmpty {
+            name = decodedName
+        } else {
+            name = "Mode"
+        }
         selectionData = try container.decodeIfPresent(Data.self, forKey: .selectionData)
         appNames = Self.normalizedAppNames(try container.decodeIfPresent([String].self, forKey: .appNames) ?? [])
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()

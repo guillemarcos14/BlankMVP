@@ -1,16 +1,32 @@
 const crypto = require("crypto");
 const { json, parseJsonBody } = require("./_membership");
 const {
+  attachAssistantUserContext,
   connectCodeFromText,
+  ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
+const { freshConversationState } = require("./bm-context");
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function explicitDurationMinutes(text) {
+  const match = cleanText(text, 600).toLowerCase().match(/(\d{1,3})\s*[-–]?\s*(?:min|mins|minute|minutes|minutos?)/i);
+  if (!match) return null;
+  return Math.min(Math.max(Number(match[1]), 5), 240);
+}
+
+function asksForDailyLimit(text) {
+  const value = cleanText(text, 600).toLowerCase();
+  return /\b(daily limit|per day|each day|every day|l[ií]mite diario|por d[ií]a)\b/i.test(value)
+    || (/\b(limit|l[ií]mite|cap|tope)\b/i.test(value) && /\d+\s*(?:min|mins|minute|minutes|minutos?)/i.test(value));
 }
 
 function header(event, name) {
@@ -131,40 +147,68 @@ function publicOpenLink(actionName, params = {}) {
 function appLink(action, appNames = []) {
   const type = action && action.type;
   if (type === "start_protection") {
-    const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
-    return publicOpenLink("start-focus", { minutes, hard: action.hard_mode ? "true" : "" });
+    return publicOpenLink("review-action", {
+      type,
+      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
+      hard: action.hard_mode ? "true" : "",
+      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
+    });
   }
   if (type === "activate_mode" && action.name) {
-    const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
-    return publicOpenLink("mode", { name: action.name, activate: "true", minutes, hard: action.hard_mode ? "true" : "" });
+    return publicOpenLink("review-action", {
+      type,
+      name: action.name,
+      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
+      hard: action.hard_mode ? "true" : "",
+      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
+    });
   }
   if (type === "apply_schedule") {
     const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
     const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
     if (start == null || end == null) return "";
     const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
-    return publicOpenLink(appNames.length ? "setup-plan" : "apply-plan", {
+    return publicOpenLink("review-action", {
+      type,
+      name: action.name || "AI Plan",
       start,
       end,
       days,
+      weekdays: Array.isArray(action.weekdays) ? action.weekdays.join(",") : "",
       apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
     });
   }
-  if (type === "enable_allow_only") return publicOpenLink("allow-only");
-  if (type === "enable_adult_filter") return publicOpenLink("adult-filter");
-  if (type === "set_daily_limit") return publicOpenLink("daily-limit", { minutes: Number.isFinite(action.minutes) ? action.minutes : 25 });
-  if (type === "pause_rules") return publicOpenLink("pause-rules", { hours: Number.isFinite(action.hours) ? action.hours : 168 });
-  if (type === "disable_pause") return publicOpenLink("resume-rules");
-  if (type === "switch_mode" && action.name) return publicOpenLink("mode", { name: action.name });
-  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") {
-    return publicOpenLink("open-picker", { source: "assistant", apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
+  if (type === "enable_allow_only") return publicOpenLink("review-action", { type });
+  if (type === "enable_adult_filter") return publicOpenLink("review-action", { type });
+  if (type === "set_daily_limit") return publicOpenLink("review-action", { type, minutes: Number.isFinite(action.minutes) ? action.minutes : "", apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
+  if (type === "pause_rules") return publicOpenLink("review-action", { type, hours: Number.isFinite(action.hours) ? action.hours : 168 });
+  if (type === "disable_pause") return publicOpenLink("review-action", { type });
+  if (type === "switch_mode" && action.name) return publicOpenLink("review-action", { type, name: action.name });
+  if (type === "open_app_picker") {
+    return publicOpenLink("review-action", {
+      type,
+      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
+      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
+      hard: action.hard_mode ? "true" : "",
+      name: action.name || "",
+      start: Number.isFinite(action.start_minute) ? action.start_minute : "",
+      end: Number.isFinite(action.end_minute) ? action.end_minute : "",
+      days: Number.isFinite(action.duration_days) ? action.duration_days : "",
+      weekdays: Array.isArray(action.weekdays) ? action.weekdays.join(",") : "",
+    });
+  }
+  if (type === "request_screen_time_permission" || type === "apply_ai_plan") {
+    return publicOpenLink("review-action", { type, apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
   }
   return "";
 }
 
 function actionableLink(plan, prompt = "") {
   const actions = Array.isArray(plan.actions) ? plan.actions : [];
-  const appNames = requestedAppNames(prompt);
+  const contractApps = plan.blocking_data && Array.isArray(plan.blocking_data.apps)
+    ? plan.blocking_data.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps")
+    : [];
+  const appNames = contractApps.length ? contractApps : requestedAppNames(prompt);
   for (const action of actions) {
     const link = appLink(action, appNames);
     if (link) return link;
@@ -176,7 +220,7 @@ function whatsappReplyText(plan, prompt = "") {
   const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
   const link = actionableLink(plan, prompt);
   if (!link) return text;
-  return `${text}\n\nOpen Blanked to apply it:\n${link}`;
+  return `${text}\n\nReview and confirm in Blanked:\n${link}`;
 }
 
 function whatsappActionButtonVariables(link) {
@@ -207,8 +251,13 @@ function whatsappActionButtonVariables(link) {
 async function sendPlanReply(to, plan, prompt = "") {
   const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
   const link = actionableLink(plan, prompt);
-  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
-  if (!link || !contentSid) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
+  // The previous template contained a misleading static CTA label. Only use a
+  // separately approved review template, never the legacy action template.
+  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID, 80);
+  const templateEnabled = process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED === "true";
+  // A template can contain a stale static button label that the backend cannot inspect.
+  // Keep the safe text link as the default until the approved template is explicitly verified.
+  if (!link || !contentSid || !templateEnabled) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
 
   const textResult = await sendWhatsAppMessage(to, text);
   const buttonResult = await sendWhatsAppMessage(to, "", {
@@ -243,9 +292,10 @@ function lunchEndMinute(text) {
   return mealEndMinute(text, /(lunch|comida|comer|almuerzo)/i);
 }
 
-function memoryFactsFromText(text) {
+function memoryFactsFromText(text, savedMemory = {}) {
   const value = cleanText(text, 800).toLowerCase();
   const apps = requestedAppNames(text);
+  const minutes = explicitDurationMinutes(text);
   const breakfastMinute = breakfastEndMinute(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
@@ -261,6 +311,15 @@ function memoryFactsFromText(text) {
     facts.breakfast_end_minute = breakfastMinute;
     facts.weak_hours = [Math.floor(breakfastMinute / 60)];
   }
+  if (savedMemory.pending_action === "set_daily_limit" && minutes != null) {
+    facts.pending_action = "";
+    facts.pending_app_names = [];
+  } else if (asksForDailyLimit(text) && minutes == null) {
+    facts.pending_action = "set_daily_limit";
+    facts.pending_app_names = apps.length
+      ? apps
+      : (Array.isArray(savedMemory.main_apps) ? savedMemory.main_apps.slice(0, 8) : []);
+  }
   return facts;
 }
 
@@ -271,15 +330,20 @@ async function agentContext(from, prompt) {
   } catch (_) {
     savedMemory = {};
   }
-  const newFacts = memoryFactsFromText(prompt);
+  const newFacts = memoryFactsFromText(prompt, savedMemory);
   const language = savedMemory.language || detectedLanguage(prompt);
+  const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
     ...newFacts,
     language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+    conversation_state: conversationState,
   };
+  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+    ? savedMemory.user_context
+    : {};
   if (Object.keys(newFacts).length) {
     try {
       await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
@@ -288,32 +352,40 @@ async function agentContext(from, prompt) {
     }
   }
   return {
+    ...userContext,
     channel: "whatsapp",
     assistant_channel: "whatsapp",
     language,
     allow_spanish_response: true,
-    is_blank_active: false,
-    has_selected_apps: true,
-    selection_count: 1,
-    screen_time_authorized: true,
-    emergency_unlocks_remaining: 3,
-    vacation_mode_active: false,
-    risk_window: "the usual risk window",
-    recommended_duration_minutes: 30,
+    is_blank_active: userContext.is_blank_active === undefined ? false : userContext.is_blank_active,
+    has_selected_apps: userContext.has_selected_apps === true,
+    selection_count: Number.isFinite(userContext.selection_count) ? userContext.selection_count : 0,
+    screen_time_authorized: userContext.screen_time_authorized === true,
+    emergency_unlocks_remaining: Number.isFinite(userContext.emergency_unlocks_remaining) ? userContext.emergency_unlocks_remaining : 3,
+    vacation_mode_active: userContext.vacation_mode_active === undefined ? false : userContext.vacation_mode_active,
+    risk_window: userContext.risk_window || "the usual risk window",
+    recommended_duration_minutes: Number.isFinite(userContext.recommended_duration_minutes) ? userContext.recommended_duration_minutes : 30,
+    user_context: userContext,
     memory,
+    recent_messages: conversationState?.recent_messages || [],
+    pending_followup_prompt: savedMemory.pending_action === "set_daily_limit"
+      && explicitDurationMinutes(prompt) != null
+      ? `Set a ${explicitDurationMinutes(prompt)}-minute daily limit${(Array.isArray(savedMemory.pending_app_names) && savedMemory.pending_app_names.length) ? ` for ${savedMemory.pending_app_names.join(" and ")}` : ""}.`
+      : "",
   };
 }
 
 async function callBlankedAgent(prompt, from) {
+  const context = await agentContext(from, prompt);
   const response = await blankedAgentHandler({
     httpMethod: "POST",
-    body: JSON.stringify({ prompt, context: await agentContext(from, prompt) }),
+    body: JSON.stringify({ prompt: context.pending_followup_prompt || prompt, context }),
   });
   const body = JSON.parse(response.body || "{}");
   if (response.statusCode < 200 || response.statusCode >= 300 || !body.ok) {
     throw new Error(body.error || "blanked_agent_failed");
   }
-  return body.plan;
+  return { plan: body.plan, context };
 }
 
 async function recordAssistantConnection({ channel, connectCode, from }) {
@@ -330,6 +402,7 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
       memory: { proactive_updates_paused: false },
       source: "assistant_channel_connected",
     });
+    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
   } catch (_) {
     return;
   }
@@ -343,6 +416,12 @@ async function processMessage(message) {
       message.from,
       "Hey! Blanked here 👋 Connected. This WhatsApp thread is now linked to your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
     );
+  }
+
+  try {
+    await ensureAssistantConnectionForPhone({ channel: "whatsapp", channelUser: message.from });
+  } catch (_) {
+    // Automatic identity matching is additive; legacy CONNECT remains available.
   }
 
   const command = message.text.toLowerCase();
@@ -371,7 +450,34 @@ async function processMessage(message) {
     });
     return sendWhatsAppMessage(message.from, pendingMessage);
   }
-  const plan = await callBlankedAgent(message.text, message.from);
+  const result = await callBlankedAgent(message.text, message.from);
+  const plan = result.plan;
+  try {
+    await recordAssistantConversationTurn({
+      channel: "whatsapp",
+      channelUser: message.from,
+      previousState: result.context.memory?.conversation_state,
+      userMessage: message.text,
+      assistantMessage: plan.message_text || plan.response_text || "",
+      topic: result.context.memory?.last_topic || "",
+    });
+  } catch (_) {
+    // Short-term memory must never block the user-facing reply.
+  }
+  if (plan.blocking_user_request === true) {
+    try {
+      await recordAssistantMemory({
+        channel: "whatsapp",
+        channelUser: message.from,
+        memory: {
+          pending_blocking: plan.blocking_ready === false ? plan.blocking_data : null,
+        },
+        source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
+      });
+    } catch (_) {
+      // Pending blocking state must never block the user-facing reply.
+    }
+  }
   return sendPlanReply(message.from, plan, message.text);
 }
 

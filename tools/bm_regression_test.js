@@ -13,6 +13,15 @@ const { policyForPlan } = require("../netlify/functions/bm-policy");
 
 const ROOT = path.join(__dirname, "..");
 const ios = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/ContentView.swift"), "utf8");
+const blankApp = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/BlankApp.swift"), "utf8");
+const home = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/HomeView.swift"), "utf8");
+const sessionStore = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/SessionStore.swift"), "utf8");
+const assistantChannel = fs.readFileSync(path.join(ROOT, "netlify/functions/assistant-channel.js"), "utf8");
+const assistantChannelShared = fs.readFileSync(path.join(ROOT, "netlify/functions/_assistant_channel.js"), "utf8");
+const bmContext = fs.readFileSync(path.join(ROOT, "netlify/functions/bm-context.js"), "utf8");
+const whatsapp = fs.readFileSync(path.join(ROOT, "netlify/functions/whatsapp-agent.js"), "utf8");
+const agent = fs.readFileSync(path.join(ROOT, "netlify/functions/blanked-agent.js"), "utf8");
+const openPage = fs.readFileSync(path.join(ROOT, "web/landing/open.html"), "utf8");
 const android = fs.readFileSync(
   path.join(ROOT, "app/src/main/java/com/blanknfc/app/data/DigitalWellnessRemoteStore.kt"),
   "utf8",
@@ -124,9 +133,79 @@ check("native_clients_close_loop_with_outcome_recorded", () => {
   assert.match(executionBlock, /outcome_recorded/, "Android must send outcome_recorded after execution");
 });
 
+check("immediate_protection_does_not_invent_duration", () => {
+  assert.match(agent, /const requestedDuration = explicitDurationMinutes\(prompt\);/);
+  assert.match(agent, /normalized\.minutes = null/);
+  assert.match(agent, /set_daily_limit.*explicitDurationMinutes/);
+  assert.match(whatsapp, /publicOpenLink\("review-action"/);
+  assert.match(whatsapp, /TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED/);
+  assert.doesNotMatch(whatsapp, /start-focus.*minutes.*30/);
+});
+
+check("whatsapp_actions_require_native_confirmation", () => {
+  assert.match(whatsapp, /Review and confirm in Blanked/);
+  assert.match(blankApp, /action == "review-action"/);
+  assert.match(sessionStore, /pendingAssistantAction/);
+  assert.match(home, /Review and confirm/);
+});
+
+check("assistant_context_sync_reaches_messaging_identity", () => {
+  assert.match(assistantChannel, /action === "sync_context"/);
+  assert.match(assistantChannel, /recordAssistantUserContext/);
+  assert.match(assistantChannelShared, /assistant_user_context_synced/);
+  assert.match(assistantChannelShared, /attachAssistantUserContext/);
+  assert.match(assistantChannel, /const connection = await findAssistantConnection\(connectCode, preferredChannel\)/);
+  assert.match(bmContext, /available_mode_catalog/);
+  assert.match(bmContext, /deriveAppPresence/);
+  assert.match(bmContext, /app_presence_state/);
+  assert.match(assistantChannelShared, /last_seen_at: now/);
+  assert.match(ios, /AssistantContextSyncClient/);
+  assert.match(ios, /BlankmindAppPresence\.payload/);
+  assert.match(home, /BlankmindAppPresence\.payload/);
+  assert.match(ios, /availableModeCatalog/);
+  assert.match(home, /assistantContextPayload/);
+  assert.match(home, /syncAssistantContext/);
+  assert.match(sessionStore, /func assistantModeCatalog/);
+});
+
+check("daily_limit_applies_screen_time_state", () => {
+  const dailyLimitBlock = blockBetween(blankApp, 'if action == "daily-limit"', 'if action == "pause-rules"');
+  assert.match(dailyLimitBlock, /refreshDailyLimitMonitoring\(\)/);
+  assert.match(dailyLimitBlock, /applyScreenTimeState\(\)/);
+  assert.match(agent, /title: "Daily Limit"/);
+  assert.match(agent, /How many minutes per day do you want to allow/);
+});
+
+check("adaptive_schedule_appends_windows", () => {
+  const scheduleBlock = blockBetween(sessionStore, "func applyAdaptivePlan(", "func applyAIPlan(");
+  assert.match(scheduleBlock, /var windows = schedule\.windows/);
+  assert.match(scheduleBlock, /windows\.append\(window\)/);
+  assert.doesNotMatch(ios, /sessionStore\.schedule\.windows = \[window\]/);
+});
+
+check("why_now_layout_is_centered", () => {
+  const whyNowBlock = blockBetween(home, "private struct RelapseReviewSheet", "private struct RelapseReasonTile");
+  assert.match(whyNowBlock, /frame\(maxWidth: \.infinity, maxHeight: \.infinity, alignment: \.top\)/);
+  assert.match(whyNowBlock, /HStack\(spacing: 0\)/);
+  assert.match(home, /requestAssistantActionConfirmation\(\.applyAIPlan\)/);
+});
+
+check("assistant_actions_reuse_saved_modes_and_ignore_stale_timer", () => {
+  assert.match(sessionStore, /func restoreSavedSelectionForAssistant\(appNames: \[String\] = \[\]\)/);
+  assert.match(sessionStore, /usePendingWidgetTimer: Bool = true/);
+  assert.match(home, /restoreSavedSelectionForAssistant\(appNames: appNames\)/);
+  assert.match(home, /usePendingWidgetTimer: false/);
+});
+
+check("review_action_survives_landing_redirect", () => {
+  assert.match(openPage, /"review-action"/);
+  assert.match(openPage, /Review and confirm in Blanked/);
+  assert.match(openPage, />Review and confirm</);
+});
+
 if (failures.length > 0) {
-  console.error(`\nBM regression suite failed: ${failures.length}/5 checks`);
+  console.error(`\nBM regression suite failed: ${failures.length}/12 checks`);
   process.exitCode = 1;
 } else {
-  console.log("\nBM regression suite passed: 5/5 checks");
+  console.log("\nBM regression suite passed: 12/12 checks");
 }

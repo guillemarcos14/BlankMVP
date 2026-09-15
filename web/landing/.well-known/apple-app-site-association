@@ -15,6 +15,10 @@
             "comment": "Open Blanked action links"
           },
           {
+            "/": "/open/*",
+            "comment": "Open dynamic handoff and action links"
+          },
+          {
             "/": "/open.html",
             "comment": "Legacy Blanked action bridge"
           }

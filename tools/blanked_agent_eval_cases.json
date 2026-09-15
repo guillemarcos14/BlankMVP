@@ -133,7 +133,7 @@
       ],
       "first_action": {
         "name": "Social",
-        "minutes": 35
+        "minutes": null
       },
       "text_matches": [
         "Social mode|35|lunch|start"
@@ -424,7 +424,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 35,
+        "minutes": null,
         "hard_mode": false
       },
       "requires_selected_apps": true,
@@ -456,7 +456,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 30,
+        "minutes": null,
         "hard_mode": true
       }
     }
@@ -1241,7 +1241,7 @@
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Sleep mode|10:00 PM|7:00 AM|30 minutes"
+        "Sleep mode|10:00 PM|7:00 AM"
       ]
     }
   },
@@ -1752,7 +1752,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 25,
+        "minutes": null,
         "hard_mode": true
       },
       "text_matches": [

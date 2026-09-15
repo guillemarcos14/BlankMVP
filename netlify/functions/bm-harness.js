@@ -59,6 +59,9 @@ function contextShape(context = {}) {
     web_preview: context.web_preview === true,
     has_selected_apps: context.has_selected_apps === true,
     screen_time_authorized: context.screen_time_authorized === true,
+    app_presence_state: clean(context.app_presence_state, 24) || "never_seen",
+    app_presence_recent: context.app_presence_recent === true,
+    app_ready: context.app_ready === true,
     is_blank_active: context.is_blank_active === true,
     recent_messages_count: Array.isArray(context.recent_messages)
       ? context.recent_messages.length

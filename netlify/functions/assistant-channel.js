@@ -3,7 +3,10 @@ const {
   cleanChannel,
   cleanText,
   findAssistantConnection,
+  attachAssistantUserContext,
+  recordAssistantMemory,
   normalizeConnectCode,
+  recordAssistantUserContext,
   recordAssistantChannel,
   proactiveGate,
   sendAssistantMessage,
@@ -23,6 +26,23 @@ async function registerPreference(body) {
     connectCode,
     userPhone: body.user_phone || body.phone_number || "",
   });
+
+  if (body.context && typeof body.context === "object" && !Array.isArray(body.context)) {
+    const normalizedContext = await recordAssistantUserContext({
+      connectCode,
+      context: body.context,
+      channel: preferredChannel,
+      userPhone: body.user_phone || body.phone_number || "",
+    });
+    const connection = await findAssistantConnection(connectCode, preferredChannel);
+    if (connection && normalizedContext) {
+      await attachAssistantUserContext({
+        connectCode,
+        channel: connection.channel,
+        channelUser: connection.channelUser,
+      });
+    }
+  }
 
   return json(200, { ok: true, connect_code: connectCode, preferred_channel: preferredChannel });
 }
@@ -87,6 +107,39 @@ async function sendProactive(body) {
   });
 }
 
+async function syncContext(body) {
+  const connectCode = normalizeConnectCode(body.connect_code);
+  const preferredChannel = cleanChannel(body.preferred_channel || body.channel);
+  const context = body.context && typeof body.context === "object" && !Array.isArray(body.context)
+    ? body.context
+    : null;
+  if (!connectCode || !context) return json(400, { error: "missing_connect_code_or_context" });
+
+  const normalizedContext = await recordAssistantUserContext({
+    connectCode,
+    context,
+    channel: preferredChannel,
+    userPhone: body.user_phone || body.phone_number || "",
+  });
+  const connection = await findAssistantConnection(connectCode, preferredChannel);
+  if (connection && normalizedContext) {
+    await recordAssistantMemory({
+      channel: connection.channel,
+      channelUser: connection.channelUser,
+      memory: { user_context: normalizedContext },
+      source: "assistant_user_context_sync",
+    });
+  }
+  return json(200, {
+    ok: true,
+    synced: Boolean(normalizedContext),
+    available_mode_count: Array.isArray(normalizedContext?.available_mode_catalog)
+      ? normalizedContext.available_mode_catalog.length
+      : 0,
+    attached_channel: connection?.channel || "",
+  });
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -95,6 +148,7 @@ exports.handler = async (event) => {
     const body = parseJsonBody(event);
     const action = cleanText(body.action, 60).toLowerCase();
     if (action === "register_preference") return registerPreference(body);
+    if (action === "sync_context") return syncContext(body);
     if (action === "send_proactive") return sendProactive(body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {

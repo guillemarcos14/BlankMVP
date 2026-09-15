@@ -7,6 +7,34 @@ delete process.env.WHATSAPP_PHONE_NUMBER_ID;
 
 const { handler } = require("../netlify/functions/whatsapp-agent");
 
+function recentAssistantMemoryResponse(target, options = {}) {
+  if (!String(target).startsWith("https://supabase.test/rest/v1/")) return null;
+  if ((options.method || "GET").toUpperCase() === "POST") {
+    return { ok: true, status: 201, text: async () => "", json: async () => ({}) };
+  }
+  const result = [{
+    payload: {
+      event: "assistant_memory_updated",
+      properties: {
+        memory: {
+          user_context: {
+            has_selected_apps: true,
+            selection_count: 3,
+            screen_time_authorized: true,
+            app_presence: {
+              app_present: true,
+              app_ready: true,
+              last_seen_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            },
+          },
+        },
+      },
+    },
+    submitted_at: new Date().toISOString(),
+  }];
+  return { ok: true, status: 200, text: async () => JSON.stringify(result), json: async () => result };
+}
+
 async function verifyWebhook() {
   const response = await handler({
     httpMethod: "GET",
@@ -132,11 +160,15 @@ async function connectGreeting() {
 }
 
 async function linkIncludesRequestedApps() {
+  process.env.SUPABASE_URL = "https://supabase.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
   let outboundText = "";
   const originalFetch = global.fetch;
-  global.fetch = async (_url, options) => {
+  global.fetch = async (_url, options = {}) => {
+    const memoryResponse = recentAssistantMemoryResponse(_url, options);
+    if (memoryResponse) return memoryResponse;
     outboundText = JSON.parse(options.body).text.body;
     return {
       ok: true,
@@ -158,7 +190,7 @@ async function linkIncludesRequestedApps() {
                     {
                       from: "34600000000",
                       id: "wamid.plan",
-                      text: { body: "Block Instagram TikTok and X from 10 to 7" },
+                      text: { body: "Block Instagram TikTok from 10 pm to 7 am every day" },
                     },
                   ],
                 },
@@ -169,23 +201,30 @@ async function linkIncludesRequestedApps() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=setup-plan/);
-    assert.match(outboundText, /apps=Instagram%2CTikTok%2CX/);
+    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=review-action/);
+    assert.match(outboundText, /apps=(?:Instagram%2CTikTok|TikTok%2CInstagram)/);
   } finally {
     global.fetch = originalFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
     delete process.env.WHATSAPP_PHONE_NUMBER_ID;
   }
 }
 
 async function twilioButtonTemplateHidesRawUrlFromMainReply() {
+  process.env.SUPABASE_URL = "https://supabase.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
   process.env.TWILIO_ACCOUNT_SID = "ACtest";
   process.env.TWILIO_AUTH_TOKEN = "test-token";
   process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
-  process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID = "HXbutton";
+  process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID = "HXbutton";
+  process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED = "true";
   const requests = [];
   const originalFetch = global.fetch;
-  global.fetch = async (_url, options) => {
+  global.fetch = async (_url, options = {}) => {
+    const memoryResponse = recentAssistantMemoryResponse(_url, options);
+    if (memoryResponse) return memoryResponse;
     const params = new URLSearchParams(options.body);
     requests.push(Object.fromEntries(params.entries()));
     return {
@@ -208,7 +247,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
                     {
                       from: "34600000000",
                       id: "wamid.button",
-                      text: { body: "Block Instagram from 10 to 7" },
+                      text: { body: "Block selected apps from 10 pm to 7 am every day" },
                     },
                   ],
                 },
@@ -222,13 +261,16 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 2);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
     assert.strictEqual(requests[1].ContentSid, "HXbutton");
-    assert.match(requests[1].ContentVariables, /open\?action=setup-plan/);
+    assert.match(requests[1].ContentVariables, /open\?action=review-action/);
   } finally {
     global.fetch = originalFetch;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     delete process.env.TWILIO_ACCOUNT_SID;
     delete process.env.TWILIO_AUTH_TOKEN;
     delete process.env.TWILIO_WHATSAPP_FROM_NUMBER;
-    delete process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID;
+    delete process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID;
+    delete process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED;
   }
 }
 
@@ -259,7 +301,7 @@ async function modePhraseOpensActivateModeLink() {
                     {
                       from: "34600000000",
                       id: "wamid.mode",
-                      text: { body: "I'm in social mode now" },
+                      text: { body: "I'm in social mode now for 45 minutes" },
                     },
                   ],
                 },
@@ -270,9 +312,8 @@ async function modePhraseOpensActivateModeLink() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=mode/);
-    assert.match(outboundText, /name=Social/);
-    assert.match(outboundText, /activate=true/);
+    assert.doesNotMatch(outboundText, /review-action/);
+    assert.match(outboundText, /Which apps|Should it start now|How long/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
@@ -318,9 +359,8 @@ async function categoryRequestOpensActivateModeLink() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=mode/);
-    assert.match(outboundText, /name=Social/);
-    assert.match(outboundText, /activate=true/);
+    assert.doesNotMatch(outboundText, /review-action/);
+    assert.match(outboundText, /Which apps|Should it start now|How long/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;

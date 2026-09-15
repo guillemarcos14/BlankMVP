@@ -1,13 +1,16 @@
 const { json, requireMethod } = require("./_membership");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
+const { freshConversationState } = require("./bm-context");
 const {
+  attachAssistantUserContext,
   connectCodeFromText,
+  ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
-const { buildSignedAudioUrl } = require("./_elevenlabs_voice");
 
 function text(statusCode, body, contentType = "text/plain; charset=utf-8") {
   return {
@@ -167,17 +170,8 @@ async function transcribeAudio(item) {
   return cleanText(parsed.text, 800);
 }
 
-function twiml(message, mediaUrl = "") {
-  if (!mediaUrl) {
-    return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
-  }
-  return [
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<Response>`,
-    `<Message><Media>${escapeXml(mediaUrl)}</Media></Message>`,
-    `<Message><Body>${escapeXml(message)}</Body></Message>`,
-    `</Response>`,
-  ].join("");
+function twiml(message) {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
 }
 
 function escapeXml(value) {
@@ -332,13 +326,13 @@ async function smsCommandReply(from, command) {
   }
   const pending = pendingActionFromMemory(memory);
   if (command === "REPORT" && !pending) {
-    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step.", speechText: "" };
+    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step." };
   }
   if (!pending) {
-    return { text: "No pending Blanked action. Tell me what you want to block or change.", speechText: "" };
+    return { text: "No pending Blanked action. Tell me what you want to block or change." };
   }
   if (command !== "OPEN" && command !== pending.command && !(command === "START" && pending.command === "BLOCK")) {
-    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.`, speechText: "" };
+    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.` };
   }
   try {
     await recordAssistantMemory({
@@ -355,7 +349,7 @@ async function smsCommandReply(from, command) {
     // Clearing a pending action must never block delivery.
   }
   const intro = pending.summary ? `${pending.summary}\n\n` : "";
-  return { text: `${intro}Open Blanked: ${pending.link}`, speechText: "" };
+  return { text: `${intro}Open Blanked: ${pending.link}` };
 }
 
 function voiceInputSummary(prompt) {
@@ -367,14 +361,6 @@ function withVoiceInputContext(text, prompt) {
   const summary = voiceInputSummary(prompt);
   if (!summary) return text;
   return `${summary}\n\n${text}`;
-}
-
-function naturalVoiceText(text) {
-  return cleanText(text, 800)
-    .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
-    .replace(/\bAction:\s*/gi, "")
-    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
-    .replace(/\bone concrete Blanked action\b/gi, "the next step in Blanked");
 }
 
 function naturalReplyText(text) {
@@ -396,6 +382,7 @@ async function recordMessageConnection(connectCode, from, channel) {
       connectCode,
       channelUser: from,
     });
+    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
   } catch (_) {
     return;
   }
@@ -460,13 +447,18 @@ async function askBAI(prompt, from, channel) {
   }
   const newFacts = memoryFactsFromText(prompt);
   const language = savedMemory.language || detectedLanguage(prompt);
+  const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
     ...newFacts,
     language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+    conversation_state: conversationState,
   };
+  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+    ? savedMemory.user_context
+    : {};
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -474,13 +466,16 @@ async function askBAI(prompt, from, channel) {
       prompt,
       locale: "en-US",
       context: {
+        ...userContext,
         channel,
         assistant_channel: channel,
         language,
         allow_spanish_response: true,
-        has_selected_apps: true,
-        screen_time_authorized: true,
+        has_selected_apps: userContext.has_selected_apps === true,
+        screen_time_authorized: userContext.screen_time_authorized === true,
+        user_context: userContext,
         memory,
+        recent_messages: conversationState?.recent_messages || [],
       },
     }),
   });
@@ -495,17 +490,41 @@ async function askBAI(prompt, from, channel) {
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     const fallback = "BM could not read that yet. Try again in a moment.";
-    return { text: fallback, speechText: fallback };
+    return { text: fallback };
   }
   const parsed = JSON.parse(response.body || "{}");
   const plan = parsed.plan || {};
+  if (plan.blocking_user_request === true) {
+    try {
+      await recordAssistantMemory({
+        channel,
+        channelUser: from,
+        memory: {
+          pending_blocking: plan.blocking_ready === false ? plan.blocking_data : null,
+          language,
+        },
+        source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
+      });
+    } catch (_) {
+      // Pending blocking state must never block the user-facing reply.
+    }
+  }
   const message = naturalReplyText(plan.message_text || plan.response_text);
+  try {
+    await recordAssistantConversationTurn({
+      channel,
+      channelUser: from,
+      previousState: savedMemory.conversation_state,
+      userMessage: prompt,
+      assistantMessage: message,
+      topic: memory.last_topic || "",
+    });
+  } catch (_) {
+    // Short-term memory must never block the user-facing reply.
+  }
   const actions = plan.actions || [];
-  const actionLink = actionDeepLink(actions, memory.main_apps);
-  const modelSpeech = naturalVoiceText(plan.speech_text || "");
+  const actionLink = actionDeepLink(actions, memory.main_apps, plan.blocking_data);
   const modelFollowup = naturalReplyText(plan.followup_text || "");
-  const speechBase = modelSpeech || message;
-  const speechActionCue = actionLink && !/\blink\b/i.test(speechBase) ? "I left the link in the next message." : "";
   if (channel === "sms" && actionLink) {
     const pendingCommand = commandForAction(actions);
     let pendingStored = false;
@@ -529,13 +548,11 @@ async function askBAI(prompt, from, channel) {
       return {
         text: `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
         actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-        speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
       };
     }
     return {
       text: `${message}\n\n${smsActionCue(actions)}`,
       actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
     };
   }
   if (channel === "whatsapp" && actionLink) {
@@ -547,18 +564,12 @@ async function askBAI(prompt, from, channel) {
         contentSid,
         contentVariables: whatsappActionButtonVariables(actionLink),
       } : null,
-      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
     };
   }
   return {
     text: actionLink ? `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : message,
     actionText: actionLink ? `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : "",
-    speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
   };
-}
-
-function wantsVoiceReply(text) {
-  return /\b(audio|voice|voice note|speak|spoken|say it|nota de voz|audio|voz|hablame|háblame|dimelo|dímelo)\b/i.test(cleanText(text, 800));
 }
 
 function publicOpenLink(actionName, params = {}) {
@@ -576,7 +587,11 @@ function appsQuery(appNames) {
   return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
 }
 
-function actionDeepLink(actions, appNames = []) {
+function actionDeepLink(actions, appNames = [], blockingData = null) {
+  if (blockingData && Array.isArray(blockingData.apps)) {
+    const contractApps = blockingData.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps");
+    if (contractApps.length) appNames = contractApps;
+  }
   const first = primaryAction(actions);
   if (!first) return "";
 
@@ -610,7 +625,17 @@ function actionDeepLink(actions, appNames = []) {
     return publicOpenLink("daily-limit", { minutes: clamp(first.minutes || 25, 5, 240) });
   }
   if (first.type === "open_app_picker") {
-    return publicOpenLink("open-picker");
+    return publicOpenLink("review-action", {
+      type: "open_app_picker",
+      apps: Array.isArray(appNames) && appNames.length ? appNames.slice(0, 8).join(",") : "",
+      minutes: Number.isFinite(first.minutes) ? first.minutes : "",
+      hard: first.hard_mode ? "true" : "",
+      name: first.name || "",
+      start: Number.isFinite(first.start_minute) ? first.start_minute : "",
+      end: Number.isFinite(first.end_minute) ? first.end_minute : "",
+      days: Number.isFinite(first.duration_days) ? first.duration_days : "",
+      weekdays: Array.isArray(first.weekdays) ? first.weekdays.join(",") : "",
+    });
   }
   if (first.type === "request_screen_time_permission") {
     return publicOpenLink("choose-apps");
@@ -662,24 +687,26 @@ exports.handler = async (event) => {
 
   const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
+  if (!connectCode) {
+    try {
+      await ensureAssistantConnectionForPhone({ channel, channelUser: from });
+    } catch (_) {
+      // Automatic identity matching is additive; legacy CONNECT remains available.
+    }
+  }
   const command = channel === "sms" ? smsCommand(prompt) : "";
   const reply = connectCode
-    ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)), speechText: "" }
+    ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)) }
     : command
       ? await smsCommandReply(from, command)
     : await askBAI(prompt, from, channel);
 
-  const shouldAttachAudio = channel === "whatsapp" && !connectCode && (audio || wantsVoiceReply(body));
-  const mediaUrl = shouldAttachAudio
-    ? buildSignedAudioUrl(event, reply.speechText || reply.text)
-    : "";
-  if (channel === "whatsapp" && reply.actionButton && !mediaUrl) {
+  if (channel === "whatsapp" && reply.actionButton) {
     await sendWhatsAppMessage(from, reply.text);
     await sendWhatsAppMessage(from, "", reply.actionButton);
     return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
   }
-  const baseReplyText = mediaUrl && reply.actionText ? reply.actionText : reply.text;
-  const replyText = audio ? withVoiceInputContext(baseReplyText, prompt) : baseReplyText;
+  const replyText = audio ? withVoiceInputContext(reply.text, prompt) : reply.text;
 
-  return text(200, twiml(replyText, mediaUrl), "application/xml; charset=utf-8");
+  return text(200, twiml(replyText), "application/xml; charset=utf-8");
 };

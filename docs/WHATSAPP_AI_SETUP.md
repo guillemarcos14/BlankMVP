@@ -24,6 +24,7 @@ WHATSAPP_APP_SECRET=meta-app-secret
 WHATSAPP_GRAPH_API_VERSION=v26.0
 BLANKED_APP_DEEP_LINK_SCHEME=blank
 BLANKED_PUBLIC_APP_LINK_BASE=https://getblank.netlify.app
+BLANKMIND_APP_DOWNLOAD_URL=https://apps.apple.com/es/app/blanked/id6789519152
 
 TWILIO_ACCOUNT_SID=replace-me
 TWILIO_AUTH_TOKEN=replace-me
@@ -38,21 +39,7 @@ ASSISTANT_PROACTIVE_QUIET_END_UTC=8
 # Optional instead of TWILIO_FROM_NUMBER:
 TWILIO_MESSAGING_SERVICE_SID=MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# Optional ElevenLabs voice layer for premium WhatsApp audio replies.
-# Without these variables, WhatsApp/SMS stay text-only.
-ELEVENLABS_API_KEY=replace-me
-ELEVENLABS_VOICE_ID=replace-me
-ELEVENLABS_TTS_MODEL=eleven_multilingual_v2
-ELEVENLABS_OUTPUT_FORMAT=mp3_44100_128
-ELEVENLABS_TTS_MAX_CHARS=420
-ELEVENLABS_AUDIO_URL_TTL_SECONDS=600
-ELEVENLABS_AUDIO_SIGNING_SECRET=replace-me-long-random-secret
-
-# Optional ElevenLabs Conversational AI call layer.
-ELEVENLABS_CONVAI_API_KEY=replace-me
-ELEVENLABS_AGENT_ID=agent_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-BAI_CALL_ADMIN_SECRET=replace-me-long-random-secret
-TWILIO_VOICE_FROM_NUMBER=+13478366767
+# Voice replies and phone calls are disabled. Audio inputs are transcribed and answered with text.
 ```
 
 ## iOS build settings
@@ -72,11 +59,12 @@ BLANK_SMS_PHONE_NUMBER=+13478366767
 ## Product contract
 
 - WhatsApp receives user messages and sends them to `blanked-agent`.
-- WhatsApp replies with guidance and, when there is an executable action, uses a Twilio CTA template button when `TWILIO_WHATSAPP_ACTION_CONTENT_SID` is configured.
+- WhatsApp replies with guidance and, when there is an executable action, uses a review-and-confirm link. A Twilio CTA template is optional through `TWILIO_WHATSAPP_REVIEW_CONTENT_SID`; set `TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED=true` only after verifying that its button label is exactly `Review and confirm`. Otherwise BM sends the precise text link and never falls back to a stale `Open Blanked` button.
 - The WhatsApp button should point to a Universal Link such as `https://getblank.netlify.app/open?action=start-focus...`; move `BLANKED_PUBLIC_APP_LINK_BASE` to `https://blanked.app` only when `/open` and AASA are served there.
-- Twilio WhatsApp can receive voice notes, transcribe them with OpenAI, answer with BM text, and attach an ElevenLabs-generated MP3 when the inbound message was audio or explicitly asks for voice.
+- Twilio WhatsApp/SMS can receive audio inputs, transcribe them with OpenAI, and answer with BM text. BM never attaches audio or generates a spoken reply.
 - iOS is still the authority for Screen Time actions.
 - `/.netlify/functions/assistant-channel` stores the user's preferred BM interface (`whatsapp` or `sms`) by `CONNECT <code>` and sends proactive BM alerts through the selected channel after the external thread has sent `CONNECT`.
+- When the iOS app is opened or returns to the foreground, it syncs a minimal `app_presence` heartbeat. BM treats it as `recently_seen` for 24 hours, then `stale`, and never claims that a stale or unseen app is definitely uninstalled. On WhatsApp/SMS, executable actions are withheld until a recent heartbeat exists; the reply then says naturally that Blankmind must be opened and includes `BLANKMIND_APP_DOWNLOAD_URL` as a conditional download link.
 - Proactive WhatsApp alerts are only sent when BM supplies a meaningful update. The backend checks that the selected SID is actually `Approved` in Twilio, enforces one delivery per 24 hours, suppresses duplicate updates for the same user, respects quiet hours, rotates the five templates, and sends the full update only after the user taps/replies positively.
 - SMS uses `/.netlify/functions/sms-agent` as an inbound SMS webhook. It accepts Twilio-style form posts, sends the message to `blanked-agent`, replies first with commands like `Reply BLOCK` instead of raw URLs, stores the pending action, and sends the Universal Link only after the user replies with `BLOCK`, `START` or `OPEN`.
 - Users can send `stop` or `disconnect` in WhatsApp to pause this channel.
@@ -88,13 +76,8 @@ Run before connecting the real Meta number:
 ```powershell
 node --check netlify/functions/whatsapp-agent.js
 node --check netlify/functions/sms-agent.js
-node --check netlify/functions/assistant-audio.js
-node --check netlify/functions/_elevenlabs_voice.js
 node --check netlify/functions/_twilio_voice.js
 node --check netlify/functions/elevenlabs-bai-tool.js
-node --check netlify/functions/bai-call-twiml.js
-node --check netlify/functions/bai-call.js
-node --check netlify/functions/twilio-voice-configure.js
 node --check netlify/functions/assistant-channel.js
 node --check netlify/functions/_assistant_channel.js
 node --check netlify/functions/funnel-event.js
@@ -105,7 +88,7 @@ node tools/bai_call_smoke_test.js
 
 Expected result: syntax checks return no output and the smoke test prints `whatsapp-agent smoke tests passed`.
 
-Voice smoke expected result: `sms-agent voice smoke tests passed`.
+Audio-input smoke expected result: `sms-agent audio input smoke tests passed`.
 
 ## Manual E2E checklist
 
@@ -128,31 +111,13 @@ Voice smoke expected result: `sms-agent voice smoke tests passed`.
 - Send the message and confirm Blanked replies `Connected`.
 - For SMS, configure the SMS provider inbound webhook to `https://getblank.netlify.app/.netlify/functions/sms-agent`, then tap `Connect SMS` in Blanked and send `CONNECT <code>`.
 - Send `Block Instagram TikTok and X from 10 to 7`.
-- In WhatsApp, confirm the reply uses the `Open Blanked` CTA template when configured.
+- In WhatsApp, confirm the reply says `Review and confirm in Blanked` and never uses the legacy `Open Blanket`/`Open Blanked` action label.
 - In SMS, confirm the first reply says `Reply BLOCK` without a raw URL; reply `BLOCK` and confirm the next SMS includes the Universal Link.
-- Send a WhatsApp voice note or a text asking for a voice note.
-- Confirm Twilio receives TwiML with `<Media>` pointing to `/.netlify/functions/assistant-audio`.
-- Confirm the WhatsApp reply includes playable audio plus the text/deep link fallback.
+- Send a WhatsApp audio note or a text asking for a voice note.
+- Confirm the audio is interpreted and the reply is text-only, with no TwiML `<Media>` element.
 - Trigger a BM proactive alert and confirm `assistant-channel` attempts delivery through the selected channel.
 - Tap the link, confirm Blanked opens the native app picker, and select the apps.
 
-## ElevenLabs calls
+## Voice status
 
-BM calls use Twilio for the phone number and ElevenLabs Agents for the spoken conversation.
-Blanked remains the authority for reasoning through:
-
-```txt
-https://getblank.netlify.app/.netlify/functions/elevenlabs-bai-tool
-```
-
-Runtime endpoints:
-
-```txt
-POST https://getblank.netlify.app/.netlify/functions/twilio-voice-configure
-POST https://getblank.netlify.app/.netlify/functions/bai-call-twiml
-POST https://getblank.netlify.app/.netlify/functions/bai-call
-```
-
-`twilio-voice-configure` is admin-protected by `BAI_CALL_ADMIN_SECRET` and sets the Twilio number's inbound voice webhook.
-`bai-call-twiml` is the Twilio voice webhook and registers each call with ElevenLabs.
-`bai-call` is admin-protected and can start outbound calls when explicitly requested.
+Voice replies, ElevenLabs TTS, and phone calls are disabled by product decision. The endpoints remain guarded and return `410 voice_replies_disabled`; re-enable them only after an explicit product decision.

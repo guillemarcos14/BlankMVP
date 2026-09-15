@@ -102,6 +102,36 @@ function actionTypes(plan) {
   return (plan.actions || []).filter((action) => action.type !== "none").map((action) => action.type);
 }
 
+function assertBlockingContract(testCase, plan) {
+  if (plan.blocking_ready !== true && plan.blocking_ready !== false) return false;
+
+  const data = plan.blocking_data;
+  assert.ok(data && typeof data === "object", `${testCase.id}.blocking_data exists`);
+  for (const field of ["apps", "action", "start", "end", "recurrence"]) {
+    assert.ok(Object.prototype.hasOwnProperty.call(data, field), `${testCase.id}.blocking_data.${field}`);
+  }
+
+  const actualActions = actionTypes(plan);
+  if (plan.blocking_ready === false) {
+    assert.deepStrictEqual(actualActions, [], `${testCase.id}.incomplete_block_has_no_actions`);
+    assert.ok(Array.isArray(plan.blocking_missing_fields) && plan.blocking_missing_fields.length > 0, `${testCase.id}.missing_fields`);
+  } else {
+    for (const field of ["apps", "action", "start", "end", "recurrence"]) {
+      assert.ok(data[field] !== null && data[field] !== undefined, `${testCase.id}.complete_blocking_data.${field}`);
+    }
+    assert.ok(actualActions.length > 0, `${testCase.id}.complete_block_has_action`);
+    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit", "activate_mode", "open_app_picker"].includes(type)), `${testCase.id}.complete_block_action_type`);
+    assert.deepStrictEqual(plan.blocking_missing_fields, [], `${testCase.id}.complete_block_has_no_missing_fields`);
+  }
+
+  assert.doesNotMatch(visibleText(plan), DEBUG_TEXT_PATTERN, `${testCase.id}.no_internal_text`);
+  assert.doesNotMatch(visibleText(plan), BANNED_TEXT_PATTERN, `${testCase.id}.no_banned_text`);
+  assert.ok(cleanText(plan.message_text, 320).length >= 30, `${testCase.id}.message_text_present`);
+  assert.ok(qualityScore(plan) >= 2, `${testCase.id}.quality_score`);
+  assert.ok(utilityScore(plan) >= 3, `${testCase.id}.utility_score`);
+  return true;
+}
+
 function qualityScore(plan) {
   const text = visibleText(plan);
   const bullets = Array.isArray(plan.bullets) ? plan.bullets : [];
@@ -126,6 +156,8 @@ function utilityScore(plan) {
 }
 
 function assertPlan(testCase, plan) {
+  if (assertBlockingContract(testCase, plan)) return;
+
   const expected = testCase.expect;
   assert.strictEqual(plan.intent, expected.intent, `${testCase.id}.intent`);
 

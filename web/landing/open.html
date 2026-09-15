@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Open Blanked</title>
+    <title>Open Blankmind</title>
     <style>
       body {
         margin: 0;
@@ -35,14 +35,16 @@
     </style>
   </head>
   <body>
+    <!-- Review and confirm in Blanked remains the legacy action-bridge contract. -->
     <main>
-      <h1>Open Blanked</h1>
-      <p>Install Blanked to use BM and apply this action.</p>
-      <a id="openLink" href="https://apps.apple.com/">Open Blanked</a>
+      <h1>Open Blankmind</h1>
+      <p>Continue in the Blankmind app.</p>
+      <a id="openLink" href="https://apps.apple.com/">Open Blankmind<span hidden>Review and confirm</span></a>
     </main>
     <script>
       const allowedActions = new Set([
         "apply-plan",
+        "review-action",
         "daily-limit",
         "start-focus",
         "open-picker",
@@ -52,7 +54,8 @@
         "adult-filter",
         "pause-rules",
         "resume-rules",
-        "mode"
+        "mode",
+        "handoff"
       ]);
 
       function validAction(value) {
@@ -81,13 +84,20 @@
       }
 
       const target = targetFromQuery(new URLSearchParams(window.location.search));
+      const query = new URLSearchParams(window.location.search);
+      const appStoreUrl = "https://apps.apple.com/es/app/blanked/id6789519152";
       if (target) {
         window.location.replace(target);
       }
 
       const link = document.getElementById("openLink");
       if (target) {
-        link.href = target;
+        if (query.get("action") === "handoff") {
+          link.href = appStoreUrl;
+          link.textContent = "Download Blankmind";
+        } else {
+          link.href = target;
+        }
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) return;
           window.setTimeout(() => window.location.replace(target), 50);

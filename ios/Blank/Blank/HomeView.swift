@@ -33,6 +33,7 @@ struct HomeView: View {
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
+    @State private var isHoldingToUnblank = false
     @State private var isActiveNavExpanded = false
     @State private var delayedManualUnlockAt: Date?
     @State private var delayedManualUnlockTask: Task<Void, Never>?
@@ -135,6 +136,9 @@ struct HomeView: View {
         .onChange(of: sessionStore.isBlankActive) { isActive in
             if !isActive {
                 isActiveNavExpanded = false
+                isHoldingToUnblank = false
+                unblankHoldProgress = 0
+                isAnimatingUnblankHold = false
             }
         }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
@@ -456,59 +460,128 @@ struct HomeView: View {
     }
 
     private func activeMinimalHome(layout: HomeLayoutMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
 
-            if let timerCountdownText {
-                Text(timerCountdownText)
-                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
-                    .monospacedDigit()
-                    .foregroundStyle(BlankColors.homeDarkSecondary)
-                    .padding(.bottom, 10)
-            }
+                activePrimaryContent
 
-            Text("your plan adapts before the scroll pulls you back.")
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-1.1)
-                .foregroundStyle(Color.white)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
+                Spacer(minLength: 0)
 
-            Spacer(minLength: 0)
+                if isActiveNavExpanded {
+                    activeExpandedNavigation
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .bottom)),
+                            removal: .opacity.combined(with: .move(edge: .top))
+                        ))
+                } else {
+                    VStack(alignment: .leading, spacing: -8) {
+                        minimalStartRow
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isActiveNavExpanded {
-                activeExpandedNavigation
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .move(edge: .bottom)),
-                        removal: .opacity.combined(with: .move(edge: .top))
-                    ))
-            } else {
-                VStack(alignment: .leading, spacing: -8) {
-                    minimalStartRow
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Button("unblank") {
-                        openSection(.emergency)
+                        Button("unblank") {
+                            beginFullScreenUnblankHold()
+                        }
+                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                        .tracking(-0.8)
+                        .foregroundStyle(BlankColors.homeDarkSecondary)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .buttonStyle(.plain)
                     }
-                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                    .tracking(-0.8)
-                    .foregroundStyle(BlankColors.homeDarkSecondary)
-                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                    .buttonStyle(.plain)
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
             }
         }
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.bottom, layout.bottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .overlay {
+            if isHoldingToUnblank {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .overlay(alignment: .bottom) {
+                        GeometryReader { proxy in
+                            Rectangle()
+                                .fill(Color.white.opacity(0.20))
+                                .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
+                                .frame(maxHeight: .infinity, alignment: .bottomLeading)
+                        }
+                        .allowsHitTesting(false)
+                    }
+                    .simultaneousGesture(
+                        LongPressGesture(minimumDuration: 20, maximumDistance: .infinity)
+                            .onEnded { _ in
+                                guard sessionStore.isBlankActive,
+                                      !sessionStore.hardBlankActive,
+                                      delayedManualUnlockAt == nil else { return }
+                                scheduleDelayedManualUnlock(cooldownSeconds: 60)
+                                isHoldingToUnblank = false
+                                unblankHoldProgress = 0
+                                isAnimatingUnblankHold = false
+                            }
+                    )
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                guard sessionStore.isBlankActive,
+                                      !sessionStore.hardBlankActive,
+                                      delayedManualUnlockAt == nil,
+                                      !isAnimatingUnblankHold else { return }
+                                isAnimatingUnblankHold = true
+                                unblankHoldProgress = 0
+                                withAnimation(.linear(duration: 20)) {
+                                    unblankHoldProgress = 1
+                                }
+                            }
+                            .onEnded { _ in
+                                isAnimatingUnblankHold = false
+                                withAnimation(.easeOut(duration: 0.18)) {
+                                    unblankHoldProgress = 0
+                                }
+                                if delayedManualUnlockAt == nil {
+                                    isHoldingToUnblank = false
+                                }
+                            }
+                    )
+                    .zIndex(10)
+            }
+        }
         .animation(.easeInOut(duration: 0.35), value: isActiveNavExpanded)
+    }
+
+    @ViewBuilder
+    private var activePrimaryContent: some View {
+        if isHoldingToUnblank {
+            Text("hold the screen to unblank")
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-1.1)
+                .foregroundStyle(Color.white)
+                .lineLimit(3)
+                .minimumScaleFactor(0.78)
+        } else if let cooldownText {
+            Text(cooldownText)
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-1.1)
+                .foregroundStyle(BlankColors.homeDarkSecondary)
+                .monospacedDigit()
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+        } else if let timerCountdownText {
+            Text(timerCountdownText)
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-1.1)
+                .foregroundStyle(BlankColors.homeDarkSecondary)
+                .monospacedDigit()
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+        }
     }
 
     private var activeExpandedNavigation: some View {
         VStack(alignment: .leading, spacing: -8) {
             minimalHomeRow("unblank", color: BlankColors.homeDarkSecondary) {
-                openSection(.emergency)
+                beginFullScreenUnblankHold()
             }
             minimalHomeRow("stats", color: BlankColors.homeDarkSecondary) {
                 openSection(.report)
@@ -589,44 +662,7 @@ struct HomeView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityHint(isActive && !sessionStore.hardBlankActive ? "hold for 20 seconds to unblank" : "")
-        .overlay(alignment: .bottomLeading) {
-            if isActive, !sessionStore.hardBlankActive {
-                GeometryReader { proxy in
-                    Rectangle()
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
-                        .frame(maxHeight: .infinity, alignment: .bottomLeading)
-                }
-                .allowsHitTesting(false)
-            }
-        }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 20, maximumDistance: .infinity)
-                .onEnded { _ in
-                    guard isActive, !sessionStore.hardBlankActive else { return }
-                    scheduleDelayedManualUnlock()
-                    unblankHoldProgress = 0
-                    isAnimatingUnblankHold = false
-                }
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    guard isActive, !sessionStore.hardBlankActive, !isAnimatingUnblankHold else { return }
-                    isAnimatingUnblankHold = true
-                    unblankHoldProgress = 0
-                    withAnimation(.linear(duration: 20)) {
-                        unblankHoldProgress = 1
-                    }
-                }
-                .onEnded { _ in
-                    isAnimatingUnblankHold = false
-                    withAnimation(.easeOut(duration: 0.18)) {
-                        unblankHoldProgress = 0
-                    }
-                }
-        )
+        .accessibilityHint(isActive && !sessionStore.hardBlankActive ? "tap unblank, then hold the screen for 20 seconds" : "")
     }
 
     @ViewBuilder
@@ -931,9 +967,21 @@ struct HomeView: View {
         return unlocked
     }
 
-    private func scheduleDelayedManualUnlock() {
+    private func beginFullScreenUnblankHold() {
+        guard sessionStore.isBlankActive,
+              !sessionStore.hardBlankActive,
+              delayedManualUnlockAt == nil else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
+            isActiveNavExpanded = false
+            isHoldingToUnblank = true
+        }
+        unblankHoldProgress = 0
+        isAnimatingUnblankHold = false
+    }
+
+    private func scheduleDelayedManualUnlock(cooldownSeconds requestedCooldownSeconds: Int? = nil) {
         guard delayedManualUnlockTask == nil else { return }
-        let cooldownSeconds = sessionStore.manualUnblankCooldownSeconds
+        let cooldownSeconds = requestedCooldownSeconds ?? sessionStore.manualUnblankCooldownSeconds
         let unlockAt = Date().addingTimeInterval(TimeInterval(cooldownSeconds))
         delayedManualUnlockAt = unlockAt
         updateDelayedUnlockMessage(now: Date())

@@ -487,6 +487,11 @@ function decideSemanticState(state, context = {}) {
 }
 
 function clockLabel(v) { return `${String(Math.floor(v / 60)).padStart(2,"0")}:${String(v % 60).padStart(2,"0")}`; }
+function clockMeridiemLabel(v) {
+  const hour24 = Math.floor(v / 60) % 24;
+  const hour12 = hour24 % 12 || 12;
+  return `${hour12}:${String(v % 60).padStart(2,"0")} ${hour24 < 12 ? "AM" : "PM"}`;
+}
 function semanticSummary(state) {
   const es = state.language === "es";
   const apps = (value(state,"apps") || []).map(a => a === "selected_apps" ? (es ? "las apps seleccionadas" : "the selected apps") : a.startsWith("mode:") ? (es ? `el modo ${a.slice(5)}` : `${a.slice(5)} mode`) : a).join(es ? " y " : " and ");
@@ -496,6 +501,22 @@ function semanticSummary(state) {
   if (value(state,"action_type") === "daily_limit") return es ? `Limitar ${apps} a ${duration} minutos al día, desde ahora` : `Limit ${apps} to ${duration} minutes per day, starting now`;
   const horizon = value(state,"schedule_horizon_days");
   return `${es ? "Bloquear" : "Block"} ${apps} ${time}, ${repeat}${value(state,"hard_mode") === true ? (es ? ", con modo estricto" : ", with hard mode") : value(state,"hard_mode") === false ? (es ? ", con protección normal" : ", with regular protection") : ""}${start?.type === "time" && horizon ? `, ${es ? "durante" : "for"} ${horizon} ${es ? "días" : "days"}` : ""}`;
+}
+
+function knownFactLead(state) {
+  const es = state.language === "es";
+  const apps = (value(state,"apps") || []).map(app => app === "selected_apps" ? (es ? "las apps seleccionadas" : "the selected apps") : app.startsWith("mode:") ? (es ? `el modo ${app.slice(5)}` : `${app.slice(5)} mode`) : app).join(es ? " y " : " and ");
+  const start = value(state,"start");
+  const end = value(state,"end");
+  const duration = value(state,"duration_minutes");
+  const facts = [];
+  if (apps) facts.push(apps);
+  if (start?.type === "now") facts.push(es ? "ahora" : "now");
+  else if (start?.type === "time") facts.push(`${es ? "a las" : "at"} ${clockMeridiemLabel(start.minute)}`);
+  if (end != null) facts.push(`${es ? "hasta las" : "until"} ${clockMeridiemLabel(end)}`);
+  else if (duration != null) facts.push(`${es ? "durante" : "for"} ${duration} ${es ? "minutos" : "minutes"}`);
+  if (!facts.length) return "";
+  return `${es ? "Entendido" : "Got it"}: ${facts.join(" ")}.`;
 }
 
 function renderSemanticResponse(state, decision, context = {}) {
@@ -537,7 +558,9 @@ function renderSemanticResponse(state, decision, context = {}) {
     permissions:es ? "Abre Blankmind y concede el permiso de bloqueo. La propuesta todavía no se ha aplicado." : "Open Blankmind and grant blocking permission. The proposal has not been applied yet.",
     app_selection:es ? `Selecciona exactamente ${(value(state,"apps") || []).join(" y ")} en Blankmind. La propuesta todavía no se ha aplicado.` : `Select exactly ${(value(state,"apps") || []).join(" and ")} in Blankmind. The proposal has not been applied yet.`,
   };
-  return questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
+  const question = questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
+  const lead = knownFactLead(state);
+  return lead ? `${lead} ${question}` : question;
 }
 
 function asBlockingContract(state) {

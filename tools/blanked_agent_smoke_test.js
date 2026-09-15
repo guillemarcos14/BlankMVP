@@ -147,6 +147,8 @@ function baseContext(overrides = {}) {
   noAction(appTimeFollowup); question(appTimeFollowup,"end_or_duration");
   assert.deepStrictEqual(fact(appTimeFollowup,"apps"),["Instagram"]);
   assert.deepStrictEqual(fact(appTimeFollowup,"start"),{type:"time",minute:660});
+  assert.match(appTimeFollowup.message_text,/Instagram/);
+  assert.match(appTimeFollowup.message_text,/11:00 AM|11 AM|11am/i);
   assert.strictEqual(fact(appTimeFollowup,"action_type"),null);
   const appTimeEndFollowup = await follow("12pm",appTimeFollowup);
   noAction(appTimeEndFollowup); question(appTimeEndFollowup,"recurrence");

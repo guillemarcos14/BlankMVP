@@ -155,7 +155,9 @@ test("advice changes intent and clears old authorization", () => {
 test("elliptic advice answers keep facts without authorizing actions", () => {
   const results = chat(["How can I scroll less in the morning?","11am Instagram","one hour","Actually 45 minutes"]);
   equalSlot(results[3],"start",{type:"time",minute:660}); equalSlot(results[3],"end",705); equalSlot(results[3],"apps",["Instagram"]);
-  equalSlot(results[3],"action_type",null); assert.equal(results[3].state.intent,"advice"); results.forEach(none);
+  equalSlot(results[3],"action_type",null); assert.equal(results[3].state.intent,"advice");
+  assert.match(results[1].responseText,/Instagram/); assert.match(results[1].responseText,/11:00/);
+  results.forEach(none);
 });
 test("advice needs explicit action intent and separate confirmation", () => {
   const results = chat(["How can I scroll less in the morning?","11am Instagram","one hour","every day for 7 days","yes","yes"]);

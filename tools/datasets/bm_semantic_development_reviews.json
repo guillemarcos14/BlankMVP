@@ -70,5 +70,23 @@
     "verdict": "equivalent",
     "language": "en",
     "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "38800fb4c6cc02edda39daa95194b2b2cd4a326fea971d66e663607ef2bd1cf8",
+    "expectation_sha256": "eb5b5df3a76ecd785dddc40693c8ad0e8718b016dbda488a4cd64a90f1321905",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response explicitly preserves Instagram, the immediate start and the 30-minute duration before asking for recurrence. No action is claimed and all visible surfaces remain consistent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "3149462307ab841e14f549c4b9a716515294dd993e4ebbec3d3d0f47cb8e4aa9",
+    "expectation_sha256": "d20226ae34f9a34529c32b5f9633fd2d0d737001bf4dd99d6e74e56fd6666fb9",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response explicitly preserves Instagram and the 10:00 AM start, then asks only for the missing duration or exact end time. It does not invent an end, duration or execution.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
   }
 ]

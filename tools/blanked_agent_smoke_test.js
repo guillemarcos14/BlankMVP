@@ -143,6 +143,20 @@ function baseContext(overrides = {}) {
   assert.match(appTimeFollowup.message_text, /Instagram.*11:00 AM|11:00 AM.*Instagram/i);
   assert.match(appTimeFollowup.message_text, /what time.*end|end.*time/i);
   assert.doesNotMatch(appTimeFollowup.message_text, /25-minute|download|permission|App Store/i);
+  const appTimeEndContext = [
+    ...appTimeContext,
+    { role: "user", content: "11am Instagram" },
+    { role: "assistant", content: appTimeFollowup.message_text },
+  ];
+  const appTimeEndFollowup = await call("12pm", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeEndContext,
+  }));
+  assert.strictEqual(appTimeEndFollowup.actions.length, 0);
+  assert.match(appTimeEndFollowup.message_text, /Instagram.*11:00 AM.*12:00 PM|11:00 AM.*12:00 PM.*Instagram/i);
+  assert.match(appTimeEndFollowup.message_text, /confirm|want me to use/i);
+  assert.doesNotMatch(appTimeEndFollowup.message_text, /from 11:00 AM to\.?$|25-minute|download|permission|App Store/i);
 
   const breakfastWithoutTime = await call("I usually use social media after breakfast", baseContext({
     channel: "whatsapp",

@@ -1323,7 +1323,9 @@ function recentAppTiming(context = {}) {
     const match = message.content.match(/\b(?:usually|around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
     if (!match) continue;
     const timeText = `${match[1]}:${String(match[2] || "00").padStart(2, "0")}${match[3] ? ` ${match[3].toUpperCase()}` : ""}`;
-    return { app, timeText };
+    const rawHour = Number(match[1]);
+    const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
+    return { app, timeText, minute: minuteOfDay(rawHour, Number(match[2] || 0), meridiem) };
   }
   return null;
 }
@@ -1379,6 +1381,7 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const recentTiming = recentAppTiming(context);
   const recentRelative = recentRelativeTimeQuestion(context);
   const relativeMinute = recentRelative ? looseSingleTime(prompt) : null;
+  const hasRecentScrollWindowEndQuestion = /what time should (?:the )?(?:protection|boundary|block) end|what time should it become available again|need end time/i.test(recentText);
   if (recentRelative && relativeMinute != null && recentRelative.key === "bedtime") {
     const start = ((relativeMinute + recentRelative.startOffset) % (24 * 60) + (24 * 60)) % (24 * 60);
     const end = (start + recentRelative.duration) % (24 * 60);
@@ -1397,6 +1400,32 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       ],
       primary_label: "Plan boundary",
       secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (recentTiming && recentTiming.minute != null && hasRecentScrollWindowEndQuestion && looseSingleTime(prompt) != null) {
+    const endMinute = looseSingleTime(prompt);
+    const startText = minuteText(recentTiming.minute);
+    const endText = minuteText(endMinute);
+    const message = language === "es"
+      ? `Entendido: proteger ${recentTiming.app} de ${startText} a ${endText}. ¿Quieres que use esa franja como protección de la mañana?`
+      : `Got it: protect ${recentTiming.app} from ${startText} to ${endText}. Do you want me to use that as the morning protection window?`;
+    return {
+      intent: "social",
+      title: "Scroll Window",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentTiming.app} de ${startText} a ${endText}.` : `Read: ${recentTiming.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: la franja ya está completa y falta confirmar antes de actuar." : "Pattern: the window is complete and needs confirmation before any action.",
+        language === "es" ? "Movimiento: confirma la franja si quieres convertirla en protección." : "Move: confirm the window if you want to turn it into protection.",
+      ],
+      primary_label: language === "es" ? "Confirmar franja" : "Confirm window",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
       actions: [],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,

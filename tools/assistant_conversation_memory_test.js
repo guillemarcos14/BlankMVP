@@ -1,6 +1,7 @@
 const assert = require("assert");
 
 process.env.OPENAI_API_KEY = "";
+process.env.BM_SEMANTIC_PERSISTENCE = "legacy"; // Exercises event-store compatibility, not durable CAS.
 process.env.SUPABASE_URL = "https://supabase.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
 process.env.BLANKED_PUBLIC_APP_LINK_BASE = "https://getblank.netlify.app";
@@ -71,7 +72,7 @@ async function withMemoryStore(callback) {
     return { ok: true, status: 200, json: async () => [], text: async () => "[]" };
   };
   try {
-    return await callback();
+    return await callback(rows);
   } finally {
     global.fetch = originalFetch;
   }
@@ -100,7 +101,7 @@ async function whatsappKeepsBedtimeQuestion() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
   try {
-    await withMemoryStore(async () => {
+    await withMemoryStore(async (rows) => {
       const memoryFetch = global.fetch;
       global.fetch = async (target, options = {}) => {
         const url = String(target);
@@ -115,6 +116,7 @@ async function whatsappKeepsBedtimeQuestion() {
         assert.strictEqual(first.statusCode, 200, first.body);
         const second = await whatsappHandler(whatsappEvent("34600000010", "11pm", "wa-memory-2"));
         assert.strictEqual(second.statusCode, 200, second.body);
+        assertRetainedStart(rows);
       } finally {
         global.fetch = memoryFetch;
       }
@@ -124,20 +126,19 @@ async function whatsappKeepsBedtimeQuestion() {
     delete process.env.WHATSAPP_PHONE_NUMBER_ID;
   }
   assert.ok(outbound.length >= 2, "WhatsApp should send both replies");
-  assert.match(outbound[0], /asleep|bedtime/i);
-  assert.match(outbound[1], /10:30 PM/);
-  assert.match(outbound[1], /11:00 PM/);
+  assert.match(outbound[0], /scrolling.*start/i);
+  assert.doesNotMatch(outbound[1], /10:30|30 minutes|review-action/);
   assert.doesNotMatch(outbound[1], /I'm here\. Tell me what's going on/i);
 }
 
 async function smsKeepsBedtimeQuestion() {
-  await withMemoryStore(async () => {
+  await withMemoryStore(async (rows) => {
     const first = await smsHandler(smsEvent("+34600000011", "How can I scroll less at night?", "sms-memory-1"));
     assert.strictEqual(first.statusCode, 200, first.body);
     const second = await smsHandler(smsEvent("+34600000011", "11pm", "sms-memory-2"));
     assert.strictEqual(second.statusCode, 200, second.body);
-    assert.match(second.body, /10:30 PM/);
-    assert.match(second.body, /11:00 PM/);
+    assertRetainedStart(rows);
+    assert.doesNotMatch(second.body, /10:30|30 minutes|review-action/);
     assert.doesNotMatch(second.body, /I'm here\. Tell me what's going on/i);
   });
 }
@@ -167,9 +168,23 @@ async function webContextKeepsBedtimeQuestion() {
     }),
   });
   const secondPlan = JSON.parse(second.body).plan;
-  assert.match(secondPlan.message_text, /10:30 AM|10:30 PM/);
-  assert.match(secondPlan.message_text, /11:00 AM|11:00 PM/);
+  assert.strictEqual(secondPlan.semantic_state.slots.start.value.minute, 1380);
+  assert.strictEqual(secondPlan.semantic_state.slots.end, null);
+  assert.strictEqual(secondPlan.semantic_state.next_question, "apps");
+  assert.deepStrictEqual(secondPlan.actions, []);
+  assert.doesNotMatch(secondPlan.message_text, /10:30|30 minutes/);
   assert.doesNotMatch(secondPlan.message_text, /I'm here\. Tell me what's on my mind/i);
+}
+
+function assertRetainedStart(rows) {
+  const states = [...rows.values()].flat().map(row => row.payload?.properties?.memory?.conversation_state?.semantic_state).filter(Boolean);
+  const state = states[states.length - 1];
+  assert.ok(state, "canonical state is persisted by the real channel handler");
+  assert.strictEqual(state.intent, "advice");
+  assert.strictEqual(state.slots.start.value.minute, 1380);
+  assert.strictEqual(state.slots.start.source.text, "11pm");
+  assert.strictEqual(state.slots.end, null, "bedtime advice never invents a 30-minute window");
+  assert.strictEqual(state.next_question, "apps");
 }
 
 function expiredConversationIsIgnored() {

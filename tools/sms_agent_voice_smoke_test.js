@@ -2,6 +2,7 @@ const assert = require("assert");
 const crypto = require("crypto");
 
 process.env.OPENAI_API_KEY = "";
+process.env.BM_SEMANTIC_PERSISTENCE = "legacy"; // Legacy event-store mock; required CAS has its own suite.
 process.env.BLANKED_PUBLIC_APP_LINK_BASE = "https://getblank.netlify.app";
 process.env.SUPABASE_URL = "https://supabase.test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -26,7 +27,8 @@ async function withAssistantMemoryMock(callback) {
               memory: {
                 user_context: {
                   has_selected_apps: true,
-                  selection_count: 3,
+                  selection_count: 1,
+                  selected_app_names: ["Instagram"],
                   screen_time_authorized: true,
                   app_presence: {
                     app_present: true,
@@ -52,7 +54,8 @@ async function withAssistantMemoryMock(callback) {
             memory: {
               user_context: {
                 has_selected_apps: true,
-                selection_count: 3,
+                selection_count: 1,
+                selected_app_names: ["Instagram"],
                 screen_time_authorized: true,
                 app_presence: {
                   app_present: true,
@@ -65,7 +68,7 @@ async function withAssistantMemoryMock(callback) {
         },
         submitted_at: new Date().toISOString(),
       };
-      const result = rows.get(key) || [seeded];
+      const result = [...(rows.get(key) || [seeded])].reverse(); // API contract is newest first; do not mutate backing rows.
       return { ok: true, status: 200, text: async () => JSON.stringify(result), json: async () => result };
     }
     return originalFetch(target, options);
@@ -92,9 +95,8 @@ async function whatsappVoiceRequestStaysText() {
   assert.match(response.body, /<Body>/);
   assert.doesNotMatch(response.body, /Action:/i);
   assert.doesNotMatch(response.body, /I prepared a Blanked link/i);
-  assert.match(response.body, /Choose Instagram in Blankmind first(?:\.|,)/i);
-  assert.match(response.body, /Blankmind/);
-  assert.match(response.body, /apps\.apple\.com/);
+  assert.match(response.body, /How many days/i);
+  assert.doesNotMatch(response.body, /apps\.apple\.com/);
   assert.doesNotMatch(response.body, /Open Blanked to apply the protection window:/);
   assert.doesNotMatch(response.body, /<Media>/);
   assert.doesNotMatch(response.body, /action=review-action/);
@@ -116,7 +118,8 @@ async function smsDoesNotAttachVoice() {
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(response.body, /<Media>/);
     assert.doesNotMatch(response.body, /https?:\/\//);
-    assert.match(response.body, /Reply BLOCK to open Blanked with this ready\./);
+    assert.match(response.body, /How many days/i);
+    assert.doesNotMatch(response.body, /Reply BLOCK/);
   });
 }
 
@@ -127,13 +130,23 @@ async function smsCommandOpensStoredAction() {
       headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
       body: new URLSearchParams({
         From: "+34600000000",
-        Body: "Block Instagram from 10 pm to 7 am every day.",
+        Body: "Block Instagram from 10 pm to 7 am every day for 7 days.",
         MessageSid: "SMsms-plan",
       }).toString(),
     });
     assert.strictEqual(first.statusCode, 200, first.body);
-    assert.match(first.body, /Reply BLOCK/);
+    assert.match(first.body, /Do you confirm/i);
+    assert.doesNotMatch(first.body, /Reply BLOCK/);
     assert.doesNotMatch(first.body, /https?:\/\//);
+
+    const confirmed = await smsHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+      body: new URLSearchParams({ From: "+34600000000", Body: "Yes", MessageSid: "SMsms-confirm" }).toString(),
+    });
+    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
+    assert.match(confirmed.body, /Reply BLOCK/);
+    assert.doesNotMatch(confirmed.body, /https?:\/\//);
 
     const second = await smsHandler({
       httpMethod: "POST",
@@ -146,7 +159,10 @@ async function smsCommandOpensStoredAction() {
     });
     assert.strictEqual(second.statusCode, 200, second.body);
     assert.match(second.body, /Open Blanked: https:\/\/getblank\.netlify\.app\/open\?action=review-action/);
-    assert.match(second.body, /type=open_app_picker/);
+    assert.match(second.body, /type=apply_schedule/);
+    assert.match(second.body, /start=1320/);
+    assert.match(second.body, /end=420/);
+    assert.match(second.body, /days=7/);
     assert.match(second.body, /apps=Instagram/);
   });
 }
@@ -163,7 +179,7 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       }).toString(),
     });
     assert.strictEqual(first.statusCode, 200, first.body);
-    assert.match(first.body, /Should it start now or at an exact time/i);
+    assert.match(first.body, /When should it start: now or at what exact time/i);
     assert.doesNotMatch(first.body, /https?:\/\//);
 
     const second = await smsHandler({
@@ -176,10 +192,17 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       }).toString(),
     });
     assert.strictEqual(second.statusCode, 200, second.body);
-    assert.match(second.body, /Open Blanked to finish setup/);
-    assert.match(second.body, /type=open_app_picker/);
-    assert.match(second.body, /apps=Instagram/);
-    assert.match(second.body, /minutes=60/);
+    assert.match(second.body, /Instagram.*60 minutes.*once.*confirm/i);
+    assert.doesNotMatch(second.body, /https?:\/\//);
+    const confirmed = await smsHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+      body: new URLSearchParams({ From: "whatsapp:+34600000001", Body: "Yes", MessageSid: "SMpending-3" }).toString(),
+    });
+    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
+    assert.match(confirmed.body, /type=start_protection/);
+    assert.match(confirmed.body, /apps=Instagram/);
+    assert.match(confirmed.body, /minutes=60/);
   });
 }
 
@@ -196,8 +219,8 @@ async function whatsappTextHasNoAudioAttachment() {
 
   assert.strictEqual(response.statusCode, 200, response.body);
   assert.doesNotMatch(response.body, /<Media>/);
-  assert.match(response.body, /Blankmind/);
-  assert.match(response.body, /apps\.apple\.com/);
+  assert.match(response.body, /How many days/i);
+  assert.doesNotMatch(response.body, /apps\.apple\.com/);
   assert.doesNotMatch(response.body, /action=review-action/);
 }
 

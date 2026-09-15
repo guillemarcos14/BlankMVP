@@ -1,0 +1,8 @@
+{
+  "fixture": "tools/datasets/bm_production_observed_replay.json",
+  "sha256": "bf4caa0acf73de496f5eca4c7d71082873168b6515c730a71945d32ebb2c6821",
+  "expectations_frozen_before_first_execution": true,
+  "production_observed_user_turns": 7,
+  "selected_excerpts": 3,
+  "human_authorship": "unverified"
+}

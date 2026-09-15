@@ -74,7 +74,7 @@ const SCALAR_KEYS = [
   "app_ready",
 ];
 
-const ARRAY_KEYS = ["authorized_action_types", "available_modes"];
+const ARRAY_KEYS = ["authorized_action_types", "available_modes", "selected_app_names"];
 const OBJECT_ARRAY_KEYS = ["available_mode_catalog"];
 const OBJECT_KEYS = ["schedule", "app_presence"];
 
@@ -153,7 +153,7 @@ function normalizeAppPresence(value) {
 function deriveAppPresence(value, now = Date.now()) {
   const presence = normalizeAppPresence(value);
   const lastSeenAt = Date.parse(presence.last_seen_at || "");
-  const ageMs = Number.isFinite(lastSeenAt) ? Math.max(0, now - lastSeenAt) : null;
+  const ageMs = Number.isFinite(lastSeenAt) && lastSeenAt <= now + 5 * 60 * 1000 ? Math.max(0, now - lastSeenAt) : null;
   const state = ageMs == null
     ? "never_seen"
     : ageMs <= APP_PRESENCE_RECENT_WINDOW_MS
@@ -228,6 +228,7 @@ function normalizeUserContext(value) {
     }
   }
   if (Array.isArray(value.available_modes)) result.available_modes = normalizeStringArray(value.available_modes, 12, 60);
+  if (Array.isArray(value.selected_app_names)) result.selected_app_names = normalizeStringArray(value.selected_app_names, 8, 60);
   if (Array.isArray(value.available_mode_catalog)) result.available_mode_catalog = normalizeModeCatalog(value.available_mode_catalog);
   if (value.schedule) result.schedule = normalizeSchedule(value.schedule);
   if (value.app_presence) result.app_presence = normalizeAppPresence(value.app_presence);
@@ -258,7 +259,7 @@ function normalizePendingBlocking(value) {
 
 function normalizeConversation(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(-8).map((message) => ({
+  return value.filter(message => message && ["user", "assistant"].includes(message.role)).slice(-8).map((message) => ({
     role: clean(message?.role, 24) || "user",
     content: clean(message?.content || message?.text, 420),
   })).filter((message) => message.content);
@@ -278,6 +279,10 @@ function normalizeConversationState(value) {
   const updatedAt = clean(value.updated_at, 64);
   if (updatedAt && Number.isFinite(Date.parse(updatedAt))) result.updated_at = updatedAt;
   if (Array.isArray(value.recent_messages)) result.recent_messages = normalizeConversation(value.recent_messages);
+  if (value.semantic_state) {
+    const semantic = require("./bm-semantic-state").normalizeSemanticState(value.semantic_state);
+    if (semantic) result.semantic_state = semantic;
+  }
   return Object.keys(result).length ? result : null;
 }
 
@@ -327,8 +332,13 @@ function buildAgentContext(input = {}) {
     if (grant) result.autonomy_grant = grant;
   }
   result.memory = normalizeMemory({ ...(shared.memory || {}), ...(source.memory || {}) });
-  const conversationState = freshConversationState(result.memory.conversation_state);
+  const conversationState = freshConversationState(source.conversation_state || result.memory.conversation_state);
   if (result.memory.conversation_state && !conversationState) delete result.memory.conversation_state;
+  if (conversationState) result.memory.conversation_state = conversationState;
+  if (source.semantic_state || conversationState?.semantic_state) {
+    const semantic = require("./bm-semantic-state").normalizeSemanticState(source.semantic_state || conversationState.semantic_state);
+    if (semantic) result.semantic_state = semantic;
+  }
   result.recent_messages = normalizeConversation(
     source.recent_messages || shared.recent_messages || source.conversation || conversationState?.recent_messages,
   );

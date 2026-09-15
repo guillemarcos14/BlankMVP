@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { supabaseFetch } = require("./_membership");
 const { freshConversationState, normalizeConversationState, normalizeUserContext } = require("./bm-context");
 const { identityForPhone } = require("./_identity");
+const { semanticPersistenceRequired, readSemanticConversation, commitSemanticConversation } = require("./_bm_semantic_store");
 
 const EVENT_TABLE = "digital_wellness_feature_payloads";
 
@@ -229,7 +230,7 @@ async function getAssistantMemory(channel, channelUser) {
     `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantChannelUserId(normalizedChannel, normalizedUser))}&select=payload,submitted_at&order=submitted_at.desc&limit=20`,
     { method: "GET" }
   );
-  return rows.reverse().reduce((memory, row) => {
+  const memory = rows.reverse().reduce((memory, row) => {
     const next = row.payload?.properties?.memory;
     if (!next || typeof next !== "object") return memory;
     const merged = {
@@ -251,6 +252,15 @@ async function getAssistantMemory(channel, channelUser) {
     }
     return merged;
   }, {});
+  if (semanticPersistenceRequired()) {
+    const stored = await readSemanticConversation(assistantChannelUserId(normalizedChannel, normalizedUser));
+    // An empty or expired dedicated session must not resurrect older event-log state.
+    delete memory.conversation_state;
+    delete memory.pending_blocking;
+    if (stored.state) memory.conversation_state = normalizeConversationState(stored.state);
+    memory.semantic_store_version = stored.storageVersion;
+  }
+  return memory;
 }
 
 function inboundMessageId(value) {
@@ -336,6 +346,17 @@ async function completeAssistantInboundMessage(channel, channelUser, messageId) 
   return { completed: true, atomic };
 }
 
+async function releaseAssistantInboundMessage(channel, channelUser, messageId) {
+  if (!semanticPersistenceRequired() || !inboundMessageId(messageId)) return;
+  await supabaseFetch("rpc/release_assistant_inbound_message", {
+    method: "POST",
+    body: JSON.stringify({
+      p_anonymous_user_id: assistantChannelUserId(channel, channelUser),
+      p_message_id: inboundMessageId(messageId),
+    }),
+  });
+}
+
 function pendingConversationSlot(text) {
   const value = cleanText(text, 420).toLowerCase();
   if (/(what time do you want to be asleep|when do you want to be asleep|when you want to be asleep|usual bedtime|hora quieres dormir|hora habitual de dormir)/i.test(value)) return "bedtime";
@@ -345,7 +366,7 @@ function pendingConversationSlot(text) {
   return "";
 }
 
-function recordConversationTurnState(previousState, userMessage, assistantMessage, topic = "") {
+function recordConversationTurnState(previousState, userMessage, assistantMessage, topic = "", semanticState = null) {
   const previous = freshConversationState(previousState) || {};
   const user = cleanText(userMessage, 420);
   const assistant = cleanText(assistantMessage, 420);
@@ -354,7 +375,7 @@ function recordConversationTurnState(previousState, userMessage, assistantMessag
     user ? { role: "user", content: user } : null,
     assistant ? { role: "assistant", content: assistant } : null,
   ].filter(Boolean).slice(-8);
-  const pendingSlot = pendingConversationSlot(assistant);
+  const pendingSlot = semanticState?.next_question || pendingConversationSlot(assistant);
   return normalizeConversationState({
     topic: cleanText(topic, 48) || previous.topic,
     pending_slot: pendingSlot,
@@ -362,19 +383,31 @@ function recordConversationTurnState(previousState, userMessage, assistantMessag
     last_user_message: user,
     last_assistant_message: assistant,
     recent_messages: recentMessages,
+    semantic_state: semanticState,
     updated_at: new Date().toISOString(),
   });
 }
 
-async function recordAssistantConversationTurn({ channel, channelUser, previousState, userMessage, assistantMessage, topic = "" }) {
-  const state = recordConversationTurnState(previousState, userMessage, assistantMessage, topic);
+async function recordAssistantConversationTurn({ channel, channelUser, previousState, userMessage, assistantMessage, topic = "", semanticState = null, expectedVersion }) {
+  const state = recordConversationTurnState(previousState, userMessage, assistantMessage, topic, semanticState);
   if (!state) return null;
-  await recordAssistantMemory({
+  if (semanticPersistenceRequired()) {
+    await commitSemanticConversation({
+      anonymousUserId: assistantChannelUserId(channel, channelUser), channel,
+      expectedVersion, state,
+    });
+  }
+  const audit = () => recordAssistantMemory({
     channel,
     channelUser,
     memory: { conversation_state: state },
     source: "assistant_conversation_turn",
   });
+  if (semanticPersistenceRequired()) {
+    try { await audit(); } catch (_) { /* The canonical state is already committed. */ }
+  } else {
+    await audit();
+  }
   return state;
 }
 
@@ -553,6 +586,7 @@ module.exports = {
   connectCodeFromText,
   claimAssistantInboundMessage,
   completeAssistantInboundMessage,
+  releaseAssistantInboundMessage,
   findAssistantConnection,
   ensureAssistantConnectionForPhone,
   getAssistantUserContext,

@@ -1,0 +1,101 @@
+[
+  {
+    "response_sha256": "cda0da87767b2b76d106d55b0e00130869ec973e7e7757114f57a9e0591dbdfe",
+    "expectation_sha256": "1187b42454e41a6d0b221c70f3be936c380ace4b09296c92dbf207fee4ea0f87",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All message, response and speech fields confirm both Instagram and TikTok, now, 18 minutes, once. The confirmation title and neutral buttons request approval without claiming execution.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "de4ec7f07b5b9f3c93e4188ba8975f86b3b9ca871717254ec38e023e398f16f3",
+    "expectation_sha256": "c899c5f773f7abf48d5e5de21ae23c1d62b06795e1a8be2957ac69346d43f1a0",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "TikTok alone replaces both apps in every text surface, retaining now, 18 minutes and once; the confirmation is renewed and no action is claimed.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "0626e7acd47eec67867c6c5a76d8c70952c87b6271112fa5a92c982d6392b221",
+    "expectation_sha256": "f58c565219c1e4e03d461c7c99f2ef29e3ab592acac6cb3c0009f7fd7db80b19",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The complete text asks to select exactly TikTok and explicitly says the proposal has not been applied. This agrees with the required app picker because current device selection contains an extra app; generic details title and buttons are appropriate.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "b3c2f40c85bb4c4831d79349c930b2f0003ada09bece43515e8448bcb61a8684",
+    "expectation_sha256": "8b66870eb0c3bff6ca55b46a8a5fdbb8f87376cdebbaf349a4a00df38b46c492",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "A quarter of an hour is accurately rendered as 15 minutes with Reddit, now and once retained; all surfaces request confirmation.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "2ecfe957cf15b1f3a65644b295db680e16a69ab617e9e7592c8fe8f0eed49f9e",
+    "expectation_sha256": "b81af03b7969dda2c14729efec282606e07ffb14180135ce92de6beacc6d8ddc",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The confirmed Reddit 15-minute immediate one-time proposal is presented for native review to apply it, without a claim that blocking already started. Title and buttons agree.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "fb34d1c4e75d7a4ba54cffc9f4ca8be50291d01dd85e148cf258efb1019304a1",
+    "expectation_sha256": "41cc062fa88d2127c79d21763060054ba3e43f097f17fb8666d396c8d4ae47b8",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The YouTube 20:30-21:15 daily schedule and explicit five-day horizon are all stated accurately, with confirmation pending and no executed-action claim.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "498422bcb114931b74ce09d6ddaeb7279646fbd2d18d16b63085bb0c74407c67",
+    "expectation_sha256": "c2dce63f137a21bd5aa425d059f6aa5c1dba2a714abaf2f2e1fce1bd02a7ae3f",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The revised schedule states Saturday and Sunday, retaining YouTube, both exact times and five-day horizon. This matches canonical ISO days 6 and 7; all surfaces request renewed confirmation.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "96dd1284e488f9b99302b270b76c3b5d0afad6949858309b4e356f6345b3bffa",
+    "expectation_sha256": "5cf63c510eca044f568a5440210a92b3ae199e2d76c6dfd7c837c98253e13497",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The confirmed weekend proposal includes YouTube, 20:30-21:15 and five days. Native actions use Sunday=1 and Saturday=7 correctly. All text invites native review rather than claiming application.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "6b1dcd872e76bbe3a1258b2009a8c230ee3dd1d18291ffdc8f0eb95a605aae19",
+    "expectation_sha256": "add7bef2ff08b1d77540becd6dd58dc5aecb39afb2bd1cc3d9171e85e7b14a48",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The English response accurately confirms Reddit now for 16 minutes once, with consistent title and buttons.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "216fc20ca1433a828aa20990ba0b21a040489c94bb730701146f1040d7f5c447",
+    "expectation_sha256": "5dd88457d26a065d6ed6234239b9eb85bceea5b6953e93225ca9d09b1addd6cb",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every text surface and both buttons are Spanish and preserve Reddit, immediate start, 16 minutes and once. The title and question request confirmation.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  },
+  {
+    "response_sha256": "404293ce868474fb4ed4a64aa7437768938fd82214538f73f2f37fdcf91b762a",
+    "expectation_sha256": "114b355d195ed5201d9be484a9584ab89d733ad4feeced4537ec26f08bbcc4bc",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every text surface and both buttons are Spanish and accurately present Reddit now for 16 minutes once for native review to apply. No surface claims the block has already started.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets; not human certification."
+  }
+]

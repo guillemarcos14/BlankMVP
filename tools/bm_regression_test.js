@@ -137,7 +137,9 @@ check("immediate_protection_does_not_invent_duration", () => {
   assert.match(agent, /const requestedDuration = explicitDurationMinutes\(prompt\);/);
   assert.match(agent, /normalized\.minutes = null/);
   assert.match(agent, /set_daily_limit.*explicitDurationMinutes/);
-  assert.match(whatsapp, /publicOpenLink\("review-action"/);
+  const reviewLink = require("../netlify/functions/_bm_action_link").reviewActionLink({ type: "start_protection", minutes: 17 });
+  assert.strictEqual(new URL(reviewLink).searchParams.get("action"), "review-action");
+  assert.strictEqual(new URL(reviewLink).searchParams.get("minutes"), "17");
   assert.match(whatsapp, /TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED/);
   assert.doesNotMatch(whatsapp, /start-focus.*minutes.*30/);
 });

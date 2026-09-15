@@ -1,0 +1,74 @@
+[
+  {
+    "response_sha256": "1703c86d600162dc5943a91fb6d7ec86ea4ed0f9c04ca253f43edb0d697b37ef",
+    "expectation_sha256": "eb5b5df3a76ecd785dddc40693c8ad0e8718b016dbda488a4cd64a90f1321905",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The three response surfaces ask whether recurrence is once or repeated and ask for days; no action or already-applied claim is present. Title and Continue/Not now labels match collection.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "5fea695a3e30edc164b8885daf4e51f10992013c4a1b04ecf1d66bcb8bc0ba0e",
+    "expectation_sha256": "23a7b34612791f12dacee2b3e32e52aa6185c2aa729f59e807442ea9f24ec287",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response accurately restates Instagram, immediate start, 30 minutes and once, then asks confirmation. No action is claimed. All visible fields are consistent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "f5c750ed858cab752f91f9e201557a46cc05e5c6604c9911b3fbbdeb5aad57fc",
+    "expectation_sha256": "a0b2cf52fc35a58ac28f0af6022879b6a303b67bbab1debab80be19e63fb2b01",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The corrected 45-minute duration replaces 30 in every response surface, while Instagram, now and once are retained. Confirmation is requested again; labels do not claim execution.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "371d82135db8cd59c9ea8152fd16bbcb87de01a47d1ace20b9cd0d8192caabe7",
+    "expectation_sha256": "57a8c9dfc907e33920d95288aec4816709b55aeb7ef22308145bfc6604ce1a4a",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response matches the confirmed 45-minute immediate Instagram proposal and correctly directs native review to apply it. It does not claim that blocking has already started.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "f8b811a3514a17911c861166c1f2aa824fb0762b49cf9aa9d0c66f86656c74e1",
+    "expectation_sha256": "d20226ae34f9a34529c32b5f9633fd2d0d737001bf4dd99d6e74e56fd6666fb9",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response asks for either missing duration or exact end time and emits no action. It does not invent an end, duration or extra recurrence; the generic title/labels are consistent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "0fcc3ccc08163db19d4280593d9af5c886141e273bb5954195ffdc247b22bc5c",
+    "expectation_sha256": "25ab69a5e811e3077bd5cb2ece98ecf673007940f57b633d26985fc46b78b982",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every response restates Instagram at 10:00-11:00 daily for exactly seven days and asks confirmation. This is equivalent to the 60-minute proposed window and contains no execution claim.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "39938ea7eac08ed4590f0c48459a090bcb1c4b1819795abb37c2f42825579599",
+    "expectation_sha256": "0dd9e5b2185388b565290bcc30eeb83840df8df8782144d469485af8ee46d27b",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every response restates the corrected 10:00-12:00 window, daily for seven days, and asks confirmation. The earlier one-hour value is absent; title and controls agree.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "6396c3f39de50d4b1cae2670a1aad47916b1efd512880babc716437de5dcd5dc",
+    "expectation_sha256": "c26390b243c64098d95c9c1b8efcb9192bcf2628b06c7d244fcbc2f3502bb19e",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The response matches the confirmed Instagram 10:00-12:00 daily proposal for seven days and distinguishes native review/application from completion. Full visible text and labels are coherent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  }
+]

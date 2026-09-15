@@ -1,0 +1,1408 @@
+{
+  "version": 1,
+  "id": "bm-semantic-independent-holdout-v1",
+  "split": "holdout",
+  "provenance": "Independently authored synthetic multi-turn user journeys by channel auditor. No private customer logs used. Expected semantic values frozen before first execution and before inspecting the canonical reducer or oracle implementation. Channel labels exercise backend contract adapters, not native app UI availability.",
+  "frozen_at": "2026-09-15",
+  "conversations": [
+    {
+      "id": "holdout_01_duration_replaces_not_clock",
+      "channel": "whatsapp",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram from 9:15 am for 75 minutes every day.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 555
+              },
+              "end": 630,
+              "duration_minutes": 75,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Sorry, make that an hour and a half.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 555
+              },
+              "end": 645,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes, that is correct.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 555
+              },
+              "end": 645,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 555,
+                "end_minute": 645,
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_02_explicit_spanish_then_neutral",
+      "channel": "sms",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "YouTube"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Bloquea YouTube ahora durante cuarenta minutos, solo esta vez.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 40,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "es"
+          }
+        },
+        {
+          "input": "ok",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 40,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 40,
+                "hard_mode": false
+              }
+            ],
+            "language": "es"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_03_app_replacement_preserves_window",
+      "channel": "ios",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram",
+          "Reddit"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram from 20:00 to 21:30 on Mondays and Wednesdays.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1200
+              },
+              "end": 1290,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  2,
+                  4
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "I meant Reddit instead of Instagram.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Reddit"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1200
+              },
+              "end": 1290,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  2,
+                  4
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Confirm",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Reddit"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1200
+              },
+              "end": 1290,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  2,
+                  4
+                ]
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 1200,
+                "end_minute": 1290,
+                "weekdays": [
+                  2,
+                  4
+                ]
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_04_bare_number_after_duration_question",
+      "channel": "web",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "TikTok"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block TikTok right now, just this once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "end"
+              ],
+              "status": "collecting",
+              "next_question": "end"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "90",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_05_action_change_resets_window",
+      "channel": "android",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram every day from 22:00 to 23:30.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1320
+              },
+              "end": 1410,
+              "duration_minutes": 90,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually forget the schedule. Set a daily limit of 23 minutes for Instagram instead.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "daily_limit",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 23,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "daily_limit",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 23,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "set_daily_limit",
+                "minutes": 23
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_06_cancellation_cannot_be_confirmation",
+      "channel": "sms",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Reddit"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Reddit now for 25 minutes, once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Reddit"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 25,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "No, leave it alone. Cancel that.",
+          "expect": {
+            "state": {
+              "intent": "cancelled",
+              "action_type": null,
+              "apps": null,
+              "app_category": null,
+              "moment": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [],
+              "status": "cancelled",
+              "next_question": null
+            },
+            "decision": {
+              "type": "cancelled",
+              "slot": null
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "yes",
+          "expect": {
+            "state": {
+              "intent": "general",
+              "action_type": null,
+              "apps": null,
+              "app_category": null,
+              "moment": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [],
+              "status": "idle",
+              "next_question": null
+            },
+            "decision": {
+              "type": "none",
+              "slot": null
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_07_confirmation_cannot_fill_duration",
+      "channel": "whatsapp",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "end"
+              ],
+              "status": "collecting",
+              "next_question": "end"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "end"
+              ],
+              "status": "collecting",
+              "next_question": "end"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "for 12 minutes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 12,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_08_reconfirmation_after_ready_edit",
+      "channel": "ios",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "YouTube"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block YouTube every day from 8 am to 9 am.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 480
+              },
+              "end": 540,
+              "duration_minutes": 60,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 480
+              },
+              "end": 540,
+              "duration_minutes": 60,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 480,
+                "end_minute": 540,
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              }
+            ],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Move the start to 8:20 am and keep the same end.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 500
+              },
+              "end": 540,
+              "duration_minutes": 40,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_09_stale_presence_keeps_contract",
+      "channel": "whatsapp",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "TikTok"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-01T08:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block TikTok now for 17 minutes only once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 17,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Confirm",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 17,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [
+                "app_presence"
+              ],
+              "status": "needs_setup",
+              "next_question": "app_presence"
+            },
+            "decision": {
+              "type": "setup",
+              "slot": "app_presence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_10_permissions_do_not_change_duration",
+      "channel": "ios",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": false,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 35 minutes, once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 35,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 35,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [
+                "screen_time_permission"
+              ],
+              "status": "needs_setup",
+              "next_question": "screen_time_permission"
+            },
+            "decision": {
+              "type": "setup",
+              "slot": "screen_time_permission"
+            },
+            "actions": [
+              {
+                "type": "request_screen_time_permission"
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_11_overnight_preserves_days",
+      "channel": "sms",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram from 10 pm until 1 am on Fridays and Saturdays.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1320
+              },
+              "end": 60,
+              "duration_minutes": 180,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes, Fridays and Saturdays.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1320
+              },
+              "end": 60,
+              "duration_minutes": 180,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  6,
+                  7
+                ]
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 1320,
+                "end_minute": 60,
+                "weekdays": [
+                  6,
+                  7
+                ]
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "holdout_12_advice_is_not_execution",
+      "channel": "web",
+      "context": {
+        "language": "en",
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00.000Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Would blocking Instagram make it easier to concentrate?",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "action_type": null,
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [],
+              "status": "idle",
+              "next_question": null
+            },
+            "decision": {
+              "type": "none",
+              "slot": null
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "I only want advice, please do not block anything.",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "action_type": null,
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [],
+              "status": "idle",
+              "next_question": null
+            },
+            "decision": {
+              "type": "none",
+              "slot": null
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    }
+  ]
+}

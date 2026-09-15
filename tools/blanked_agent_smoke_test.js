@@ -115,296 +115,168 @@ function baseContext(overrides = {}) {
   assert.match(webPolitics.message_text, /digital wellness|phone|screen|apps|móvil|pantallas|bienestar digital/i);
   assert.doesNotMatch(webPolitics.message_text, /history|politic|conflict|identity|affected|israel|palestin/i);
 
-  const missingBedtime = await call("How can I not scroll at night?", baseContext());
-  assert.strictEqual(missingBedtime.actions.length, 0);
-  assert.match(missingBedtime.response_text, /bed|asleep|phone/i);
+  // These are integration assertions against independently specified facts. The
+  // original smoke asserted guessed windows, automatic confirmation, seven-day
+  // expiration and executable picker payloads. Those expectations were unsafe.
+  function fact(plan, key) { return plan.semantic_state?.slots[key]?.value ?? null; }
+  function noAction(plan) { assert.deepStrictEqual(plan.actions, []); }
+  function question(plan, slot) { assert.deepStrictEqual(plan.semantic_decision, { type: "ask", slot }); }
+  async function follow(prompt, previous, context = baseContext({channel:"app"})) {
+    return call(prompt, {...context, semantic_state:previous.semantic_state});
+  }
 
+  const missingBedtime = await call("How can I not scroll at night?", baseContext());
+  noAction(missingBedtime); question(missingBedtime,"start");
+  assert.strictEqual(missingBedtime.semantic_state.intent,"advice");
+  assert.strictEqual(fact(missingBedtime,"start"),null);
+  assert.strictEqual(fact(missingBedtime,"duration_minutes"),null);
   const rememberedBedtime = await call("How can I not scroll at night?", baseContext({
-    memory: { bedtime_minute: 23 * 60, weak_hours: [22], main_apps: ["TikTok"] },
+    memory:{bedtime_minute:23*60,weak_hours:[22],main_apps:["TikTok"]},
   }));
-  assert.strictEqual(rememberedBedtime.actions.length, 0);
-  assert.match(rememberedBedtime.message_text, /11:00 PM|bed|boundary|asleep/i);
+  noAction(rememberedBedtime); question(rememberedBedtime,"start");
+  assert.strictEqual(fact(rememberedBedtime,"apps"),null);
 
   const missingApp = await call("I keep doomscrolling.", baseContext());
-  assert.strictEqual(missingApp.actions.length, 0);
-  assert.match(missingApp.response_text, /where|app|loop/i);
-
+  noAction(missingApp);
+  assert.match(missingApp.response_text,/where|app|loop/i);
   const appTimeContext = [
-    { role: "user", content: "How can I scroll less in the morning?" },
-    { role: "assistant", content: "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day." },
+    {role:"user",content:"How can I scroll less in the morning?"},
+    {role:"assistant",content:"Which app pulls you in most, and when does it usually happen?"},
   ];
-  const appTimeFollowup = await call("11am Instagram", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeContext,
-    memory: { conversation_state: { recent_messages: appTimeContext } },
-  }));
-  assert.strictEqual(appTimeFollowup.actions.length, 0);
-  assert.match(appTimeFollowup.message_text, /Instagram.*11:00 AM|11:00 AM.*Instagram/i);
-  assert.match(appTimeFollowup.message_text, /what time.*end|end.*time/i);
-  assert.doesNotMatch(appTimeFollowup.message_text, /25-minute|download|permission|App Store/i);
-  const appTimeEndContext = [
-    ...appTimeContext,
-    { role: "user", content: "11am Instagram" },
-    { role: "assistant", content: appTimeFollowup.message_text },
-  ];
-  const appTimeEndFollowup = await call("12pm", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeEndContext,
-  }));
-  assert.strictEqual(appTimeEndFollowup.actions.length, 0);
-  assert.match(appTimeEndFollowup.message_text, /Instagram.*11:00 AM.*12:00 PM|11:00 AM.*12:00 PM.*Instagram/i);
-  assert.match(appTimeEndFollowup.message_text, /confirm|want me to use/i);
-  assert.doesNotMatch(appTimeEndFollowup.message_text, /from 11:00 AM to\.?$|25-minute|download|permission|App Store/i);
-  const tenAmContext = [
-    ...appTimeContext,
-    { role: "user", content: "Instagram at 10am" },
-    { role: "assistant", content: "Got it: Instagram is the app and 10:00 AM is when it starts. What time should the protection end?" },
-  ];
-  const oneHourEndFollowup = await call("1 hour", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: tenAmContext,
-  }));
-  assert.strictEqual(oneHourEndFollowup.actions.length, 0);
-  assert.match(oneHourEndFollowup.message_text, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i);
-  assert.doesNotMatch(oneHourEndFollowup.message_text, /\b1:00 AM|\b1:00 PM|\b10:00 PM/i);
-  const correctedWindowFollowup = await call("No, from 10 to 11 am", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: [
-      ...tenAmContext,
-      { role: "user", content: "1 hour" },
-      { role: "assistant", content: oneHourEndFollowup.message_text },
-    ],
-  }));
-  assert.strictEqual(correctedWindowFollowup.actions.length, 0);
-  assert.match(correctedWindowFollowup.message_text, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i);
-  assert.doesNotMatch(correctedWindowFollowup.message_text, /\b10:00 PM|\b1:00 AM/i);
-  assert.match(correctedWindowFollowup.message_text, /confirm|want me to use/i);
-  const appTimeBareNoon = await call("At 12", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeEndContext,
-  }));
-  assert.strictEqual(appTimeBareNoon.actions.length, 0);
-  assert.match(appTimeBareNoon.message_text, /11:00 AM.*12:00 PM|12:00 PM.*11:00 AM/i);
-  assert.doesNotMatch(appTimeBareNoon.message_text, /12:00 AM/i);
-  assert.match(appTimeBareNoon.message_text, /confirm|want me to use/i);
-  const appTimeBareNoonConfirmedContext = [
-    ...appTimeEndContext,
-    { role: "user", content: "At 12" },
-    { role: "assistant", content: appTimeBareNoon.message_text },
-  ];
-  const appTimeBareNoonConfirmed = await call("yes", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeBareNoonConfirmedContext,
-  }));
-  assert.deepStrictEqual(appTimeBareNoonConfirmed.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.strictEqual(appTimeBareNoonConfirmed.actions[0].end_minute, 12 * 60);
-  assert.doesNotMatch(appTimeBareNoonConfirmed.message_text, /apps\.apple\.com|download|create a plan|12:00 AM/i);
-  const appTimeInstalledContext = [
-    ...appTimeBareNoonConfirmedContext,
-    { role: "user", content: "yes" },
-    { role: "assistant", content: appTimeBareNoonConfirmed.message_text },
-  ];
-  const appTimeInstalledContinuation = await call("I have it", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeInstalledContext,
-  }));
-  assert.deepStrictEqual(appTimeInstalledContinuation.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.match(appTimeInstalledContinuation.message_text, /plan.*ready|prepared|review/i);
-  assert.doesNotMatch(appTimeInstalledContinuation.message_text, /apps\.apple\.com|download|create a plan/i);
-  const appTimeConfirmedContext = [
-    ...appTimeEndContext,
-    { role: "user", content: "12pm" },
-    { role: "assistant", content: appTimeEndFollowup.message_text },
-  ];
-  const appTimeConfirmed = await call("yes", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    app_presence: {
-      app_present: true,
-      app_ready: true,
-      last_seen_at: new Date().toISOString(),
-    },
-    recent_messages: appTimeConfirmedContext,
-  }));
-  assert.deepStrictEqual(appTimeConfirmed.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.strictEqual(appTimeConfirmed.actions[0].start_minute, 11 * 60);
-  assert.strictEqual(appTimeConfirmed.actions[0].end_minute, 12 * 60);
-  assert.doesNotMatch(appTimeConfirmed.message_text, /25-minute|daily limit|already (set|blocked)|download|App Store/i);
+  const appTimeFollowup = await call("11am Instagram", baseContext({channel:"whatsapp",recent_messages:appTimeContext}));
+  noAction(appTimeFollowup); question(appTimeFollowup,"end_or_duration");
+  assert.deepStrictEqual(fact(appTimeFollowup,"apps"),["Instagram"]);
+  assert.deepStrictEqual(fact(appTimeFollowup,"start"),{type:"time",minute:660});
+  assert.strictEqual(fact(appTimeFollowup,"action_type"),null);
+  const appTimeEndFollowup = await follow("12pm",appTimeFollowup);
+  noAction(appTimeEndFollowup); question(appTimeEndFollowup,"recurrence");
+  assert.strictEqual(fact(appTimeEndFollowup,"end"),720);
+  assert.strictEqual(fact(appTimeEndFollowup,"duration_minutes"),60);
+  const ambiguousEnd = await follow("At 12",appTimeFollowup);
+  noAction(ambiguousEnd); question(ambiguousEnd,"end");
+  assert.strictEqual(fact(ambiguousEnd,"end"),null);
+  assert.strictEqual(fact(ambiguousEnd,"confirmation"),null);
+  noAction(await follow("yes",ambiguousEnd));
+  noAction(await follow("I have it",ambiguousEnd));
 
-  const appTimeModelQuestionContext = [
-    { role: "user", content: "How can I scroll less in the morning?" },
-    { role: "assistant", content: "Got it. Which app pulls you in most, and when does it usually happen?" },
-  ];
-  const appTimeModelQuestion = await call("11am Instagram", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-    recent_messages: appTimeModelQuestionContext,
-  }));
-  assert.strictEqual(appTimeModelQuestion.actions.length, 0);
-  assert.match(appTimeModelQuestion.message_text, /Instagram.*11:00 AM|11:00 AM.*Instagram/i);
-  assert.match(appTimeModelQuestion.message_text, /what time.*end|end.*time/i);
-  assert.doesNotMatch(appTimeModelQuestion.message_text, /25-minute|daily limit|download|permission|App Store/i);
+  const tenAm = await call("Instagram at 10am",baseContext({recent_messages:appTimeContext}));
+  const oneHour = await follow("1 hour",tenAm);
+  noAction(oneHour); question(oneHour,"recurrence");
+  assert.deepStrictEqual(fact(oneHour,"start"),{type:"time",minute:600});
+  assert.strictEqual(fact(oneHour,"end"),660);
+  assert.strictEqual(fact(oneHour,"duration_minutes"),60);
+  const corrected = await follow("No, from 10 to 11 am",oneHour);
+  noAction(corrected); question(corrected,"recurrence");
+  assert.deepStrictEqual(fact(corrected,"start"),{type:"time",minute:600});
+  assert.strictEqual(fact(corrected,"end"),660);
+  const recurringAdvice = await follow("every day for 9 days",corrected);
+  noAction(recurringAdvice); question(recurringAdvice,"action_type");
+  const proposed = await follow("yes",recurringAdvice);
+  noAction(proposed);
+  assert.strictEqual(proposed.semantic_decision.type,"confirm");
+  const scheduled = await follow("yes",proposed,baseContext({channel:"app",selected_app_names:["Instagram"]}));
+  assert.deepStrictEqual(scheduled.actions.map(a=>a.type),["apply_schedule"]);
+  assert.strictEqual(scheduled.actions[0].start_minute,600);
+  assert.strictEqual(scheduled.actions[0].end_minute,660);
+  assert.strictEqual(scheduled.actions[0].duration_days,9);
+  assert.deepStrictEqual(scheduled.actions[0].weekdays,[1,2,3,4,5,6,7]);
+  assert.match(scheduled.message_text,/10:00 to 11:00.*9 days/);
 
-  const breakfastWithoutTime = await call("I usually use social media after breakfast", baseContext({
-    channel: "whatsapp",
-    assistant_channel: "whatsapp",
-  }));
-  assert.strictEqual(breakfastWithoutTime.actions.length, 0);
-  assert.match(breakfastWithoutTime.message_text, /finish breakfast/i);
-  assert.strictEqual(breakfastWithoutTime.message_text, breakfastWithoutTime.response_text);
-  assert.doesNotMatch(`${breakfastWithoutTime.message_text} ${breakfastWithoutTime.response_text}`, /Social mode|30 minutes|Start Social/i);
+  const breakfastWithoutTime = await call("I usually use social media after breakfast",baseContext({channel:"whatsapp"}));
+  noAction(breakfastWithoutTime);
+  assert.match(breakfastWithoutTime.message_text,/finish breakfast/i);
+  assert.strictEqual(breakfastWithoutTime.message_text,breakfastWithoutTime.response_text);
+  assert.doesNotMatch(breakfastWithoutTime.message_text,/Social mode|30 minutes|Start Social/i);
+  const breakfastWithRememberedApp = await call("I usually use social media after breakfast",baseContext({memory:{main_apps:["Instagram"]}}));
+  noAction(breakfastWithRememberedApp);
+  assert.match(breakfastWithRememberedApp.message_text,/finish breakfast/i);
+  const breakfastWithTime = await call("I usually use social media after breakfast",baseContext({memory:{breakfast_end_minute:480}}));
+  noAction(breakfastWithTime);
+  const rememberedApp = await call("I keep doomscrolling.",baseContext({memory:{main_apps:["Instagram"],weak_hours:[21],last_plan_outcome:"broke"}}));
+  noAction(rememberedApp); // Habit evidence alone does not authorize a 21:00-22:00 rule.
+  assert.notStrictEqual(rememberedApp.semantic_state.intent,"block");
 
-  const breakfastWithRememberedApp = await call("I usually use social media after breakfast", baseContext({
-    memory: { main_apps: ["Instagram"] },
-  }));
-  assert.strictEqual(breakfastWithRememberedApp.actions.length, 0);
-  assert.match(breakfastWithRememberedApp.message_text, /finish breakfast/i);
-  assert.strictEqual(breakfastWithRememberedApp.message_text, breakfastWithRememberedApp.response_text);
+  const explicitWindow = await call("Block selected apps from 10 pm to 7 am every day.",baseContext({channel:"app"}));
+  noAction(explicitWindow); question(explicitWindow,"schedule_horizon_days");
+  assert.deepStrictEqual(fact(explicitWindow,"start"),{type:"time",minute:1320});
+  assert.strictEqual(fact(explicitWindow,"end"),420);
+  const immediateBlock = await call("I want to block Instagram now.",baseContext());
+  noAction(immediateBlock);
+  assert.deepStrictEqual(immediateBlock.semantic_state.pending_slots,["end_or_duration","recurrence"]);
+  const unbounded = await call("Block TikTok indefinitely now.",baseContext());
+  noAction(unbounded);
+  assert.ok(unbounded.semantic_state.errors.some(e=>e.code==="unbounded_duration"));
+  assert.strictEqual(fact(unbounded,"duration_minutes"),null);
 
-  const breakfastWithTime = await call("I usually use social media after breakfast", baseContext({
-    memory: { breakfast_end_minute: 8 * 60 },
-  }));
-  assert.strictEqual(breakfastWithTime.actions.length, 0);
-  assert.strictEqual(breakfastWithTime.blocking_user_request, false);
+  const modeContext = baseContext({channel:"app",available_modes:["Instagram solo"],available_mode_catalog:[{name:"Instagram solo",app_names:["Instagram"],selection_count:1}]});
+  const modeProposal = await call("Block Instagram now for 45 minutes once",modeContext);
+  noAction(modeProposal);
+  const savedMode = await follow("yes",modeProposal,modeContext);
+  assert.deepStrictEqual(savedMode.actions.map(a=>a.type),["activate_mode"]);
+  assert.strictEqual(savedMode.actions[0].name,"Instagram solo");
+  assert.strictEqual(savedMode.actions[0].minutes,45);
+  const selectedImmediate = await call("Block selected apps for 45 minutes now.",baseContext({channel:"app"}));
+  noAction(selectedImmediate); question(selectedImmediate,"recurrence");
+  const selectedOnce = await follow("just once",selectedImmediate);
+  noAction(selectedOnce);
+  const selectedConfirmed = await follow("yes",selectedOnce);
+  assert.strictEqual(selectedConfirmed.actions[0].type,"start_protection");
+  assert.strictEqual(selectedConfirmed.actions[0].minutes,45);
 
-  const rememberedApp = await call("I keep doomscrolling.", baseContext({
-    memory: { main_apps: ["Instagram"], weak_hours: [21], last_plan_outcome: "broke" },
-  }));
-  assert.strictEqual(rememberedApp.actions.length, 1);
-  assert.strictEqual(rememberedApp.actions[0].type, "apply_schedule");
-  assert.strictEqual(rememberedApp.actions[0].start_minute, 21 * 60);
-  assert.strictEqual(rememberedApp.actions[0].end_minute, 22 * 60);
-  assert.strictEqual(rememberedApp.blocking_user_request, false);
-  assert.match(rememberedApp.bullets.join(" "), /broke|earlier|usual|9:00 PM/i);
-  assert.doesNotMatch(`${rememberedApp.message_text} ${rememberedApp.bullets.join(" ")}`, /25-minute|daily limit/i);
+  const pickerProposal = await call("Block Instagram from 7pm for one hour every day for 7 days",baseContext({channel:"app"}));
+  noAction(pickerProposal);
+  const picker = await follow("yes",pickerProposal);
+  assert.deepStrictEqual(picker.actions.map(a=>a.type),["open_app_picker"]);
+  for (const field of ["minutes","start_minute","end_minute","weekdays","duration_days"]) assert.strictEqual(picker.actions[0][field],null);
+  const claimedSelection = await call("I have already selected the app. Now block it.",baseContext({has_selected_apps:false,selection_count:0}));
+  noAction(claimedSelection); question(claimedSelection,"apps");
+  assert.strictEqual(fact(claimedSelection,"apps"),null);
+  const orphanLegacyPending = await call("45 minutes",baseContext({pending_blocking:{apps:["Instagram"],start:{type:"now",value:"now"},recurrence:{type:"once",value:[0]}}}));
+  noAction(orphanLegacyPending);
+  assert.strictEqual(fact(orphanLegacyPending,"confirmation"),null);
+  assert.strictEqual(orphanLegacyPending.semantic_decision.slot,orphanLegacyPending.semantic_state.next_question);
+  if (orphanLegacyPending.semantic_state.intent === "general") {
+    assert.deepStrictEqual(orphanLegacyPending.semantic_state.pending_slots,[]);
+    assert.deepStrictEqual(orphanLegacyPending.semantic_decision,{type:"none",slot:null});
+    assert.deepStrictEqual(orphanLegacyPending.blocking_missing_fields,[]);
+  }
 
-  const explicitWindow = await call("Block selected apps from 10 pm to 7 am every day.", baseContext());
-  assert.ok(explicitWindow.actions.some((action) => action.type === "apply_schedule"));
-  assert.strictEqual(explicitWindow.actions[0].start_minute, 22 * 60);
-  assert.strictEqual(explicitWindow.actions[0].end_minute, 7 * 60);
-  assert.match(explicitWindow.message_text, /Protect selected apps from 10:00 PM to 7:00 AM/i);
-  assert.doesNotMatch(explicitWindow.message_text, /I can help|apply it in Blanked|Read:|Pattern:|Move:/i);
+  const dailyLimit = await call("Set a 25-minute daily limit for Instagram.",baseContext({channel:"app"}));
+  noAction(dailyLimit); question(dailyLimit,"start");
+  assert.strictEqual(fact(dailyLimit,"duration_minutes"),25);
+  assert.strictEqual(fact(dailyLimit,"action_type"),"daily_limit");
+  const dailyLimitNow = await follow("now",dailyLimit);
+  noAction(dailyLimitNow);
+  const dailyLimitConfirmed = await follow("yes",dailyLimitNow,baseContext({channel:"app",selected_app_names:["Instagram"]}));
+  assert.strictEqual(dailyLimitConfirmed.actions[0].type,"set_daily_limit");
+  assert.strictEqual(dailyLimitConfirmed.actions[0].minutes,25);
+  const dailyLimitNeedsAmount = await call("Set a daily limit for Instagram.",baseContext());
+  noAction(dailyLimitNeedsAmount);
+  assert.strictEqual(fact(dailyLimitNeedsAmount,"duration_minutes"),null);
+  assert.ok(dailyLimitNeedsAmount.semantic_state.pending_slots.includes("end_or_duration"));
 
-  const immediateBlock = await call("I want to block Instagram now.", baseContext());
-  assert.strictEqual(immediateBlock.actions.length, 0);
-  assert.deepStrictEqual(immediateBlock.blocking_missing_fields, ["end"]);
-  assert.match(immediateBlock.message_text, /How long|cu[aá]nto tiempo/i);
+  const appSpanishLocale = await call("Block selected apps from 10 pm to 7 am every day.",baseContext({locale:"es-ES",channel:"app"}));
+  assert.strictEqual(appSpanishLocale.semantic_state.language,"en");
+  noAction(appSpanishLocale);
+  const whatsappSpanish = await call("Bloquea Instagram de 10 de la noche a 7 de la mañana cada día.",baseContext({channel:"whatsapp"}));
+  assert.strictEqual(whatsappSpanish.semantic_state.language,"es");
+  assert.deepStrictEqual(fact(whatsappSpanish,"start"),{type:"time",minute:1320});
+  assert.strictEqual(fact(whatsappSpanish,"end"),420);
+  noAction(whatsappSpanish);
+  const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am",baseContext());
+  noAction(sleepGoalWindow); // A sleep goal is not authorization for a guessed 22:45 block.
+  assert.notStrictEqual(sleepGoalWindow.semantic_state.intent,"block");
 
-  const completeImmediate = await call("Block TikTok indefinitely now.", baseContext());
-  assert.strictEqual(completeImmediate.blocking_ready, true);
-  assert.strictEqual(completeImmediate.actions[0].type, "open_app_picker");
-  assert.strictEqual(completeImmediate.actions[0].name, "Immediate Protection");
-
-  const savedInstagramMode = await call(
-    "Block Instagram indefinitely now.",
-    baseContext({
-      available_modes: ["Instagram solo"],
-      available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"], selection_count: 1 }],
-    })
-  );
-  assert.strictEqual(savedInstagramMode.actions[0].type, "activate_mode");
-  assert.strictEqual(savedInstagramMode.actions[0].name, "Instagram solo");
-  assert.strictEqual(savedInstagramMode.requires_selected_apps, false);
-
-  const savedInstagramScheduledMode = await call(
-    "Block Instagram for 1 hour at 7 pm every day.",
-    baseContext({
-      available_modes: ["Instagram solo"],
-      available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"], selection_count: 1 }],
-    })
-  );
-  assert.strictEqual(savedInstagramScheduledMode.actions[0].type, "apply_schedule");
-  assert.strictEqual(savedInstagramScheduledMode.actions[0].name, "Instagram solo");
-  assert.strictEqual(savedInstagramScheduledMode.requires_selected_apps, false);
-
-  const savedInstagramFollowupMode = await call(
-    "3 mins",
-    baseContext({
-      available_modes: ["Instagram solo"],
-      available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"], selection_count: 1 }],
-      pending_blocking: {
-        apps: ["Instagram"],
-        start: { type: "now", value: "now" },
-        recurrence: { type: "once", value: [0] },
-      },
-    })
-  );
-  assert.strictEqual(savedInstagramFollowupMode.actions[0].type, "activate_mode");
-  assert.strictEqual(savedInstagramFollowupMode.actions[0].name, "Instagram solo");
-  assert.strictEqual(savedInstagramFollowupMode.requires_selected_apps, false);
-
-  const selectedImmediate = await call("Block selected apps for 45 minutes now.", baseContext());
-  assert.strictEqual(selectedImmediate.actions[0].type, "start_protection");
-  assert.strictEqual(selectedImmediate.actions[0].minutes, 45);
-
-  const scheduledDuration = await call("Block Instagram for 1 hour at 7 pm every day.", baseContext());
-  assert.strictEqual(scheduledDuration.actions[0].type, "open_app_picker");
-  assert.strictEqual(scheduledDuration.actions[0].start_minute, 19 * 60);
-  assert.strictEqual(scheduledDuration.actions[0].end_minute, 20 * 60);
-
-  const completedFollowup = await call("45 minutes", baseContext({
-    pending_blocking: {
-      apps: ["Instagram"],
-      start: { type: "now", value: "now" },
-      recurrence: { type: "once", value: [0] },
-    },
-  }));
-  assert.strictEqual(completedFollowup.blocking_ready, true);
-  assert.strictEqual(completedFollowup.actions[0].type, "open_app_picker");
-  assert.strictEqual(completedFollowup.actions[0].minutes, 45);
-
-  const claimedSelectionImmediate = await call(
-    "I have already selected the app. Now block it.",
-    baseContext({ has_selected_apps: false, selection_count: 0 })
-  );
-  assert.strictEqual(claimedSelectionImmediate.actions.length, 0);
-  assert.ok(claimedSelectionImmediate.blocking_missing_fields.includes("apps"));
-  assert.match(claimedSelectionImmediate.message_text, /Which apps|qu[eé] aplicaciones/i);
-
-  const explicitDailyLimit = await call("Set a 25-minute daily limit for Instagram.", baseContext());
-  assert.ok(explicitDailyLimit.actions.some((action) => action.type === "open_app_picker"));
-  assert.strictEqual(explicitDailyLimit.blocking_ready, true);
-
-  const dailyLimitNeedsAmount = await call("Set a daily limit for Instagram.", baseContext());
-  assert.strictEqual(dailyLimitNeedsAmount.actions.length, 0);
-  assert.match(dailyLimitNeedsAmount.message_text, /how many minutes|cu[aá]ntos minutos/i);
-  assert.doesNotMatch(dailyLimitNeedsAmount.message_text, /25-minute|25 minutos/i);
-
-  const appSpanishLocale = await call("Block selected apps from 10 pm to 7 am every day.", baseContext({ locale: "es-ES", channel: "app" }));
-  assert.match(appSpanishLocale.message_text, /Protect selected apps/i);
-  assert.doesNotMatch(appSpanishLocale.message_text, /Protegería|bloqueo|franja/i);
-
-  const whatsappSpanish = await call("Bloquea Instagram de 10 de la noche a 7 de la mañana cada día.", baseContext({ channel: "whatsapp" }));
-  assert.match(whatsappSpanish.message_text, /Puedo bloquear|Instagram/i);
-
-  const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am", baseContext());
-  assert.strictEqual(sleepGoalWindow.actions.length, 1);
-  assert.strictEqual(sleepGoalWindow.actions[0].type, "apply_schedule");
-  assert.strictEqual(sleepGoalWindow.actions[0].start_minute, 22 * 60 + 45);
-  assert.strictEqual(sleepGoalWindow.actions[0].end_minute, 23 * 60);
-  assert.strictEqual(sleepGoalWindow.blocking_user_request, false);
-
-  const rawContract = await callRaw("Block selected apps from 10 pm to 7 am every day.", baseContext());
-  assert.match(rawContract.harness.run_id, /^bm_/);
-  assert.strictEqual(rawContract.harness.harness_version, "bm-harness-v2");
-  assert.strictEqual(rawContract.harness.status, "completed");
-  assert.strictEqual(rawContract.loop.loop_version, "bm-loop-excellence-v1");
-  assert.strictEqual(rawContract.loop.schema_version, 1);
-  assert.ok(rawContract.loop.action_types.includes("apply_schedule"));
-  assert.doesNotMatch(JSON.stringify(rawContract.harness), /Block selected apps from 10 pm to 7 am every day/i);
-
-  const serialized = JSON.stringify([missingBedtime, rememberedBedtime, missingApp, rememberedApp, explicitWindow, sleepGoalWindow]);
-  assert.doesNotMatch(serialized, /source|model_error|openai|debug|QA/i);
-
-  console.log("blanked-agent smoke tests passed");
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+  const rawContract = await callRaw("Block selected apps from 10 pm to 7 am every day.",baseContext());
+  assert.match(rawContract.harness.run_id,/^bm_/);
+  assert.strictEqual(rawContract.harness.harness_version,"bm-harness-v2");
+  assert.strictEqual(rawContract.harness.status,"completed");
+  assert.strictEqual(rawContract.loop.loop_version,"bm-loop-excellence-v1");
+  assert.strictEqual(rawContract.loop.schema_version,1);
+  assert.deepStrictEqual(rawContract.loop.action_types,[]);
+  assert.doesNotMatch(JSON.stringify(rawContract.harness),/Block selected apps from 10 pm to 7 am every day/i);
+  // Source provenance is required in state, but internal metadata is not prose.
+  const visible = JSON.stringify([missingBedtime,rememberedBedtime,missingApp,rememberedApp,explicitWindow,sleepGoalWindow].map(p=>({text:p.message_text,bullets:p.bullets})));
+  assert.doesNotMatch(visible,/model_error|openai|debug|QA/i);
+  console.log("blanked-agent smoke tests passed (canonical semantic contract)");
+})().catch(error=>{ console.error(error); process.exit(1); });

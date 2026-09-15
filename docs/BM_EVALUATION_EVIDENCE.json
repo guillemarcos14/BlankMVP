@@ -1,0 +1,1432 @@
+{
+  "evidence_version": 2,
+  "created_at": "2026-09-15T17:41:26.056Z",
+  "status": "candidate_validation_only_not_production_release",
+  "reports": [
+    {
+      "file": "tmp/bm-semantic/oracle-mutations-final.json",
+      "sha256": "145fbcb9f76350e03ed410ccda264d0f411476187b824980484c6c01c5e72b27",
+      "generated_at": null,
+      "summary": {
+        "mutations": 35,
+        "rejected": 33,
+        "review_invalidated": 2,
+        "escaped": 0
+      },
+      "release_eligible": null,
+      "regressions": null,
+      "semantic_variants": null,
+      "text_variants": null,
+      "source_snapshot": null
+    },
+    {
+      "file": "tmp/bm-semantic/legacy-false-positives-final.json",
+      "sha256": "2ab4e587f3fe1ceaa01c0a07388cc99e5d0bdbc21739b45668a43a86f4ee78dd",
+      "generated_at": "2026-09-15T17:38:59.801Z",
+      "summary": {
+        "false_positives": 6,
+        "total": 6
+      },
+      "release_eligible": null,
+      "regressions": null,
+      "semantic_variants": null,
+      "text_variants": null,
+      "source_snapshot": null
+    },
+    {
+      "file": "tmp/bm-semantic/batch-v2-reviewed-final-240.json",
+      "sha256": "ae438aeecbf63127f44a865f7839f910115dfcb69e2f93300d94ebf8236bce2a",
+      "generated_at": "2026-09-15T17:39:02.067Z",
+      "summary": {
+        "conversations": 240,
+        "turns": 960,
+        "active_model_turns": 0,
+        "source_counts": {
+          "semantic_state_v1": 960
+        },
+        "passed": 960,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "regressions": 0,
+      "semantic_variants": 0,
+      "text_variants": 0,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "4362f699f866c218e15d1ccac7eaf2f9ff2d0421b82f16cfb18019b2d58921db",
+        "tools/bm_semantic_replay.js": "6cb1992213d32da459f39c902a402fe3c3143add3c66232ec80089a7bde970b3",
+        "netlify/functions/blanked-agent.js": "086c101978c6a4e55750fed9fb36857174d57a8d296b1e5a648dd20e09565c61",
+        "netlify/functions/bm-semantic-state.js": "01bf71a04dc8b50b128e998a6cf951b414bc14e02600c3db9c4de2d08afb86db",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      }
+    },
+    {
+      "file": "tmp/bm-semantic/live-differential-v2.json",
+      "sha256": "5774ae370a29b6b5c28ee7d0569e6e5b01ba4361d100c9076251c992229c9203",
+      "generated_at": "2026-09-15T17:35:01.774Z",
+      "summary": {
+        "conversations": 20,
+        "turns": 80,
+        "active_model_turns": 80,
+        "source_counts": {
+          "openai:gpt-5.6-luna": 48,
+          "openai:gpt-5.6-luna:semantic": 32
+        },
+        "passed": 0,
+        "failed": 21,
+        "unverified": 59,
+        "dimensions": {
+          "intent": {
+            "passed": 32,
+            "failed": 0,
+            "unverified": 48,
+            "pass_percent": 40
+          },
+          "slots": {
+            "passed": 32,
+            "failed": 0,
+            "unverified": 48,
+            "pass_percent": 40
+          },
+          "transition": {
+            "passed": 32,
+            "failed": 0,
+            "unverified": 48,
+            "pass_percent": 40
+          },
+          "provenance": {
+            "passed": 32,
+            "failed": 0,
+            "unverified": 48,
+            "pass_percent": 40
+          },
+          "decision": {
+            "passed": 32,
+            "failed": 0,
+            "unverified": 48,
+            "pass_percent": 40
+          },
+          "actions": {
+            "passed": 45,
+            "failed": 19,
+            "unverified": 16,
+            "pass_percent": 56.25
+          },
+          "safety": {
+            "passed": 32,
+            "failed": 14,
+            "unverified": 34,
+            "pass_percent": 40
+          },
+          "visible_equivalence": {
+            "passed": 0,
+            "failed": 2,
+            "unverified": 78,
+            "pass_percent": 0
+          }
+        }
+      },
+      "release_eligible": false,
+      "regressions": 0,
+      "semantic_variants": 3,
+      "text_variants": 16,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b93c0b8985de6daea044e2ff054b81ec2a3ec4fc260d5cc511652562e25906f5",
+        "tools/bm_semantic_replay.js": "e69eeacaf57c1dedcdc6724253066ce4348913b305395841128f1d197cb9b4dc",
+        "netlify/functions/blanked-agent.js": "2a03b41d0cba3ff4896acd7a2f0140f82dc94717f7fa3cc147d57cf98b38a379",
+        "netlify/functions/bm-semantic-state.js": "7f388e37a6f6ae202db30c6cf0f302fd17d61005a1cd501ad8d7f704783b293c",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      }
+    },
+    {
+      "file": "tmp/bm-semantic/live-final-v2-reviewed-final.json",
+      "sha256": "21e49e2e146552d62c3c438379676c76f82f5ca2e96d7db0d76adb79983134c9",
+      "generated_at": "2026-09-15T17:39:34.994Z",
+      "summary": {
+        "conversations": 6,
+        "turns": 24,
+        "active_model_turns": 24,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 24
+        },
+        "passed": 24,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "regressions": 0,
+      "semantic_variants": 0,
+      "text_variants": 0,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "4362f699f866c218e15d1ccac7eaf2f9ff2d0421b82f16cfb18019b2d58921db",
+        "tools/bm_semantic_replay.js": "6cb1992213d32da459f39c902a402fe3c3143add3c66232ec80089a7bde970b3",
+        "netlify/functions/blanked-agent.js": "086c101978c6a4e55750fed9fb36857174d57a8d296b1e5a648dd20e09565c61",
+        "netlify/functions/bm-semantic-state.js": "01bf71a04dc8b50b128e998a6cf951b414bc14e02600c3db9c4de2d08afb86db",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      }
+    },
+    {
+      "file": "tmp/bm-semantic/heldout-initial.json",
+      "sha256": "171ece192c2e5860bc4ede2d1aaa127f0567b8c374f966c21d58bb053e11340f",
+      "generated_at": "2026-09-15T17:23:09.359Z",
+      "summary": {
+        "conversations": 12,
+        "turns": 30,
+        "passed": 0,
+        "failed": 24,
+        "unverified": 6,
+        "dimensions": {
+          "intent": {
+            "passed": 26,
+            "failed": 4,
+            "unverified": 0,
+            "pass_percent": 86.67
+          },
+          "slots": {
+            "passed": 12,
+            "failed": 18,
+            "unverified": 0,
+            "pass_percent": 40
+          },
+          "transition": {
+            "passed": 8,
+            "failed": 22,
+            "unverified": 0,
+            "pass_percent": 26.67
+          },
+          "provenance": {
+            "passed": 30,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 9,
+            "failed": 21,
+            "unverified": 0,
+            "pass_percent": 30
+          },
+          "actions": {
+            "passed": 23,
+            "failed": 7,
+            "unverified": 0,
+            "pass_percent": 76.67
+          },
+          "safety": {
+            "passed": 28,
+            "failed": 2,
+            "unverified": 0,
+            "pass_percent": 93.33
+          },
+          "visible_equivalence": {
+            "passed": 0,
+            "failed": 8,
+            "unverified": 22,
+            "pass_percent": 0
+          }
+        }
+      },
+      "release_eligible": false,
+      "regressions": 0,
+      "semantic_variants": 0,
+      "text_variants": 0,
+      "source_snapshot": null
+    },
+    {
+      "file": "tmp/bm-semantic/heldout-v2-unseen.json",
+      "sha256": "cfbd8e0b813523703a630e4244d2a6ae34ac9fd28421e48c08361611444956d5",
+      "generated_at": "2026-09-15T17:35:13.800Z",
+      "summary": {
+        "conversations": 4,
+        "turns": 11,
+        "active_model_turns": 0,
+        "source_counts": {
+          "semantic_state_v1": 11
+        },
+        "passed": 0,
+        "failed": 4,
+        "unverified": 7,
+        "dimensions": {
+          "intent": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 7,
+            "failed": 4,
+            "unverified": 0,
+            "pass_percent": 63.64
+          },
+          "transition": {
+            "passed": 9,
+            "failed": 2,
+            "unverified": 0,
+            "pass_percent": 81.82
+          },
+          "provenance": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 9,
+            "failed": 2,
+            "unverified": 0,
+            "pass_percent": 81.82
+          },
+          "actions": {
+            "passed": 9,
+            "failed": 2,
+            "unverified": 0,
+            "pass_percent": 81.82
+          },
+          "safety": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 0,
+            "failed": 0,
+            "unverified": 11,
+            "pass_percent": 0
+          }
+        }
+      },
+      "release_eligible": false,
+      "regressions": 0,
+      "semantic_variants": 0,
+      "text_variants": 0,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b93c0b8985de6daea044e2ff054b81ec2a3ec4fc260d5cc511652562e25906f5",
+        "tools/bm_semantic_replay.js": "e69eeacaf57c1dedcdc6724253066ce4348913b305395841128f1d197cb9b4dc",
+        "netlify/functions/blanked-agent.js": "2a03b41d0cba3ff4896acd7a2f0140f82dc94717f7fa3cc147d57cf98b38a379",
+        "netlify/functions/bm-semantic-state.js": "7f388e37a6f6ae202db30c6cf0f302fd17d61005a1cd501ad8d7f704783b293c",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      }
+    }
+  ],
+  "same_response_postprocessing_examples": [
+    {
+      "conversation": "ios_duration_correction",
+      "turn": 3,
+      "input": "Actually, make that 45 minutes.",
+      "source": "openai:gpt-5.6-luna",
+      "raw_response": "Got it. I’ll block Instagram for 45 minutes, just this once. Confirm it to start.",
+      "raw_actions": [
+        {
+          "type": "start_protection",
+          "minutes": 45,
+          "hard_mode": null,
+          "name": null,
+          "start_minute": null,
+          "end_minute": null,
+          "weekdays": null,
+          "duration_days": null,
+          "hours": null
+        }
+      ],
+      "final_response": "I'm here. Tell me what's going on, and I'll help from there.",
+      "final_actions": [],
+      "same_model_response": true
+    },
+    {
+      "conversation": "duration_not_end_time_anonymized_reconstruction",
+      "turn": 3,
+      "input": "No, until noon.",
+      "source": "openai:gpt-5.6-luna",
+      "raw_response": "Got it. I’d block Instagram every day from 10:00 AM until noon for the next 7 days.",
+      "raw_actions": [
+        {
+          "type": "apply_schedule",
+          "minutes": null,
+          "hard_mode": null,
+          "name": "Instagram until noon",
+          "start_minute": 600,
+          "end_minute": 720,
+          "weekdays": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "duration_days": 7,
+          "hours": null
+        }
+      ],
+      "final_response": "I'm here. Tell me what's going on, and I'll help from there.",
+      "final_actions": [],
+      "same_model_response": true
+    }
+  ],
+  "changed_since_final_live_snapshot": [],
+  "limitations": [
+    "The 960-turn batch repeats six authored conversations 40 times; it is a concurrency/replay and stability proof, not960 independent scenarios.",
+    "The final live candidate sample covers two conversation scripts, three repetitions, 24 real Luna semantic extraction calls; it does not establish general-language accuracy.",
+    "Eight full visible-response pairs were reviewed by an independent agent and hash-bound. This is not human certification.",
+    "Original unseen holdouts and first failing reports are immutable. Repaired reruns are regression evidence, not fresh hidden evaluation.",
+    "A minimized corpus now includes read-only production-observed snapshots. Human authorship, original channel and unique conversation count remain unverified; some exchanges may be historical smoke tests.",
+    "No deployment or device/WhatsApp end-to-end execution occurred in this evaluation work."
+  ],
+  "production_observed_corpus": {
+    "file": "tools/datasets/bm_production_observed_anonymized.json",
+    "sha256": "9001b91bb7a8801d192d9363c1a30f9c9194ef22bf70227ff64416cc56151ef6",
+    "deduplication": {
+      "input_snapshots": 17,
+      "input_message_occurrences": 118,
+      "input_exchange_occurrences": 59,
+      "unique_exact_text_exchanges": 14,
+      "duplicate_exchange_text_occurrences_removed": 45,
+      "maximal_context_windows": 14,
+      "method": "Each exact user/assistant text pair stored once. Windows refer to zero-based pair positions; wholly contained windows omitted. Overlap is content evidence, not proof of identical authors or conversation boundaries."
+    },
+    "provenance": {
+      "source": "production_event_read_only",
+      "human_authorship": "unverified",
+      "historical_smoke_or_test_possible": true,
+      "unique_conversations": null,
+      "channel": "not retained in supplied snapshots",
+      "text_policy": "Exact safe text from supplied extraction. Existing [link] markers retained; no further text paraphrasing. Retrieval timestamps and all external identifiers omitted.",
+      "privacy_review": "All retained texts manually inspected: app names, clock/duration expressions and generic dialogue only; no names, phones, emails, locations, account identifiers or URLs remain."
+    },
+    "replay_fixture": "tools/datasets/bm_production_observed_replay.json",
+    "initial_reports": [
+      {
+        "file": "tmp/bm-semantic/production-observed-initial-local.json",
+        "sha256": "dd47fd96cb0afb7ea4219c8b4ccd1c7ad7b6f06ab4e0c1eec5c0360dbd40d9f1",
+        "summary": {
+          "conversations": 3,
+          "turns": 7,
+          "active_model_turns": 0,
+          "source_counts": {
+            "deterministic_fallback": 4,
+            "semantic_state_v1": 2,
+            "deterministic_conversation_context": 1
+          },
+          "passed": 0,
+          "failed": 6,
+          "unverified": 1,
+          "dimensions": {
+            "intent": {
+              "passed": 3,
+              "failed": 4,
+              "unverified": 0,
+              "pass_percent": 42.86
+            },
+            "slots": {
+              "passed": 1,
+              "failed": 6,
+              "unverified": 0,
+              "pass_percent": 14.29
+            },
+            "transition": {
+              "passed": 2,
+              "failed": 5,
+              "unverified": 0,
+              "pass_percent": 28.57
+            },
+            "provenance": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "decision": {
+              "passed": 2,
+              "failed": 5,
+              "unverified": 0,
+              "pass_percent": 28.57
+            },
+            "actions": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "safety": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "visible_equivalence": {
+              "passed": 0,
+              "failed": 0,
+              "unverified": 7,
+              "pass_percent": 0
+            }
+          }
+        },
+        "source_snapshot": {
+          "tools/bm_semantic_oracle.js": "4362f699f866c218e15d1ccac7eaf2f9ff2d0421b82f16cfb18019b2d58921db",
+          "tools/bm_semantic_replay.js": "6cb1992213d32da459f39c902a402fe3c3143add3c66232ec80089a7bde970b3",
+          "netlify/functions/blanked-agent.js": "086c101978c6a4e55750fed9fb36857174d57a8d296b1e5a648dd20e09565c61",
+          "netlify/functions/bm-semantic-state.js": "60870fd8515fd1b1154625569d65227259fef73fd00bc30b50f938cca03f324a",
+          "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+        }
+      },
+      {
+        "file": "tmp/bm-semantic/production-observed-initial-live.json",
+        "sha256": "c09d943739f33937294de363b7a8b3705b0967c1f8a225d4cbdff742068c0588",
+        "summary": {
+          "conversations": 3,
+          "turns": 7,
+          "active_model_turns": 6,
+          "source_counts": {
+            "openai:gpt-5.6-luna": 4,
+            "openai:gpt-5.6-luna:semantic": 2,
+            "deterministic_conversation_context": 1
+          },
+          "passed": 0,
+          "failed": 6,
+          "unverified": 1,
+          "dimensions": {
+            "intent": {
+              "passed": 3,
+              "failed": 4,
+              "unverified": 0,
+              "pass_percent": 42.86
+            },
+            "slots": {
+              "passed": 1,
+              "failed": 6,
+              "unverified": 0,
+              "pass_percent": 14.29
+            },
+            "transition": {
+              "passed": 2,
+              "failed": 5,
+              "unverified": 0,
+              "pass_percent": 28.57
+            },
+            "provenance": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "decision": {
+              "passed": 2,
+              "failed": 5,
+              "unverified": 0,
+              "pass_percent": 28.57
+            },
+            "actions": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "safety": {
+              "passed": 7,
+              "failed": 0,
+              "unverified": 0,
+              "pass_percent": 100
+            },
+            "visible_equivalence": {
+              "passed": 0,
+              "failed": 0,
+              "unverified": 7,
+              "pass_percent": 0
+            }
+          }
+        },
+        "source_snapshot": {
+          "tools/bm_semantic_oracle.js": "4362f699f866c218e15d1ccac7eaf2f9ff2d0421b82f16cfb18019b2d58921db",
+          "tools/bm_semantic_replay.js": "6cb1992213d32da459f39c902a402fe3c3143add3c66232ec80089a7bde970b3",
+          "netlify/functions/blanked-agent.js": "086c101978c6a4e55750fed9fb36857174d57a8d296b1e5a648dd20e09565c61",
+          "netlify/functions/bm-semantic-state.js": "60870fd8515fd1b1154625569d65227259fef73fd00bc30b50f938cca03f324a",
+          "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+        }
+      }
+    ],
+    "finding": "Initial runs exposed lost morning/advice state and legacy visible replies retaining Instagram/time while canonical state stayed empty. Those initial failures remain unchanged.",
+    "resolution": "Generalized runtime repairs passed the unchanged seven-input fixture locally and in 21 final active-model turns; see typed-final-production-live-21.json. Original historical production responses remain preserved verbatim."
+  },
+  "latest_validation_reports": [
+    {
+      "file": "tmp/bm-semantic/typed-final-batch-240.json",
+      "sha256": "8408b5a4a8211728fad917aecc3d7dccfd59b67ddc61ad83c2919619541f4bff",
+      "generated_at": "2026-09-15T18:15:51.855Z",
+      "summary": {
+        "conversations": 240,
+        "turns": 960,
+        "active_model_turns": 0,
+        "source_counts": {
+          "semantic_state_v1": 960
+        },
+        "passed": 960,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "5921e15268ff3ed6f4fe40ccfa8791471858e29fb50c91ff652681c79e8d7f45",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0,
+      "groups_with_semantic_variation": 0,
+      "groups_with_text_variation": 0
+    },
+    {
+      "file": "tmp/bm-semantic/typed-final-live-24.json",
+      "sha256": "ee1fb5943565a67f7bac4922ef493f366003fd00ee9d1865acfce819c4644e4a",
+      "generated_at": "2026-09-15T18:16:03.165Z",
+      "summary": {
+        "conversations": 6,
+        "turns": 24,
+        "active_model_turns": 24,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 24
+        },
+        "passed": 24,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "5921e15268ff3ed6f4fe40ccfa8791471858e29fb50c91ff652681c79e8d7f45",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0,
+      "groups_with_semantic_variation": 0,
+      "groups_with_text_variation": 0
+    },
+    {
+      "file": "tmp/bm-semantic/typed-final-production-live-21.json",
+      "sha256": "0a68c62f4fd3b38ddd79c755d829b470c7f41c126aa00b41b443312110585f2d",
+      "generated_at": "2026-09-15T18:16:12.942Z",
+      "summary": {
+        "conversations": 9,
+        "turns": 21,
+        "active_model_turns": 21,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 21
+        },
+        "passed": 21,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "5921e15268ff3ed6f4fe40ccfa8791471858e29fb50c91ff652681c79e8d7f45",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0,
+      "groups_with_semantic_variation": 0,
+      "groups_with_text_variation": 0
+    },
+    {
+      "file": "tmp/bm-semantic/typed-final-heldout-v4-live-11.json",
+      "sha256": "86260328dae14faad32d4ef1b821d12ef3af88fac7413145d6fe00a6dee66674",
+      "generated_at": "2026-09-15T18:17:16.232Z",
+      "summary": {
+        "conversations": 5,
+        "turns": 11,
+        "active_model_turns": 11,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 11
+        },
+        "passed": 11,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 11,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "5921e15268ff3ed6f4fe40ccfa8791471858e29fb50c91ff652681c79e8d7f45",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0,
+      "groups_with_semantic_variation": 0,
+      "groups_with_text_variation": 0
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-oracle-mutations.json",
+      "sha256": "df133a72e595ad7c97bf296927e6cd641dbc23c383fed41fed9098ef228098d2",
+      "generated_at": null,
+      "summary": {
+        "mutations": 42,
+        "rejected": 40,
+        "review_invalidated": 2,
+        "escaped": 0,
+        "batch_jobs": 200,
+        "batch_concurrency_peak": 7
+      },
+      "release_eligible": null,
+      "source_snapshot": null,
+      "failures": [],
+      "regressions": null,
+      "groups_with_semantic_variation": null,
+      "groups_with_text_variation": null
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-legacy-false-positives.json",
+      "sha256": "3cb725f9d157c0af676f83a9eb13f4b7829a0c2b419f7c5192c3c895c3e89d72",
+      "generated_at": "2026-09-15T18:07:58.508Z",
+      "summary": {
+        "false_positives": 6,
+        "total": 6
+      },
+      "release_eligible": null,
+      "source_snapshot": null,
+      "failures": [],
+      "regressions": null,
+      "groups_with_semantic_variation": null,
+      "groups_with_text_variation": null
+    }
+  ],
+  "current_validation_status": "final_candidate_suites_passed_production_verification_pending",
+  "validation_scope": "Individual passing suites do not establish overall production release. Original failures and dataset expectations are preserved.",
+  "updated_at": "2026-09-15T18:19:38.525Z",
+  "pretyped_validation_reports": [
+    {
+      "file": "tmp/bm-semantic/final-freeze-batch-240.json",
+      "sha256": "177dc8e9cef6289b9ce21849ac681715c7696dc2b75a1072a5d596781933fcea",
+      "summary": {
+        "conversations": 240,
+        "turns": 960,
+        "active_model_turns": 0,
+        "source_counts": {
+          "semantic_state_v1": 960
+        },
+        "passed": 960,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 960,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "05ac94a394d1cce5eb45183971a4cda4e5b1c968507820504fc65c21b3a52c16",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-live-24.json",
+      "sha256": "19c499b974fcc8d3bcfc8f041df5c5c7515473f9458b88a451521e5221b11613",
+      "summary": {
+        "conversations": 6,
+        "turns": 24,
+        "active_model_turns": 24,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 24
+        },
+        "passed": 24,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 24,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "05ac94a394d1cce5eb45183971a4cda4e5b1c968507820504fc65c21b3a52c16",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-production-local-7.json",
+      "sha256": "fb75c6c6cb3fe8643a65d2eea3f2f4722a460077629594781170bf0b5109a7d2",
+      "summary": {
+        "conversations": 3,
+        "turns": 7,
+        "active_model_turns": 0,
+        "source_counts": {
+          "semantic_state_v1": 7
+        },
+        "passed": 7,
+        "failed": 0,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "visible_equivalence": {
+            "passed": 7,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": true,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "05ac94a394d1cce5eb45183971a4cda4e5b1c968507820504fc65c21b3a52c16",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [],
+      "regressions": 0
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-production-live-21.json",
+      "sha256": "671105c612e10f30a6e2518189bcec29f2e4a6c140917554fa97bfba7ec87501",
+      "summary": {
+        "conversations": 9,
+        "turns": 21,
+        "active_model_turns": 19,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic": 19,
+          "semantic_state_v1": 2
+        },
+        "passed": 19,
+        "failed": 2,
+        "unverified": 0,
+        "dimensions": {
+          "intent": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 19,
+            "failed": 2,
+            "unverified": 0,
+            "pass_percent": 90.48
+          },
+          "visible_equivalence": {
+            "passed": 21,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          }
+        }
+      },
+      "release_eligible": false,
+      "source_snapshot": {
+        "tools/bm_semantic_oracle.js": "b4d45e7502e971ec6d1cb1a825b28577409c0e4bf3ff040ba31cd000502bb2bf",
+        "tools/bm_semantic_replay.js": "dd3f83ec0c02ab320251bef5b8318fa0a6a43fd84050ff625d4f7ccef792de79",
+        "netlify/functions/blanked-agent.js": "e20369d0004cbe3f8cb3cd1c997a8dcad9b7c11a89d31ea350b2ac130b550014",
+        "netlify/functions/bm-semantic-state.js": "cb012e03ecb61dcc5a88ae9c3790789f55e6c1a55432a89d7c8e06f5ba270b58",
+        "netlify/functions/bm-semantic-extraction.js": "05ac94a394d1cce5eb45183971a4cda4e5b1c968507820504fc65c21b3a52c16",
+        "netlify/functions/bm-context.js": "d8e00bf909bcf6367c39d1e5e8fc81c9a8f5b4ad3bb2ebe640ca03283edfce9d"
+      },
+      "failures": [
+        {
+          "conversation": "observed_morning_short_app_time",
+          "turn": 1,
+          "repetition": 2,
+          "causes": [
+            {
+              "dimension": "safety",
+              "code": "model_failure_masked_by_fallback",
+              "expected": null,
+              "actual": "Unexpected token 'm', \"mornings\" is not valid JSON"
+            }
+          ]
+        },
+        {
+          "conversation": "observed_duration_then_explicit_correction",
+          "turn": 1,
+          "repetition": 2,
+          "causes": [
+            {
+              "dimension": "safety",
+              "code": "model_failure_masked_by_fallback",
+              "expected": null,
+              "actual": "Unexpected token 'm', \"mornings\" is not valid JSON"
+            }
+          ]
+        }
+      ],
+      "regressions": 0
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-oracle-mutations.json",
+      "sha256": "df133a72e595ad7c97bf296927e6cd641dbc23c383fed41fed9098ef228098d2",
+      "summary": {
+        "mutations": 42,
+        "rejected": 40,
+        "review_invalidated": 2,
+        "escaped": 0
+      },
+      "release_eligible": null,
+      "source_snapshot": null,
+      "failures": [],
+      "regressions": null
+    },
+    {
+      "file": "tmp/bm-semantic/final-freeze-legacy-false-positives.json",
+      "sha256": "3cb725f9d157c0af676f83a9eb13f4b7829a0c2b419f7c5192c3c895c3e89d72",
+      "summary": {
+        "false_positives": 6,
+        "total": 6
+      },
+      "release_eligible": null,
+      "source_snapshot": null,
+      "failures": [],
+      "regressions": null
+    }
+  ],
+  "source_snapshot_checked_at": "2026-09-15T18:19:38.835Z",
+  "final_active_model_summary": {
+    "turns": 56,
+    "passed": 56,
+    "failed": 0,
+    "unverified": 0,
+    "source": "openai:gpt-5.6-luna:semantic",
+    "development": "2 conversations / 8 turns, each repeated 3 times (24 calls)",
+    "production_observed": "3 diagnostic excerpts / 7 inputs, each repeated 3 times (21 calls); human authorship unverified",
+    "heldout_v4": "5 independently frozen conversations / 11 turns, one active-model replay after its first local run",
+    "scope": "Local planner with live model API. No provider delivery, native execution or production deployment was exercised."
+  },
+  "typed_extraction_repair": {
+    "original_failed_report": "tmp/bm-semantic/final-freeze-production-live-21.json",
+    "original_failures": 2,
+    "cause": "Model emitted unquoted mornings inside value_json; nested JSON string parsing failed. Correct deterministic fallback did not make those turns pass.",
+    "repair": "Runtime replaced value_json with a typed per-slot JSON value schema. Oracle and dataset expectations were unchanged.",
+    "post_repair_report": "tmp/bm-semantic/typed-final-production-live-21.json",
+    "post_repair_actual_model_turns": 21,
+    "post_repair_failures": 0
+  },
+  "independent_review_files": [
+    {
+      "file": "tools/datasets/bm_semantic_development_reviews.json",
+      "sha256": "20eacde15548f4791f3512e3f518e7227cf3f36e5022bc97bcaecddd845e9bf1",
+      "records": 8,
+      "unique_bindings": 8,
+      "reviewers": [
+        "audit_channels independent agent"
+      ],
+      "scope": "Independent AI agent assessment of all exact visible surfaces against authored expectations. Not human certification; not a naturalness score."
+    },
+    {
+      "file": "tools/datasets/bm_production_observed_reviews.json",
+      "sha256": "8e4516ad0d731aafbc84975c47a428e8a08097b46bdffb6423eee58cb271eec0",
+      "records": 7,
+      "unique_bindings": 5,
+      "reviewers": [
+        "audit_channels independent agent"
+      ],
+      "scope": "Independent AI agent assessment of all exact visible surfaces against authored expectations. Not human certification; not a naturalness score."
+    },
+    {
+      "file": "tools/datasets/bm_semantic_heldout_v4_reviews.json",
+      "sha256": "0946d5dcca624d82b1f8106760943ff810e629cb2af8c9bcf72c87e767fadf40",
+      "records": 11,
+      "unique_bindings": 11,
+      "reviewers": [
+        "audit_channels independent agent"
+      ],
+      "scope": "Independent AI agent assessment of all exact visible surfaces against authored expectations. Not human certification; not a naturalness score."
+    }
+  ],
+  "final_product_harness": {
+    "file": "tmp/bm-audit/final-harness.json",
+    "sha256": "1634b867f5e859ac17e8024d222d3fb5cdce29368ea66ae88f50cde6fc1be079",
+    "run_id": "ph_1789496029090_931ce6b4",
+    "status": "passed",
+    "commands": 25,
+    "passed": 25,
+    "repairs_used": 0,
+    "scope_violations": [],
+    "note": "Automated checks passed against the original baseline. Legacy compatibility findings remain diagnostic and separately adjudicated; this does not establish every historical semantic issue fixed or production readiness."
+  }
+}

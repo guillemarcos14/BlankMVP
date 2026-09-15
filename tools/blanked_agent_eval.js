@@ -12,7 +12,7 @@ const outPath = outIndex >= 0 ? rawArgs[outIndex + 1] : null;
 const urlIndex = rawArgs.indexOf("--url");
 const endpointUrl = urlIndex >= 0 ? rawArgs[urlIndex + 1] : null;
 
-if (!useModel && !endpointUrl) {
+if (require.main === module && !useModel && !endpointUrl) {
   process.env.OPENAI_API_KEY = "";
 }
 
@@ -226,7 +226,7 @@ function assertPlan(testCase, plan) {
   assert.ok(utilityScore(plan) >= minUtility, `${testCase.id}.utility_score`);
 }
 
-(async () => {
+async function main() {
   if (useModel && !process.env.OPENAI_API_KEY) {
     console.error("OPENAI_API_KEY is required for --model eval");
     process.exit(2);
@@ -322,7 +322,11 @@ function assertPlan(testCase, plan) {
     console.log(`Average quality score: ${report.metrics.average_quality_score}/3`);
     console.log(`Average utility score: ${report.metrics.average_utility_score}/5`);
   }
-})().catch((error) => {
+}
+
+module.exports = { assertPlan, assertBlockingContract, qualityScore, utilityScore, baseContext, callAgent };
+
+if (require.main === module) main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

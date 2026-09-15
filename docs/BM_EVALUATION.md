@@ -1,0 +1,113 @@
+# BM: evaluación semántica y replay
+
+## 1. Qué demuestra cada resultado
+
+`tools/bm_semantic_oracle.js` no importa el parser, reducer, renderer ni actionGate de BM. Compara hechos esperados escritos en el dataset con el estado y la acción obtenidos. Comprueba intención, slots, decisión, transición, procedencia/confianza, confirmación, permisos, presencia, acciones prematuras y contradicciones visibles. Las acciones se comparan completas salvo identificadores y etiquetas de presentación; no basta con acertar `type` o una hora.
+
+Los resultados posibles son `passed`, `failed` y `unverified`. **Solo `passed` permite release.** No existe una media de naturalidad que compense un horario incorrecto. Las métricas blandas (longitud, frases y repetición) son descriptivas y aparecen separadas.
+
+Las expresiones regulares solo pueden rechazar contradicciones evidentes. No pueden certificar el significado de una respuesta arbitraria. Para aprobar la equivalencia visible, el evaluador exige una revisión independiente vinculada mediante SHA-256 al conjunto exacto de superficies visibles y a la expectativa completa. Un texto absurdo con las palabras correctas queda `unverified` y bloquea release. El evaluador no convierte automáticamente una revisión pendiente en éxito.
+
+Las revisiones de otro agente se identifican como tales; no equivalen a revisión humana. El JSON de revisión usa `response_sha256`, `expectation_sha256`, `reviewer`, `rationale`, `verdict` (`equivalent` o `not_equivalent`) y `language`. Ambos hashes se encuentran en `runs[].turns[].review_binding`. Si cambia una hora, aplicación, duración, idioma o cualquier superficie, la revisión anterior deja de valer. No escribir revisiones automáticamente a partir de `status` ni del texto del renderer.
+
+La equivalencia estructural admite únicamente transformaciones que preservan significado: orden de conjuntos de apps/días, campos nulos de acciones, alias públicos `end`/`end_or_duration` y `screen_time_permission`/`permissions`, y duración calculable de un intervalo cerrado. Nunca sobrescribe dos valores explícitos incompatibles para hacerlos coincidir.
+
+También compara los slots `hard_mode` y `requested_capability`. En fixtures anteriores, su ausencia significa `null` (no solicitado), nunca permiso implícito. `hard_mode` debe coincidir con la acción que lo admite; una solicitud de capacidad no soportada o de revisión de información no puede convertirse en bloqueo. En acciones `activate_mode` y `switch_mode`, `name` es el modo que se ejecuta y se compara exactamente; solo nombres de presentación como el título de una franja pueden ignorarse.
+
+## 2. Ejecución
+
+Desde la raíz del backend:
+
+```powershell
+node tools/bm_semantic_oracle_test.js --out tmp/bm-semantic/oracle-mutations.json
+node tools/bm_legacy_evaluator_audit.js --out tmp/bm-semantic/legacy-false-positives.json
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_development_v2.json --repeats 2 --concurrency 8 --out tmp/bm-semantic/development.json
+```
+
+El replay devuelve código `1` si hay fallos **o equivalencia sin verificar**, y `2` si la configuración/dataset es inválido. El informe siempre conserva los fallos por conversación/turno y continúa las demás conversaciones. Un error de red no se convierte en acierto del fallback.
+
+Para backend local con el modelo activo o un endpoint del planner:
+
+```powershell
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_development_v2.json --model --repeats 3 --concurrency 6 --out tmp/bm-semantic/active-model.json
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_development_v2.json --url https://getblank.netlify.app/.netlify/functions/blanked-agent --repeats 3 --concurrency 6 --out tmp/bm-semantic/endpoint.json
+```
+
+`--model` requiere `OPENAI_API_KEY`; no se imprime ni se guarda. `--token-env NOMBRE` permite autorización HTTP por una variable existente. Sin `--model`, el replay local deshabilita llamadas al modelo en ese proceso. `--url` solo llama al planner: nunca usar los webhooks WhatsApp/SMS para replay masivo. El runner rechaza rutas `whatsapp-agent`, `sms-agent` y `assistant-channel`. No ejecuta acciones nativas ni despliega servicios.
+
+Para cientos de conversaciones con concurrencia limitada, comparación de regresiones y revisiones independientes:
+
+```powershell
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_development_v2.json --repeats 40 --concurrency 12 --out tmp/bm-semantic/batch-240.json
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_development_v2.json --reviews tools/datasets/bm_semantic_development_reviews.json --baseline tmp/bm-semantic/development.json --out tmp/bm-semantic/reviewed.json
+```
+
+La concurrencia admite 1–64 conversaciones independientes; los turnos de una conversación conservan el orden. Cada repetición empieza sin estado de la repetición anterior. El historial normal de BM conserva ocho mensajes; el control directo recibe el historial completo. El estado canónico real devuelto, nunca el esperado, pasa al siguiente turno. `__REPLAY_NOW__` en `context.app_presence.last_seen_at` significa presencia fresca al inicio de esa conversación; el valor resuelto se envía al planner. Los datasets de presencia caducada usan fechas explícitas.
+
+## 3. Diferencial y observabilidad
+
+```powershell
+node tools/bm_semantic_replay.js --dataset tools/datasets/bm_semantic_differential_v2.json --model --differential --repeats 2 --concurrency 6 --out tmp/bm-semantic/live-differential.json
+```
+
+Los cinco modos son `direct_model` (conversación normal), `bm_full` (prompt legacy completo), `bm_raw` (JSON del modelo antes del postprocesado), `bm_canonical` y `bm_final`. El adaptador local privado `_evaluation.traceTurn` no se activa mediante un campo de una petición HTTP pública. `--adapter ruta.js` acepta otro adaptador con `traceTurn({prompt,context,mode})`; permite instrumentar un servicio remoto sin inventar respuestas cuando faltan etapas.
+
+`trace.request` conserva el prompt de sistema, el contexto serializado y el schema enviados. `trace.raw_plan`, `action_gate`, `normalized_plan` y `final_plan` pertenecen a **una misma respuesta del modelo**. `layer_changes` identifica en qué transformación cambian acciones o texto. Comparar dos llamadas independientes sin este control mezcla postprocesado con variación del modelo. Los modos canónico y final pueden coincidir por diseño cuando el estado ya genera la respuesta final sin reescritura; esa identidad no demuestra una ablación distinta.
+
+El control directo no produce slots ni acciones estructuradas. Esa falta de instrumentación se registra como `unverified`, no como prueba de que Luna interpretó mal el mensaje. El contenido libre requiere revisión independiente. En los brazos legacy, las acciones observables incorrectas sí fallan aunque no exista estado canónico.
+
+El informe incluye porcentajes separados por dimensión, respuestas completas, estado esperado/obtenido, acciones esperadas/obtenidas, causas probables agrupadas, regresiones respecto de un informe anterior, variación semántica/textual por repetición, fuentes del resultado y hashes de código/dataset. `dataset.sha256` es el hash del JSON canónico; los manifests de holdout usan hash de bytes del archivo, por lo que pueden diferir sin que cambie el contenido.
+
+## 4. Datasets y auditoría del evaluador anterior
+
+`tools/datasets/bm_semantic_development.json` conserva las expectativas iniciales independientes: cinco canales, respuestas elípticas, recurrencia y correcciones de duración; añade una reconstrucción explícitamente etiquetada de la clase duración/hora. No se presenta esa reconstrucción como transcripción real.
+
+Después se revisaron 17 snapshots obtenidos mediante lectura de eventos productivos. `tools/datasets/bm_production_observed_anonymized.json` conserva 14 pares de texto únicos de usuario/asistente, deduplicados de 59 ocurrencias de pares (118 mensajes). Mantiene ventanas de contexto como referencias al texto único y omite ventanas enteramente contenidas. Se eliminaron timestamps e identificadores externos; los textos seguros son exactos, con los marcadores `[link]` ya presentes en la extracción. **Son textos observados en producción; no se ha verificado autoría humana ni el número de conversaciones distintas.** Algunos pueden proceder de smoke tests históricos. No interpretar 17 snapshots, 14 pares o 14 ventanas como igual número de usuarios/conversaciones.
+
+`bm_production_observed_replay.json` toma siete inputs exactos, distribuidos en tres extractos diagnósticos, con expectativas independientes congeladas antes de ejecutar y un contexto WhatsApp sintético declarado. Conserva el texto del asistente productivo en el corpus de procedencia; no lo usa como resultado esperado. El extracto de bloqueo inmediato se inicia expresamente sin estado previo para aislar esa instrucción. Los fragmentos ambiguos o con contexto ya corrompido se conservan en el corpus, pero no reciben expectativas especulativas. Los primeros informes fallidos permanecen como evidencia del estado previo a la reparación.
+
+`bm_semantic_heldout.json` y su manifest fueron escritos por un agente distinto sin leer la implementación del oracle/reducer. Se congelaron antes de su primera ejecución. No modificar sus expectativas para corregir un fallo. Tras revelar sus fallos deja de ser un conjunto oculto nuevo: conservar el primer resultado y crear otro conjunto independiente para una futura release.
+
+Durante la auditoría apareció un requisito que el contrato inicial omitía: iOS/Android/web convierten `duration_days:null` en siete días. Por tanto el estado incorpora `schedule_horizon_days` explícito para programaciones recurrentes. Un fixture v1 sin ese campo significa `null`, nunca siete días. Los datasets v2 especifican el horizonte en el input y lo verifican en estado y acción; los originales y los primeros informes se conservan. Cambiar este contrato debe documentarse como migración de capacidades, no como corrección oculta de asserts.
+
+`tools/bm_legacy_evaluator_audit.js` llama al **mismo `assertPlan` usado por la suite anterior**, exportado sin modificar sus asserts. Construye seis planes deliberadamente erróneos que ese evaluador acepta:
+
+| Contraejemplo | Por qué pasaba |
+| --- | --- |
+| Hora/app/ejecución visibles contradictorias | Basta un token horario esperado; no compara significado |
+| `blocking_data` distinto de la acción | Comprueba presencia de campos, no equivalencia |
+| Días de recurrencia cambiados | El fixture solo comprueba parte de la primera acción |
+| Permisos falsos | La rama blocking retorna antes de comprobar expectativas de permisos |
+| Texto absurdo con palabras correctas | Longitud, formato y palabras puntúan como calidad/utilidad |
+| Voz/follow-up contradictorios | Esas superficies no entran en `visibleText`/`userVisibleText` |
+
+Cinco contraejemplos mantienen intactas las expectativas del fixture original; el de permisos añade dos expectativas explícitas para demostrar que la rama las ignora. Son falsos positivos construidos y reproducibles del evaluador, no respuestas atribuidas al modelo productivo.
+
+El nuevo test modifica deliberadamente horarios, duración, apps, recurrencia, horizonte, confirmación, procedencia, acción, siguiente paso, idioma y texto. Ejecuta el evaluador real para cada mutante. Las mutaciones de texto arbitrario invalidan la revisión vinculada; se distinguen de los errores semánticos que se detectan directamente. También comprueba 200 trabajos concurrentes con límite real, continuidad de estado y conservación de errores por turno.
+
+## 5. Criterios de release
+
+No aprobar una release si queda cualquier fallo duro, revisión visible pendiente, resultado de modelo ocultado por fallback o gate existente fallido. Exigir coincidencia de estado y siguiente paso, correcciones que invaliden confirmación, acciones equivalentes, cero valores inventados y cero acciones prematuras en desarrollo y un holdout nuevo. Repetir el modelo activo y comprobar que no aparecen variantes semánticas graves.
+
+Los tests de contexto por canal verifican el backend compartido, no la entrega del proveedor ni la ejecución en dispositivos. La release necesita además gates de transporte/presencia/persistencia, compilación nativa y smoke final real de permisos, revisión, ejecución y verificación. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.
+
+No presentar `114/114`, la ausencia de crashes, las métricas blandas o una suite determinista repetida como prueba de comprensión general. La evidencia final debe nombrar dataset, versión de contrato, hash de implementación, fuentes reales, repeticiones, fallos pendientes y alcance de las revisiones independientes.
+
+### Evidencia de esta pasada, 2026-09-15
+
+`docs/BM_EVALUATION_EVIDENCE.json` conserva hashes de informes/código, resultados separados y ejemplos exactos de una misma respuesta antes y después del postprocesado. Los cuatro informes `typed-final-*` corresponden al código final, incluido `bm-semantic-extraction.js`; sus seis hashes de implementación coincidían con los archivos al cerrar esta validación.
+
+| Informe en `tmp/bm-semantic/` | Alcance | Resultado |
+| --- | --- | --- |
+| `typed-final-batch-240.json` | Seis guiones de desarrollo repetidos 40 veces, concurrencia 12 | 960/960 turnos locales |
+| `typed-final-live-24.json` | Dos guiones, tres repeticiones | 24/24 respuestas reales de Luna |
+| `typed-final-production-live-21.json` | Siete inputs observados, tres repeticiones; autoría humana no verificada | 21/21 respuestas reales de Luna |
+| `typed-final-heldout-v4-live-11.json` | Cinco conversaciones congeladas independientemente, tras su primera ejecución local | 11/11 respuestas reales de Luna |
+
+Las 56 llamadas finales se identificaron como `openai:gpt-5.6-luna:semantic`, sin fallos, equivalencias pendientes ni errores ocultos por fallback. No aparecieron regresiones ni variación semántica/textual en los guiones repetidos. Las revisiones independientes cubren las superficies exactas: ocho combinaciones de desarrollo, cinco del corpus observado y once de v4. Son revisiones de otro agente, no certificación humana.
+
+El informe anterior `final-freeze-production-live-21.json` conserva dos fallos reales de extracción: el modelo devolvió `mornings` dentro de un campo que exigía otra capa de JSON codificado como texto. Aunque el fallback conservaba el estado correcto, el oracle rechazó esos turnos. El runtime sustituyó ese campo por valores JSON tipados; el replay final aprobó las mismas expectativas sin cambiarlas. También permanecen los primeros fallos semánticos del corpus observado y de los holdouts consumidos.
+
+La mutación del evaluador impidió que pasaran **42 errores deliberados**: 40 rechazos directos y dos textos que necesitarían una revisión independiente nueva. El evaluador anterior aceptó los seis contraejemplos. El harness final (`tmp/bm-audit/final-harness.json`) aprobó 25/25 comandos, sin reparaciones ni violaciones de alcance frente a la línea base original. Sus diagnósticos legacy siguen separados y documentados: estos resultados no demuestran que se hayan resuelto todos los casos históricos.
+
+Esta validación llama al planner local con el modelo real; no prueba entrega por proveedores, ejecución nativa ni despliegue productivo. Los resultados favorables del candidato no sustituyen los primeros informes fallidos ni justifican declarar comprensión general o release productiva.

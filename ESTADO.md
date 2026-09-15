@@ -1,13 +1,15 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-08
+Ultima actualizacion: 2026-09-15
 
 ## Resumen actual
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
 - El repo contiene app Android (`app/`), MVP iPhone (`ios/Blank/`), documentos de lanzamiento (`docs/`) y landing estatica (`web/landing/`).
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
+- La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-15: Creados tres commits de release (`e494323`, `e560c4c`, `b5ae08d`) y subidos a `origin/codex/release-2026-09-15`; product harness `19/19` y Android `BUILD SUCCESSFUL`; gate BM amplio `18/25`, sin deploy de producción.
 - 2026-09-14: Corregido BM para reconocer `breakfast`/`desayuno` como momento relativo. Si falta la hora de finalización, pregunta primero y no propone `Social mode` ni otra acción; con la hora guardada crea la franja desde ese momento. Añadida regresión al smoke test.
 - 2026-09-08: Anadido sync directo de proveedores en `wearable-sync`: Oura, WHOOP, Fitbit/Google Health y Withings consultan APIs, normalizan a `common_features/provider_features/source_confidence/freshness`, guardan snapshot, actualizan `last_sync_at/status` y registran `wearable_sync_success/failed`; errores de proveedor marcan conexion `error`. `digital-wellness-features` carga memoria previa de `wearable_recommendation_outcomes` para evitar repetir recomendaciones ignoradas y reforzar aceptadas. iOS/Android Source Hub abre OAuth directo para proveedores configurados. Validado JS, Android tests y `git diff --check`.
 - 2026-09-08: Netlify produccion `getblank` redeploy `6a9fe59066d9e0490c340114` con funciones wearable; smoke real OK para `wearable-connections`, `wearable-outcome` y `digital-wellness-features`; bloqueos esperados: Oura `provider_oauth_not_configured`, Garmin `provider_requires_partner_access`, sync directo sin cuenta `wearable_connection_not_found`.

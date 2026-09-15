@@ -525,6 +525,21 @@ struct HomeView: View {
             minimalHomeRow("emergency", color: BlankColors.homeDarkSecondary) {
                 openSection(.emergency)
             }
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    isActiveNavExpanded = false
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(BlankColors.homeDarkSecondary)
+                    .frame(width: 44, height: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Collapse menu")
+            .accessibilityHint("Return to the active home")
         }
     }
 

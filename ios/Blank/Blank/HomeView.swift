@@ -33,6 +33,7 @@ struct HomeView: View {
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
+    @State private var isActiveNavExpanded = false
     @State private var delayedManualUnlockAt: Date?
     @State private var delayedManualUnlockTask: Task<Void, Never>?
     @State private var showingRelapseReview = false
@@ -130,6 +131,11 @@ struct HomeView: View {
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+        }
+        .onChange(of: sessionStore.isBlankActive) { isActive in
+            if !isActive {
+                isActiveNavExpanded = false
+            }
         }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
@@ -470,23 +476,56 @@ struct HomeView: View {
 
             Spacer(minLength: 0)
 
-            VStack(alignment: .leading, spacing: -8) {
-                minimalStartRow
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            if isActiveNavExpanded {
+                activeExpandedNavigation
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .move(edge: .bottom)),
+                        removal: .opacity.combined(with: .move(edge: .top))
+                    ))
+            } else {
+                VStack(alignment: .leading, spacing: -8) {
+                    minimalStartRow
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button("unblank") {
-                    openSection(.emergency)
+                    Button("unblank") {
+                        openSection(.emergency)
+                    }
+                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                    .tracking(-0.8)
+                    .foregroundStyle(BlankColors.homeDarkSecondary)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .buttonStyle(.plain)
                 }
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                .tracking(-0.8)
-                .foregroundStyle(BlankColors.homeDarkSecondary)
-                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                .buttonStyle(.plain)
+                .transition(.opacity)
             }
         }
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.bottom, layout.bottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .animation(.easeInOut(duration: 0.35), value: isActiveNavExpanded)
+    }
+
+    private var activeExpandedNavigation: some View {
+        VStack(alignment: .leading, spacing: -8) {
+            minimalHomeRow("unblank", color: BlankColors.homeDarkSecondary) {
+                openSection(.emergency)
+            }
+            minimalHomeRow("stats", color: BlankColors.homeDarkSecondary) {
+                openSection(.report)
+            }
+            minimalHomeRow("plan", color: BlankColors.homeDarkSecondary) {
+                openSection(.modes)
+            }
+            minimalHomeRow("timer", color: BlankColors.homeDarkSecondary) {
+                openSection(.timer)
+            }
+            minimalHomeRow("settings", color: BlankColors.homeDarkSecondary) {
+                openSection(.settings)
+            }
+            minimalHomeRow("emergency", color: BlankColors.homeDarkSecondary) {
+                openSection(.emergency)
+            }
+        }
     }
 
     private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -512,7 +551,13 @@ struct HomeView: View {
         let titleColor = isActive ? Color.white : BlankColors.homeLightInk
 
         return Button {
-            guard !isActive else { return }
+            if isActive {
+                guard !sessionStore.hardBlankActive else { return }
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    isActiveNavExpanded = true
+                }
+                return
+            }
             let result = withAnimation(.easeInOut(duration: 0.65)) {
                 sessionStore.activateBlank()
             }

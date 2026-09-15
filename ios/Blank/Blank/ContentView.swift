@@ -2385,7 +2385,7 @@ private struct BlankedAgentClient {
 }
 
 struct AssistantContextSyncClient {
-    private func sync(connectCode: String, channel: String, phoneNumber: String, context: AgentContext) async {
+    func sync(connectCode: String, channel: String, phoneNumber: String, context: AgentContext) async {
         await sync(
             connectCode: connectCode,
             channel: channel,
@@ -2782,7 +2782,7 @@ enum BlankedAgentMemory {
         }
     }
 
-    private static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
+    static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
         defaults.removeObject(forKey: lastPromptKey)
         defaults.set(inferredIntent.rawValue, forKey: lastIntentKey)
         if let bedtime = explicitBedtimeMinute(in: prompt) {

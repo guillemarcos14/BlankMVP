@@ -2385,7 +2385,7 @@ private struct BlankedAgentClient {
 }
 
 struct AssistantContextSyncClient {
-    func sync(connectCode: String, channel: String, phoneNumber: String, context: AgentContext) async {
+    fileprivate func sync(connectCode: String, channel: String, phoneNumber: String, context: AgentContext) async {
         await sync(
             connectCode: connectCode,
             channel: channel,
@@ -2794,7 +2794,7 @@ enum BlankedAgentMemory {
         defaults.set(patternCluster(for: prompt, intent: inferredIntent), forKey: patternClusterKey)
     }
 
-    static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
+    fileprivate static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
         defaults.set(plan.title, forKey: lastPlanTitleKey)
         defaults.set(Date().timeIntervalSince1970, forKey: lastPlanAppliedAtKey)
         defaults.set(plan.intent.rawValue, forKey: lastIntentKey)

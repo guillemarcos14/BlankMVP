@@ -143,7 +143,7 @@ check("immediate_protection_does_not_invent_duration", () => {
 });
 
 check("whatsapp_actions_require_native_confirmation", () => {
-  assert.match(whatsapp, /Review and confirm in Blanked/);
+  assert.match(whatsapp, /Review and confirm in Blankmind/);
   assert.match(blankApp, /action == "review-action"/);
   assert.match(sessionStore, /pendingAssistantAction/);
   assert.match(home, /Review and confirm/);
@@ -199,7 +199,7 @@ check("assistant_actions_reuse_saved_modes_and_ignore_stale_timer", () => {
 
 check("review_action_survives_landing_redirect", () => {
   assert.match(openPage, /"review-action"/);
-  assert.match(openPage, /Review and confirm in Blanked/);
+  assert.match(openPage, /Review and confirm in Blankmind/);
   assert.match(openPage, />Review and confirm</);
 });
 

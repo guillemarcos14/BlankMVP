@@ -113,6 +113,9 @@ function pendingState(context = {}) {
 
 function isBlockingRequest(prompt, context = {}) {
   const currentText = lower(prompt);
+  const retrospectiveMention = hasAny(currentText, ["broke the block", "broke my block", "last block", "yesterday after", "relapse", "recaída", "recaida"])
+    && !hasAny(currentText, ["block now", "protect now", "start now", "bloquea ahora", "proteger ahora", "inicia ahora"]);
+  if (retrospectiveMention) return false;
   const blockingTerms = ["block", "bloquea", "bloquear", "limit", "protect", "proteger", "instagram", "tiktok", "tik tok", "youtube", "reddit", "twitter", "facebook", "snapchat"];
   const workConflict = hasAny(currentText, ["but i need", "but need", "need it", "for work", "for studying", "for study", "para trabajar", "para estudiar", "lo necesito", "la necesito"])
     && hasAny(currentText, blockingTerms);
@@ -197,6 +200,10 @@ function parseApps(text, context = {}) {
     return { value: [`mode:${modeName}`], source: "mode", resolved: true, mode_name: modeName };
   }
 
+  if (context.has_selected_apps === true) {
+    return { value: ["selected_apps"], source: "device_selection", resolved: true };
+  }
+
   if (hasAny(value, ["social media", "social apps", "social networks", "redes sociales"])) {
     return { value: [], source: "category", category: "social_apps", resolved: false };
   }
@@ -265,7 +272,7 @@ function relativeMomentKey(text) {
   if (hasAny(value, ["after breakfast", "right after breakfast", "despues de desayunar", "después de desayunar"])) return "breakfast";
   if (hasAny(value, ["after lunch", "right after lunch", "despues de comer", "después de comer", "despues de lunch", "después de lunch"])) return "lunch";
   if (hasAny(value, ["after dinner", "right after dinner", "despues de cenar", "después de cenar", "despues de dinner", "después de dinner"])) return "dinner";
-  if (hasAny(value, ["after work", "right after work", "despues de trabajar", "después de trabajar", "despues de work", "después de work"])) return "work";
+  if (hasAny(value, ["after work", "right after work", "despues de trabajar", "después de trabajar", "despues de work", "después de work", "when work ends", "when i finish work", "cuando termine de trabajar", "cuando termino de trabajar", "al terminar de trabajar"])) return "work";
   return "";
 }
 
@@ -277,27 +284,46 @@ function relativeMomentDefaults(text) {
   const match = matches[matches.length - 1];
   if (!match) return null;
   const rawHour = Number(match[1]);
-  const meridiem = match[3] || (key === "breakfast" ? "am" : "pm");
-  const minute = parseClock(rawHour, match[2], meridiem, "");
+  const meridiem = match[3] || (rawHour > 12 ? "" : key === "breakfast" ? "am" : "pm");
+  const minute = meridiem
+    ? parseClock(rawHour, match[2], meridiem, "")
+    : rawHour >= 0 && rawHour <= 23 ? rawHour * 60 + Number(match[2] || 0) : null;
   if (typeof minute !== "number") return null;
+  const offset = key === "work" && hasAny(value, ["finish", "ends", "termine", "termino", "al terminar"])
+    ? 10
+    : 0;
+  const startMinute = (minute + offset) % (24 * 60);
   const duration = key === "dinner" ? 90 : key === "work" ? 60 : 60;
   return {
-    start: { type: "time", value: minute, source: "relative_followup" },
+    start: { type: "time", value: startMinute, source: "relative_followup" },
     end: { type: "duration", value: duration, source: "relative_default" },
     recurrence: { type: "daily", value: [1, 2, 3, 4, 5, 6, 7], source: "relative_default" },
   };
 }
 
-function parseTimeWindow(text) {
+function parseTimeWindow(text, context = {}) {
   const value = lower(text);
   const expression = /(\d{1,2})(?::(\d{2}))?\s*(am|pm|de la mañana|de la manana|de la tarde|de la noche)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|de la mañana|de la manana|de la tarde|de la noche)?/i;
   const match = value.match(expression);
   if (!match) return null;
-  const start = parseClock(match[1], match[2], match[3], "");
+  let start = parseClock(match[1], match[2], match[3], "");
   let end = parseClock(match[4], match[5], match[6], "");
-  if (typeof start === "number" && end && typeof end === "object" && end.ambiguous && !match[6]) {
-    const endCandidate = Number(end.hour) * 60 + Number(end.minute || 0);
-    if (start >= 12 * 60 && start > endCandidate) end = parseClock(match[4], match[5], "am", "");
+  if ((start && typeof start === "object" && start.ambiguous) || (end && typeof end === "object" && end.ambiguous)) {
+    const startWasExplicit24Hour = typeof start === "number";
+    const startHour = Number(match[1]);
+    const endHour = Number(match[4]);
+    const memory = contextSafeMemory(context.memory);
+    const lastTopic = lower(memory.last_topic || memory.last_intent || "", 40);
+    const nightly = hasAny(value, ["tonight", "at night", "night", "bedtime", "sleep", "noche", "dormir", "acostarme"])
+      || lastTopic === "sleep"
+      || (hasAny(value, ["block", "bloquea", "bloquear", "instagram", "tiktok", "youtube", "scroll"]) && startHour >= 9 && startHour <= 11 && endHour >= 1 && endHour <= 9 && endHour <= startHour);
+    const startMarker = match[3] || (nightly ? "pm" : "am");
+    const startsInPm = nightly || /pm|tarde|noche/i.test(match[3] || "") || startHour >= 13;
+    const endMarker = match[6] || (startsInPm
+      ? (endHour <= startHour ? "am" : "pm")
+      : (endHour <= startHour ? "pm" : "am"));
+    start = startWasExplicit24Hour ? start : parseClock(match[1], match[2], startMarker, "");
+    end = parseClock(match[4], match[5], endMarker, "");
   }
   if (start == null || end == null || typeof start !== "number" || typeof end !== "number" || start === end) {
     return { ambiguous: true };
@@ -310,7 +336,7 @@ function parseStart(text, context = {}) {
   if (hasAny(value, ["right now", "now", "immediately", "ahora mismo", "ahora", "ya", "en este momento"])) {
     return { type: "now", value: "now", source: "conversation" };
   }
-  const window = parseTimeWindow(value);
+  const window = parseTimeWindow(value, context);
   if (window && !window.ambiguous) return { type: "time", value: window.start, source: "conversation", raw: window.raw };
   const single = parseTimeParts(value, /\b(?:at|around|about|starting at|from|a las|sobre|a partir de las|a partir de)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|de la mañana|de la manana|de la tarde|de la noche)?/i);
   if (single && typeof single.parsed === "number") return { type: "time", value: single.parsed, source: "conversation", raw: single.raw };
@@ -331,14 +357,14 @@ function contextSafeMemory(text) {
   return text && typeof text === "object" ? text : {};
 }
 
-function parseEnd(text, start) {
+function parseEnd(text, start, context = {}) {
   const duration = parseDurationMinutes(text);
   if (duration != null) return { type: "duration", value: duration, source: "conversation" };
   const value = lower(text);
   if (hasAny(value, ["indefinite", "indefinitely", "forever", "without an end", "sin límite", "sin limite", "indefinido", "indefinida", "indefinidamente", "para siempre", "hasta que lo quite", "until i stop"])) {
     return { type: "indefinite", value: null, source: "conversation" };
   }
-  const window = parseTimeWindow(value);
+  const window = parseTimeWindow(value, context);
   if (window && !window.ambiguous) return { type: "time", value: window.end, source: "conversation" };
   if (start && start.type === "time" && start.raw && /\bfrom\b|\bto\b|\buntil\b|\ba\b|-/i.test(value)) return { type: "missing", value: null };
   return { type: "missing", value: null };
@@ -388,15 +414,16 @@ function resolveBlockingContract(prompt, context = {}, plan = null) {
   const apps = parseApps(combinedText, context);
   const actionType = pending.action || parseAction(combinedText);
   let start = mergePending("start", parseStart(combinedText, context), pending);
-  let end = mergePending("end", parseEnd(combinedText, start), pending);
+  let end = mergePending("end", parseEnd(combinedText, start, context), pending);
   let recurrence = mergePending("recurrence", parseRecurrence(combinedText, start), pending);
-  const explicitWindow = parseTimeWindow(combinedText);
-  if (explicitWindow && !explicitWindow.ambiguous && recurrence && recurrence.type === "missing" && explicitWindow.start > explicitWindow.end) {
-    recurrence = { type: "daily", value: [1, 2, 3, 4, 5, 6, 7], source: "overnight_default" };
+  const explicitWindow = parseTimeWindow(combinedText, context);
+  if (explicitWindow && !explicitWindow.ambiguous && recurrence && recurrence.type === "missing") {
+    recurrence = { type: "once", value: [0], source: "explicit_window_default" };
   }
   const relativeDefaults = relativeMomentDefaults(combinedText);
   if (relativeDefaults) {
-    if (!start || start.type === "missing") start = relativeDefaults.start;
+    const relativeWorkFinish = relativeMomentKey(combinedText) === "work" && hasAny(combinedText.toLowerCase(), ["finish", "ends", "termine", "termino", "al terminar"]);
+    if (!start || start.type === "missing" || relativeWorkFinish) start = relativeDefaults.start;
     if (!end || end.type === "missing") end = relativeDefaults.end;
     if (!recurrence || recurrence.type === "missing") recurrence = relativeDefaults.recurrence;
   }
@@ -460,6 +487,16 @@ function missingQuestion(contract, language = "en") {
   return "Tell me the missing blocking details and I will prepare it.";
 }
 
+function inferredBlockingIntent(prompt) {
+  const text = lower(prompt);
+  if (hasAny(text, ["relapse", "reca", "broke the block", "break the block", "can't stop", "cannot stop", "no puedo parar", "terrible today", "fatal hoy"])) return "emergency";
+  if (hasAny(text, ["sleep", "night", "bed", "bedtime", "dormir", "duermo", "acuesto", "noche"])) return "sleep";
+  if (hasAny(text, ["exam", "study", "estudio", "estudiar", "examen"])) return "study";
+  if (hasAny(text, ["focus", "concentrate", "concentration", "deep work", "work", "foco", "concentrarme", "trabajar"])
+    || (hasAny(text, ["strict", "hard block", "bloqueo fuerte", "bloqueo estricto"]) && /\b\d+\s*(?:minutes?|mins?|minutos?)\b/i.test(text))) return "focus";
+  return "social";
+}
+
 function publicBlockingData(data) {
   if (!data || typeof data !== "object") return null;
   const publicField = (field) => {
@@ -502,11 +539,15 @@ function incompleteBlockingPlan(contract, language = "en", prompt = "", context 
   const missing = relativeKey && !relativeMomentDefaults(combinedText)
     ? relativeQuestions[relativeKey]
     : missingQuestion(contract, language);
+  const inferredIntent = inferredBlockingIntent(prompt);
+  const timingLabel = inferredIntent === "sleep" && hasAny(lower(prompt), ["tonight", "at night", "noche", "bedtime", "esta noche"])
+    ? language === "es" ? " esta noche" : " tonight"
+    : "";
   const question = language === "es"
-    ? `Puedo preparar un bloqueo para ${target}${knownWindow}, pero ${missing}${webNote}`
-    : `I can prepare a block for ${target}${knownWindow}, but ${missing.charAt(0).toLowerCase()}${missing.slice(1)}${webNote}`;
+    ? `Puedo preparar un bloqueo para ${target}${knownWindow}${timingLabel}, pero ${missing}${webNote}`
+    : `I can prepare a block for ${target}${knownWindow}${timingLabel}, but ${missing.charAt(0).toLowerCase()}${missing.slice(1)}${webNote}`;
   return {
-    intent: "social",
+    intent: inferredIntent,
     title: language === "es" ? "Detalles del bloqueo" : "Blocking details",
     response_text: question,
     bullets: language === "es"

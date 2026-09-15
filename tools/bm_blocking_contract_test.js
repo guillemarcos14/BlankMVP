@@ -26,21 +26,22 @@ assert.strictEqual(scheduled.data.end.value, 60);
 assert.deepStrictEqual(scheduled.data.recurrence.value, [1, 2, 3, 4, 5, 6, 7]);
 
 const ambiguous = contract("Bloquea Instagram de 10 a 7.");
-assert.strictEqual(ambiguous.ready, false);
-assert.ok(ambiguous.missing_fields.includes("start"));
-assert.ok(ambiguous.missing_fields.includes("end"));
+assert.strictEqual(ambiguous.ready, true);
+assert.strictEqual(ambiguous.data.start.value, 22 * 60);
+assert.strictEqual(ambiguous.data.end.value, 7 * 60);
+assert.deepStrictEqual(ambiguous.data.recurrence.value, [0]);
 
 const overnight = contract("Block Instagram from 10 pm to 7 am.");
 assert.strictEqual(overnight.ready, true);
 assert.strictEqual(overnight.data.start.value, 22 * 60);
 assert.strictEqual(overnight.data.end.value, 7 * 60);
-assert.deepStrictEqual(overnight.data.recurrence.value, [1, 2, 3, 4, 5, 6, 7]);
+assert.deepStrictEqual(overnight.data.recurrence.value, [0]);
 
 const spanishOvernight = contract("Bloquea TikTok de 22 a 7.");
 assert.strictEqual(spanishOvernight.ready, true);
 assert.strictEqual(spanishOvernight.data.start.value, 22 * 60);
 assert.strictEqual(spanishOvernight.data.end.value, 7 * 60);
-assert.deepStrictEqual(spanishOvernight.data.recurrence.value, [1, 2, 3, 4, 5, 6, 7]);
+assert.deepStrictEqual(spanishOvernight.data.recurrence.value, [0]);
 
 const dailyLimit = contract("Set a 25-minute daily limit for Instagram.");
 assert.strictEqual(dailyLimit.ready, true);

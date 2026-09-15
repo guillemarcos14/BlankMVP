@@ -165,12 +165,29 @@ function utilityScore(plan) {
 }
 
 function assertPlan(testCase, plan) {
-  if (assertBlockingContract(testCase, plan)) return;
-
   const expected = testCase.expect;
+  const hasBlockingContract = assertBlockingContract(testCase, plan);
   assert.strictEqual(plan.intent, expected.intent, `${testCase.id}.intent`);
-
   assert.deepStrictEqual(actionTypes(plan), expected.action_types, `${testCase.id}.action_types`);
+
+  if (hasBlockingContract) {
+    if (expected.first_action) {
+      assert.ok(plan.actions && plan.actions[0], `${testCase.id}.first_action exists`);
+      assertSubset(plan.actions[0], expected.first_action, `${testCase.id}.first_action`);
+    }
+    const blockingText = visibleText(plan);
+    const blockingUiText = userVisibleText(plan);
+    for (const pattern of expected.text_matches || []) {
+      assert.match(blockingText, new RegExp(pattern, "i"), `${testCase.id}.text_matches:${pattern}`);
+    }
+    for (const pattern of expected.ui_text_matches || []) {
+      assert.match(blockingUiText, new RegExp(pattern, "i"), `${testCase.id}.ui_text_matches:${pattern}`);
+    }
+    for (const pattern of expected.ui_text_not_matches || []) {
+      assert.doesNotMatch(blockingUiText, new RegExp(pattern, "i"), `${testCase.id}.ui_text_not_matches:${pattern}`);
+    }
+    return;
+  }
 
   if (expected.first_action) {
     assert.ok(plan.actions && plan.actions[0], `${testCase.id}.first_action exists`);

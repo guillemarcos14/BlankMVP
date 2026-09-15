@@ -216,9 +216,13 @@ function baseContext(overrides = {}) {
   const rememberedApp = await call("I keep doomscrolling.", baseContext({
     memory: { main_apps: ["Instagram"], weak_hours: [21], last_plan_outcome: "broke" },
   }));
-  assert.strictEqual(rememberedApp.actions.length, 0);
+  assert.strictEqual(rememberedApp.actions.length, 1);
+  assert.strictEqual(rememberedApp.actions[0].type, "apply_schedule");
+  assert.strictEqual(rememberedApp.actions[0].start_minute, 21 * 60);
+  assert.strictEqual(rememberedApp.actions[0].end_minute, 22 * 60);
   assert.strictEqual(rememberedApp.blocking_user_request, false);
   assert.match(rememberedApp.bullets.join(" "), /broke|earlier|usual|9:00 PM/i);
+  assert.doesNotMatch(`${rememberedApp.message_text} ${rememberedApp.bullets.join(" ")}`, /25-minute|daily limit/i);
 
   const explicitWindow = await call("Block selected apps from 10 pm to 7 am every day.", baseContext());
   assert.ok(explicitWindow.actions.some((action) => action.type === "apply_schedule"));
@@ -320,8 +324,11 @@ function baseContext(overrides = {}) {
   assert.match(whatsappSpanish.message_text, /Puedo bloquear|Instagram/i);
 
   const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am", baseContext());
-  assert.strictEqual(sleepGoalWindow.actions.length, 0);
-  assert.ok(sleepGoalWindow.blocking_missing_fields.includes("apps"));
+  assert.strictEqual(sleepGoalWindow.actions.length, 1);
+  assert.strictEqual(sleepGoalWindow.actions[0].type, "apply_schedule");
+  assert.strictEqual(sleepGoalWindow.actions[0].start_minute, 22 * 60 + 45);
+  assert.strictEqual(sleepGoalWindow.actions[0].end_minute, 23 * 60);
+  assert.strictEqual(sleepGoalWindow.blocking_user_request, false);
 
   const rawContract = await callRaw("Block selected apps from 10 pm to 7 am every day.", baseContext());
   assert.match(rawContract.harness.run_id, /^bm_/);

@@ -652,13 +652,17 @@ function completeBlockingPlan(contract, language = "en", prompt = "") {
       ? (startMinute + Number(data.end.value)) % (24 * 60)
       : Number(data.end.value);
     if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute) || startMinute === endMinute) return null;
-    plannedAction = action("apply_schedule", {
+    const scheduleAction = action("apply_schedule", {
       name: modeName || `Block ${namedApps.join(" + ") || "selected apps"}`,
       start_minute: startMinute,
       end_minute: endMinute,
       weekdays: recurrenceDays[0] === 0 ? [1, 2, 3, 4, 5, 6, 7] : recurrenceDays,
       duration_days: recurrenceDays[0] === 0 ? 1 : 7,
     });
+    const shouldActivateMode = modeName && (data.start.type === "now" || /\b(?:mode|modo|profile|perfil)\b/i.test(prompt));
+    plannedAction = shouldActivateMode
+      ? [action("activate_mode", { name: modeName, minutes: durationMinutes, hard_mode: hardMode }), scheduleAction]
+      : scheduleAction;
     title = "Scheduled Protection";
     responseText = language === "es"
       ? `Puedo bloquear ${appLabel} de ${minuteText(startMinute)} a ${minuteText(endMinute)}.`
@@ -675,7 +679,7 @@ function completeBlockingPlan(contract, language = "en", prompt = "") {
     bullets,
     primary_label: language === "es" ? "Revisar bloqueo" : "Review block",
     secondary_label: language === "es" ? "Ahora no" : "Not now",
-    actions: plannedAction ? [plannedAction] : [],
+    actions: Array.isArray(plannedAction) ? plannedAction : plannedAction ? [plannedAction] : [],
     requires_selected_apps: contract.app_source === "conversation",
     requires_screen_time_authorization: true,
     blocking_ready: true,
@@ -1163,7 +1167,7 @@ function classify(prompt, context = {}) {
   if (explicitDurationMinutes(prompt) && contains(text, ["hard block", "hard blok", "hard bloquear", "block distractions", "blok everything", "bloquear everything", "bloquea distracciones", "bloquear distractions", "bloquear distracciones"])) return "focus";
   if (contains(text, ["porn", "porno", "adult", "xxx"])) return "adultContent";
   if (contains(text, ["losing control", "perdiendo el control", "urge", "emergency", "reca", "relapse", "broke the block", "break the block", "can't stop", "no puedo parar", "terrible today", "fatal hoy", "no consigo concentrarme"])) return "emergency";
-  if (contains(text, ["sleep", "night", "bed", "dormir", "duermo", "acuesto", "noche", "scrolleando hasta", "scrolling until", "tired", "cansado"])) return "sleep";
+  if (contains(text, ["sleep", "night", "tonight", "this evening", "bed", "dormir", "duermo", "acuesto", "noche", "esta noche", "scrolleando hasta", "scrolling until", "tired", "cansado"])) return "sleep";
   if (contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"])) return "study";
   if (contains(text, ["allow only", "whatsapp", "maps", "solo", "only"])) return "allowOnly";
   if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa", "resume my rules", "resume rules", "reanuda", "reanudar", "quita la pausa", "quitar la pausa", "disable pause", "remove pause"])) return "vacation";
@@ -1835,7 +1839,7 @@ function fallbackPlan(prompt, context = {}) {
   const blockingContract = resolveBlockingContract(prompt, context);
   const incompleteBlock = incompleteBlockingPlan(blockingContract, language, prompt, context);
   if (incompleteBlock) return incompleteBlock;
-  const completeBlock = completeBlockingPlan(blockingContract, language);
+  const completeBlock = completeBlockingPlan(blockingContract, language, prompt);
   if (completeBlock) return completeBlock;
   const proactive = proactivePlan(prompt, context, language);
   if (proactive) return proactive;
@@ -2451,7 +2455,6 @@ function fallbackPlan(prompt, context = {}) {
       primary_label: "Apply protection",
       secondary_label: "Open report",
       actions: selected && authorized ? [
-        action("set_daily_limit", { minutes: 25 }),
         action("apply_schedule", { name: "Scroll Control", start_minute: weakHours[0] * 60, end_minute: ((weakHours[0] + 1) % 24) * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })
       ] : [action(selected ? "request_screen_time_permission" : "open_app_picker")],
       requires_selected_apps: !selected,
@@ -2498,7 +2501,9 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
 
-  if (timeWindow && ["sleep", "focus", "social", "general"].includes(intent)) {
+  const relativeRoutineWindow = Boolean(relativeMoment(prompt) && !explicitTimeWindow(prompt, context));
+  const knownRoutineApp = namedApp(prompt) !== "the app" || (Array.isArray(memory.main_apps) && memory.main_apps.length > 0);
+  if (timeWindow && ["sleep", "focus", "social", "general"].includes(intent) && (!relativeRoutineWindow || knownRoutineApp)) {
     const start = minuteText(timeWindow.start);
     const end = minuteText(timeWindow.end);
     const planIntent = intent === "general" ? "social" : intent;
@@ -2630,7 +2635,24 @@ function fallbackPlan(prompt, context = {}) {
     const mealDefault = meal === "breakfast" ? 8 * 60 : meal === "dinner" ? 20 * 60 : 13 * 60;
     const mealDuration = meal === "dinner" ? 90 : 60;
     const momentText = meal ? `after ${meal}` : rememberedRisk || "before the usual scroll window";
-    const startMinute = resolvedMealStart ?? (meal ? mealDefault : 1230);
+    const startMinute = resolvedMealStart ?? (meal ? mealDefault : (weakHours.length > 0 ? weakHours[0] * 60 : null));
+    const hasKnownAppTarget = namedApp(prompt) !== "the app" || (Array.isArray(memory.main_apps) && memory.main_apps.length > 0);
+    const scheduleAction = startMinute == null || !hasKnownAppTarget
+      ? null
+      : action("apply_schedule", {
+        name: meal ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} Protection` : "Scroll Control",
+        start_minute: startMinute,
+        end_minute: (startMinute + (meal ? mealDuration : (weakHours.length > 0 ? 60 : 150))) % (24 * 60),
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      });
+    const requestedLimit = explicitDurationMinutes(prompt);
+    const limitAction = requestedLimit == null ? null : action("set_daily_limit", { minutes: requestedLimit });
+    const outcomeMove = lastOutcome === "broke"
+      ? "Move: start the boundary earlier and review what broke the last attempt."
+      : lastOutcome === "held"
+        ? "Move: repeat the boundary that held before making it harder."
+        : "Move: add friction before the scroll has momentum and review whether the window holds.";
     return {
       ...base,
       title: "Scroll Loop",
@@ -2642,11 +2664,9 @@ function fallbackPlan(prompt, context = {}) {
       bullets: [
         "Pattern: the trigger matters more than total screen time.",
         `Move: add friction ${momentText}, before the scroll has momentum.`,
-        "Start with a 25 minute daily limit plus a short protective window."
+        outcomeMove,
       ],
-      actions: meal && resolvedMealStart == null
-        ? []
-        : [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: meal ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} Protection` : "Scroll Control", start_minute: startMinute, end_minute: (startMinute + (meal ? mealDuration : 150)) % (24 * 60), weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
+      actions: [limitAction, scheduleAction].filter(Boolean),
     };
   }
 
@@ -3019,7 +3039,7 @@ function blockingPickerAction(contract) {
 function actionGate(plan, fallback, context = {}, prompt = "") {
   const proposed = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map((item) => normalizeActionForPrompt(item, prompt)).filter(Boolean) : [];
   const blockingContract = resolveBlockingContract(prompt, context, plan);
-  const blockingCandidate = blockingContract.is_blocking_request || proposed.some((item) => isBlockingActionType(item.type));
+  const blockingCandidate = blockingContract.user_request || proposed.some((item) => isBlockingActionType(item.type));
   const missingOnlyApps = blockingContract.user_request
     && blockingContract.missing_fields.length === 1
     && blockingContract.missing_fields[0] === "apps"
@@ -3030,7 +3050,10 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   if (missingOnlyApps && !["mode", "device_selection"].includes(blockingContract.app_source) && !claimsSelectedApps(prompt)) {
     return [blockingPickerAction(blockingContract)];
   }
-  if (blockingCandidate && !blockingContract.ready) return [];
+  // A user-declared block must remain inert until its contract is complete.
+  // A model/fallback recommendation without an explicit block request still
+  // needs to pass through the normal setup and permission gates below.
+  if (blockingContract.user_request && !blockingContract.ready) return [];
   if (blockingContract.user_request && blockingContract.ready && !["mode", "device_selection"].includes(blockingContract.app_source) && !claimsSelectedApps(prompt)) {
     return [blockingPickerAction(blockingContract)];
   }
@@ -3080,6 +3103,13 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const uniqueSetup = setupActions.filter((item, index, items) => items.findIndex((candidate) => candidate.type === item.type) === index);
   if (uniqueSetup.length > 0) return uniqueSetup.slice(0, 2);
 
+  if (!selected && fallbackActions.some((item) => actionNeedsSelection(item.type))) {
+    return [action("open_app_picker")];
+  }
+  if (!authorized && fallbackActions.some((item) => actionNeedsScreenTime(item.type))) {
+    return [action("request_screen_time_permission")];
+  }
+
   if (gated.length > 0) return gated;
 
   if (fallbackActions.length > 0 && !adviceOnly && !promptHasFutureTiming(prompt)) return fallbackActions.slice(0, 4).map((item) => normalizeActionForPrompt(item, prompt)).filter(Boolean);
@@ -3113,7 +3143,8 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
   const nextMove = userFacingText(source.next_move, 160);
   const fallbackBullets = fallback.bullets;
   const blockingContract = resolveBlockingContract(prompt, context, plan);
-  const incompleteBlocking = blockingContract.user_request && !blockingContract.ready;
+  const hasUserBlockingContract = blockingContract.user_request;
+  const incompleteBlocking = hasUserBlockingContract && !blockingContract.ready;
   const actions = actionGate(plan, fallback, context, prompt);
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const modelProposedAction = Array.isArray(plan.actions) && plan.actions.some((item) => item && item.type && item.type !== "none");
@@ -3152,10 +3183,10 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     actions,
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
-    blocking_ready: blockingContract.is_blocking_request ? blockingContract.ready : null,
-    blocking_user_request: blockingContract.is_blocking_request ? blockingContract.user_request : false,
-    blocking_missing_fields: blockingContract.is_blocking_request ? blockingContract.missing_fields : [],
-    blocking_data: blockingContract.is_blocking_request ? publicBlockingData(blockingContract.data) : null,
+    blocking_ready: hasUserBlockingContract ? blockingContract.ready : null,
+    blocking_user_request: hasUserBlockingContract,
+    blocking_missing_fields: hasUserBlockingContract ? blockingContract.missing_fields : [],
+    blocking_data: hasUserBlockingContract ? publicBlockingData(blockingContract.data) : null,
     recommendation_id: cleanText(plan.recommendation_id, 120) || cleanText(context.recommendation_id, 120) || `bm_rec_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
   };
   const messageText = conversationalMessage(normalizedPlan, language, prompt);

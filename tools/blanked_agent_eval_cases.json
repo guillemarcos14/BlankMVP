@@ -278,7 +278,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1320,
@@ -322,7 +322,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1260,
@@ -381,10 +381,7 @@
     "prompt": "I feel anxious and keep opening Instagram.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "anxiety|trigger|Pattern"
       ]
@@ -407,7 +404,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -662,9 +658,7 @@
     "prompt": "Block Duolingo.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
-      ],
+      "action_types": [],
       "text_matches": [
         "Duolingo|Blanked App|choose"
       ],
@@ -693,7 +687,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 420,
@@ -726,10 +720,7 @@
     "prompt": "I feel guilty after scrolling Instagram for hours.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "guilt|trigger|Pattern"
       ],
@@ -753,7 +744,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -769,9 +759,7 @@
     },
     "expect": {
       "intent": "focus",
-      "action_types": [
-        "request_screen_time_permission"
-      ],
+      "action_types": [],
       "requires_screen_time_authorization": true
     }
   },
@@ -876,10 +864,7 @@
     "prompt": "Twitter makes me compare myself and lose time.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "comparison|trigger|Pattern|Twitter"
       ]
@@ -902,7 +887,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1350,
@@ -1079,8 +1064,12 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
+      "action_types": [],
+      "ui_text_matches": [
+        "scroll|morning|app|time"
+      ],
+      "ui_text_not_matches": [
+        "25-minute|daily limit|https?://|blank://"
       ]
     }
   },
@@ -1124,14 +1113,9 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
-      ],
+      "action_types": [],
       "text_matches": [
         "Instagram|Blanked App|choose"
-      ],
-      "ui_text_matches": [
-        "Choose Instagram in Blanked App first"
       ],
       "ui_text_not_matches": [
         "TikTok|spare time|Set up"
@@ -1157,7 +1141,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -1694,7 +1677,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1090,
@@ -1739,7 +1722,7 @@
     "expect": {
       "intent": "sleep",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1320,

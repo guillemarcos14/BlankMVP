@@ -28,6 +28,7 @@ keystore.properties
 # Generated visual experiments
 /tools/generated_backgrounds/
 /tmp/product-harness/
+/tmp/reports/
 /tools/reports/product_harness_*.json
 /web/landing/assets/blank-green-mascot*
 /web/landing/assets/blank-product-square-*.png

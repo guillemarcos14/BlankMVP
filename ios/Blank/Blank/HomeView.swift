@@ -9,6 +9,7 @@ enum HomeSection: Hashable {
     case report
     case emergency
     case timer
+    case settings
 }
 
 struct HomeView: View {
@@ -48,6 +49,21 @@ struct HomeView: View {
         sessionStore.digitalWellnessV3
     }
 
+    private var healthPermissionLabel: String {
+        switch healthKitStore.state {
+        case .connected:
+            return "connected"
+        case .requesting:
+            return "requesting"
+        case .unavailable:
+            return "unavailable"
+        case .notRequested:
+            return "not connected"
+        case .failed:
+            return "needs attention"
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let viewportWidth = proxy.size.width
@@ -55,50 +71,30 @@ struct HomeView: View {
             let layout = HomeLayoutMetrics(size: CGSize(width: viewportWidth, height: viewportHeight), safeAreaInsets: proxy.safeAreaInsets)
 
             ZStack(alignment: .topLeading) {
-                AppBackground(isActive: sessionStore.isBlankActive)
-                    .frame(width: viewportWidth, height: viewportHeight)
-                    .clipped()
+                if activeSection == nil {
+                    (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+                        .frame(width: viewportWidth, height: viewportHeight)
+                        .ignoresSafeArea()
+                } else {
+                    AppBackground(isActive: sessionStore.isBlankActive)
+                        .frame(width: viewportWidth, height: viewportHeight)
+                        .clipped()
+                }
 
                 if activeSection == nil {
-                    topBar
-                        .position(x: layout.centerX, y: layout.topBarCenterY)
-                        .zIndex(2)
-
-                    topHomePanel(width: layout.actionWidth)
-                        .padding(.horizontal, layout.horizontalPadding)
-                        .padding(.top, layout.configTopPadding)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                    centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
-                        .position(x: layout.centerX, y: layout.messageCenterY)
-
-                    bottomShortcutBar(width: layout.actionWidth)
-                        .position(x: layout.centerX, y: layout.bottomShortcutCenterY)
+                    minimalHome(layout: layout)
+                        .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
                 }
 
-                if let activeSection {
-                    HomeSectionScreen(
-                        showingPicker: $showingPicker,
-                        section: activeSection,
-                        screenWidth: viewportWidth,
-                        screenHeight: viewportHeight,
-                        intervention: relapseIntervention,
-                        onEmergencyUnlock: performEmergencyUnlock,
-                        onTimedBlank: startTimedBlank
-                    ) {
-                        closeSection()
-                    }
-                    .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
-                    .transition(.opacity)
-                    .zIndex(5)
-                }
+                homeSectionScreen(viewportWidth: viewportWidth, viewportHeight: viewportHeight)
             }
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
         .ignoresSafeArea()
-        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .foregroundStyle(activeSection == nil ? BlankColors.minimalInk : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .environment(\.blankMinimalAppearance, true)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .animation(.easeInOut(duration: 0.35), value: activeSection)
         .navigationBarBackButtonHidden()
@@ -219,6 +215,37 @@ struct HomeView: View {
                 }
             )
             .preferredColorScheme(.light)
+        }
+    }
+
+    @ViewBuilder
+    private func homeSectionScreen(viewportWidth: CGFloat, viewportHeight: CGFloat) -> some View {
+        if let activeSection {
+            HomeSectionScreen(
+                showingPicker: $showingPicker,
+                section: activeSection,
+                screenWidth: viewportWidth,
+                screenHeight: viewportHeight,
+                intervention: relapseIntervention,
+                onEmergencyUnlock: performEmergencyUnlock,
+                onTimedBlank: startTimedBlank,
+                onOpenSection: openSection,
+                onOpenAssistant: { showingAssistantConnect = true },
+                onRequestScreenTimePermission: {
+                    Task {
+                        _ = await screenTimeBlocker.requestAuthorization()
+                        applyScreenTimeControls()
+                    }
+                },
+                onRequestHealthAccess: { healthKitStore.requestAccess() },
+                screenTimeStatus: screenTimeBlocker.authorizationStatusLabel,
+                healthStatus: healthPermissionLabel
+            ) {
+                closeSection()
+            }
+            .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+            .transition(.opacity)
+            .zIndex(5)
         }
     }
 
@@ -358,6 +385,229 @@ struct HomeView: View {
     @ViewBuilder
     private func topHomePanel(width: CGFloat) -> some View {
         EmptyView()
+    }
+
+    @ViewBuilder
+    private func minimalHome(layout: HomeLayoutMetrics) -> some View {
+        if sessionStore.isBlankActive {
+            activeMinimalHome(layout: layout)
+        } else {
+            idleMinimalHome(layout: layout)
+        }
+    }
+
+    private func idleMinimalHome(layout: HomeLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: -8) {
+                minimalStartRow
+
+                minimalHomeRow("stats", color: BlankColors.minimalSecondary) {
+                    openSection(.report)
+                }
+
+                minimalHomeRow("plan", color: BlankColors.minimalSecondary) {
+                    openSection(.modes)
+                }
+
+                minimalHomeRow("timer", color: BlankColors.minimalSecondary) {
+                    openSection(.timer)
+                }
+
+                minimalHomeRow("settings", color: BlankColors.minimalSecondary) {
+                    openSection(.settings)
+                }
+
+                minimalStatus
+
+                HStack(spacing: 18) {
+                    minimalUtilityRow("assistant") {
+                        showingAssistantConnect = true
+                    }
+
+                    #if targetEnvironment(simulator)
+                    minimalUtilityRow("onboarding") {
+                        openOnboardingDemo()
+                    }
+
+                    minimalUtilityRow("pro") {
+                        enableDemoPro()
+                    }
+                    #endif
+                }
+                .padding(.top, 7)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.bottom, layout.bottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+    }
+
+    private func activeMinimalHome(layout: HomeLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            Text("blank is active.")
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-1.1)
+                .foregroundStyle(Color.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+
+            Spacer(minLength: 0)
+
+            VStack(alignment: .leading, spacing: -8) {
+                minimalStartRow
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button("emergency") {
+                    openSection(.emergency)
+                }
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .tracking(-0.8)
+                .foregroundStyle(BlankColors.newLookDarkSecondary)
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, layout.horizontalPadding)
+        .padding(.bottom, layout.bottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .foregroundStyle(color)
+                .tracking(-0.6)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private var minimalStartRow: some View {
+        let isActive = sessionStore.isBlankActive
+        let title = isActive
+            ? (sessionStore.hardBlankActive ? "blank active" : "unblank")
+            : "blank"
+        let titleColor = isActive ? BlankColors.newLookDarkSecondary : BlankColors.minimalInk
+
+        return Button {
+            guard !isActive else { return }
+            let result = withAnimation(.easeInOut(duration: 0.65)) {
+                sessionStore.activateBlank()
+            }
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            setMessage(for: result)
+        } label: {
+            Text(title)
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .foregroundStyle(titleColor)
+                .tracking(-0.6)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(isActive && !sessionStore.hardBlankActive ? "hold for 20 seconds to unblank" : "")
+        .overlay(alignment: .bottomLeading) {
+            if isActive, !sessionStore.hardBlankActive {
+                GeometryReader { proxy in
+                    Rectangle()
+                        .fill(Color.white.opacity(0.16))
+                        .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
+                        .frame(maxHeight: .infinity, alignment: .bottomLeading)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 20, maximumDistance: .infinity)
+                .onEnded { _ in
+                    guard isActive, !sessionStore.hardBlankActive else { return }
+                    scheduleDelayedManualUnlock()
+                    unblankHoldProgress = 0
+                    isAnimatingUnblankHold = false
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard isActive, !sessionStore.hardBlankActive, !isAnimatingUnblankHold else { return }
+                    isAnimatingUnblankHold = true
+                    unblankHoldProgress = 0
+                    withAnimation(.linear(duration: 20)) {
+                        unblankHoldProgress = 1
+                    }
+                }
+                .onEnded { _ in
+                    isAnimatingUnblankHold = false
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        unblankHoldProgress = 0
+                    }
+                }
+        )
+    }
+
+    @ViewBuilder
+    private var minimalStatus: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if sessionStore.isBlankActive,
+               sessionStore.blankActiveUntil == nil,
+               let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
+                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
+                    .monospacedDigit()
+            }
+
+            if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
+                Text("Schedule paused \(remainingText(until: schedulePausedUntil))")
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+            }
+
+            if let message {
+                if let messageAction {
+                    Button {
+                        resolve(messageAction)
+                    } label: {
+                        Text(message)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(message)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+
+            if let cooldownText {
+                Text(cooldownText)
+                    .monospacedDigit()
+            } else if let timerCountdownText {
+                Text(timerCountdownText)
+                    .monospacedDigit()
+            }
+        }
+        .font(.blankInter(size: 13, relativeTo: .footnote))
+        .foregroundStyle(BlankColors.minimalSecondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 6)
+    }
+
+    private func minimalUtilityRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+            .foregroundStyle(BlankColors.minimalSecondary)
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .buttonStyle(.plain)
     }
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
@@ -979,6 +1229,7 @@ struct AppBackground: View {
 
 private struct ModesList: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
     @State private var newModeName = ""
@@ -987,8 +1238,13 @@ private struct ModesList: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
+    @ViewBuilder
     var body: some View {
-        List {
+        Group {
+            if minimalAppearance {
+                newLookPlan
+            } else {
+                List {
             TopSheetHeader(
                 title: "Plan",
                 subtitle: "Protection, routines, safeguards.",
@@ -1032,18 +1288,90 @@ private struct ModesList: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+                }
+                .tint(textColor)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
+                .background(Color.clear)
+            }
         }
-        .tint(textColor)
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .scrollIndicators(.hidden)
-        .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             windows = sessionStore.schedule.windows.isEmpty
                 ? [BlankHabitWindow(name: "Routine 1", enabled: false)]
                 : sessionStore.schedule.windows
         }
+    }
+
+    private var newLookPlan: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                TopSheetHeader(
+                    title: "Plan",
+                    subtitle: "",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 34)
+
+                Text(sessionStore.currentMode.name.lowercased())
+                    .font(.blankInter(size: 32, weight: .bold, relativeTo: .title2))
+                    .tracking(-0.8)
+                    .foregroundStyle(textColor)
+
+                Text(blockedAppsText)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(secondaryColor)
+                    .padding(.top, 4)
+
+                newLookRule
+
+                newLookPlanRow(title: "protected apps", detail: blockedAppsText) {
+                    showingPicker = true
+                    onFinish()
+                }
+
+                newLookPlanRow(title: "routines", detail: routineSummaryText) {}
+
+                planRoutineEditor
+                    .padding(.top, 20)
+
+                planAdvancedControls
+                    .padding(.top, 24)
+                    .padding(.bottom, 34)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var newLookRule: some View {
+        Rectangle()
+            .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+            .frame(height: 1)
+            .padding(.top, 26)
+            .padding(.bottom, 8)
+    }
+
+    private func newLookPlanRow(title: String, detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                Text(title)
+                    .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
+                    .tracking(-0.45)
+                    .foregroundStyle(textColor)
+                Spacer(minLength: 8)
+                Text(detail)
+                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func modeButton(_ mode: BlankFocusMode) -> some View {
@@ -1510,6 +1838,12 @@ struct HomeSectionScreen: View {
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
     let onTimedBlank: (Int, Bool) -> Void
+    let onOpenSection: (HomeSection) -> Void
+    let onOpenAssistant: () -> Void
+    let onRequestScreenTimePermission: () -> Void
+    let onRequestHealthAccess: () -> Void
+    let screenTimeStatus: String
+    let healthStatus: String
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -1517,9 +1851,19 @@ struct HomeSectionScreen: View {
         let contentTop: CGFloat = 94
         let contentHeight = max(0, screenHeight - contentTop)
         let contentWidth = min(max(0, screenWidth - 32), 360)
+        let minimalAppearance = true
 
         ZStack(alignment: .topLeading) {
+            if minimalAppearance {
+                (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+                    .ignoresSafeArea()
+            } else {
+                AppBackground(isActive: true)
+                    .ignoresSafeArea()
+            }
+
             routeContent
+                .environment(\.blankMinimalAppearance, minimalAppearance)
                 .frame(width: contentWidth, height: contentHeight, alignment: .top)
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
                 .offset(x: horizontalOffset, y: contentTop)
@@ -1527,14 +1871,22 @@ struct HomeSectionScreen: View {
             Button {
                 onClose()
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .regular))
-                    .foregroundStyle(textColor)
-                    .frame(width: 32, height: 32)
+                Group {
+                    if minimalAppearance {
+                        Text("back")
+                            .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                            .tracking(-0.3)
+                    } else {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 22, weight: .regular))
+                    }
+                }
+                .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
+                .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .position(x: 34, y: 64)
+            .position(x: 64, y: 84)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -1561,7 +1913,95 @@ struct HomeSectionScreen: View {
             )
         case .timer:
             TimerScreen(onStart: onTimedBlank)
+        case .settings:
+            SettingsScreen(
+                onOpenEmergency: { onOpenSection(.emergency) },
+                onOpenAssistant: onOpenAssistant,
+                onRequestScreenTimePermission: onRequestScreenTimePermission,
+                onRequestHealthAccess: onRequestHealthAccess,
+                screenTimeStatus: screenTimeStatus,
+                healthStatus: healthStatus
+            )
         }
+    }
+}
+
+private struct SettingsScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+
+    let onOpenEmergency: () -> Void
+    let onOpenAssistant: () -> Void
+    let onRequestScreenTimePermission: () -> Void
+    let onRequestHealthAccess: () -> Void
+    let screenTimeStatus: String
+    let healthStatus: String
+
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("settings")
+                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                    .tracking(-0.6)
+                    .foregroundStyle(textColor)
+                    .padding(.bottom, 18)
+
+                settingsRow(
+                    title: "emergency",
+                    detail: "unlock access while blanked",
+                    action: onOpenEmergency
+                )
+
+                settingsRow(
+                    title: "screen time",
+                    detail: "screen time \(screenTimeStatus)",
+                    action: onRequestScreenTimePermission
+                )
+
+                settingsRow(
+                    title: "health",
+                    detail: "apple health \(healthStatus)",
+                    action: onRequestHealthAccess
+                )
+
+                settingsRow(
+                    title: "assistant",
+                    detail: "whatsapp · sms · connection code",
+                    action: onOpenAssistant
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func settingsRow(
+        title: String,
+        detail: String,
+        color: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title3))
+                    .tracking(-0.4)
+
+                Text(detail)
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(color ?? textColor)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 }
 
@@ -2266,6 +2706,7 @@ private struct RelapseReasonButtonStyle: ButtonStyle {
 
 private struct EmergencyScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     let emergencyUnlocksRemaining: Int
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
@@ -2274,41 +2715,49 @@ private struct EmergencyScreen: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        VStack(spacing: 22) {
+        VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 18 : 22) {
             Spacer(minLength: 0)
 
-            VStack(spacing: 10) {
-                Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(textColor)
-                    .frame(width: 52, height: 52)
-                    .background {
-                        Circle().fill(textColor.opacity(0.08))
-                    }
+            VStack(alignment: minimalAppearance ? .leading : .center, spacing: 10) {
+                if !minimalAppearance {
+                    Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(textColor)
+                        .frame(width: 52, height: 52)
+                        .background {
+                            Circle().fill(textColor.opacity(0.08))
+                        }
+                }
 
-                Text(isConfirming ? "Spend emergency?" : "Emergency")
-                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                Text(isConfirming ? "spend emergency?" : "emergency")
+                    .font(.blankInter(
+                        size: minimalAppearance ? 40 : 34,
+                        weight: minimalAppearance ? .bold : .medium,
+                        relativeTo: .largeTitle
+                    ))
+                    .tracking(minimalAppearance ? -0.6 : 0)
                     .foregroundStyle(textColor)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(minimalAppearance ? .leading : .center)
 
                 Text(bodyText)
-                    .font(.blankInter(size: 16, weight: .regular, relativeTo: .body))
+                    .font(.blankInter(size: minimalAppearance ? 14 : 16, weight: .regular, relativeTo: .body))
                     .foregroundStyle(secondaryColor)
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
+                    .multilineTextAlignment(minimalAppearance ? .leading : .center)
+                    .lineSpacing(minimalAppearance ? 0 : 3)
                     .frame(maxWidth: 300)
             }
+            .frame(maxWidth: .infinity, alignment: minimalAppearance ? .leading : .center)
 
             emergencyAllowance
 
             VStack(spacing: 12) {
                 if isConfirming {
-                    Button("Keep blocking") {
+                    Button(minimalAppearance ? "keep blocking" : "Keep blocking") {
                         isConfirming = false
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
 
-                    Button("Confirm unlock") {
+                    Button(minimalAppearance ? "confirm unlock" : "Confirm unlock") {
                         _ = onUnlock()
                     }
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
@@ -2316,7 +2765,7 @@ private struct EmergencyScreen: View {
                     .foregroundStyle(secondaryColor)
                     .disabled(emergencyUnlocksRemaining <= 0)
                 } else {
-                    Button("Spend emergency") {
+                    Button(minimalAppearance ? "spend emergency" : "Spend emergency") {
                         isConfirming = true
                     }
                     .buttonStyle(BlankPrimaryButtonStyle())
@@ -2335,15 +2784,17 @@ private struct EmergencyScreen: View {
 
     private var bodyText: String {
         if isConfirming {
-            return "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
+            return minimalAppearance
+                ? "this unlocks blankmind now. you will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
+                : "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
         }
         guard sessionStore.isBlankActive else {
-            return "No active block right now."
+            return minimalAppearance ? "no active block right now." : "No active block right now."
         }
         guard emergencyUnlocksRemaining > 0 else {
-            return "No emergency unlocks left."
+            return minimalAppearance ? "no emergency unlocks left." : "No emergency unlocks left."
         }
-        return "Use one unlock only if access is necessary now."
+        return minimalAppearance ? "use one unlock only if access is necessary now." : "Use one unlock only if access is necessary now."
     }
 
     private var emergencyAllowance: some View {
@@ -2476,6 +2927,7 @@ private struct TechnicalSheetActions<Content: View>: View {
 
 private struct TimerScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @State private var hardMode = false
     @State private var selectedMinutes = 30
     let onStart: (Int, Bool) -> Void
@@ -2485,7 +2937,11 @@ private struct TimerScreen: View {
     private var recommendedMinutes: Int { sessionStore.digitalWellnessV3.plan.recommendedDurationMinutes }
 
     var body: some View {
-        VStack(spacing: 22) {
+        Group {
+            if minimalAppearance {
+                newLookTimer
+            } else {
+                VStack(spacing: 22) {
             Spacer(minLength: 0)
 
             TopSheetHeader(
@@ -2512,7 +2968,10 @@ private struct TimerScreen: View {
                     .foregroundStyle(textColor)
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
-                    .background { Capsule().fill(textColor.opacity(0.10)) }
+                    .background {
+                        RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 20, style: .continuous)
+                            .fill(textColor.opacity(0.10))
+                    }
                 }
                 .buttonStyle(.plain)
 
@@ -2560,12 +3019,97 @@ private struct TimerScreen: View {
             .padding(18)
             .blankControlSurface(cornerRadius: 24, tintOpacity: 0.08, emphasized: true)
 
-            Spacer(minLength: 0)
+                    Spacer(minLength: 0)
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.clear)
+            }
         }
-        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private var newLookTimer: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TopSheetHeader(
+                title: "Timer",
+                subtitle: "",
+                titleColor: textColor,
+                subtitleColor: secondaryColor
+            )
+
+            Spacer(minLength: 38)
+
+            Text(durationNumber(selectedMinutes))
+                .font(.blankInter(size: 92, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-3)
+                .foregroundStyle(textColor)
+                .monospacedDigit()
+                .lineLimit(1)
+
+            Text(durationUnit(selectedMinutes))
+                .font(.blankInter(size: 20, weight: .bold, relativeTo: .title3))
+                .foregroundStyle(secondaryColor)
+
+            Rectangle()
+                .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+                .frame(height: 1)
+                .padding(.top, 28)
+                .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                ForEach(options, id: \.self) { minutes in
+                    Button {
+                        selectedMinutes = minutes
+                    } label: {
+                        HStack {
+                            Text(formatDuration(minutes))
+                                .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
+                                .tracking(-0.4)
+                            Spacer()
+                            if selectedMinutes == minutes {
+                                Text("selected")
+                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
+                                    .foregroundStyle(secondaryColor)
+                            }
+                        }
+                        .foregroundStyle(selectedMinutes == minutes ? textColor : secondaryColor)
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Toggle("hard mode", isOn: $hardMode)
+                .font(.blankInter(size: 18, weight: .bold, relativeTo: .headline))
+                .foregroundStyle(textColor)
+                .tint(textColor.opacity(0.75))
+                .padding(.top, 16)
+
+            Spacer(minLength: 26)
+
+            Button {
+                if !sessionStore.isBlankActive {
+                    onStart(selectedMinutes, hardMode)
+                }
+            } label: {
+                Text(sessionStore.isBlankActive ? "blank is active" : "start blank")
+                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
+                    .tracking(-0.6)
+                    .foregroundStyle(textColor)
+                    .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(sessionStore.isBlankActive)
+            .opacity(sessionStore.isBlankActive ? 0.52 : 1)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var timerDurationRing: some View {
@@ -2613,8 +3157,14 @@ private struct TimerScreen: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 42)
                 .background {
-                    Capsule()
+                    RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 21, style: .continuous)
                         .fill(selectedMinutes == minutes ? BlankColors.premiumBlue.opacity(0.24) : textColor.opacity(0.08))
+                }
+                .overlay {
+                    if minimalAppearance {
+                        Rectangle()
+                            .stroke(BlankColors.line, lineWidth: 0.8)
+                    }
                 }
         }
         .buttonStyle(.plain)
@@ -2644,6 +3194,7 @@ private struct TimerScreen: View {
 
 private struct AssistantConnectSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.dismiss) private var dismiss
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
@@ -2660,18 +3211,23 @@ private struct AssistantConnectSheet: View {
             let contentWidth = min(max(0, proxy.size.width - 48), 360)
 
             ZStack {
-                AppBackground(isActive: sessionStore.isBlankActive)
-                    .ignoresSafeArea()
+                if minimalAppearance {
+                    BlankAtmosphericBackground(dimmed: sessionStore.isBlankActive)
+                } else {
+                    AppBackground(isActive: sessionStore.isBlankActive)
+                        .ignoresSafeArea()
+                }
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 22) {
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 7) {
-                                Text("Assistant")
-                                    .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                                Text(minimalAppearance ? "assistant" : "Assistant")
+                                    .font(.blankInter(size: minimalAppearance ? 40 : 34, weight: minimalAppearance ? .bold : .medium, relativeTo: .largeTitle))
+                                    .tracking(minimalAppearance ? -0.6 : 0)
                                     .lineLimit(1)
 
-                                Text("Use Blanked from WhatsApp or SMS.")
+                                Text(minimalAppearance ? "use blankmind from whatsapp or sms." : "Use Blanked from WhatsApp or SMS.")
                                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
                                     .foregroundStyle(secondaryColor)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -2692,7 +3248,7 @@ private struct AssistantConnectSheet: View {
                         }
 
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("Your phone")
+                            Text(minimalAppearance ? "your phone" : "Your phone")
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
                             TextField("+1 555 000 0000", text: $phoneNumber)
@@ -2702,7 +3258,7 @@ private struct AssistantConnectSheet: View {
                                 .padding(.horizontal, 16)
                                 .frame(height: 52)
                                 .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
-                            Text("Used to match your CONNECT message.")
+                            Text(minimalAppearance ? "used to match your connect message." : "Used to match your CONNECT message.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
                         }
@@ -2735,11 +3291,11 @@ private struct AssistantConnectSheet: View {
 
                         VStack(alignment: .leading, spacing: 10) {
                             HStack(alignment: .firstTextBaseline) {
-                                Text("Code")
+                                Text(minimalAppearance ? "code" : "Code")
                                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption2))
                                     .foregroundStyle(secondaryColor)
                                 Spacer()
-                                Button(copiedCode ? "Copied" : "Copy") {
+                                Button(copiedCode ? (minimalAppearance ? "copied" : "Copied") : (minimalAppearance ? "copy" : "Copy")) {
                                     UIPasteboard.general.string = connectMessage
                                     copiedCode = true
                                 }
@@ -2776,6 +3332,7 @@ private struct AssistantConnectSheet: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(textColor)
+        .environment(\.blankMinimalAppearance, true)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             ensureConnectCode()

@@ -1,17 +1,28 @@
 const assert = require("assert");
 
 process.env.OPENAI_API_KEY = "";
+process.env.BM_SEMANTIC_PERSISTENCE = "legacy"; // Legacy event-store mock; required CAS has its own suite.
 process.env.WHATSAPP_VERIFY_TOKEN = "test-token";
 delete process.env.WHATSAPP_ACCESS_TOKEN;
 delete process.env.WHATSAPP_PHONE_NUMBER_ID;
 
 const { handler } = require("../netlify/functions/whatsapp-agent");
 
+const semanticMemoryRows = new Map();
+
 function recentAssistantMemoryResponse(target, options = {}) {
   if (!String(target).startsWith("https://supabase.test/rest/v1/")) return null;
   if ((options.method || "GET").toUpperCase() === "POST") {
+    const row = JSON.parse(options.body || "{}");
+    if (row.anonymous_user_id && row.payload) {
+      const list = semanticMemoryRows.get(row.anonymous_user_id) || [];
+      list.push({ payload: row.payload, submitted_at: row.submitted_at });
+      semanticMemoryRows.set(row.anonymous_user_id, list);
+    }
     return { ok: true, status: 201, text: async () => "", json: async () => ({}) };
   }
+  const keyMatch = String(target).match(/anonymous_user_id=eq\.([^&]+)/);
+  const key = keyMatch ? decodeURIComponent(keyMatch[1]) : "";
   const result = [{
     payload: {
       event: "assistant_memory_updated",
@@ -19,7 +30,8 @@ function recentAssistantMemoryResponse(target, options = {}) {
         memory: {
           user_context: {
             has_selected_apps: true,
-            selection_count: 3,
+            selection_count: 2,
+            selected_app_names: ["Instagram", "TikTok"],
             screen_time_authorized: true,
             app_presence: {
               app_present: true,
@@ -32,6 +44,8 @@ function recentAssistantMemoryResponse(target, options = {}) {
     },
     submitted_at: new Date().toISOString(),
   }];
+  result.push(...(semanticMemoryRows.get(key) || []));
+  result.reverse(); // Supabase GET requests order=submitted_at.desc.
   return { ok: true, status: 200, text: async () => JSON.stringify(result), json: async () => result };
 }
 
@@ -160,6 +174,7 @@ async function connectGreeting() {
 }
 
 async function linkIncludesRequestedApps() {
+  semanticMemoryRows.clear();
   process.env.SUPABASE_URL = "https://supabase.test";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
@@ -190,7 +205,7 @@ async function linkIncludesRequestedApps() {
                     {
                       from: "34600000000",
                       id: "wamid.plan",
-                      text: { body: "Block Instagram TikTok from 10 pm to 7 am every day" },
+                      text: { body: "Block Instagram TikTok from 10 pm to 7 am every day for 7 days" },
                     },
                   ],
                 },
@@ -201,6 +216,10 @@ async function linkIncludesRequestedApps() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
+    assert.match(outboundText, /Do you confirm/i);
+    assert.doesNotMatch(outboundText, /review-action/);
+    const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.plan.confirm", text: { body: "Yes" } }] } }] }] }) });
+    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
     assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=review-action/);
     assert.match(outboundText, /apps=(?:Instagram%2CTikTok|TikTok%2CInstagram)/);
   } finally {
@@ -213,6 +232,7 @@ async function linkIncludesRequestedApps() {
 }
 
 async function twilioButtonTemplateHidesRawUrlFromMainReply() {
+  semanticMemoryRows.clear();
   process.env.SUPABASE_URL = "https://supabase.test";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
   process.env.TWILIO_ACCOUNT_SID = "ACtest";
@@ -247,7 +267,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
                     {
                       from: "34600000000",
                       id: "wamid.button",
-                      text: { body: "Block selected apps from 10 pm to 7 am every day" },
+                      text: { body: "Block Instagram and TikTok from 10 pm to 7 am every day for 7 days" },
                     },
                   ],
                 },
@@ -258,6 +278,12 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
+    assert.strictEqual(requests.length, 1);
+    assert.match(requests[0].Body, /Do you confirm/i);
+    assert.doesNotMatch(requests[0].Body, /review-action/);
+    requests.length = 0;
+    const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.button.confirm", text: { body: "Yes" } }] } }] }] }) });
+    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
     assert.strictEqual(requests.length, 2);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
     assert.strictEqual(requests[1].ContentSid, "HXbutton");

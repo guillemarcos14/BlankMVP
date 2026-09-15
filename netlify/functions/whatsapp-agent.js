@@ -5,6 +5,7 @@ const {
   claimAssistantInboundMessage,
   connectCodeFromText,
   completeAssistantInboundMessage,
+  releaseAssistantInboundMessage,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
   recordAssistantConversationTurn,
@@ -14,6 +15,8 @@ const {
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
+const { reviewActionLink } = require("./_bm_action_link");
+const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -221,62 +224,7 @@ function publicOpenLink(actionName, params = {}) {
 }
 
 function appLink(action, appNames = []) {
-  const type = action && action.type;
-  if (type === "start_protection") {
-    return publicOpenLink("review-action", {
-      type,
-      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
-      hard: action.hard_mode ? "true" : "",
-      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
-    });
-  }
-  if (type === "activate_mode" && action.name) {
-    return publicOpenLink("review-action", {
-      type,
-      name: action.name,
-      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
-      hard: action.hard_mode ? "true" : "",
-      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
-    });
-  }
-  if (type === "apply_schedule") {
-    const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
-    const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
-    if (start == null || end == null) return "";
-    const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
-    return publicOpenLink("review-action", {
-      type,
-      name: action.name || "AI Plan",
-      start,
-      end,
-      days,
-      weekdays: Array.isArray(action.weekdays) ? action.weekdays.join(",") : "",
-      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
-    });
-  }
-  if (type === "enable_allow_only") return publicOpenLink("review-action", { type });
-  if (type === "enable_adult_filter") return publicOpenLink("review-action", { type });
-  if (type === "set_daily_limit") return publicOpenLink("review-action", { type, minutes: Number.isFinite(action.minutes) ? action.minutes : "", apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
-  if (type === "pause_rules") return publicOpenLink("review-action", { type, hours: Number.isFinite(action.hours) ? action.hours : 168 });
-  if (type === "disable_pause") return publicOpenLink("review-action", { type });
-  if (type === "switch_mode" && action.name) return publicOpenLink("review-action", { type, name: action.name });
-  if (type === "open_app_picker") {
-    return publicOpenLink("review-action", {
-      type,
-      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
-      minutes: Number.isFinite(action.minutes) ? action.minutes : "",
-      hard: action.hard_mode ? "true" : "",
-      name: action.name || "",
-      start: Number.isFinite(action.start_minute) ? action.start_minute : "",
-      end: Number.isFinite(action.end_minute) ? action.end_minute : "",
-      days: Number.isFinite(action.duration_days) ? action.duration_days : "",
-      weekdays: Array.isArray(action.weekdays) ? action.weekdays.join(",") : "",
-    });
-  }
-  if (type === "request_screen_time_permission" || type === "apply_ai_plan") {
-    return publicOpenLink("review-action", { type, apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
-  }
-  return "";
+  return reviewActionLink(action, appNames);
 }
 
 function actionableLink(plan, prompt = "") {
@@ -427,7 +375,8 @@ async function agentContext(from, prompt) {
   let savedMemory = {};
   try {
     savedMemory = await getAssistantMemory("whatsapp", from);
-  } catch (_) {
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt, savedMemory);
@@ -468,10 +417,7 @@ async function agentContext(from, prompt) {
     user_context: userContext,
     memory,
     recent_messages: conversationState?.recent_messages || [],
-    pending_followup_prompt: savedMemory.pending_action === "set_daily_limit"
-      && explicitDurationMinutes(prompt) != null
-      ? `Set a ${explicitDurationMinutes(prompt)}-minute daily limit${(Array.isArray(savedMemory.pending_app_names) && savedMemory.pending_app_names.length) ? ` for ${savedMemory.pending_app_names.join(" and ")}` : ""}.`
-      : "",
+
   };
 }
 
@@ -479,7 +425,7 @@ async function callBlankedAgent(prompt, from) {
   const context = await agentContext(from, prompt);
   const response = await blankedAgentHandler({
     httpMethod: "POST",
-    body: JSON.stringify({ prompt: context.pending_followup_prompt || prompt, context }),
+    body: JSON.stringify({ prompt, context }),
   });
   const body = JSON.parse(response.body || "{}");
   if (response.statusCode < 200 || response.statusCode >= 300 || !body.ok) {
@@ -569,9 +515,12 @@ async function processMessage(message) {
       previousState: result.context.memory?.conversation_state,
       userMessage: prompt,
       assistantMessage: plan.message_text || plan.response_text || "",
+      semanticState: plan.semantic_state,
+      expectedVersion: result.context.memory?.semantic_store_version,
       topic: result.context.memory?.last_topic || "",
     });
-  } catch (_) {
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
     // Short-term memory must never block the user-facing reply.
   }
   if (plan.blocking_user_request === true) {
@@ -622,7 +571,13 @@ exports.handler = async (event) => {
           // A temporary memory outage must not discard an inbound message.
         }
       }
-      const result = await processMessage(message);
+      let result;
+      try {
+        result = await processMessage(message);
+      } catch (error) {
+        try { await releaseAssistantInboundMessage("whatsapp", message.from, message.id); } catch (_) { /* Return failure; never deliver an uncommitted action. */ }
+        throw error;
+      }
       results.push(result);
       const deliveryFailed = result?.skipped === true && /credentials|template_requires/i.test(result.reason || "")
         || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");

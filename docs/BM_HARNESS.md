@@ -1,5 +1,7 @@
 # BM Harness
 
+Actualización semántica 2026-09-15: el product harness incluye 25 checks. Un resultado verde no certifica comprensión ni release. Ver [auditoría y límites](BM_SEMANTIC_AUDIT.md), [oracle/replay](BM_EVALUATION.md) y [adjudicación del evaluador anterior](BM_LEGACY_GATE_ADJUDICATION.md). Los scores legacy se conservan como diagnósticos y no sustituyen las comprobaciones semánticas, nativas y de persistencia.
+
 BM es el nombre actual de Blankmind. `BAI` solo permanece en nombres técnicos heredados.
 
 ## Arquitectura de excelencia

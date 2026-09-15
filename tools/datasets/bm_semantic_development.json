@@ -1,0 +1,964 @@
+{
+  "version": 1,
+  "id": "bm-semantic-development-v1",
+  "split": "development",
+  "provenance": "Independently authored expected logical values. Five channel variants and one explicitly labeled reconstruction, not a production transcript.",
+  "conversations": [
+    {
+      "id": "whatsapp_duration_correction",
+      "channel": "whatsapp",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "selection_count": 1,
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "__REPLAY_NOW__"
+        },
+        "app_presence_state": "recently_seen",
+        "app_presence_recent": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 30 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually, make that 45 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sms_duration_correction",
+      "channel": "sms",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "selection_count": 1,
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "__REPLAY_NOW__"
+        },
+        "app_presence_state": "recently_seen",
+        "app_presence_recent": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 30 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually, make that 45 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "web_duration_correction",
+      "channel": "web",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "selection_count": 1,
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "__REPLAY_NOW__"
+        },
+        "app_presence_state": "recently_seen",
+        "app_presence_recent": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 30 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually, make that 45 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ios_duration_correction",
+      "channel": "ios",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "selection_count": 1,
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "__REPLAY_NOW__"
+        },
+        "app_presence_state": "recently_seen",
+        "app_presence_recent": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 30 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually, make that 45 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "android_duration_correction",
+      "channel": "android",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "selection_count": 1,
+        "screen_time_authorized": true,
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "__REPLAY_NOW__"
+        },
+        "app_presence_state": "recently_seen",
+        "app_presence_recent": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram now for 30 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Just once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Actually, make that 45 minutes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "duration_not_end_time_anonymized_reconstruction",
+      "channel": "ios",
+      "provenance": "Reconstruction of the user-reported duration-vs-clock failure class. No private transcript available or invented as real evidence.",
+      "context": {
+        "has_selected_apps": true,
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "screen_time_authorized": true
+      },
+      "turns": [
+        {
+          "input": "Block Instagram from 10 am every day.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "end_or_duration"
+              ],
+              "status": "collecting",
+              "next_question": "end_or_duration"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end_or_duration"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "1 hour.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": 660,
+              "duration_minutes": 60,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "No, until noon.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": 720,
+              "duration_minutes": null,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    }
+  ]
+}

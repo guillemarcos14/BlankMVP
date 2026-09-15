@@ -13,6 +13,8 @@ const {
   loopSummary,
 } = require("./bm-loop");
 const { buildAgentContext, deriveAppPresence } = require("./bm-context");
+const { advanceSemanticState } = require("./bm-semantic-state");
+const { extractWithModel } = require("./bm-semantic-extraction");
 const {
   incompleteBlockingPlan,
   isBlockingActionType,
@@ -82,13 +84,11 @@ function completeNaturalText(value, maxLength = 420) {
 }
 
 function responseLanguage(prompt, context = {}) {
-  const channel = cleanText(context.channel || context.assistant_channel || "", 20).toLowerCase();
-  const appSurface = channel === "app" || channel === "web";
-  const explicit = cleanText(context.language || (appSurface ? "" : context.locale) || "", 20).toLowerCase();
-  if (explicit.startsWith("es")) return "es";
-  if (explicit.startsWith("en")) return "en";
-  if (appSurface) return "en";
   const text = cleanText(prompt, 600).toLowerCase();
+  if (/\b(?:in english|en ingl[eé]s)\b/.test(text)) return "en";
+  if (/\b(?:in spanish|en espa[nñ]ol|en castellano)\b/.test(text)) return "es";
+  const previousLanguage = context.semantic_state?.language || context.memory?.conversation_state?.semantic_state?.language;
+  const explicit = cleanText(previousLanguage || context.language || context.locale || "", 20).toLowerCase();
   const spanishScore = [
     "¿", "á", "é", "í", "ó", "ú", "ñ",
     "como puedo", "cómo puedo", "que deberia", "qué debería", "quiero", "bloquear", "bloquea",
@@ -100,10 +100,12 @@ function responseLanguage(prompt, context = {}) {
   ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
   const englishScore = [
     "how can i", "what should i", "block", "after", "phone", "sleep", "work", "study",
-    "instagram", "tiktok", "youtube", "scroll", "focus", "advice", "help me",
+    "scroll", "focus", "advice", "help me", "minutes", "hours", "instead", "only once",
   ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
-  if (spanishScore > englishScore) return "es";
-  return "en";
+  const shortSpanish = /\b(?:vale|minutos|hora|horas|solo|mejor|diario|diariamente|siempre|cada|confirma|confirmo|s[ií]|hoy|ahora)\b/.test(text) ? 2 : 0;
+  if (spanishScore + shortSpanish > englishScore) return "es";
+  if (englishScore > 0) return "en";
+  return explicit.startsWith("es") ? "es" : "en";
 }
 
 function isWebPreview(context = {}) {
@@ -3416,11 +3418,11 @@ function extractResponseText(responseBody) {
   return "";
 }
 
-async function modelPlan(prompt, context, fallback, language) {
+async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: normalizePlan({ plan: fallback }, fallback, context, prompt, language), source: "deterministic_fallback" };
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetchImpl("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
@@ -3473,10 +3475,10 @@ async function modelPlan(prompt, context, fallback, language) {
   }
   const body = await response.json();
   const parsed = JSON.parse(extractResponseText(body));
-  return { plan: normalizePlan(parsed, fallback, context, prompt, language), source: `openai:${model}` };
+  return { plan: normalizePlan(parsed, fallback, context, prompt, language), raw_plan: parsed.plan || parsed, source: `openai:${model}` };
 }
 
-exports.handler = async (event) => {
+exports.handler = async (event, runtime = {}) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
   let harnessRun = null;
@@ -3493,6 +3495,43 @@ exports.handler = async (event) => {
       route: harnessRun.route,
       language,
     });
+    const semanticOptions = {
+      previousState: context.semantic_state || context.memory?.conversation_state?.semantic_state,
+      prompt, context, language,
+    };
+    let semantic = advanceSemanticState(semanticOptions);
+    let semanticExtraction = null;
+    let semanticModelError = null;
+    if (semantic.handled && process.env.OPENAI_API_KEY) {
+      try {
+        semanticExtraction = await extractWithModel({ prompt, previousState: semanticOptions.previousState, context });
+        semantic = advanceSemanticState({ ...semanticOptions, extraction: semanticExtraction.extraction });
+      } catch (error) {
+        semanticModelError = error.name === "TimeoutError" ? "semantic_model_timeout" : error.message;
+        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError });
+      }
+    }
+    recordStage(harnessRun, "semantic_reduced", {
+      revision: semantic.state.revision, intent: semantic.state.intent, status: semantic.state.status,
+      pending_slots: semantic.state.pending_slots, errors: semantic.state.errors.map(error => error.code),
+    });
+    if (semantic.handled) {
+      harnessRun.route = "semantic";
+      const plan = semanticPlan(semantic, language, prompt);
+      if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
+        context, previous_state: semanticOptions.previousState || null,
+        extraction: semanticExtraction?.trace || null, deterministic_patch: semantic.patch,
+        extraction_validation: semantic.extractionValidation || null,
+        semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
+        postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",
+      });
+      recordStage(harnessRun, "action_gate", { decision: semantic.decision.type, action_types: plan.actions.map(item => item.type), action_count: plan.actions.length });
+      const loop = createLoop({ prompt, context, plan, runId: harnessRun.run_id, promptHash: harnessRun.prompt_hash, contextFingerprint: harnessRun.context_fingerprint });
+      recordStage(harnessRun, "loop_planned", loopSummary(loop));
+      const source = semanticExtraction?.source || "semantic_state_v1";
+      finishRun(harnessRun, { plan, source });
+      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
+    }
     if (!useAppLayer) {
       let conversationResult;
       try {
@@ -3506,6 +3545,7 @@ exports.handler = async (event) => {
       conversationResult.plan = appendWebConversionNote(conversationResult.plan, prompt, context, language);
       conversationResult.plan = appendAppPresenceGuidance(conversationResult.plan, prompt, context, language);
       conversationResult.plan = localizePlan(conversationResult.plan, language);
+      conversationResult.plan = enforceSemanticBoundary(conversationResult.plan, semantic, language);
       const gatedSummary = planSummary(conversationResult.plan);
       recordStage(harnessRun, "action_gate", {
         decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
@@ -3552,6 +3592,7 @@ exports.handler = async (event) => {
     }
     result.plan = appendAppPresenceGuidance(result.plan, prompt, context, language);
     result.plan = localizePlan(result.plan, language);
+    result.plan = enforceSemanticBoundary(result.plan, semantic, language);
     const gatedSummary = planSummary(result.plan);
     recordStage(harnessRun, "action_gate", {
       decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
@@ -3588,3 +3629,95 @@ exports.handler = async (event) => {
     return json(500, { error: "blanked_agent_failed", detail: error.message });
   }
 };
+
+function semanticPlan(result, language, prompt) {
+  const plan = {
+    intent: classify(prompt, {}) === "general" ? "social" : classify(prompt, {}),
+    title: result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
+      : result.state.intent === "cancelled" ? (language === "es" ? "Propuesta descartada" : "Proposal discarded")
+      : language === "es"
+      ? result.decision.type === "confirm" ? "Confirmar bloqueo" : result.decision.type === "ready" ? "Revisar bloqueo" : "Detalles del bloqueo"
+      : result.decision.type === "confirm" ? "Confirm protection" : result.decision.type === "ready" ? "Review protection" : "Protection details",
+    response_text: result.responseText,
+    message_text: result.responseText,
+    speech_text: result.responseText,
+    followup_text: "",
+    bullets: [],
+    primary_label: language === "es" ? "Continuar" : "Continue",
+    secondary_label: language === "es" ? "Ahora no" : "Not now",
+    actions: result.actions.map(item => action(item.type, item)),
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+    blocking_ready: result.blockingContract.user_request ? result.blockingContract.ready : null,
+    blocking_user_request: result.blockingContract.user_request,
+    blocking_missing_fields: result.blockingContract.user_request ? result.blockingContract.missing_fields : [],
+    blocking_data: result.blockingContract.data,
+    semantic_state: result.state,
+    semantic_decision: result.decision,
+    recommendation_id: `bm_sem_${crypto.randomUUID()}`,
+  };
+  return plan;
+}
+
+function enforceSemanticBoundary(plan, semantic, language) {
+  const protectionTypes = new Set(["start_protection", "activate_mode", "apply_schedule", "set_daily_limit", "apply_ai_plan", "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "switch_mode"]);
+  const setupCarriesAction = item => ["open_app_picker", "request_screen_time_permission"].includes(item.type)
+    && ["minutes", "start_minute", "end_minute", "duration_days", "weekdays", "hard_mode", "name"].some(key => item[key] != null);
+  if ((plan.actions || []).some(item => protectionTypes.has(item.type) || setupCarriesAction(item))) {
+    // The legacy planner cannot create a new blocking intention or pending slot.
+    // Preserve the reducer's decision, including its absence of an authorized plan.
+    const text = language === "es" ? "No he podido validar una propuesta ejecutable a partir de esa petición. No he aplicado ningún cambio." : "I couldn't validate an executable proposal from that request. I haven't applied any changes.";
+    return { ...plan, title: language === "es" ? "Petición pendiente" : "Request not applied", actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", bullets: [], semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
+  }
+  return { ...plan, semantic_state: semantic.state, semantic_decision: semantic.decision };
+}
+
+// Local evaluation entry point. Never exposed through request flags on the HTTP handler.
+// bm_raw and bm_full use the same model response, so the comparison isolates postprocessing.
+async function traceEvaluationTurn({ prompt, context = {}, mode = "bm_final" }) {
+  if (mode === "bm_final" || mode === "bm_canonical") {
+    let trace = null;
+    const response = await exports.handler({ httpMethod: "POST", body: JSON.stringify({ prompt, context }) }, { captureSemanticTrace: value => { trace = value; } });
+    const result = JSON.parse(response.body);
+    if (response.statusCode !== 200) throw new Error(result.error || "evaluation_handler_failed");
+    return { ...result, ...(trace ? { trace } : {}) };
+  }
+  const normalizedContext = buildAgentContext(context);
+  const language = responseLanguage(prompt, normalizedContext);
+  if (mode === "direct_model") {
+    if (!process.env.OPENAI_API_KEY) throw new Error("active_model_key_missing");
+    const request = {
+      model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
+      input: [
+        { role: "system", content: "You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in the user's language. Do not claim to have performed device actions." },
+        ...(context.recent_messages || []).filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map(m => ({ role: m.role, content: m.content })),
+        { role: "user", content: prompt },
+      ],
+      max_output_tokens: 500,
+    };
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify(request), signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok) throw new Error(`direct_model_http_${response.status}`);
+    const body = await response.json();
+    const text = extractResponseText(body);
+    return { plan: { response_text: text, message_text: text, actions: [] }, source: `openai:${body.model || request.model}`, trace: { request, raw_text: text, structured_semantics: false } };
+  }
+  const fallback = fallbackPlan(prompt, normalizedContext);
+  let modelRequest = null;
+  const result = await modelPlan(prompt, normalizedContext, fallback, language, async (url, options) => {
+    modelRequest = JSON.parse(options.body);
+    return fetch(url, { ...options, signal: AbortSignal.timeout(30000) });
+  });
+  const rawPlan = result.raw_plan || null;
+  const gatedActions = rawPlan ? actionGate(rawPlan, fallback, normalizedContext, prompt) : result.plan.actions;
+  const finalPlan = localizePlan(appendAppPresenceGuidance(result.plan, prompt, normalizedContext, language), language);
+  return {
+    plan: mode === "bm_raw" ? rawPlan || result.plan : finalPlan,
+    source: result.source,
+    trace: { request: modelRequest, context: normalizedContext, fallback, raw_plan: rawPlan, action_gate: gatedActions, normalized_plan: result.plan, final_plan: finalPlan, schema: agentSchema },
+  };
+}
+
+exports._evaluation = { traceTurn: traceEvaluationTurn };

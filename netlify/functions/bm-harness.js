@@ -11,6 +11,7 @@ const STAGES = new Set([
   "planner_started",
   "planner_completed",
   "planner_fallback",
+  "semantic_reduced",
   "action_gate",
   "loop_planned",
   "completed",

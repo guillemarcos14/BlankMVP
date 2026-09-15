@@ -80,74 +80,52 @@ async function run() {
   assert.ok(serverSeenAt && Date.now() - Date.parse(serverSeenAt) < 5000);
   assert.strictEqual(syncedRow.payload.properties.context.app_presence.source, "assistant_context_sync");
 
-  const installGuidance = await request("Block Instagram from 10 pm to 7 am every day", { channel: "whatsapp" });
-  assert.strictEqual(installGuidance.actions.length, 0);
+  async function confirmedProposal(context) {
+    const proposal = await request("Block Instagram from 22:00 to 23:00 every day for 7 days", context);
+    assert.deepStrictEqual(proposal.actions, [], "A complete contract still needs confirmation");
+    assert.strictEqual(proposal.semantic_state.status, "awaiting_confirmation");
+    return request("Yes", { ...context, semantic_state: proposal.semantic_state });
+  }
+
+  const installGuidance = await confirmedProposal({ channel: "whatsapp" });
+  assert.deepStrictEqual(installGuidance.actions, []);
+  assert.strictEqual(installGuidance.semantic_state.status, "needs_setup");
+  assert.strictEqual(installGuidance.semantic_state.next_question, "app_presence");
   assert.match(installGuidance.message_text, /Blankmind/);
-  assert.match(installGuidance.message_text, /apps\.apple\.com/);
-  assert.match(installGuidance.message_text, /If you already have it|Si ya la tienes/);
-  assert.doesNotMatch(installGuidance.message_text, /review-action/);
+  assert.doesNotMatch(installGuidance.message_text, /review-action|uninstalled/i);
 
   const incompleteRequest = await request("Block Instagram", { channel: "whatsapp" });
-  assert.strictEqual(incompleteRequest.actions.length, 0);
-  assert.match(incompleteRequest.message_text, /what time|Should it start|a qué hora|hora/i);
+  assert.deepStrictEqual(incompleteRequest.actions, []);
+  assert.strictEqual(incompleteRequest.semantic_state.next_question, "start");
   assert.doesNotMatch(incompleteRequest.message_text, /apps\.apple\.com|download|descarga/i);
 
-  const staleGuidance = await request(
-    "Block Instagram from 10 pm to 7 am every day",
-    {
-      channel: "sms",
-      app_presence: {
-        app_present: true,
-        app_ready: true,
-        last_seen_at: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
-      },
-    },
-  );
-  assert.strictEqual(staleGuidance.actions.length, 0);
-  assert.match(staleGuidance.message_text, /If you no longer have it installed/);
+  const staleGuidance = await confirmedProposal({
+    channel: "sms",
+    app_presence: { app_present: true, app_ready: true, last_seen_at: new Date(now - 48 * 60 * 60 * 1000).toISOString() },
+  });
+  assert.deepStrictEqual(staleGuidance.actions, []);
+  assert.strictEqual(staleGuidance.semantic_state.next_question, "app_presence");
 
-  const recentPlan = await request(
-    "Block Instagram from 10 pm to 7 am every day",
-    {
-      channel: "whatsapp",
-      has_selected_apps: true,
-      screen_time_authorized: true,
-      app_presence: {
-        app_present: true,
-        app_ready: true,
-        last_seen_at: new Date(now - 60 * 60 * 1000).toISOString(),
-      },
-    },
-  );
-  assert.ok(recentPlan.actions.length > 0);
+  const recentContext = {
+    channel: "whatsapp", has_selected_apps: true, selected_app_names: ["Instagram"], screen_time_authorized: true,
+    app_presence: { app_present: true, app_ready: true, last_seen_at: new Date(now - 60 * 60 * 1000).toISOString() },
+  };
+  const recentPlan = await confirmedProposal(recentContext);
+  assert.deepStrictEqual(recentPlan.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.strictEqual(recentPlan.actions[0].start_minute, 1320);
+  assert.strictEqual(recentPlan.actions[0].end_minute, 1380);
   assert.doesNotMatch(recentPlan.message_text, /apps\.apple\.com|download it here|descárgala aquí/);
 
-  const confirmedWindowContext = [
-    { role: "user", content: "How can I scroll less in the morning?" },
-    { role: "assistant", content: "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day." },
-    { role: "user", content: "Instagram around 11am" },
-    { role: "assistant", content: "Got it: Instagram is the app and 11:00 AM is when it starts. What time should the protection end?" },
-    { role: "user", content: "At 12" },
-    { role: "assistant", content: "Got it: protect Instagram from 11:00 AM to 12:00 PM. Do you want me to use that as the morning protection window?" },
-  ];
-  const confirmedWithoutPresence = await request("yes", {
-    channel: "whatsapp",
-    recent_messages: confirmedWindowContext,
-  });
-  assert.deepStrictEqual(confirmedWithoutPresence.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.match(confirmedWithoutPresence.message_text, /Open Blankmind|Blankmind/);
-  assert.doesNotMatch(confirmedWithoutPresence.message_text, /apps\.apple\.com|download|create a plan/i);
+  // A spoken installation claim is not a fresh app heartbeat.
   const installedContinuation = await request("I have it", {
-    channel: "whatsapp",
-    recent_messages: [
-      ...confirmedWindowContext,
-      { role: "user", content: "yes" },
-      { role: "assistant", content: confirmedWithoutPresence.message_text },
-    ],
+    channel: "whatsapp", semantic_state: installGuidance.semantic_state,
   });
-  assert.deepStrictEqual(installedContinuation.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.match(installedContinuation.message_text, /plan|review/i);
-  assert.doesNotMatch(installedContinuation.message_text, /apps\.apple\.com|download|create a plan/i);
+  assert.deepStrictEqual(installedContinuation.actions, []);
+  assert.strictEqual(installedContinuation.semantic_state.next_question, "app_presence");
+
+  const permissionGuidance = await confirmedProposal({ ...recentContext, screen_time_authorized: false });
+  assert.deepStrictEqual(permissionGuidance.actions.map((item) => item.type), ["request_screen_time_permission"]);
+  assert.strictEqual(permissionGuidance.semantic_state.next_question, "permissions");
 
   const smallTalk = await request("Hey", { channel: "whatsapp" });
   assert.doesNotMatch(smallTalk.message_text, /apps\.apple\.com|download|descarga/i);

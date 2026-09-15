@@ -1,0 +1,110 @@
+[
+  {
+    "response_sha256": "94b7d5166941e4906953050f0a196f992f42be61e1a9f5fdd25fcefc5677519f",
+    "expectation_sha256": "6bc935c6aa673d4781591006f9735c1ed64b05efb308c417566e19996fc940e7",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All surfaces accurately confirm Netflix 06:20-06:50 Tuesday and Thursday for eight days. Confirmation is pending with no action claim.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "aae6decc515e1e32e46aff4e8f746b6bb878bec0d4812625db15a0ce285929de",
+    "expectation_sha256": "7a4995e4a419243b500129904b74616b1216abe8380cc882437d3680579ecd4a",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All surfaces preserve Netflix, both exact times, Tuesday and Thursday and eight days and request native review to apply. Native action days 3 and 5 correctly encode Tuesday/Thursday while state days are ISO 2 and 4.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "ee8f5ece33dacd1b5788e86681028318565eb88f796c398eafae63c99764caca",
+    "expectation_sha256": "d68ef81b215d97759dbac8b43bdc1caf157bef8a6a7729e68abd7d0814b4079f",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The complete text accurately confirms the overnight TikTok 23:40-00:20 daily schedule for four days. No action is presented as already applied.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "ee8f5ece33dacd1b5788e86681028318565eb88f796c398eafae63c99764caca",
+    "expectation_sha256": "a6efcd25082d01d9fed851f5548ccf216f6086f4215237af342c00eea12a9dab",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Not equivalent: the user explicitly changes the end to 00:35, but every response surface repeats 00:20 and asks confirmation of the stale window. The old end and duration contradict the requested correction.",
+    "verdict": "not_equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "852e389729d114aefc7ac2188db041f8db2c4997b0d686317bec13454fad691a",
+    "expectation_sha256": "337317b3e493df471a08abd9874bad67b4b93feedd0accc27fc00f99f47433f4",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Not equivalent: after the ignored end correction the confirmed proposal and native action still end at 00:20 instead of 00:35. The visible invitation to apply therefore refers to the wrong window.",
+    "verdict": "not_equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "48204adfa9f9728eee5f629c49460abea1430dbac4ecfd02540c8db94dd416a7",
+    "expectation_sha256": "d67c9a38c2c4704d15647c7b0c7fc32d09d61e8478245c936921b9785301342f",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All text accurately asks confirmation of Instagram now for 27 minutes once. Title/buttons are consistent and no action is claimed.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "51e3682ef543c8bca644b3f111f0c5bc09eec75edcd22e45e84d036e03c78598",
+    "expectation_sha256": "1cc4df8b1f30904ff254a313ba85b054e034427cfdf89e15a9b7ad9bffcc7eb8",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All text incorporates the replacement duration of 32 minutes, retaining Instagram now and once, and asks for renewed confirmation.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "3f4f9d1cd6e23b5bab2c1e80c4805b78aa8f3d3bf40d47a5875d58e79bfccf43",
+    "expectation_sha256": "e205e1194634a7bb3c8bb5bc0038ac93c68b6ac9ac6428ada951c177a801a8a4",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All text accurately presents the confirmed Instagram 32-minute immediate one-time proposal for native review to apply; no execution is claimed.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "edbc22123c236312721b83a8406ed1cb42083b27852802c68ca2abed628b2fb4",
+    "expectation_sha256": "667af913cb77a5dd7be21f3fe84db62ebf9135f4faeefacff8635f8677f719d4",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every text surface and label is Spanish and accurately confirms YouTube now for 19 minutes once. No action is claimed.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "9c525100d533b912f3ff472cc6499277b764cc633c3775714ffe9ecb917f2d4b",
+    "expectation_sha256": "c49ac0e30174e2fd748f93c610f4fafef2029bbe21579d23133531e56e66ffe4",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every text surface and label is Spanish, asks for the required blocking permission in Blankmind and explicitly says the proposal has not been applied. This agrees with the permission setup action.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "c213d31150bd6a3422e520086db3ca2785eda3b8f71114f4bc66d62baac2a2e7",
+    "expectation_sha256": "61b9197f2a970f447684472a5570032685d69a31addd54477a3b8a17127fe552",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The text accurately confirms Reddit 07:15-07:40 on Monday and Sunday for nine days. Day order does not change the weekly set. All labels are consistent with awaiting confirmation.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  },
+  {
+    "response_sha256": "c213d31150bd6a3422e520086db3ca2785eda3b8f71114f4bc66d62baac2a2e7",
+    "expectation_sha256": "990232c57aab688d004531477bbb41b6eafba739f69eade5993608741400fcdd",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Not equivalent: the user cancels this request, but all text instead repeats the old Reddit schedule and asks confirmation. The request was neither cancelled nor acknowledged.",
+    "verdict": "not_equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets. Not human certification; original frozen expectations unchanged."
+  }
+]

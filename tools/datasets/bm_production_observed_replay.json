@@ -1,0 +1,294 @@
+{
+  "version": 1,
+  "contract_version": 2,
+  "id": "bm-production-observed-semantic-v1",
+  "split": "anonymized",
+  "provenance": {
+    "corpus": "tools/datasets/bm_production_observed_anonymized.json",
+    "source": "production_event_read_only",
+    "human_authorship": "unverified",
+    "unique_conversations": null,
+    "fixture_authorship": "Expected meaning independently authored from user text and documented semantic contract before executing the replay; historical assistant text is evidence, not gold.",
+    "replay_scope": "Three diagnostic excerpts, seven user turns. The standalone immediate request is intentionally replayed from empty context; this is not a reconstruction of its original full session.",
+    "excluded": "Approximate times, meta-conversation and already-corrupted confirmation context are retained in the provenance corpus but not assigned speculative state expectations."
+  },
+  "conversations": [
+    {
+      "id": "observed_morning_short_app_time",
+      "channel": "whatsapp",
+      "provenance": "Exact production-observed user text; selected excerpt replayed with a synthetic WhatsApp context. Original channel, permissions, prior state and human authorship not established.",
+      "context": {
+        "has_selected_apps": false,
+        "screen_time_authorized": false,
+        "memory": {}
+      },
+      "turns": [
+        {
+          "input": "How can I scroll less in the mornings?",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": null,
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "start",
+                "apps",
+                "end_or_duration",
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "start"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "start"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "11am Instagram",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": {
+                "type": "time",
+                "minute": 660
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "end_or_duration",
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "end_or_duration"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end_or_duration"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "observed_duration_then_explicit_correction",
+      "channel": "whatsapp",
+      "provenance": "Exact production-observed user text; selected excerpt replayed with a synthetic WhatsApp context. Original channel, permissions, prior state and human authorship not established.",
+      "context": {
+        "has_selected_apps": false,
+        "screen_time_authorized": false,
+        "memory": {}
+      },
+      "turns": [
+        {
+          "input": "I want to scroll less in the mornings",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": null,
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": null,
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "start",
+                "apps",
+                "end_or_duration",
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "start"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "start"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Instagram at 10am",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": null,
+              "duration_minutes": null,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "end_or_duration",
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "end_or_duration"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "end_or_duration"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "1 hour",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": 660,
+              "duration_minutes": 60,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "No, from 10 to 11 am",
+          "expect": {
+            "state": {
+              "intent": "advice",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": "morning",
+              "action_type": null,
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": 660,
+              "duration_minutes": 60,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence",
+                "action_type"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "observed_explicit_immediate_request",
+      "channel": "whatsapp",
+      "provenance": "Exact production-observed user text; selected excerpt replayed with a synthetic WhatsApp context. Original channel, permissions, prior state and human authorship not established.",
+      "context": {
+        "has_selected_apps": false,
+        "screen_time_authorized": false,
+        "memory": {}
+      },
+      "turns": [
+        {
+          "input": "I want to block Instagram 45 mins right now",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 45,
+              "recurrence": null,
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "recurrence"
+              ],
+              "status": "collecting",
+              "next_question": "recurrence"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "recurrence"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        }
+      ]
+    }
+  ]
+}

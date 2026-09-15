@@ -744,14 +744,15 @@ private struct ConversationalHomeView: View {
             do {
                 resolvedPlan = try await BlankedAgentClient().plan(prompt: text, context: context)
             } catch {
-                #if targetEnvironment(simulator)
-                var debugPlan = fallbackPlan
-                debugPlan.source = "local_fallback"
-                debugPlan.modelError = error.localizedDescription
-                resolvedPlan = debugPlan
-                #else
-                resolvedPlan = fallbackPlan
-                #endif
+                var unavailablePlan = fallbackPlan
+                unavailablePlan.actions = []
+                unavailablePlan.requiresSelectedApps = false
+                unavailablePlan.requiresScreenTimeAuthorization = false
+                unavailablePlan.responseText = "I couldn't check that request. Please try again."
+                unavailablePlan.messageText = unavailablePlan.responseText
+                unavailablePlan.source = "remote_unavailable"
+                unavailablePlan.modelError = error.localizedDescription
+                resolvedPlan = unavailablePlan
             }
             await MainActor.run {
                 activePlan = resolvedPlan.hasExecutableActions ? resolvedPlan : nil
@@ -762,6 +763,9 @@ private struct ConversationalHomeView: View {
                     userMessage: text,
                     assistantMessage: resolvedPlan.displayMessageText
                 )
+                if let semanticState = resolvedPlan.semanticState {
+                    BlankedAgentMemory.recordSemanticState(semanticState)
+                }
             }
         }
     }
@@ -1353,6 +1357,8 @@ private struct AgentContext {
 private extension AgentContext {
     var serializedPayload: [String: Any] {
         var payload: [String: Any] = [
+            "channel": "ios",
+            "assistant_channel": "app",
             "is_blank_active": isBlankActive,
             "has_selected_apps": hasSelectedApps,
             "selection_count": selectionCount,
@@ -1378,6 +1384,9 @@ private extension AgentContext {
         ]
         if let strongestWindow = system.profile.strongestWindow {
             payload["strongest_hour"] = strongestWindow
+        }
+        if let semanticState = BlankedAgentMemory.recentSemanticState() {
+            payload["semantic_state"] = semanticState
         }
         return payload
     }
@@ -1579,6 +1588,7 @@ private struct AgentPlan: Identifiable, Equatable {
     var modelError: String? = nil
     var recommendationId: String? = nil
     var loop: AgentLoop? = nil
+    var semanticState: Data? = nil
 
     var executableActionCount: Int {
         actions.filter { $0 != .none }.count
@@ -2361,6 +2371,16 @@ private struct BlankedAgentClient {
         )
         plan.source = decoded.source
         plan.modelError = decoded.model_error
+        if let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let remotePlan = body["plan"] as? [String: Any],
+           let semanticState = remotePlan["semantic_state"] as? [String: Any],
+           JSONSerialization.isValidJSONObject(semanticState) {
+            plan.semanticState = try JSONSerialization.data(withJSONObject: semanticState)
+            // Canonical wording is already validated against the proposal by the backend.
+            // Cropping it at the legacy 180-character limit can remove a condition or question.
+            if let message = remotePlan["message_text"] as? String { plan.messageText = message }
+            if let response = remotePlan["response_text"] as? String { plan.responseText = response }
+        }
         return plan
     }
 
@@ -2739,6 +2759,8 @@ enum BlankedAgentMemory {
     private static let bedtimeMinuteKey = "blankedAgentBedtimeMinute"
     private static let patternClusterKey = "blankedAgentPatternCluster"
     private static let conversationKey = "blankedAgentShortConversation"
+    private static let semanticStateKey = "blankedAgentSemanticState"
+    private static let semanticStateTimestampKey = "blankedAgentSemanticStateTimestamp"
     private static let shortConversationTTL: TimeInterval = 2 * 60 * 60
 
     private struct StoredConversationMessage: Codable {
@@ -2750,6 +2772,21 @@ enum BlankedAgentMemory {
     static func recentConversationMessages(now: Date = Date()) -> [[String: String]] {
         let valid = storedConversationMessages(now: now)
         return valid.map { ["role": $0.role, "content": $0.content] }
+    }
+
+    static func recordSemanticState(_ data: Data, now: Date = Date()) {
+        guard data.count <= 65_536,
+              (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { return }
+        defaults.set(data, forKey: semanticStateKey)
+        defaults.set(now.timeIntervalSince1970, forKey: semanticStateTimestampKey)
+    }
+
+    static func recentSemanticState(now: Date = Date()) -> [String: Any]? {
+        let storedAt = defaults.double(forKey: semanticStateTimestampKey)
+        let age = now.timeIntervalSince1970 - storedAt
+        guard storedAt > 0, age >= -300, age <= shortConversationTTL,
+              let data = defaults.data(forKey: semanticStateKey), data.count <= 65_536 else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     static func recordConversationTurn(userMessage: String, assistantMessage: String, now: Date = Date()) {

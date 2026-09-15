@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "provenance": {
+    "source": "production_event_read_only",
+    "human_authorship": "unverified",
+    "historical_smoke_or_test_possible": true,
+    "unique_conversations": null,
+    "channel": "not retained in supplied snapshots",
+    "text_policy": "Exact safe text from supplied extraction. Existing [link] markers retained; no further text paraphrasing. Retrieval timestamps and all external identifiers omitted.",
+    "privacy_review": "All retained texts manually inspected: app names, clock/duration expressions and generic dialogue only; no names, phones, emails, locations, account identifiers or URLs remain."
+  },
+  "deduplication": {
+    "input_snapshots": 17,
+    "input_message_occurrences": 118,
+    "input_exchange_occurrences": 59,
+    "unique_exact_text_exchanges": 14,
+    "duplicate_exchange_text_occurrences_removed": 45,
+    "maximal_context_windows": 14,
+    "method": "Each exact user/assistant text pair stored once. Windows refer to zero-based pair positions; wholly contained windows omitted. Overlap is content evidence, not proof of identical authors or conversation boundaries."
+  },
+  "exchanges": [
+    {
+      "user": "Instagram at 10am",
+      "assistant": "Got it: Instagram is the app and 10:00 AM is when it starts. What time should the protection end?"
+    },
+    {
+      "user": "1 hour",
+      "assistant": "Got it: protect Instagram from 10:00 AM to 1:00 AM. Do you want me to use that as the morning protection window?"
+    },
+    {
+      "user": "No, from 10 to 11 am",
+      "assistant": "Got it: protect Instagram from 10:00 AM to 10:00 PM. Do you want me to use that as the morning protection window?"
+    },
+    {
+      "user": "I want to block Instagram 45 mins right now",
+      "assistant": "Choose Instagram in Blankmind first. To apply it, you need Blankmind because the phone permissions live there. If you do not have it, download it here: [link] If you already have it, open it and we can continue."
+    },
+    {
+      "user": "I want to scroll less in the mornings",
+      "assistant": "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day."
+    },
+    {
+      "user": "I have it",
+      "assistant": "Great. Open Blanked App and create a plan to block Instagram from 11:00 AM to 12:00 AM. Once it’s open, I can guide you through the setup."
+    },
+    {
+      "user": "Yes",
+      "assistant": "Confirmed: I’d protect Instagram from 11:00 AM to 12:00 AM. Blankmind will apply the window after y To apply it, you need Blankmind because the phone permissions live there. If you do not have it, download it here: [link] If you already have it, open it and we can continue."
+    },
+    {
+      "user": "At 12",
+      "assistant": "Got it: protect Instagram from 11:00 AM to 12:00 AM. Do you want me to use that as the morning protection window?"
+    },
+    {
+      "user": "What would you say it’s correct?",
+      "assistant": "I’d say: “Got it - Instagram is where the scrolling starts, usually around 11 AM. What time should the block end?"
+    },
+    {
+      "user": "Instagram around 11am",
+      "assistant": "Got it: Instagram is the app and 11:00 AM is when it starts. What time should the protection end?"
+    },
+    {
+      "user": "How can I scroll less in the mornings?",
+      "assistant": "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day."
+    },
+    {
+      "user": "TEST",
+      "assistant": "Test received. What would you like help with?"
+    },
+    {
+      "user": "11am Instagram",
+      "assistant": "Set a 25-minute daily limit and review it after a day. To apply it, you need Blankmind because the phone permissions live there. If you do not have it, download it here: [link] If you already have it, open it and we can continue."
+    },
+    {
+      "user": "Yes, show me",
+      "assistant": "What would you like me to show you?"
+    }
+  ],
+  "context_windows": [
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      4,
+      0,
+      1,
+      2
+    ],
+    [
+      5,
+      4,
+      0,
+      1
+    ],
+    [
+      6,
+      5,
+      4,
+      0
+    ],
+    [
+      7,
+      6,
+      5,
+      4
+    ],
+    [
+      8,
+      7,
+      6,
+      5
+    ],
+    [
+      9,
+      8,
+      7,
+      6
+    ],
+    [
+      4,
+      9,
+      8,
+      7
+    ],
+    [
+      10,
+      4,
+      9,
+      8
+    ],
+    [
+      11,
+      10,
+      4,
+      9
+    ],
+    [
+      10,
+      11,
+      10,
+      4
+    ],
+    [
+      12,
+      10,
+      11,
+      10
+    ],
+    [
+      10,
+      12,
+      10,
+      11
+    ],
+    [
+      13
+    ]
+  ]
+}

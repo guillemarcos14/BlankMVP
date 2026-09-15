@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-15
 
 ## Resumen actual
+- 2026-09-15: Auditoría semántica BM entregada localmente en `codex/bm-semantic-audit`: reducer, extracción tipada con evidencia, confirmación exacta, acciones derivadas, persistencia CAS y evaluador independiente. Product harness 25/25 con alcance válido; core 82/82; 42 mutaciones impedidas; batch 960 turnos de seis guiones repetidos; Luna activo 45/45 después de corregir el schema. El legacy conserva 61/114 discrepancias adjudicadas sin aprobación global. No hay nueva release ni migración aplicada; pendientes SQL real, build/prueba iOS y límites funcionales/calidad del informe `docs/BM_SEMANTIC_AUDIT.md`.
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
 - El repo contiene app Android (`app/`), MVP iPhone (`ios/Blank/`), documentos de lanzamiento (`docs/`) y landing estatica (`web/landing/`).
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
@@ -604,6 +605,7 @@ Ultima actualizacion: 2026-09-15
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-15: BM usa estado semántico como autoridad para bloqueos; el modelo aporta evidencia, nunca autorización. Correcciones invalidan confirmación. Sin defaults de horas, duración, apps ni horizonte. La migración 015 y persistencia requerida deben preceder a una futura publicación del backend. Evaluación dura sin compensación por medias; texto nuevo exige revisión independiente. No desplegar desde esta tarea.
 - [cerrada] 2026-07-31: En el programa de embajadores, las comisiones se pagaran semanalmente para reforzar incentivo y velocidad; metodos de pago aceptados: transferencia bancaria o Bizum.
 - [cerrada] 2026-07-31: La atribucion de ventas para embajadores de Blank sera de 60 dias.
 - [cerrada] 2026-07-31: La atribucion del programa de embajadores se hara por codigo de descuento usado en checkout; no se usaran links trackeados en esta fase.

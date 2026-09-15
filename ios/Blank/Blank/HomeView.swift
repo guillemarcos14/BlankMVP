@@ -2035,14 +2035,14 @@ struct HomeSectionScreen: View {
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
     let onTimedBlank: (Int, Bool) -> Void
-    let onOpenSection: (HomeSection) -> Void = { _ in }
-    let onOpenAssistant: () -> Void = {}
-    let onRequestScreenTimePermission: () -> Void = {}
-    let onRequestHealthAccess: () -> Void = {}
-    let onRelinkBlank: () -> Void = {}
-    let onForgetBlank: () -> Void = {}
-    let screenTimeStatus: String = "unknown"
-    let healthStatus: String = "unknown"
+    let onOpenSection: (HomeSection) -> Void
+    let onOpenAssistant: () -> Void
+    let onRequestScreenTimePermission: () -> Void
+    let onRequestHealthAccess: () -> Void
+    let onRelinkBlank: () -> Void
+    let onForgetBlank: () -> Void
+    let screenTimeStatus: String
+    let healthStatus: String
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 

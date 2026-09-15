@@ -72,7 +72,7 @@ struct HomeView: View {
 
             ZStack(alignment: .topLeading) {
                 if activeSection == nil {
-                    (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+                    (sessionStore.isBlankActive ? BlankColors.homeDarkBackground : BlankColors.homeLightBackground)
                         .frame(width: viewportWidth, height: viewportHeight)
                         .ignoresSafeArea()
                 } else {
@@ -91,7 +91,7 @@ struct HomeView: View {
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
         .ignoresSafeArea()
-        .foregroundStyle(activeSection == nil ? BlankColors.minimalInk : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
+        .foregroundStyle(activeSection == nil ? (sessionStore.isBlankActive ? Color.white : BlankColors.homeLightInk) : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .environment(\.blankMinimalAppearance, true)
@@ -403,20 +403,24 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
-                minimalHomeRow("stats", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("stats", color: BlankColors.homeLightSecondary) {
                     openSection(.report)
                 }
 
-                minimalHomeRow("plan", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("plan", color: BlankColors.homeLightSecondary) {
                     openSection(.modes)
                 }
 
-                minimalHomeRow("timer", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("timer", color: BlankColors.homeLightSecondary) {
                     openSection(.timer)
                 }
 
-                minimalHomeRow("settings", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("settings", color: BlankColors.homeLightSecondary) {
                     openSection(.settings)
+                }
+
+                minimalHomeRow("emergency", color: BlankColors.homeLightSecondary) {
+                    openSection(.emergency)
                 }
 
                 minimalStatus
@@ -449,11 +453,19 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
 
-            Text("blank is active.")
+            if let timerCountdownText {
+                Text(timerCountdownText)
+                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
+                    .monospacedDigit()
+                    .foregroundStyle(BlankColors.homeDarkSecondary)
+                    .padding(.bottom, 10)
+            }
+
+            Text("your plan adapts before the scroll pulls you back.")
                 .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
                 .tracking(-1.1)
                 .foregroundStyle(Color.white)
-                .lineLimit(2)
+                .lineLimit(3)
                 .minimumScaleFactor(0.78)
 
             Spacer(minLength: 0)
@@ -462,12 +474,12 @@ struct HomeView: View {
                 minimalStartRow
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Button("emergency") {
+                Button("unblank") {
                     openSection(.emergency)
                 }
                 .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .tracking(-0.8)
-                .foregroundStyle(BlankColors.newLookDarkSecondary)
+                .foregroundStyle(BlankColors.homeDarkSecondary)
                 .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                 .buttonStyle(.plain)
             }
@@ -495,9 +507,9 @@ struct HomeView: View {
     private var minimalStartRow: some View {
         let isActive = sessionStore.isBlankActive
         let title = isActive
-            ? (sessionStore.hardBlankActive ? "blank active" : "unblank")
+            ? (sessionStore.hardBlankActive ? "blank active" : "menu")
             : "blank"
-        let titleColor = isActive ? BlankColors.newLookDarkSecondary : BlankColors.minimalInk
+        let titleColor = isActive ? Color.white : BlankColors.homeLightInk
 
         return Button {
             guard !isActive else { return }
@@ -597,7 +609,7 @@ struct HomeView: View {
             }
         }
         .font(.blankInter(size: 13, relativeTo: .footnote))
-        .foregroundStyle(BlankColors.minimalSecondary)
+        .foregroundStyle(sessionStore.isBlankActive ? BlankColors.homeDarkSecondary : BlankColors.homeLightSecondary)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.top, 6)
     }
@@ -605,7 +617,7 @@ struct HomeView: View {
     private func minimalUtilityRow(_ title: String, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(BlankColors.minimalSecondary)
+            .foregroundStyle(BlankColors.homeLightSecondary)
             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
             .buttonStyle(.plain)
     }

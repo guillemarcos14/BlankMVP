@@ -192,6 +192,57 @@ const traces = [
     ],
   },
   {
+    id: "morning_scroll_duration_and_correction",
+    context: baseContext({
+      app_presence: {},
+      app_presence_state: "never_seen",
+      app_presence_recent: false,
+    }),
+    turns: [
+      {
+        prompt: "How can I scroll less in the morning?",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertNoInventedLimit(plan, label);
+        },
+      },
+      {
+        prompt: "Instagram at 10am",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /Instagram.*10:00 AM|10:00 AM.*Instagram/i, `${label}.keeps_context`);
+          assertContains(plan, /end|finish|time/i, `${label}.asks_for_end_time`);
+        },
+      },
+      {
+        prompt: "1 hour",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i, `${label}.uses_duration_from_start`);
+          assert.doesNotMatch(visibleText(plan), /\b1:00 AM|\b1:00 PM|\b10:00 PM/i, `${label}.does_not_treat_duration_as_clock`);
+        },
+      },
+      {
+        prompt: "No, from 10 to 11 am",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i, `${label}.uses_corrected_window`);
+          assertContains(plan, /confirm|use that|window/i, `${label}.asks_confirmation`);
+          assert.doesNotMatch(visibleText(plan), /\b10:00 PM|\b1:00 AM/i, `${label}.does_not_drift_to_pm`);
+        },
+      },
+      {
+        prompt: "yes",
+        check: (plan, label) => {
+          const planActions = actions(plan);
+          assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.confirmed_action`);
+          assert.strictEqual(planActions[0].start_minute, 10 * 60, `${label}.start_minute`);
+          assert.strictEqual(planActions[0].end_minute, 11 * 60, `${label}.end_minute`);
+        },
+      },
+    ],
+  },
+  {
     id: "bedtime_context_continuity",
     context: baseContext(),
     turns: [

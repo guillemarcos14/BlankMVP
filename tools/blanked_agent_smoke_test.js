@@ -157,6 +157,32 @@ function baseContext(overrides = {}) {
   assert.match(appTimeEndFollowup.message_text, /Instagram.*11:00 AM.*12:00 PM|11:00 AM.*12:00 PM.*Instagram/i);
   assert.match(appTimeEndFollowup.message_text, /confirm|want me to use/i);
   assert.doesNotMatch(appTimeEndFollowup.message_text, /from 11:00 AM to\.?$|25-minute|download|permission|App Store/i);
+  const tenAmContext = [
+    ...appTimeContext,
+    { role: "user", content: "Instagram at 10am" },
+    { role: "assistant", content: "Got it: Instagram is the app and 10:00 AM is when it starts. What time should the protection end?" },
+  ];
+  const oneHourEndFollowup = await call("1 hour", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: tenAmContext,
+  }));
+  assert.strictEqual(oneHourEndFollowup.actions.length, 0);
+  assert.match(oneHourEndFollowup.message_text, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i);
+  assert.doesNotMatch(oneHourEndFollowup.message_text, /\b1:00 AM|\b1:00 PM|\b10:00 PM/i);
+  const correctedWindowFollowup = await call("No, from 10 to 11 am", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: [
+      ...tenAmContext,
+      { role: "user", content: "1 hour" },
+      { role: "assistant", content: oneHourEndFollowup.message_text },
+    ],
+  }));
+  assert.strictEqual(correctedWindowFollowup.actions.length, 0);
+  assert.match(correctedWindowFollowup.message_text, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i);
+  assert.doesNotMatch(correctedWindowFollowup.message_text, /\b10:00 PM|\b1:00 AM/i);
+  assert.match(correctedWindowFollowup.message_text, /confirm|want me to use/i);
   const appTimeBareNoon = await call("At 12", baseContext({
     channel: "whatsapp",
     assistant_channel: "whatsapp",

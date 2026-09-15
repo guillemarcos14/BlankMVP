@@ -1355,6 +1355,7 @@ function scrollUntilSleepTime(prompt) {
 
 function looseSingleTime(prompt, referenceMinute = null) {
   const text = cleanText(prompt, 600).toLowerCase();
+  if (/\b(?:hours?|hrs?|h|minutes?|mins?|m)\b/i.test(text)) return null;
   const match = text.match(/\b(?:usually|normalmente|sobre|around|at|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   if (!match) return null;
   const rawHour = Number(match[1]);
@@ -1533,12 +1534,16 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       followup_text: "",
     };
   }
+  const followupWindow = recentTiming && recentTiming.minute != null ? explicitTimeWindow(prompt, context) : null;
+  const followupDurationMinutes = recentTiming && recentTiming.minute != null ? conversationalDurationMinutes(prompt) : null;
   const followupEndMinute = recentTiming && recentTiming.minute != null
-    ? looseSingleTime(prompt, recentTiming.minute)
+    ? followupWindow?.end ?? (followupDurationMinutes != null
+      ? (recentTiming.minute + followupDurationMinutes) % (24 * 60)
+      : looseSingleTime(prompt, recentTiming.minute))
     : null;
   if (recentTiming && recentTiming.minute != null && hasRecentScrollWindowEndQuestion && followupEndMinute != null) {
     const endMinute = followupEndMinute;
-    const startText = minuteText(recentTiming.minute);
+    const startText = minuteText(followupWindow?.start ?? recentTiming.minute);
     const endText = minuteText(endMinute);
     const message = language === "es"
       ? `Entendido: proteger ${recentTiming.app} de ${startText} a ${endText}. ¿Quieres que use esa franja como protección de la mañana?`
@@ -1701,6 +1706,27 @@ function explicitDurationMinutes(prompt) {
   const match = text.match(/(\d{1,3})\s*[-–]?\s*(?:min|mins|minute|minutes|minutos?)/i);
   if (!match) return null;
   return cleanNumber(match[1], 30, 5, 240);
+}
+
+function conversationalDurationMinutes(prompt) {
+  const text = cleanText(prompt, 120).toLowerCase();
+  if (!text) return null;
+  if (/^half\s+(?:an?\s+)?hours?[.!?\s]*$/i.test(text)) return 30;
+  const unitPattern = /\b(\d{1,3}|a|an|one)\s*(hours?|hrs?|h|minutes?|mins?|m)\b/gi;
+  const parts = [...text.matchAll(unitPattern)];
+  if (!parts.length) return null;
+  const remainder = text
+    .replace(unitPattern, "")
+    .replace(/\b(?:for|about|around|roughly|and|plus)\b/gi, "")
+    .replace(/[.!?,+]/g, " ")
+    .trim();
+  if (remainder) return null;
+  const total = parts.reduce((sum, match) => {
+    const amount = /^(?:a|an|one)$/i.test(match[1]) ? 1 : Number(match[1]);
+    const minutes = /hour|hr|\bh\b/i.test(match[2]) ? amount * 60 : amount;
+    return sum + minutes;
+  }, 0);
+  return Number.isFinite(total) && total > 0 ? Math.min(240, Math.max(1, Math.round(total))) : null;
 }
 
 function wantsHardMode(prompt) {

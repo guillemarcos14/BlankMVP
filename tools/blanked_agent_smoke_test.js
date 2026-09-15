@@ -244,12 +244,11 @@ function baseContext(overrides = {}) {
   }
 
   const dailyLimit = await call("Set a 25-minute daily limit for Instagram.",baseContext({channel:"app"}));
-  noAction(dailyLimit); question(dailyLimit,"start");
+  noAction(dailyLimit); assert.deepStrictEqual(dailyLimit.semantic_decision,{type:"confirm",slot:"confirmation"});
+  assert.deepStrictEqual(fact(dailyLimit,"start"),{type:"now"});
   assert.strictEqual(fact(dailyLimit,"duration_minutes"),25);
   assert.strictEqual(fact(dailyLimit,"action_type"),"daily_limit");
-  const dailyLimitNow = await follow("now",dailyLimit);
-  noAction(dailyLimitNow);
-  const dailyLimitConfirmed = await follow("yes",dailyLimitNow,baseContext({channel:"app",selected_app_names:["Instagram"]}));
+  const dailyLimitConfirmed = await follow("yes",dailyLimit,baseContext({channel:"app",selected_app_names:["Instagram"]}));
   assert.strictEqual(dailyLimitConfirmed.actions[0].type,"set_daily_limit");
   assert.strictEqual(dailyLimitConfirmed.actions[0].minutes,25);
   const dailyLimitNeedsAmount = await call("Set a daily limit for Instagram.",baseContext());

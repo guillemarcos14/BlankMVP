@@ -335,6 +335,12 @@ test("daily limits cannot discard an explicitly requested hard flag", () => {
   equalSlot(results[1],"hard_mode",true); assert.equal(results[1].decision.slot,"hard_mode"); results.forEach(none);
   const normal=turn("Use a regular limit",results[1].state); equalSlot(normal,"hard_mode",false); none(normal); assert.equal(normal.state.status,"awaiting_confirmation");
 });
+test("daily limits default to now and ask for an explicit duration", () => {
+  const result=turn("Set a daily limit for Instagram",null,DEVICE);
+  equalSlot(result,"action_type","daily_limit"); equalSlot(result,"start",{type:"now"});
+  assert.equal(result.decision.slot,"end_or_duration"); assert.equal(result.actions.length,0);
+  assert.match(result.responseText,/duration|minutes/i);
+});
 test("recurring protection cannot turn now into a repeating clock or a one-off action", () => {
   for (const recurrence of ["every day","weekdays","weekends"]) {
     const results=chat([`Block Instagram now for 30 minutes ${recurrence}`,"yes"]);

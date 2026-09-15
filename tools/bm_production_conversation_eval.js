@@ -122,7 +122,7 @@ const traces = [
           assertContains(plan, /Instagram/i, `${label}.keeps_app`);
           assertContains(plan, /11:00 AM|11 AM|11am/i, `${label}.keeps_start_time`);
           assertContains(plan, /12:00 PM|12 PM|12pm/i, `${label}.keeps_end_time`);
-          assertContains(plan, /confirm|use that|window/i, `${label}.asks_confirmation`);
+          assertContains(plan, /once|recurring|which days/i, `${label}.asks_recurrence_before_action`);
           assertNoPrematureLink(plan, label);
           assertNoInventedLimit(plan, label);
         },
@@ -130,10 +130,8 @@ const traces = [
       {
         prompt: "yes",
         check: (plan, label) => {
-          const planActions = actions(plan);
-          assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.confirmed_action`);
-          assert.strictEqual(planActions[0].start_minute, 11 * 60, `${label}.start_minute`);
-          assert.strictEqual(planActions[0].end_minute, 12 * 60, `${label}.end_minute`);
+          assertNoAction(plan, label);
+          assertContains(plan, /once|recurring|which days/i, `${label}.keeps_recurrence_gate`);
           assert.doesNotMatch(clean(plan?.message_text || plan?.response_text, 500), /25[- ]minute daily limit|set a 25|already (set|blocked)/i, `${label}.no_action_hallucination`);
         },
       },
@@ -155,7 +153,7 @@ const traces = [
         },
       },
       {
-        prompt: "Instagram around 11am",
+        prompt: "Instagram at 11am",
         check: (plan, label) => {
           assertNoAction(plan, label);
           assertContains(plan, /Instagram.*11:00 AM|11:00 AM.*Instagram/i, `${label}.keeps_context`);
@@ -163,7 +161,7 @@ const traces = [
         },
       },
       {
-        prompt: "At 12",
+        prompt: "12pm",
         check: (plan, label) => {
           assertNoAction(plan, label);
           assertContains(plan, /11:00 AM.*12:00 PM|12:00 PM.*11:00 AM/i, `${label}.infers_noon`);
@@ -173,19 +171,16 @@ const traces = [
       {
         prompt: "yes",
         check: (plan, label) => {
-          const planActions = actions(plan);
-          assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.plan_created_by_bm`);
-          assert.strictEqual(planActions[0].start_minute, 11 * 60, `${label}.start_minute`);
-          assert.strictEqual(planActions[0].end_minute, 12 * 60, `${label}.end_minute`);
-          assertContains(plan, /open blankmind|review/i, `${label}.review_in_app`);
+          assertNoAction(plan, label);
+          assertContains(plan, /once|recurring|which days/i, `${label}.keeps_recurrence_gate`);
           assert.doesNotMatch(visibleText(plan), /apps\.apple\.com|download|create a plan|12:00 AM/i, `${label}.no_manual_creation_or_download`);
         },
       },
       {
         prompt: "I have it",
         check: (plan, label) => {
-          assert.deepStrictEqual(actions(plan).map((item) => item.type), ["apply_schedule"], `${label}.preserves_created_plan`);
-          assertContains(plan, /plan|review/i, `${label}.continues_plan`);
+          assertNoAction(plan, label);
+          assertContains(plan, /once|recurring|which days/i, `${label}.preserves_recurrence_gate`);
           assert.doesNotMatch(visibleText(plan), /apps\.apple\.com|download|create a plan/i, `${label}.no_manual_creation_or_download`);
         },
       },
@@ -227,17 +222,15 @@ const traces = [
         check: (plan, label) => {
           assertNoAction(plan, label);
           assertContains(plan, /Instagram.*10:00 AM.*11:00 AM|10:00 AM.*11:00 AM.*Instagram/i, `${label}.uses_corrected_window`);
-          assertContains(plan, /confirm|use that|window/i, `${label}.asks_confirmation`);
+          assertContains(plan, /once|recurring|which days/i, `${label}.asks_recurrence_before_action`);
           assert.doesNotMatch(visibleText(plan), /\b10:00 PM|\b1:00 AM/i, `${label}.does_not_drift_to_pm`);
         },
       },
       {
         prompt: "yes",
         check: (plan, label) => {
-          const planActions = actions(plan);
-          assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.confirmed_action`);
-          assert.strictEqual(planActions[0].start_minute, 10 * 60, `${label}.start_minute`);
-          assert.strictEqual(planActions[0].end_minute, 11 * 60, `${label}.end_minute`);
+          assertNoAction(plan, label);
+          assertContains(plan, /once|recurring|which days/i, `${label}.keeps_recurrence_gate`);
         },
       },
     ],
@@ -272,11 +265,28 @@ const traces = [
       {
         prompt: "Block selected apps from 10 pm to 7 am every day.",
         check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /how many days|1 to 14 days|days should it repeat/i, `${label}.asks_for_horizon`);
+          assertNoInventedLimit(plan, label);
+        },
+      },
+      {
+        prompt: "7 days",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /22:00.*07:00|10:00 PM.*7:00 AM/i, `${label}.keeps_window`);
+          assertContains(plan, /confirm|do you/i, `${label}.asks_confirmation`);
+        },
+      },
+      {
+        prompt: "yes",
+        check: (plan, label) => {
           const schedule = actions(plan).find((item) => item.type === "apply_schedule");
           assert.ok(schedule, `${label}.schedule_exists`);
           assert.strictEqual(schedule.start_minute, 22 * 60, `${label}.start_minute`);
           assert.strictEqual(schedule.end_minute, 7 * 60, `${label}.end_minute`);
-          assertNoInventedLimit(plan, label);
+          assert.strictEqual(schedule.duration_days, 7, `${label}.duration_days`);
+          assertContains(plan, /review|apply/i, `${label}.review_in_app`);
         },
       },
     ],

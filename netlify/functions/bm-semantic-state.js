@@ -379,6 +379,9 @@ function reduceSemanticState(previous, patch, { language, now = Date.now() } = {
     if (state.slots.duration_minutes?.source.kind === "derived") update("duration_minutes",null,"derived");
   }
   for (const [key,v] of Object.entries(patch.set)) if (validValue(key,v)) update(key,v);
+  if (value(state,"action_type") === "daily_limit" && value(state,"start") == null) {
+    update("start",{type:"now"},"derived",["action_type"]);
+  }
   const start = value(state,"start"), end = value(state,"end"), duration = value(state,"duration_minutes");
   if (start?.type === "time" && end != null && duration != null && (start.minute + duration) % 1440 !== end) state.errors.push({ code:"time_duration_conflict", slot:"time_consistency", text:patch.evidence });
   else if (start?.type === "time" && end == null && duration != null) update("end",(start.minute + duration) % 1440,"derived",["start","duration_minutes"]);
@@ -558,7 +561,9 @@ function renderSemanticResponse(state, decision, context = {}) {
     permissions:es ? "Abre Blankmind y concede el permiso de bloqueo. La propuesta todavía no se ha aplicado." : "Open Blankmind and grant blocking permission. The proposal has not been applied yet.",
     app_selection:es ? `Selecciona exactamente ${(value(state,"apps") || []).join(" y ")} en Blankmind. La propuesta todavía no se ha aplicado.` : `Select exactly ${(value(state,"apps") || []).join(" and ")} in Blankmind. The proposal has not been applied yet.`,
   };
-  const question = questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
+  const question = value(state,"action_type") === "daily_limit" && decision.slot === "end_or_duration"
+    ? (es ? "¿Cuántos minutos al día quieres permitir?" : "How many minutes per day should the limit allow?")
+    : questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
   const lead = knownFactLead(state);
   return lead ? `${lead} ${question}` : question;
 }

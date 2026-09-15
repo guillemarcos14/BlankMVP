@@ -58,8 +58,8 @@ begin
       lease_expires_at = now() + make_interval(secs => lease_seconds)
   where anonymous_user_id = trim(p_anonymous_user_id)
     and message_id = trim(p_message_id)
-    and status = 'processing'
-    and lease_expires_at <= now();
+    and assistant_inbound_messages.status = 'processing'
+    and assistant_inbound_messages.lease_expires_at <= now();
 
   if found then
     return query select true, 'reclaimed';

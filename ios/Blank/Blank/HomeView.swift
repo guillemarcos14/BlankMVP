@@ -204,7 +204,7 @@ struct HomeView: View {
                         sessionStore.dailyLimitEnabled = true
                         sessionStore.refreshDailyLimitMonitoring()
                         applyScreenTimeControls()
-                        message = "Daily limit set to (dailyLimitMinutes) minutes."
+                        message = "Daily limit set to \(dailyLimitMinutes) minutes."
                         messageAction = nil
                     } else if let schedule = sessionStore.pendingPlanSchedule,
                               contextualPlanSelection.blankedSelectionCount > 0 {
@@ -218,7 +218,7 @@ struct HomeView: View {
                             weekdays: schedule.weekdays
                         )
                         applyScreenTimeControls()
-                        message = "Added (schedule.name) without replacing your existing protection windows."
+                        message = "Added \(schedule.name) without replacing your existing protection windows."
                         messageAction = nil
                     } else {
                         sessionStore.selection = contextualPlanSelection
@@ -582,7 +582,7 @@ struct HomeView: View {
             }
 
             if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
-                Text("Schedule paused (remainingText(until: schedulePausedUntil))")
+                Text("Schedule paused \(remainingText(until: schedulePausedUntil))")
                     .font(.blankInter(size: 13, relativeTo: .footnote))
             }
 
@@ -979,13 +979,13 @@ struct HomeView: View {
             return "Open the app picker to choose what Blanked can protect?"
         case .configureAndOpenAppPicker(let appNames, let durationMinutes, _, let schedule):
             if let schedule {
-                return "Choose the apps for (schedule.name) from (formatMinute(schedule.startMinute)) to (formatMinute(schedule.endMinute))?"
+                return "Choose the apps for \(schedule.name) from \(formatMinute(schedule.startMinute)) to \(formatMinute(schedule.endMinute))?"
             }
             let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
-            return durationMinutes.map { "Choose (target) and start protection for ($0) minutes?" } ?? "Choose (target) and start protection now?"
+            return durationMinutes.map { "Choose \(target) and start protection for \($0) minutes?" } ?? "Choose \(target) and start protection now?"
         case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
             let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
-            return "Choose (target) and set a daily limit of (minutes) minutes?"
+            return "Choose \(target) and set a daily limit of \(minutes) minutes?"
         case .requestScreenTimePermission:
             return "Request Screen Time permission?"
         }

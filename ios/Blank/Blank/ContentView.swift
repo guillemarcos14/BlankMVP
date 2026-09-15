@@ -2794,7 +2794,7 @@ enum BlankedAgentMemory {
         defaults.set(patternCluster(for: prompt, intent: inferredIntent), forKey: patternClusterKey)
     }
 
-    private static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
+    static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
         defaults.set(plan.title, forKey: lastPlanTitleKey)
         defaults.set(Date().timeIntervalSince1970, forKey: lastPlanAppliedAtKey)
         defaults.set(plan.intent.rawValue, forKey: lastIntentKey)

@@ -3651,7 +3651,7 @@ private struct AssistantConnectSheet: View {
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(textColor)
-        .environment(\.blankMinimalAppearance, !sessionStore.isBlankActive)
+        .environment(\.blankMinimalAppearance, true)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {
             ensureConnectCode()

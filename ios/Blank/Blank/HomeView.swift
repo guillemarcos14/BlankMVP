@@ -428,57 +428,40 @@ struct HomeView: View {
 
     private func minimalHome(layout: HomeLayoutMetrics) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                Text("1")
-                    .font(.blankInter(size: 76, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(BlankColors.minimalFaded)
-                    .minimumScaleFactor(0.8)
-
-                Spacer(minLength: 0)
-
-                Image(systemName: "asterisk")
-                    .font(.system(size: 35, weight: .bold))
-                    .foregroundStyle(BlankColors.minimalInk)
-                    .frame(width: 44, height: 44)
-                    .accessibilityHidden(true)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, layout.topPadding)
-
-            Spacer(minLength: 24)
+            Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: 0) {
                 minimalStartRow
 
-                minimalHomeRow("Stats", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("stats", color: BlankColors.minimalSecondary) {
                     openSection(.report)
                 }
 
-                minimalHomeRow("Plan", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("plan", color: BlankColors.minimalSecondary) {
                     openSection(.modes)
                 }
 
-                minimalHomeRow("Timer", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("timer", color: BlankColors.minimalSecondary) {
                     openSection(.timer)
                 }
 
-                minimalHomeRow("Emergency", color: BlankColors.minimalSecondary) {
+                minimalHomeRow("emergency", color: BlankColors.minimalSecondary) {
                     openSection(.emergency)
                 }
 
                 minimalStatus
 
                 HStack(spacing: 18) {
-                    minimalUtilityRow("Assistant") {
+                    minimalUtilityRow("assistant") {
                         showingAssistantConnect = true
                     }
 
                     #if targetEnvironment(simulator)
-                    minimalUtilityRow("Onboarding") {
+                    minimalUtilityRow("onboarding") {
                         openOnboardingDemo()
                     }
 
-                    minimalUtilityRow("Pro") {
+                    minimalUtilityRow("pro") {
                         enableDemoPro()
                     }
                     #endif
@@ -486,21 +469,20 @@ struct HomeView: View {
                 .padding(.top, 14)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: layout.bottomPadding)
         }
         .padding(.horizontal, layout.horizontalPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.bottom, layout.bottomPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
     private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                .font(.blankInter(size: 34, weight: .bold, relativeTo: .title2))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 49, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -510,8 +492,8 @@ struct HomeView: View {
     private var minimalStartRow: some View {
         let isActive = sessionStore.isBlankActive
         let title = isActive
-            ? (sessionStore.hardBlankActive ? "Blank active" : "Hold to unblank")
-            : "Start Blank"
+            ? (sessionStore.hardBlankActive ? "blank active" : "hold to unblank")
+            : "start blank"
         let titleColor = isActive ? BlankColors.minimalSecondary : BlankColors.minimalInk
 
         return Button {
@@ -523,11 +505,11 @@ struct HomeView: View {
             setMessage(for: result)
         } label: {
             Text(title)
-                .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                .font(.blankInter(size: 34, weight: .bold, relativeTo: .title2))
                 .foregroundStyle(titleColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
-                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 49, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

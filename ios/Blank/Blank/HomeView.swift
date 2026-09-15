@@ -1557,10 +1557,11 @@ private struct ModesList: View {
 
     @ViewBuilder
     var body: some View {
-        if minimalAppearance {
-            newLookPlan
-        } else {
-            List {
+        Group {
+            if minimalAppearance {
+                newLookPlan
+            } else {
+                List {
             TopSheetHeader(
                 title: "Plan",
                 subtitle: "Protection, routines, safeguards.",
@@ -1604,12 +1605,13 @@ private struct ModesList: View {
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+                }
+                .tint(textColor)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
+                .background(Color.clear)
             }
-            .tint(textColor)
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .scrollIndicators(.hidden)
-            .background(Color.clear)
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .onAppear {

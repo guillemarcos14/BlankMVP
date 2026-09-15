@@ -330,7 +330,18 @@ private struct ConversationalHomeView: View {
                 horizontalOffset: horizontalOffset,
                 intervention: system.relapseIntervention,
                 onEmergencyUnlock: performEmergencyUnlock,
-                onTimedBlank: startTimedBlank
+                onTimedBlank: startTimedBlank,
+                onOpenSection: openSection,
+                onOpenAssistant: {},
+                onRequestScreenTimePermission: {
+                    Task {
+                        _ = await screenTimeBlocker.requestAuthorization()
+                        restoreRuntimeState()
+                    }
+                },
+                onRequestHealthAccess: {},
+                screenTimeStatus: screenTimeBlocker.authorizationStatusLabel,
+                healthStatus: "Unavailable"
             ) {
                 closeSection()
             }

@@ -1555,6 +1555,7 @@ private struct ModesList: View {
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
 
+    @ViewBuilder
     var body: some View {
         if minimalAppearance {
             newLookPlan

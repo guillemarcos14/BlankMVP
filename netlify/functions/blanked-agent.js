@@ -2876,6 +2876,7 @@ function deterministicNoActionTitle(title) {
     "Digital Wellness Read",
     "Plan Context",
     "Plan Timing",
+    "Scroll Window",
     "Personal Assistant",
     "Automation Setup",
     "Reminder Context",

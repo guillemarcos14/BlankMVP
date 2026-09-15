@@ -4257,7 +4257,7 @@ private struct LiquidGlassModifier: ViewModifier {
             .background {
                 if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(BlankColors.minimalBackground)
+                        .fill(Color.clear)
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -4272,7 +4272,7 @@ private struct LiquidGlassModifier: ViewModifier {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(minimalAppearance ? BlankColors.line : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0.8 : 0.7)
+                    .stroke(minimalAppearance ? Color.clear : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0 : 0.7)
             }
             .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.026), radius: 14, x: 0, y: 8)
     }

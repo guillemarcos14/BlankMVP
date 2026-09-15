@@ -164,7 +164,7 @@ private struct BlankGlassCardModifier: ViewModifier {
             .background {
                 if minimalAppearance {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(BlankColors.minimalBackground)
+                        .fill(Color.clear)
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -178,7 +178,7 @@ private struct BlankGlassCardModifier: ViewModifier {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(minimalAppearance ? BlankColors.line : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0.8 : 1)
+                    .stroke(minimalAppearance ? Color.clear : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0 : 1)
             )
             .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
     }
@@ -194,13 +194,13 @@ private struct BlankControlSurfaceModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(minimalAppearance ? BlankColors.minimalBackground : Color.white.opacity(tintOpacity))
+                    .fill(minimalAppearance ? Color.clear : Color.white.opacity(tintOpacity))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
-                        minimalAppearance ? BlankColors.line : Color.white.opacity(emphasized ? 0.34 : 0.18),
-                        lineWidth: minimalAppearance ? 0.8 : 0.8
+                        minimalAppearance ? Color.clear : Color.white.opacity(emphasized ? 0.34 : 0.18),
+                        lineWidth: minimalAppearance ? 0 : 0.8
                     )
             }
             .shadow(

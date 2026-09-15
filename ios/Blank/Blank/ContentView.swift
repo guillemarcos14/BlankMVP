@@ -350,8 +350,6 @@ private struct ConversationalHomeView: View {
                     }
                 },
                 onRequestHealthAccess: {},
-                onRelinkBlank: {},
-                onForgetBlank: {},
                 screenTimeStatus: screenTimeBlocker.authorizationStatusLabel,
                 healthStatus: "unknown"
             ) {

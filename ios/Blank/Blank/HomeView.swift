@@ -9,6 +9,7 @@ enum HomeSection: Hashable {
     case report
     case emergency
     case timer
+    case settings
 }
 
 struct HomeView: View {
@@ -81,7 +82,15 @@ struct HomeView: View {
                         screenHeight: viewportHeight,
                         intervention: relapseIntervention,
                         onEmergencyUnlock: performEmergencyUnlock,
-                        onTimedBlank: startTimedBlank
+                        onTimedBlank: startTimedBlank,
+                        onOpenSection: openSection,
+                        onOpenAssistant: { showingAssistantConnect = true },
+                        onRequestScreenTimePermission: requestScreenTimePermission,
+                        onRequestHealthAccess: { healthKitStore.requestAccess() },
+                        onRelinkBlank: { showingRelink = true },
+                        onForgetBlank: { showingForgetConfirm = true },
+                        screenTimeStatus: screenTimePermissionLabel,
+                        healthStatus: healthPermissionLabel
                     ) {
                         closeSection()
                     }
@@ -445,8 +454,8 @@ struct HomeView: View {
                     openSection(.timer)
                 }
 
-                minimalHomeRow("emergency", color: BlankColors.minimalSecondary) {
-                    openSection(.emergency)
+                minimalHomeRow("settings", color: BlankColors.minimalSecondary) {
+                    openSection(.settings)
                 }
 
                 minimalStatus
@@ -813,6 +822,41 @@ struct HomeView: View {
         #else
         return false
         #endif
+    }
+
+    private var screenTimePermissionLabel: String {
+        switch screenTimeBlocker.authorizationStatus {
+        case .approved:
+            return "connected"
+        case .denied:
+            return "denied"
+        case .notDetermined:
+            return "not connected"
+        @unknown default:
+            return "unknown"
+        }
+    }
+
+    private var healthPermissionLabel: String {
+        switch healthKitStore.state {
+        case .connected:
+            return "connected"
+        case .requesting:
+            return "requesting"
+        case .notRequested:
+            return "not connected"
+        case .unavailable:
+            return "not available"
+        case .failed:
+            return "denied"
+        }
+    }
+
+    private func requestScreenTimePermission() {
+        Task { @MainActor in
+            _ = await screenTimeBlocker.requestAuthorization()
+            applyScreenTimeControls()
+        }
     }
 
     private func openOnboardingDemo() {
@@ -1986,6 +2030,14 @@ struct HomeSectionScreen: View {
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
     let onTimedBlank: (Int, Bool) -> Void
+    let onOpenSection: (HomeSection) -> Void = { _ in }
+    let onOpenAssistant: () -> Void = {}
+    let onRequestScreenTimePermission: () -> Void = {}
+    let onRequestHealthAccess: () -> Void = {}
+    let onRelinkBlank: () -> Void = {}
+    let onForgetBlank: () -> Void = {}
+    let screenTimeStatus: String = "unknown"
+    let healthStatus: String = "unknown"
     let onClose: () -> Void
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
 
@@ -2037,7 +2089,112 @@ struct HomeSectionScreen: View {
             )
         case .timer:
             TimerScreen(onStart: onTimedBlank)
+        case .settings:
+            SettingsScreen(
+                onOpenEmergency: { onOpenSection(.emergency) },
+                onOpenAssistant: onOpenAssistant,
+                onRequestScreenTimePermission: onRequestScreenTimePermission,
+                onRequestHealthAccess: onRequestHealthAccess,
+                onRelinkBlank: onRelinkBlank,
+                onForgetBlank: onForgetBlank,
+                screenTimeStatus: screenTimeStatus,
+                healthStatus: healthStatus
+            )
         }
+    }
+}
+
+private struct SettingsScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+
+    let onOpenEmergency: () -> Void
+    let onOpenAssistant: () -> Void
+    let onRequestScreenTimePermission: () -> Void
+    let onRequestHealthAccess: () -> Void
+    let onRelinkBlank: () -> Void
+    let onForgetBlank: () -> Void
+    let screenTimeStatus: String
+    let healthStatus: String
+
+    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("settings")
+                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                    .tracking(-0.6)
+                    .foregroundStyle(textColor)
+                    .padding(.bottom, 18)
+
+                settingsRow(
+                    title: "emergency",
+                    detail: "unlock access while blanked",
+                    action: onOpenEmergency
+                )
+
+                settingsRow(
+                    title: "screen time",
+                    detail: "screen time \(screenTimeStatus)",
+                    action: onRequestScreenTimePermission
+                )
+
+                settingsRow(
+                    title: "health",
+                    detail: "apple health \(healthStatus)",
+                    action: onRequestHealthAccess
+                )
+
+                settingsRow(
+                    title: "assistant",
+                    detail: "whatsapp · sms · connection code",
+                    action: onOpenAssistant
+                )
+
+                settingsRow(
+                    title: "relink blank",
+                    detail: "change the linked nfc tag",
+                    action: onRelinkBlank
+                )
+
+                settingsRow(
+                    title: "forget blank",
+                    detail: "return to setup",
+                    color: secondaryColor,
+                    action: onForgetBlank
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func settingsRow(
+        title: String,
+        detail: String,
+        color: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title3))
+                    .tracking(-0.4)
+
+                Text(detail)
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(color ?? textColor)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
     }
 }
 

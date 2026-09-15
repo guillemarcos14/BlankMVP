@@ -50,12 +50,14 @@ function fail(message, code = 1) {
 }
 
 function run(command, args, options = {}) {
-  const executable = process.platform === "win32" && command === "npx" ? "npx.cmd" : command;
+  const useWindowsNpxShell = process.platform === "win32" && command === "npx";
+  const executable = command;
   const result = spawnSync(executable, args, {
     cwd: ROOT,
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
     stdio: options.inherit ? "inherit" : "pipe",
+    ...(useWindowsNpxShell ? { shell: true } : {}),
   });
   if (result.error) fail(`${executable} ${args.join(" ")}: ${result.error.message}`);
   if (result.status !== 0 && !options.allowFailure) {

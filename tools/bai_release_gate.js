@@ -13,6 +13,7 @@ const rootDir = path.join(__dirname, "..");
 const hasApiKey = Boolean(process.env.OPENAI_API_KEY);
 const forceModel = args.has("--model");
 const quick = args.has("--quick");
+const production = args.has("--production");
 const save = args.has("--save");
 const model = argValue("--model", process.env.OPENAI_MODEL || "gpt-5.6-luna");
 const wideCount = argValue("--count", "125");
@@ -80,5 +81,6 @@ run("BM product harness", ["tools/product_harness_test.js"]);
 run("Messaging compatibility smoke", ["tools/whatsapp_agent_smoke_test.js"]);
 run("SMS/audio-input compatibility smoke", ["tools/sms_agent_voice_smoke_test.js"]);
 run("Assistant conversation memory", ["tools/assistant_conversation_memory_test.js"]);
+if (production) run("BM production active conversation", ["tools/bm_production_conversation_eval.js", "--repeats", "2", ...(save ? ["--out", "tools/reports/bm_production_conversation_eval.json"] : [])]);
 
 console.log("\nBM release gate passed.");

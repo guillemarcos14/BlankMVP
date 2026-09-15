@@ -157,6 +157,39 @@ function baseContext(overrides = {}) {
   assert.match(appTimeEndFollowup.message_text, /Instagram.*11:00 AM.*12:00 PM|11:00 AM.*12:00 PM.*Instagram/i);
   assert.match(appTimeEndFollowup.message_text, /confirm|want me to use/i);
   assert.doesNotMatch(appTimeEndFollowup.message_text, /from 11:00 AM to\.?$|25-minute|download|permission|App Store/i);
+  const appTimeConfirmedContext = [
+    ...appTimeEndContext,
+    { role: "user", content: "12pm" },
+    { role: "assistant", content: appTimeEndFollowup.message_text },
+  ];
+  const appTimeConfirmed = await call("yes", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    app_presence: {
+      app_present: true,
+      app_ready: true,
+      last_seen_at: new Date().toISOString(),
+    },
+    recent_messages: appTimeConfirmedContext,
+  }));
+  assert.deepStrictEqual(appTimeConfirmed.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.strictEqual(appTimeConfirmed.actions[0].start_minute, 11 * 60);
+  assert.strictEqual(appTimeConfirmed.actions[0].end_minute, 12 * 60);
+  assert.doesNotMatch(appTimeConfirmed.message_text, /25-minute|daily limit|already (set|blocked)|download|App Store/i);
+
+  const appTimeModelQuestionContext = [
+    { role: "user", content: "How can I scroll less in the morning?" },
+    { role: "assistant", content: "Got it. Which app pulls you in most, and when does it usually happen?" },
+  ];
+  const appTimeModelQuestion = await call("11am Instagram", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeModelQuestionContext,
+  }));
+  assert.strictEqual(appTimeModelQuestion.actions.length, 0);
+  assert.match(appTimeModelQuestion.message_text, /Instagram.*11:00 AM|11:00 AM.*Instagram/i);
+  assert.match(appTimeModelQuestion.message_text, /what time.*end|end.*time/i);
+  assert.doesNotMatch(appTimeModelQuestion.message_text, /25-minute|daily limit|download|permission|App Store/i);
 
   const breakfastWithoutTime = await call("I usually use social media after breakfast", baseContext({
     channel: "whatsapp",

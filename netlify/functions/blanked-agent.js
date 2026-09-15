@@ -1203,7 +1203,7 @@ function minuteOfDay(hour, minute, meridiem) {
 
 function explicitTimeWindow(prompt, context = {}) {
   const text = cleanText(prompt, 600).toLowerCase();
-  const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  const match = text.match(/(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (!match) return null;
   const startHour = Number(match[1]);
   const endHour = Number(match[4]);
@@ -1373,15 +1373,22 @@ function ambiguousDigitalMomentPlan(prompt, language = "en") {
 function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const messages = recentMessages(context);
   const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
+  const recentAssistantMessages = messages.filter((message) => message.role === "assistant");
+  const recentAssistantText = recentAssistantMessages.map((message) => message.content).join(" ").toLowerCase();
+  const latestAssistantText = recentAssistantMessages.length
+    ? recentAssistantMessages[recentAssistantMessages.length - 1].content.toLowerCase()
+    : "";
   const app = namedApp(prompt);
   const timeMatch = cleanText(prompt, 120).match(/\b(?:around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   const timeText = timeMatch ? `${timeMatch[1]}:${String(timeMatch[2] || "00").padStart(2, "0")}${timeMatch[3] ? ` ${timeMatch[3].toUpperCase()}` : ""}` : "";
   const hasRecentAmbiguousLoss = /lose control|what do you lose control|do you mean|a qué te refieres|qué quieres decir/i.test(recentText);
-  const hasRecentScrollContextQuestion = /where the scrolling usually starts|where .*scrolling .*starts|app, moment, or time of day|app, momento o hora del día/i.test(recentText);
+  const hasRecentScrollContextQuestion = /where the scrolling usually starts|where .*scrolling .*starts|app, moment, or time of day|app, momento o hora del día|which app pulls you in most.*when does it usually happen|which app.*when does it usually happen|what app.*when.*happen|what app.*what time|which app.*what time|app.*when.*usually happen|app.*time.*usually start/i.test(recentAssistantText);
   const recentTiming = recentAppTiming(context);
   const recentRelative = recentRelativeTimeQuestion(context);
   const relativeMinute = recentRelative ? looseSingleTime(prompt) : null;
-  const hasRecentScrollWindowEndQuestion = /what time should (?:the )?(?:protection|boundary|block) end|what time should it become available again|need end time/i.test(recentText);
+  const hasRecentScrollWindowEndQuestion = /what time should (?:the )?(?:protection|boundary|block) end|what time should it become available again|need end time|what time should the protection end|a qué hora debería terminar la protección|hora final/i.test(recentAssistantText);
+  const confirmationWindow = explicitTimeWindow(latestAssistantText, context);
+  const confirmsRecentScrollWindow = /^(?:yes|yeah|yep|correct|do it|go ahead|confirm|confirm window|sí|si|vale|adelante|hazlo|confirmar(?: la franja)?)[.!\s]*$/i.test(cleanText(prompt, 80)) && /confirm(?: window| the window)?|want me to use|use that .*window|confirmar(?: la franja)?|usar esa franja/i.test(latestAssistantText);
   if (recentRelative && relativeMinute != null && recentRelative.key === "bedtime") {
     const start = ((relativeMinute + recentRelative.startOffset) % (24 * 60) + (24 * 60)) % (24 * 60);
     const end = (start + recentRelative.duration) % (24 * 60);
@@ -1429,6 +1436,38 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       actions: [],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (recentTiming && recentTiming.minute != null && confirmationWindow && confirmsRecentScrollWindow) {
+    const startText = minuteText(confirmationWindow.start);
+    const endText = minuteText(confirmationWindow.end);
+    const name = language === "es" ? "Protección de mañana" : "Morning Protection";
+    const message = language === "es"
+      ? `Confirmado: protegería ${recentTiming.app} de ${startText} a ${endText}. La app aplicará la franja después de revisar los permisos.`
+      : `Confirmed: I’d protect ${recentTiming.app} from ${startText} to ${endText}. Blanked App will apply the window after you review permissions.`;
+    return {
+      intent: "social",
+      title: name,
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentTiming.app} de ${startText} a ${endText}.` : `Read: ${recentTiming.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: has confirmado una franja concreta, no un límite diario inventado." : "Pattern: you confirmed a specific window, not an invented daily limit.",
+        language === "es" ? "Movimiento: revisar permisos y aplicar esta franja en Blankmind App." : "Move: review permissions and apply this window in Blanked App.",
+      ],
+      primary_label: language === "es" ? "Aplicar franja" : "Apply window",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [action("apply_schedule", {
+        name,
+        start_minute: confirmationWindow.start,
+        end_minute: confirmationWindow.end,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
       message_text: message,
       speech_text: message,
       followup_text: "",

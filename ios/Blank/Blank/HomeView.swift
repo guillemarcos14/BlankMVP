@@ -461,11 +461,10 @@ struct HomeView: View {
 
     private func activeMinimalHome(layout: HomeLayoutMetrics) -> some View {
         ZStack(alignment: .topLeading) {
+            activePrimaryContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
             VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
-
-                activePrimaryContent
-
                 Spacer(minLength: 0)
 
                 if isActiveNavExpanded {
@@ -491,6 +490,7 @@ struct HomeView: View {
                     .transition(.opacity)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
         .padding(.horizontal, layout.horizontalPadding)
         .padding(.bottom, layout.bottomPadding)
@@ -1011,17 +1011,16 @@ struct HomeView: View {
         delayedManualUnlockAt = nil
     }
 
-    private func updateDelayedUnlockMessage(now: Date) {
-        guard let delayedManualUnlockAt else { return }
-        let seconds = max(0, Int(ceil(delayedManualUnlockAt.timeIntervalSince(now))))
-        message = seconds > 0 ? "Cooldown active" : "Unlocking..."
+    private func updateDelayedUnlockMessage(now _: Date) {
+        guard delayedManualUnlockAt != nil else { return }
+        message = nil
         messageAction = nil
     }
 
     private var cooldownText: String? {
         guard let delayedManualUnlockAt else { return nil }
         let seconds = max(0, Int(ceil(delayedManualUnlockAt.timeIntervalSince(now))))
-        return "Cooldown: \(formatCooldown(seconds))"
+        return formatCooldown(seconds)
     }
 
     private var timerCountdownText: String? {
@@ -2675,86 +2674,58 @@ private struct RelapseReviewSheet: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let contentWidth = min(max(proxy.size.width - 48, 0), 360)
+            let contentWidth = min(max(proxy.size.width - 48, 0), 420)
 
             ZStack {
-                AppBackground(isActive: false)
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.14),
-                            BlankColors.background.opacity(0.20),
-                            Color.white.opacity(0.06)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                BlankColors.homeLightBackground
                     .ignoresSafeArea()
-                }
 
-                VStack(alignment: .leading, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(BlankColors.ink.opacity(0.78))
-                            .frame(width: 38, height: 38)
-                            .background {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .overlay { Circle().fill(Color.white.opacity(0.28)) }
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("why now?")
+                            .font(.blankInter(size: 48, weight: .bold, relativeTo: .largeTitle))
+                            .tracking(-1.4)
+                            .foregroundStyle(BlankColors.homeLightInk)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                            .padding(.top, proxy.safeAreaInsets.top + 24)
+
+                        Text(intervention.alternative)
+                            .font(.blankInter(size: 18, weight: .medium, relativeTo: .title3))
+                            .foregroundStyle(BlankColors.mutedInk)
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 18)
+                            .padding(.bottom, 42)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            ForEach(RelapseReviewReason.allCases) { reason in
+                                Button {
+                                    onSelect(reason)
+                                    dismiss()
+                                } label: {
+                                    RelapseReasonTile(reason: reason)
+                                }
+                                .buttonStyle(RelapseReasonButtonStyle())
                             }
-                            .overlay {
-                                Circle().stroke(BlankColors.glassBorder, lineWidth: 1)
-                            }
-                            .shadow(color: BlankColors.ink.opacity(0.08), radius: 14, x: 0, y: 8)
+                        }
 
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Why now?")
-                                .font(.blankInter(size: 32, weight: .medium, relativeTo: .largeTitle))
-                                .foregroundStyle(BlankColors.ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.86)
-
-                            Text(intervention.alternative)
-                                .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("skip")
+                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                                 .foregroundStyle(BlankColors.mutedInk)
-                                .lineSpacing(2)
-                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .padding(.top, 28)
+                        .padding(.bottom, max(proxy.safeAreaInsets.bottom + 18, 28))
                     }
-                    .padding(.top, 6)
-
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        ForEach(RelapseReviewReason.allCases) { reason in
-                            Button {
-                                onSelect(reason)
-                                dismiss()
-                            } label: {
-                                RelapseReasonTile(reason: reason)
-                            }
-                            .buttonStyle(RelapseReasonButtonStyle())
-                        }
-                    }
-
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("Skip")
-                            .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                            .foregroundStyle(BlankColors.ink.opacity(0.58))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 2)
-
-                    Spacer(minLength: 0)
+                    .frame(width: contentWidth, alignment: .leading)
                 }
-                .frame(width: contentWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .padding(.top, 92)
-                .padding(.bottom, 28)
             }
         }
         .preferredColorScheme(.light)
@@ -2765,26 +2736,33 @@ private struct RelapseReasonTile: View {
     let reason: RelapseReviewReason
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 16) {
             Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(BlankColors.ink.opacity(0.74))
-                .frame(width: 28, height: 28)
-                .background {
-                    Circle().fill(BlankColors.ink.opacity(0.055))
-                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(BlankColors.homeLightSecondary)
+                .frame(width: 24, alignment: .leading)
 
-            Text(reason.title)
-                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(BlankColors.ink.opacity(0.94))
+            Text(reason.title.lowercased())
+                .font(.blankInter(size: 22, weight: .bold, relativeTo: .title3))
+                .tracking(-0.35)
+                .foregroundStyle(BlankColors.homeLightInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
 
             Spacer(minLength: 0)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(BlankColors.homeLightSecondary)
         }
-        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .frame(height: 58)
+        .frame(minHeight: 68)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(BlankColors.newLookRule)
+                .frame(height: 1)
+        }
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -2803,22 +2781,7 @@ private struct RelapseReasonTile: View {
 private struct RelapseReasonButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Color.white.opacity(configuration.isPressed ? 0.24 : 0.38))
-                    BlankGlassCornerHighlight(width: 76, height: 28, xOffset: -68, yOffset: -20)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(BlankColors.glassBorder, lineWidth: 1)
-            }
-            .shadow(color: BlankColors.ink.opacity(configuration.isPressed ? 0.025 : 0.065), radius: configuration.isPressed ? 8 : 16, x: 0, y: configuration.isPressed ? 4 : 10)
+            .opacity(configuration.isPressed ? 0.52 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }

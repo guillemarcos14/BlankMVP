@@ -76,6 +76,11 @@ struct BlankApp: App {
             purchaseStore.captureReferral(from: url)
             return
         }
+        if action == "handoff" {
+            let token = components?.stringQueryItem("token") ?? ""
+            Task { await claimAppHandoff(token) }
+            return
+        }
         if action == "scan-blank", BlankedRuntimeMode.legacyNfcEnabled {
             sessionStore.requestBlankScanFromWidget()
             return
@@ -93,6 +98,11 @@ struct BlankApp: App {
 
         if action == "setup-plan" {
             setupPlan(from: components)
+            return
+        }
+
+        if action == "review-action" {
+            requestAssistantActionConfirmation(from: components)
             return
         }
 
@@ -133,6 +143,7 @@ struct BlankApp: App {
                 sessionStore.dailyLimitMinutes = min(max(minutes, 5), 240)
                 sessionStore.dailyLimitEnabled = true
                 sessionStore.refreshDailyLimitMonitoring()
+                applyScreenTimeState()
             }
             return
         }
@@ -194,24 +205,105 @@ struct BlankApp: App {
 
     private func setupPlan(from components: URLComponents?) {
         applyPlan(from: components, shouldOpenPickerIfIncomplete: false)
-        openBlockConfiguration(from: components, startsFreshSelection: true)
+        let appNames = components?.listQueryItem("apps") ?? []
+        let shouldStartFresh = !sessionStore.hasSelectedApps || !appNames.isEmpty
+        if !sessionStore.hasSelectedApps || !appNames.isEmpty {
+            openBlockConfiguration(from: components, startsFreshSelection: shouldStartFresh)
+        }
     }
 
     private func applyPlan(from components: URLComponents?, shouldOpenPickerIfIncomplete: Bool = true) {
         let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
         let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
         let durationDays = components?.intQueryItem("days") ?? 7
+        let name = components?.stringQueryItem("name") ?? "AI Plan"
+        let weekdays = components?.listQueryItem("weekdays").compactMap(Int.init) ?? Array(1...7)
 
         if let startMinute, let endMinute {
+            _ = sessionStore.selectBestMode(matching: name)
             sessionStore.applyAdaptivePlan(
                 startMinute: min(max(startMinute, 0), 1439),
                 endMinute: min(max(endMinute, 0), 1439),
                 durationDays: min(max(durationDays, 1), 14),
-                activateCurrentWindow: false
+                activateCurrentWindow: false,
+                name: name,
+                weekdays: weekdays
             )
             applyScreenTimeState()
         } else if shouldOpenPickerIfIncomplete {
             sessionStore.requestBlockConfiguration()
+        }
+    }
+
+    private func requestAssistantActionConfirmation(from components: URLComponents?) {
+        let type = components?.stringQueryItem("type") ?? ""
+        let appNames = components?.listQueryItem("apps") ?? []
+        let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
+        let hardMode = components?.boolQueryItem("hard") ?? false
+        switch type {
+        case "start_protection":
+            sessionStore.requestAssistantActionConfirmation(.startProtection(minutes: minutes, hardMode: hardMode, appNames: appNames))
+        case "activate_mode":
+            let name = components?.stringQueryItem("name") ?? "Routine"
+            sessionStore.requestAssistantActionConfirmation(.activateMode(name: name, minutes: minutes, hardMode: hardMode, appNames: appNames))
+        case "switch_mode":
+            sessionStore.requestAssistantActionConfirmation(.switchMode(name: components?.stringQueryItem("name") ?? "Routine"))
+        case "apply_schedule":
+            guard let start = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute"),
+                  let end = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute") else { return }
+            let weekdays = components?.listQueryItem("weekdays").compactMap(Int.init) ?? Array(1...7)
+            sessionStore.requestAssistantActionConfirmation(.applySchedule(
+                name: components?.stringQueryItem("name") ?? "AI Plan",
+                startMinute: min(max(start, 0), 1439),
+                endMinute: min(max(end, 0), 1439),
+                weekdays: weekdays,
+                durationDays: min(max(components?.intQueryItem("days") ?? 7, 1), 14),
+                appNames: appNames
+            ))
+        case "set_daily_limit":
+            sessionStore.requestAssistantActionConfirmation(.setDailyLimit(minutes: minutes, appNames: appNames))
+        case "enable_allow_only":
+            sessionStore.requestAssistantActionConfirmation(.allowOnly)
+        case "enable_adult_filter":
+            sessionStore.requestAssistantActionConfirmation(.adultFilter)
+        case "pause_rules":
+            sessionStore.requestAssistantActionConfirmation(.pauseRules(hours: min(max(components?.intQueryItem("hours") ?? 168, 1), 168)))
+        case "disable_pause":
+            sessionStore.requestAssistantActionConfirmation(.disablePause)
+        case "apply_ai_plan":
+            sessionStore.requestAssistantActionConfirmation(.applyAIPlan)
+        case "open_app_picker":
+            let pickerStart = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
+            let pickerEnd = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
+            let pickerName = components?.stringQueryItem("name") ?? ""
+            let pickerSchedule: PendingPlanSchedule?
+            if let pickerStart, let pickerEnd {
+                pickerSchedule = PendingPlanSchedule(
+                    name: components?.stringQueryItem("name") ?? "AI Plan",
+                    startMinute: min(max(pickerStart, 0), 1439),
+                    endMinute: min(max(pickerEnd, 0), 1439),
+                    weekdays: components?.listQueryItem("weekdays").compactMap(Int.init) ?? Array(1...7),
+                    durationDays: min(max(components?.intQueryItem("days") ?? 7, 1), 14)
+                )
+            } else {
+                pickerSchedule = nil
+            }
+            if pickerName == "Daily Limit", let minutes {
+                sessionStore.requestAssistantActionConfirmation(.configureAndOpenDailyLimitPicker(appNames: appNames, minutes: minutes))
+            } else if pickerSchedule != nil || minutes != nil || hardMode || !pickerName.isEmpty {
+                sessionStore.requestAssistantActionConfirmation(.configureAndOpenAppPicker(
+                    appNames: appNames,
+                    durationMinutes: minutes,
+                    hardMode: hardMode,
+                    schedule: pickerSchedule
+                ))
+            } else {
+                sessionStore.requestAssistantActionConfirmation(.openAppPicker(appNames: appNames))
+            }
+        case "request_screen_time_permission":
+            sessionStore.requestAssistantActionConfirmation(.requestScreenTimePermission)
+        default:
+            break
         }
     }
 
@@ -224,8 +316,46 @@ struct BlankApp: App {
     }
 
     private func isBlankedUniversalLink(_ url: URL) -> Bool {
-        guard url.scheme == "https", ["blanked.app", "getblank.netlify.app"].contains(url.host ?? "") else { return false }
+        guard url.scheme == "https", ["blankmind.ai", "blanked.app", "getblank.netlify.app"].contains(url.host ?? "") else { return false }
         return url.path == "/open" || url.path == "/open.html"
+    }
+
+    private func claimAppHandoff(_ token: String) async {
+        guard !token.isEmpty,
+              let baseURL = configuredMembershipBaseURL() else { return }
+        var request = URLRequest(url: baseURL.appendingPathComponent("app-handoff"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 8
+        let payload: [String: Any] = [
+            "action": "claim",
+            "handoff_token": token,
+            "app_install_id": BlankSharedState.appInstallId,
+            "data_consent": true,
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode),
+              let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        let defaults = BlankSharedState.defaults
+        if let connectCode = result["assistant_connect_code"] as? String, !connectCode.isEmpty {
+            defaults.set(connectCode, forKey: "blankAssistantConnectCode")
+        }
+        if let phone = result["phone_e164"] as? String, !phone.isEmpty {
+            defaults.set(phone, forKey: "blankAssistantPhoneNumber")
+        }
+        defaults.set(Date.now.formatted(date: .abbreviated, time: .shortened), forKey: "blankAssistantConnectedAt")
+    }
+
+    private func configuredMembershipBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return URL(string: trimmed)
     }
 }
 

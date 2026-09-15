@@ -20,6 +20,10 @@ enum BlankColors {
     static let premiumBlue = Color(red: 0.20, green: 0.47, blue: 0.92)
     static let controlSurface = Color.white.opacity(0.16)
     static let activeControlSurface = Color.white.opacity(0.09)
+    static let minimalBackground = Color(red: 0.953, green: 0.953, blue: 0.937)
+    static let minimalInk = Color(red: 0.115, green: 0.118, blue: 0.115)
+    static let minimalSecondary = Color(red: 0.390, green: 0.395, blue: 0.390)
+    static let minimalFaded = Color(red: 0.730, green: 0.732, blue: 0.716)
     static let glassBorder = LinearGradient(
         colors: [
             Color.white.opacity(0.48),

@@ -17,6 +17,9 @@ struct HomeView: View {
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var assistantConnectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var assistantPreferredChannel = ""
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var assistantPhoneNumber = ""
 
     @State private var now = Date()
     @State private var message: String?
@@ -55,25 +58,19 @@ struct HomeView: View {
             let layout = HomeLayoutMetrics(size: CGSize(width: viewportWidth, height: viewportHeight), safeAreaInsets: proxy.safeAreaInsets)
 
             ZStack(alignment: .topLeading) {
-                AppBackground(isActive: sessionStore.isBlankActive)
-                    .frame(width: viewportWidth, height: viewportHeight)
-                    .clipped()
+                if activeSection == nil {
+                    BlankColors.minimalBackground
+                        .frame(width: viewportWidth, height: viewportHeight)
+                        .ignoresSafeArea()
+                } else {
+                    AppBackground(isActive: sessionStore.isBlankActive)
+                        .frame(width: viewportWidth, height: viewportHeight)
+                        .clipped()
+                }
 
                 if activeSection == nil {
-                    topBar
-                        .position(x: layout.centerX, y: layout.topBarCenterY)
-                        .zIndex(2)
-
-                    topHomePanel(width: layout.actionWidth)
-                        .padding(.horizontal, layout.horizontalPadding)
-                        .padding(.top, layout.configTopPadding)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                    centerContent(maxWidth: layout.messageMaxWidth, actionWidth: layout.actionWidth)
-                        .position(x: layout.centerX, y: layout.messageCenterY)
-
-                    bottomShortcutBar(width: layout.actionWidth)
-                        .position(x: layout.centerX, y: layout.bottomShortcutCenterY)
+                    minimalHome(layout: layout)
+                        .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
                 }
 
                 if let activeSection {
@@ -96,9 +93,9 @@ struct HomeView: View {
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
         .ignoresSafeArea()
-        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .foregroundStyle(activeSection == nil ? BlankColors.minimalInk : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
         .toolbar(.hidden, for: .navigationBar)
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .preferredColorScheme(activeSection == nil ? .light : (sessionStore.isBlankActive ? .dark : .light))
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .animation(.easeInOut(duration: 0.35), value: activeSection)
         .navigationBarBackButtonHidden()
@@ -118,6 +115,7 @@ struct HomeView: View {
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
+            syncAssistantContext()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -129,20 +127,29 @@ struct HomeView: View {
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
+            syncAssistantContext()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+            syncAssistantContext()
         }
+        .onChange(of: sessionStore.focusModes) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.isBlankActive) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.dailyLimitMinutes) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.dailyLimitEnabled) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
+            syncAssistantContext()
             if sessionStore.allowOnlyModeEnabled && !sessionStore.hasSelectedApps {
                 showingPicker = true
             }
         }
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             applyScreenTimeControls()
+            syncAssistantContext()
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
@@ -159,7 +166,11 @@ struct HomeView: View {
                 if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
                     if let modeName = sessionStore.pendingPlanModeName,
                        contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.createOrUpdateMode(named: modeName, selection: contextualPlanSelection)
+                        sessionStore.createOrUpdateMode(
+                            named: modeName,
+                            selection: contextualPlanSelection,
+                            appNames: sessionStore.pendingPlanAppNames
+                        )
                         if sessionStore.pendingPlanShouldActivate {
                             let result = withAnimation(.easeInOut(duration: 0.65)) {
                                 sessionStore.activateBlank(
@@ -174,6 +185,41 @@ struct HomeView: View {
                             message = "\(modeName) mode saved."
                             messageAction = nil
                         }
+                    } else if sessionStore.pendingPlanShouldActivate,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                        let result = withAnimation(.easeInOut(duration: 0.65)) {
+                            sessionStore.activateBlank(
+                                durationMinutes: sessionStore.pendingPlanDurationMinutes,
+                                hardMode: sessionStore.pendingPlanHardMode
+                            )
+                        }
+                        applyScreenTimeControls()
+                        setMessage(for: result)
+                        activeSection = nil
+                    } else if let dailyLimitMinutes = sessionStore.pendingPlanDailyLimitMinutes,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                        sessionStore.dailyLimitMinutes = dailyLimitMinutes
+                        sessionStore.dailyLimitEnabled = true
+                        sessionStore.refreshDailyLimitMonitoring()
+                        applyScreenTimeControls()
+                        message = "Daily limit set to (dailyLimitMinutes) minutes."
+                        messageAction = nil
+                    } else if let schedule = sessionStore.pendingPlanSchedule,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                        sessionStore.applyAdaptivePlan(
+                            startMinute: schedule.startMinute,
+                            endMinute: schedule.endMinute,
+                            durationDays: schedule.durationDays,
+                            activateCurrentWindow: false,
+                            name: schedule.name,
+                            weekdays: schedule.weekdays
+                        )
+                        applyScreenTimeControls()
+                        message = "Added (schedule.name) without replacing your existing protection windows."
+                        messageAction = nil
                     } else {
                         sessionStore.selection = contextualPlanSelection
                     }
@@ -190,7 +236,8 @@ struct HomeView: View {
             AssistantConnectSheet(
                 whatsAppNumber: configuredWhatsAppNumber(),
                 smsNumber: configuredSMSNumber(),
-                openURL: openURL
+                openURL: openURL,
+                initialContext: assistantContextPayload()
             )
         }
         .sheet(isPresented: $showingRelink) {
@@ -204,12 +251,31 @@ struct HomeView: View {
             }
             .presentationDetents([.medium])
         }
+        .confirmationDialog(
+            "Review and confirm",
+            isPresented: Binding(
+                get: { sessionStore.pendingAssistantAction != nil },
+                set: { isPresented in
+                    if !isPresented { sessionStore.clearAssistantActionConfirmation() }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Confirm") {
+                confirmPendingAssistantAction()
+            }
+            Button("Cancel", role: .cancel) {
+                sessionStore.clearAssistantActionConfirmation()
+            }
+        } message: {
+            Text(assistantActionConfirmationMessage)
+        }
         .fullScreenCover(isPresented: $showingRelapseReview) {
             RelapseReviewSheet(
                 intervention: relapseIntervention,
                 onSelect: { reason in
                     sessionStore.recordRelapseReview(reason)
-                    sessionStore.applyAIPlan()
+                    sessionStore.requestAssistantActionConfirmation(.applyAIPlan)
                     Task {
                         await BlankFunnelAnalytics.track(
                             "ai_plan_applied",
@@ -358,6 +424,203 @@ struct HomeView: View {
     @ViewBuilder
     private func topHomePanel(width: CGFloat) -> some View {
         EmptyView()
+    }
+
+    private func minimalHome(layout: HomeLayoutMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Text("1")
+                    .font(.blankInter(size: 76, weight: .semibold, relativeTo: .largeTitle))
+                    .foregroundStyle(BlankColors.minimalFaded)
+                    .minimumScaleFactor(0.8)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "asterisk")
+                    .font(.system(size: 35, weight: .bold))
+                    .foregroundStyle(BlankColors.minimalInk)
+                    .frame(width: 44, height: 44)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, layout.topPadding)
+
+            Spacer(minLength: 24)
+
+            VStack(alignment: .leading, spacing: 0) {
+                minimalStartRow
+
+                minimalHomeRow("Stats", color: BlankColors.minimalSecondary) {
+                    openSection(.report)
+                }
+
+                minimalHomeRow("Plan", color: BlankColors.minimalSecondary) {
+                    openSection(.modes)
+                }
+
+                minimalHomeRow("Timer", color: BlankColors.minimalSecondary) {
+                    openSection(.timer)
+                }
+
+                minimalHomeRow("Emergency", color: BlankColors.minimalSecondary) {
+                    openSection(.emergency)
+                }
+
+                minimalStatus
+
+                HStack(spacing: 18) {
+                    minimalUtilityRow("Assistant") {
+                        showingAssistantConnect = true
+                    }
+
+                    #if targetEnvironment(simulator)
+                    minimalUtilityRow("Onboarding") {
+                        openOnboardingDemo()
+                    }
+
+                    minimalUtilityRow("Pro") {
+                        enableDemoPro()
+                    }
+                    #endif
+                }
+                .padding(.top, 14)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: layout.bottomPadding)
+        }
+        .padding(.horizontal, layout.horizontalPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+
+    private var minimalStartRow: some View {
+        let isActive = sessionStore.isBlankActive
+        let title = isActive
+            ? (sessionStore.hardBlankActive ? "Blank active" : "Hold to unblank")
+            : "Start Blank"
+        let titleColor = isActive ? BlankColors.minimalSecondary : BlankColors.minimalInk
+
+        return Button {
+            guard !isActive else { return }
+            let result = withAnimation(.easeInOut(duration: 0.65)) {
+                sessionStore.activateBlank()
+            }
+            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
+            setMessage(for: result)
+        } label: {
+            Text(title)
+                .font(.blankInter(size: 30, weight: .semibold, relativeTo: .title2))
+                .foregroundStyle(titleColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottomLeading) {
+            if isActive, !sessionStore.hardBlankActive {
+                GeometryReader { proxy in
+                    Rectangle()
+                        .fill(BlankColors.minimalInk.opacity(0.16))
+                        .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
+                        .frame(maxHeight: .infinity, alignment: .bottomLeading)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 20, maximumDistance: .infinity)
+                .onEnded { _ in
+                    guard isActive, !sessionStore.hardBlankActive else { return }
+                    scheduleDelayedManualUnlock()
+                    unblankHoldProgress = 0
+                    isAnimatingUnblankHold = false
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in
+                    guard isActive, !sessionStore.hardBlankActive, !isAnimatingUnblankHold else { return }
+                    isAnimatingUnblankHold = true
+                    unblankHoldProgress = 0
+                    withAnimation(.linear(duration: 20)) {
+                        unblankHoldProgress = 1
+                    }
+                }
+                .onEnded { _ in
+                    isAnimatingUnblankHold = false
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        unblankHoldProgress = 0
+                    }
+                }
+        )
+    }
+
+    @ViewBuilder
+    private var minimalStatus: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if sessionStore.isBlankActive,
+               sessionStore.blankActiveUntil == nil,
+               let blankActiveSince = sessionStore.blankActiveSince {
+                Text(elapsedText(since: blankActiveSince))
+                    .font(.blankInter(size: 14, weight: .semibold, relativeTo: .footnote))
+                    .monospacedDigit()
+            }
+
+            if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
+                Text("Schedule paused (remainingText(until: schedulePausedUntil))")
+                    .font(.blankInter(size: 13, relativeTo: .footnote))
+            }
+
+            if let message {
+                if let messageAction {
+                    Button {
+                        resolve(messageAction)
+                    } label: {
+                        Text(message)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Text(message)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+
+            if let cooldownText {
+                Text(cooldownText)
+                    .monospacedDigit()
+            } else if let timerCountdownText {
+                Text(timerCountdownText)
+                    .monospacedDigit()
+            }
+        }
+        .font(.blankInter(size: 13, relativeTo: .footnote))
+        .foregroundStyle(BlankColors.minimalSecondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.top, 12)
+    }
+
+    private func minimalUtilityRow(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+            .foregroundStyle(BlankColors.minimalSecondary)
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .buttonStyle(.plain)
     }
 
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
@@ -686,6 +949,186 @@ struct HomeView: View {
         sessionStore.shouldOpenBlockConfiguration = false
     }
 
+    private var assistantActionConfirmationMessage: String {
+        guard let action = sessionStore.pendingAssistantAction else {
+            return "No action is waiting for confirmation."
+        }
+        switch action {
+        case .startProtection(let minutes, _, let appNames):
+            let target = appNames.isEmpty ? "the current app selection" : appNames.joined(separator: ", ")
+            return minutes.map { "Start protection now for \($0) minutes using \(target)?" } ?? "Start protection now using \(target), with no duration added?"
+        case .activateMode(let name, let minutes, _, _):
+            return minutes.map { "Start \(name) mode for \($0) minutes?" } ?? "Start \(name) mode now, without adding a duration?"
+        case .switchMode(let name):
+            return "Switch to \(name) mode?"
+        case .applySchedule(let name, let start, let end, _, let days, _):
+            return "Add \(name) as a new protection window from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .setDailyLimit(let minutes, _):
+            return minutes.map { "Set a daily limit of \($0) minutes?" } ?? "Set a daily limit after you choose its duration?"
+        case .allowOnly:
+            return "Enable Allow Only?"
+        case .adultFilter:
+            return "Enable adult web protection?"
+        case .pauseRules(let hours):
+            return "Pause protection rules for \(hours) hours?"
+        case .disablePause:
+            return "Resume protection rules?"
+        case .applyAIPlan:
+            return "Apply the recommended adaptive plan?"
+        case .openAppPicker:
+            return "Open the app picker to choose what Blanked can protect?"
+        case .configureAndOpenAppPicker(let appNames, let durationMinutes, _, let schedule):
+            if let schedule {
+                return "Choose the apps for (schedule.name) from (formatMinute(schedule.startMinute)) to (formatMinute(schedule.endMinute))?"
+            }
+            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
+            return durationMinutes.map { "Choose (target) and start protection for ($0) minutes?" } ?? "Choose (target) and start protection now?"
+        case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
+            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
+            return "Choose (target) and set a daily limit of (minutes) minutes?"
+        case .requestScreenTimePermission:
+            return "Request Screen Time permission?"
+        }
+    }
+
+    private func confirmPendingAssistantAction() {
+        guard let pendingAction = sessionStore.pendingAssistantAction else { return }
+        sessionStore.clearAssistantActionConfirmation()
+
+        switch pendingAction {
+        case .startProtection(let minutes, let hardMode, let appNames):
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(
+                    appNames: appNames,
+                    startsFreshSelection: !appNames.isEmpty,
+                    shouldActivate: true,
+                    durationMinutes: minutes,
+                    hardMode: hardMode
+                )
+                return
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+        case .activateMode(let name, let minutes, let hardMode, let appNames):
+            if !sessionStore.selectBestMode(matching: name) {
+                guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                    sessionStore.requestBlockConfiguration(
+                        appNames: appNames,
+                        startsFreshSelection: !appNames.isEmpty,
+                        modeName: name,
+                        shouldActivate: true,
+                        durationMinutes: minutes,
+                        hardMode: hardMode
+                    )
+                    return
+                }
+                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection, appNames: appNames)
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+        case .switchMode(let name):
+            if sessionStore.selectBestMode(matching: name) {
+                message = "\(name) mode selected."
+                messageAction = nil
+            } else if sessionStore.hasSelectedApps {
+                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection)
+                message = "\(name) mode saved."
+                messageAction = nil
+            } else {
+                sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
+            }
+        case .applySchedule(let name, let start, let end, let weekdays, let days, let appNames):
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(
+                    appNames: appNames,
+                    startsFreshSelection: !appNames.isEmpty,
+                    schedule: PendingPlanSchedule(
+                        name: name,
+                        startMinute: start,
+                        endMinute: end,
+                        weekdays: weekdays,
+                        durationDays: days
+                    )
+                )
+                return
+            }
+            sessionStore.applyAdaptivePlan(
+                startMinute: start,
+                endMinute: end,
+                durationDays: days,
+                activateCurrentWindow: false,
+                name: name,
+                weekdays: weekdays
+            )
+            applyScreenTimeControls()
+            message = "Added \(name) without replacing your existing protection windows."
+            messageAction = nil
+        case .setDailyLimit(let minutes, let appNames):
+            guard let minutes else {
+                message = "Tell BM how many minutes per day you want to allow before activating this limit."
+                messageAction = nil
+                return
+            }
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: !appNames.isEmpty)
+                return
+            }
+            sessionStore.dailyLimitMinutes = minutes
+            sessionStore.dailyLimitEnabled = true
+            sessionStore.refreshDailyLimitMonitoring()
+            applyScreenTimeControls()
+            message = "Daily limit set to \(minutes) minutes."
+            messageAction = nil
+        case .allowOnly:
+            sessionStore.allowOnlyModeEnabled = true
+            applyScreenTimeControls()
+        case .adultFilter:
+            sessionStore.adultContentBlockingEnabled = true
+            applyScreenTimeControls()
+        case .pauseRules(let hours):
+            sessionStore.enableVacationMode(hours: hours)
+            applyScreenTimeControls()
+        case .disablePause:
+            sessionStore.disableVacationMode()
+            applyScreenTimeControls()
+        case .applyAIPlan:
+            sessionStore.applyAIPlan()
+            applyScreenTimeControls()
+        case .openAppPicker(let appNames):
+            sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: true)
+        case .configureAndOpenAppPicker(let appNames, let durationMinutes, let hardMode, let schedule):
+            sessionStore.requestBlockConfiguration(
+                appNames: appNames,
+                startsFreshSelection: true,
+                shouldActivate: schedule == nil,
+                durationMinutes: durationMinutes,
+                hardMode: hardMode,
+                schedule: schedule
+            )
+        case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
+            sessionStore.requestBlockConfiguration(
+                appNames: appNames,
+                startsFreshSelection: true,
+                dailyLimitMinutes: minutes
+            )
+        case .requestScreenTimePermission:
+            Task {
+                _ = await screenTimeBlocker.requestAuthorization()
+                applyScreenTimeControls()
+            }
+        }
+    }
+
     private var contextualPickerHeaderText: String {
         if let modeName = sessionStore.pendingPlanModeName {
             return "Create \(modeName) mode"
@@ -726,6 +1169,55 @@ struct HomeView: View {
         guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankSMSPhoneNumber") as? String else { return nil }
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty || trimmed.contains("$(") ? nil : trimmed
+    }
+
+    private func assistantContextPayload() -> [String: Any] {
+        let system = aiSystem
+        var payload: [String: Any] = [
+            "is_blank_active": sessionStore.isBlankActive,
+            "has_selected_apps": sessionStore.hasSelectedApps,
+            "selection_count": sessionStore.selectionCount,
+            "screen_time_authorized": screenTimeBlocker.authorizationStatus == .approved,
+            "emergency_unlocks_remaining": sessionStore.emergencyUnlocksRemaining,
+            "vacation_mode_active": sessionStore.isVacationModeActive,
+            "adherence_score": system.profile.adherenceScore,
+            "weekly_protected_minutes": system.profile.weeklyProtectedMinutes,
+            "weekly_break_count": system.profile.weeklyBreakCount,
+            "risk_window": system.forecast.riskWindow,
+            "recommended_duration_minutes": system.plan.recommendedDurationMinutes,
+            "weekly_goal": system.plan.weeklyGoal,
+            "mode_name": sessionStore.currentMode.name,
+            "available_modes": sessionStore.focusModes.map(\.name),
+            "available_mode_catalog": sessionStore.assistantModeCatalog(),
+            "app_presence": BlankmindAppPresence.payload(
+                appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
+            ),
+            "schedule": sessionStore.assistantScheduleContext(),
+            "allow_only_mode_enabled": sessionStore.allowOnlyModeEnabled,
+            "adult_content_blocking_enabled": sessionStore.adultContentBlockingEnabled,
+            "daily_limit_enabled": sessionStore.dailyLimitEnabled,
+            "daily_limit_minutes": sessionStore.dailyLimitMinutes,
+            "memory": BlankedAgentMemory.snapshot(system: system),
+        ]
+        if let strongestWindow = system.profile.strongestWindow {
+            payload["strongest_hour"] = strongestWindow
+        }
+        return payload
+    }
+
+    private func syncAssistantContext() {
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        guard !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        let payload = assistantContextPayload()
+        Task {
+            await AssistantContextSyncClient().sync(
+                connectCode: code,
+                channel: channel,
+                phoneNumber: assistantPhoneNumber,
+                payload: payload
+            )
+        }
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -2132,7 +2624,10 @@ private struct RelapseReviewSheet: View {
                     .ignoresSafeArea()
                 }
 
-                VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+
+                    VStack(alignment: .leading, spacing: 22) {
                     VStack(alignment: .leading, spacing: 14) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 15, weight: .semibold))
@@ -2190,8 +2685,11 @@ private struct RelapseReviewSheet: View {
                     .padding(.top, 2)
 
                     Spacer(minLength: 0)
+                    }
+                    .frame(width: contentWidth, alignment: .leading)
+
+                    Spacer(minLength: 0)
                 }
-                .frame(width: contentWidth, alignment: .leading)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .padding(.top, 92)
                 .padding(.bottom, 28)
@@ -2650,10 +3148,12 @@ private struct AssistantConnectSheet: View {
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
     @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
     @State private var copiedCode = false
+    @State private var showingPhoneSignIn = false
 
     let whatsAppNumber: String?
     let smsNumber: String?
     let openURL: OpenURLAction
+    let initialContext: [String: Any]
 
     var body: some View {
         GeometryReader { proxy in
@@ -2705,6 +3205,13 @@ private struct AssistantConnectSheet: View {
                             Text("Used to match your CONNECT message.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
+
+                            Button("Sign in with your phone") {
+                                showingPhoneSignIn = true
+                            }
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                            .foregroundStyle(textColor)
+                            .buttonStyle(.plain)
                         }
 
                         VStack(spacing: 10) {
@@ -2780,6 +3287,10 @@ private struct AssistantConnectSheet: View {
         .onAppear {
             ensureConnectCode()
         }
+        .sheet(isPresented: $showingPhoneSignIn) {
+            AppPhoneSignInSheet(initialPhone: phoneNumber)
+                .environmentObject(sessionStore)
+        }
     }
 
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
@@ -2826,7 +3337,8 @@ private struct AssistantConnectSheet: View {
             await registerAssistantPreference(
                 channel: channel,
                 connectCode: connectCode,
-                userPhone: cleanedUserPhone
+                userPhone: cleanedUserPhone,
+                context: initialContext
             )
             await BlankFunnelAnalytics.track(
                 "assistant_channel_connect_started",
@@ -2840,7 +3352,12 @@ private struct AssistantConnectSheet: View {
         dismiss()
     }
 
-    private func registerAssistantPreference(channel: AssistantChannel, connectCode: String, userPhone: String) async {
+    private func registerAssistantPreference(
+        channel: AssistantChannel,
+        connectCode: String,
+        userPhone: String,
+        context: [String: Any]
+    ) async {
         guard let baseURL = configuredBaseURL() else { return }
         var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
         request.httpMethod = "POST"
@@ -2850,7 +3367,8 @@ private struct AssistantConnectSheet: View {
             "action": "register_preference",
             "connect_code": connectCode,
             "preferred_channel": channel == .whatsApp ? "whatsapp" : "sms",
-            "user_phone": userPhone
+            "user_phone": userPhone,
+            "context": context
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         _ = try? await URLSession.shared.data(for: request)
@@ -2865,6 +3383,177 @@ private struct AssistantConnectSheet: View {
             return nil
         }
         return URL(string: trimmed)
+    }
+}
+
+private struct AppPhoneSignInSheet: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
+    @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @State private var code = ""
+    @State private var channel = "whatsapp"
+    @State private var verificationStarted = false
+    @State private var isWorking = false
+    @State private var errorMessage: String?
+
+    let initialPhone: String
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Use the same phone number you verified on the web. Blankmind will link this app install to that account and its WhatsApp or SMS thread.")
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Phone") {
+                    TextField("+1 555 000 0000", text: $phoneNumber)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                    Picker("Send code by", selection: $channel) {
+                        Text("WhatsApp").tag("whatsapp")
+                        Text("SMS").tag("sms")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if verificationStarted {
+                    Section("Verification code") {
+                        TextField("123456", text: $code)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                        Button(isWorking ? "Verifying…" : "Verify and connect") {
+                            Task { await verifyCode() }
+                        }
+                        .disabled(isWorking || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                } else {
+                    Section {
+                        Button(isWorking ? "Sending…" : "Send verification code") {
+                            Task { await requestCode() }
+                        }
+                        .disabled(isWorking || phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Connect Blankmind")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear {
+                if phoneNumber.isEmpty { phoneNumber = initialPhone }
+            }
+        }
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private func requestCode() async {
+        await performRequest(action: "request_otp", payload: [
+            "phone": phoneNumber,
+            "channel": channel,
+        ])
+        if errorMessage == nil { verificationStarted = true }
+    }
+
+    private func verifyCode() async {
+        do {
+            isWorking = true
+            errorMessage = nil
+            let auth = try await postJSON(path: "app-auth", payload: [
+                "action": "verify_otp",
+                "phone": phoneNumber,
+                "token": code,
+            ])
+            guard let accessToken = auth["access_token"] as? String, !accessToken.isEmpty else {
+                throw AppPhoneSignInError.message("Blankmind did not return a session.")
+            }
+            let linked = try await postJSON(
+                path: "app-handoff",
+                payload: [
+                    "action": "claim_identity",
+                    "app_install_id": BlankSharedState.appInstallId,
+                    "data_consent": true,
+                ],
+                bearerToken: accessToken
+            )
+            guard let linkedCode = linked["assistant_connect_code"] as? String, !linkedCode.isEmpty else {
+                throw AppPhoneSignInError.message("The account was verified but the assistant link was not created.")
+            }
+            connectCode = linkedCode
+            preferredChannel = channel
+            if let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty {
+                phoneNumber = linkedPhone
+            }
+            connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isWorking = false
+    }
+
+    private func performRequest(action: String, payload: [String: Any]) async {
+        do {
+            isWorking = true
+            errorMessage = nil
+            var body = payload
+            body["action"] = action
+            _ = try await postJSON(path: "app-auth", payload: body)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isWorking = false
+    }
+
+    private func postJSON(path: String, payload: [String: Any], bearerToken: String? = nil) async throws -> [String: Any] {
+        guard let baseURL = configuredBaseURL() else {
+            throw AppPhoneSignInError.message("Blankmind connection is not configured in this build.")
+        }
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let bearerToken { request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization") }
+        request.timeoutInterval = 12
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let result = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            let detail = result["detail"] as? String ?? result["error"] as? String ?? "Request failed."
+            throw AppPhoneSignInError.message(detail.replacingOccurrences(of: "_", with: " "))
+        }
+        return result
+    }
+
+    private func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return URL(string: trimmed)
+    }
+}
+
+private enum AppPhoneSignInError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        if case let .message(value) = self { return value }
+        return nil
     }
 }
 

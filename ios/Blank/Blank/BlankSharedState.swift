@@ -9,6 +9,15 @@ enum BlankSharedState {
         UserDefaults(suiteName: appGroupIdentifier) ?? .standard
     }
 
+    static var appInstallId: String {
+        if let existing = defaults.string(forKey: Keys.appInstallId), !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString
+        defaults.set(created, forKey: Keys.appInstallId)
+        return created
+    }
+
     static func hasConfiguredBlock(in defaults: UserDefaults = Self.defaults) -> Bool {
         selectionCount(in: defaults) > 0
     }
@@ -237,6 +246,7 @@ enum BlankSharedState {
     }
 
     enum Keys {
+        static let appInstallId = "blankIdentityAppInstallId"
         static let isBlankActive = "isBlankActive"
         static let blankActiveSince = "blankActiveSince"
         static let blankActiveUntil = "blankActiveUntil"

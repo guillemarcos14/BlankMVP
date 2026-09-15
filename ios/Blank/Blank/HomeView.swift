@@ -441,6 +441,7 @@ struct HomeView: View {
         EmptyView()
     }
 
+    @ViewBuilder
     private func minimalHome(layout: HomeLayoutMetrics) -> some View {
         if sessionStore.isBlankActive {
             activeMinimalHome(layout: layout)

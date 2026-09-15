@@ -75,11 +75,11 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
             .frame(height: minimalAppearance ? 52 : 50)
             .foregroundStyle(light ? BlankColors.ink : Color.white)
             .background {
-                if minimalAppearance {
-                    Rectangle()
-                        .fill(light ? BlankColors.minimalInk.opacity(configuration.isPressed ? 0.78 : 1) : Color.white.opacity(configuration.isPressed ? 0.72 : 0.94))
-                } else {
-                    ZStack {
+                ZStack {
+                    if minimalAppearance {
+                        Rectangle()
+                            .fill(light ? BlankColors.minimalInk.opacity(configuration.isPressed ? 0.78 : 1) : Color.white.opacity(configuration.isPressed ? 0.72 : 0.94))
+                    } else {
                         Capsule().fill(.ultraThinMaterial)
                         Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
                         BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
@@ -104,11 +104,11 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
             .frame(height: minimalAppearance ? 52 : 48)
             .foregroundStyle(BlankColors.ink)
             .background {
-                if minimalAppearance {
-                    Rectangle()
-                        .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.04))
-                } else {
-                    ZStack {
+                ZStack {
+                    if minimalAppearance {
+                        Rectangle()
+                            .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.04))
+                    } else {
                         Capsule().fill(.ultraThinMaterial)
                         Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.42 : 0.30))
                         Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
@@ -288,10 +288,10 @@ struct TopSheetPrimaryButtonLabel: View {
             .padding(.horizontal, 26)
             .frame(height: minimalAppearance ? 52 : 46)
             .background {
-                if minimalAppearance {
-                    Rectangle().fill(BlankColors.minimalInk.opacity(0.08))
-                } else {
-                    ZStack {
+                ZStack {
+                    if minimalAppearance {
+                        Rectangle().fill(BlankColors.minimalInk.opacity(0.08))
+                    } else {
                         Capsule().fill(.ultraThinMaterial)
                         Capsule().fill(Color.white.opacity(0.34))
                         BlankGlassCornerHighlight(width: 74, height: 28, xOffset: -44, yOffset: -15)

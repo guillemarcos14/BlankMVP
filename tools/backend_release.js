@@ -287,7 +287,7 @@ function deploy(args) {
   }
   if (args.netlify) {
     const siteId = args.siteId || "59955668-9a9b-4979-a283-63fbf3115fe5";
-    run("npx", ["netlify", "deploy", "--prod", "--dir", "web/landing", "--site", siteId], { inherit: true });
+    run("npx", ["netlify", "deploy", "--prod", "--dir", "web/landing", "--site", siteId, "--skip-functions-cache"], { inherit: true });
     actions.push("netlify getblank");
   }
   const reportPath = writeReport("deploy.json", {

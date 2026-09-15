@@ -494,7 +494,7 @@ struct HomeView: View {
         let isActive = sessionStore.isBlankActive
         let title = isActive
             ? (sessionStore.hardBlankActive ? "blank active" : "hold to unblank")
-            : "start blank"
+            : "blank"
         let titleColor = isActive ? BlankColors.minimalSecondary : BlankColors.minimalInk
 
         return Button {

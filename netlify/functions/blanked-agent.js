@@ -224,6 +224,59 @@ function shouldOfferAppPresenceGuidance(prompt, plan, context = {}) {
   return actions.length > 0 || blockingContract.user_request;
 }
 
+function claimsAppInstalled(prompt) {
+  return /^(?:i have (?:it|the app)|already have (?:it|the app)|it(?:'s| is) installed|the app is installed|ya la tengo(?: instalada)?|la app está instalada|la app esta instalada)[.!\s]*$/i.test(cleanText(prompt, 120));
+}
+
+function recentScrollWindow(context = {}) {
+  const messages = recentMessages(context);
+  let start = null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user") continue;
+    const app = namedApp(message.content);
+    if (app === "the app") continue;
+    const minute = looseSingleTime(message.content);
+    if (minute == null) continue;
+    start = { app, startMinute: minute, index };
+    break;
+  }
+  if (!start) return null;
+  for (let index = messages.length - 1; index > start.index; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user" || namedApp(message.content) !== "the app") continue;
+    const endMinute = looseSingleTime(message.content, start.startMinute);
+    if (endMinute == null) continue;
+    return { app: start.app, startMinute: start.startMinute, endMinute };
+  }
+  return null;
+}
+
+function hasConfirmedWindowContext(context = {}) {
+  const messages = recentMessages(context);
+  const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
+  const assistantText = messages
+    .filter((message) => message.role === "assistant")
+    .map((message) => message.content)
+    .join(" ")
+    .toLowerCase();
+  return Boolean(
+    recentScrollWindow(context) &&
+    /want me to use|confirm(?: window| the window)?|confirmar(?: la franja)?|usar esa franja/i.test(assistantText) &&
+    /\b(?:yes|yeah|yep|correct|do it|go ahead|confirm|sí|si|vale|adelante|hazlo)\b/i.test(recentText),
+  );
+}
+
+function isConfirmedPlanContinuation(prompt, plan, context = {}) {
+  const actions = Array.isArray(plan?.actions) ? plan.actions : [];
+  if (!actions.some((item) => item && item.type === "apply_schedule")) return false;
+  const value = cleanText(prompt, 80);
+  const affirmative = /^(?:yes|yeah|yep|correct|do it|go ahead|confirm|confirm window|sí|si|vale|adelante|hazlo|confirmar(?: la franja)?)[.!\s]*$/i.test(value);
+  const latestAssistant = [...recentMessages(context)].reverse().find((message) => message.role === "assistant");
+  const immediateConfirmation = affirmative && Boolean(latestAssistant && /want me to use|confirm(?: window| the window)?|confirmar(?: la franja)?|usar esa franja/i.test(latestAssistant.content));
+  return immediateConfirmation || (claimsAppInstalled(prompt) && hasConfirmedWindowContext(context));
+}
+
 function truncateForTail(value, maxLength) {
   const text = naturalChannelText(value, maxLength);
   if (text.length <= maxLength) return text;
@@ -236,6 +289,30 @@ function appendAppPresenceGuidance(plan, prompt, context = {}, language = "en") 
   if (!shouldOfferAppPresenceGuidance(prompt, plan, context)) return plan;
   const presence = deriveAppPresence(context.app_presence);
   if (presence.state === "recently_seen") return plan;
+
+  if (isConfirmedPlanContinuation(prompt, plan, context)) {
+    const schedule = Array.isArray(plan.actions)
+      ? plan.actions.find((item) => item && item.type === "apply_schedule")
+      : null;
+    const recentWindow = recentScrollWindow(context);
+    const appLabel = recentWindow?.app || recentAppTiming(context)?.app || (language === "es" ? "las apps seleccionadas" : "the selected apps");
+    const startMinute = Number.isFinite(schedule?.start_minute) ? schedule.start_minute : recentWindow?.startMinute ?? 0;
+    const endMinute = Number.isFinite(schedule?.end_minute) ? schedule.end_minute : recentWindow?.endMinute ?? startMinute;
+    const startText = minuteText(startMinute);
+    const endText = minuteText(endMinute);
+    const message = language === "es"
+      ? `Confirmado: el plan protegería ${appLabel} de ${localizeMinuteText(startText, language)} a ${localizeMinuteText(endText, language)}. Abre Blankmind para revisarlo y elige ${appLabel} allí solo si la app te lo pide.`
+      : `Confirmed: the plan will protect ${appLabel} from ${startText} to ${endText}. Open Blankmind to review it, and choose ${appLabel} there only if the app asks you to.`;
+    return {
+      ...plan,
+      response_text: message,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
 
   const downloadUrl = blankmindAppDownloadUrl();
   const guidance = presence.state === "stale"
@@ -1276,13 +1353,18 @@ function scrollUntilSleepTime(prompt) {
     /\buntil\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i.test(text);
 }
 
-function looseSingleTime(prompt) {
+function looseSingleTime(prompt, referenceMinute = null) {
   const text = cleanText(prompt, 600).toLowerCase();
   const match = text.match(/\b(?:usually|normalmente|sobre|around|at|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   if (!match) return null;
   const rawHour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  if (!match[3] && rawHour === 12 && Number.isFinite(referenceMinute)) {
+    const referenceHour = Math.floor(referenceMinute / 60);
+    if (referenceHour >= 6 && referenceHour < 12) return 12 * 60 + minute;
+  }
   const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
-  return minuteOfDay(rawHour, Number(match[2] || 0), meridiem);
+  return minuteOfDay(rawHour, minute, meridiem);
 }
 
 function recentMessages(context = {}) {
@@ -1393,6 +1475,38 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const hasRecentScrollWindowEndQuestion = /what time should (?:the )?(?:protection|boundary|block) end|what time should it become available again|need end time|what time should the protection end|a qué hora debería terminar la protección|hora final/i.test(recentAssistantText);
   const confirmationWindow = explicitTimeWindow(latestAssistantText, context);
   const confirmsRecentScrollWindow = /^(?:yes|yeah|yep|correct|do it|go ahead|confirm|confirm window|sí|si|vale|adelante|hazlo|confirmar(?: la franja)?)[.!\s]*$/i.test(cleanText(prompt, 80)) && /confirm(?: window| the window)?|want me to use|use that .*window|confirmar(?: la franja)?|usar esa franja/i.test(latestAssistantText);
+  const recentWindow = recentScrollWindow(context);
+  if (claimsAppInstalled(prompt) && hasConfirmedWindowContext(context) && recentWindow) {
+    const startText = minuteText(recentWindow.startMinute);
+    const endText = minuteText(recentWindow.endMinute);
+    const message = language === "es"
+      ? `Perfecto. El plan ya está preparado para proteger ${recentWindow.app} de ${localizeMinuteText(startText, language)} a ${localizeMinuteText(endText, language)}. Abre Blankmind para revisarlo y elige ${recentWindow.app} allí solo si la app te lo pide.`
+      : `Perfect. The plan is ready to protect ${recentWindow.app} from ${startText} to ${endText}. Open Blankmind to review it, and choose ${recentWindow.app} there only if the app asks you to.`;
+    return {
+      intent: "social",
+      title: "Morning Protection",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentWindow.app} de ${startText} a ${endText}.` : `Read: ${recentWindow.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: el plan ya está creado y solo necesita revisión en la app." : "Pattern: the plan is already created and only needs review in the app.",
+        language === "es" ? "Movimiento: selecciona la app únicamente si Blankmind te lo solicita." : "Move: select the app only if Blankmind asks you to.",
+      ],
+      primary_label: language === "es" ? "Revisar plan" : "Review plan",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [action("apply_schedule", {
+        name: language === "es" ? "Protección de mañana" : "Morning Protection",
+        start_minute: recentWindow.startMinute,
+        end_minute: recentWindow.endMinute,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
   if (recentRelative && relativeMinute != null && recentRelative.key === "bedtime") {
     const start = ((relativeMinute + recentRelative.startOffset) % (24 * 60) + (24 * 60)) % (24 * 60);
     const end = (start + recentRelative.duration) % (24 * 60);
@@ -1419,8 +1533,11 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       followup_text: "",
     };
   }
-  if (recentTiming && recentTiming.minute != null && hasRecentScrollWindowEndQuestion && looseSingleTime(prompt) != null) {
-    const endMinute = looseSingleTime(prompt);
+  const followupEndMinute = recentTiming && recentTiming.minute != null
+    ? looseSingleTime(prompt, recentTiming.minute)
+    : null;
+  if (recentTiming && recentTiming.minute != null && hasRecentScrollWindowEndQuestion && followupEndMinute != null) {
+    const endMinute = followupEndMinute;
     const startText = minuteText(recentTiming.minute);
     const endText = minuteText(endMinute);
     const message = language === "es"
@@ -1450,8 +1567,8 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
     const endText = minuteText(confirmationWindow.end);
     const name = language === "es" ? "Protección de mañana" : "Morning Protection";
     const message = language === "es"
-      ? `Confirmado: protegería ${recentTiming.app} de ${startText} a ${endText}. La app aplicará la franja después de revisar los permisos.`
-      : `Confirmed: I’d protect ${recentTiming.app} from ${startText} to ${endText}. Blanked App will apply the window after you review permissions.`;
+      ? `Confirmado: el plan protegería ${recentTiming.app} de ${startText} a ${endText}. Abre Blankmind para revisarlo y elige la app solo si te lo pide.`
+      : `Confirmed: the plan will protect ${recentTiming.app} from ${startText} to ${endText}. Open Blankmind to review it, and choose the app only if it asks you to.`;
     return {
       intent: "social",
       title: name,
@@ -1459,7 +1576,7 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       bullets: [
         language === "es" ? `Lectura: ${recentTiming.app} de ${startText} a ${endText}.` : `Read: ${recentTiming.app} from ${startText} to ${endText}.`,
         language === "es" ? "Patrón: has confirmado una franja concreta, no un límite diario inventado." : "Pattern: you confirmed a specific window, not an invented daily limit.",
-        language === "es" ? "Movimiento: revisar permisos y aplicar esta franja en Blankmind App." : "Move: review permissions and apply this window in Blanked App.",
+        language === "es" ? "Movimiento: revisar el plan y elegir la app solo si Blankmind lo solicita." : "Move: review the plan and choose the app only if Blankmind asks you to.",
       ],
       primary_label: language === "es" ? "Aplicar franja" : "Apply window",
       secondary_label: language === "es" ? "Ahora no" : "Not now",

@@ -122,6 +122,33 @@ async function run() {
   assert.ok(recentPlan.actions.length > 0);
   assert.doesNotMatch(recentPlan.message_text, /apps\.apple\.com|download it here|descárgala aquí/);
 
+  const confirmedWindowContext = [
+    { role: "user", content: "How can I scroll less in the morning?" },
+    { role: "assistant", content: "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day." },
+    { role: "user", content: "Instagram around 11am" },
+    { role: "assistant", content: "Got it: Instagram is the app and 11:00 AM is when it starts. What time should the protection end?" },
+    { role: "user", content: "At 12" },
+    { role: "assistant", content: "Got it: protect Instagram from 11:00 AM to 12:00 PM. Do you want me to use that as the morning protection window?" },
+  ];
+  const confirmedWithoutPresence = await request("yes", {
+    channel: "whatsapp",
+    recent_messages: confirmedWindowContext,
+  });
+  assert.deepStrictEqual(confirmedWithoutPresence.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.match(confirmedWithoutPresence.message_text, /Open Blankmind|Blankmind/);
+  assert.doesNotMatch(confirmedWithoutPresence.message_text, /apps\.apple\.com|download|create a plan/i);
+  const installedContinuation = await request("I have it", {
+    channel: "whatsapp",
+    recent_messages: [
+      ...confirmedWindowContext,
+      { role: "user", content: "yes" },
+      { role: "assistant", content: confirmedWithoutPresence.message_text },
+    ],
+  });
+  assert.deepStrictEqual(installedContinuation.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.match(installedContinuation.message_text, /plan|review/i);
+  assert.doesNotMatch(installedContinuation.message_text, /apps\.apple\.com|download|create a plan/i);
+
   const smallTalk = await request("Hey", { channel: "whatsapp" });
   assert.doesNotMatch(smallTalk.message_text, /apps\.apple\.com|download|descarga/i);
 

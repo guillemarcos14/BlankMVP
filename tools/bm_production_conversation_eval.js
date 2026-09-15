@@ -140,6 +140,58 @@ const traces = [
     ],
   },
   {
+    id: "confirmed_plan_survives_unknown_presence",
+    context: baseContext({
+      app_presence: {},
+      app_presence_state: "never_seen",
+      app_presence_recent: false,
+    }),
+    turns: [
+      {
+        prompt: "How can I scroll less in the morning?",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertNoInventedLimit(plan, label);
+        },
+      },
+      {
+        prompt: "Instagram around 11am",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /Instagram.*11:00 AM|11:00 AM.*Instagram/i, `${label}.keeps_context`);
+          assertContains(plan, /end|finish|time/i, `${label}.asks_for_end_time`);
+        },
+      },
+      {
+        prompt: "At 12",
+        check: (plan, label) => {
+          assertNoAction(plan, label);
+          assertContains(plan, /11:00 AM.*12:00 PM|12:00 PM.*11:00 AM/i, `${label}.infers_noon`);
+          assert.doesNotMatch(visibleText(plan), /12:00 AM/i, `${label}.not_midnight`);
+        },
+      },
+      {
+        prompt: "yes",
+        check: (plan, label) => {
+          const planActions = actions(plan);
+          assert.deepStrictEqual(planActions.map((item) => item.type), ["apply_schedule"], `${label}.plan_created_by_bm`);
+          assert.strictEqual(planActions[0].start_minute, 11 * 60, `${label}.start_minute`);
+          assert.strictEqual(planActions[0].end_minute, 12 * 60, `${label}.end_minute`);
+          assertContains(plan, /open blankmind|review/i, `${label}.review_in_app`);
+          assert.doesNotMatch(visibleText(plan), /apps\.apple\.com|download|create a plan|12:00 AM/i, `${label}.no_manual_creation_or_download`);
+        },
+      },
+      {
+        prompt: "I have it",
+        check: (plan, label) => {
+          assert.deepStrictEqual(actions(plan).map((item) => item.type), ["apply_schedule"], `${label}.preserves_created_plan`);
+          assertContains(plan, /plan|review/i, `${label}.continues_plan`);
+          assert.doesNotMatch(visibleText(plan), /apps\.apple\.com|download|create a plan/i, `${label}.no_manual_creation_or_download`);
+        },
+      },
+    ],
+  },
+  {
     id: "bedtime_context_continuity",
     context: baseContext(),
     turns: [

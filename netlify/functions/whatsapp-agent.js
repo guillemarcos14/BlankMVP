@@ -296,7 +296,7 @@ function whatsappReplyText(plan, prompt = "") {
   const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
   const link = actionableLink(plan, prompt);
   if (!link) return text;
-  return `${text}\n\nReview and confirm in Blanked:\n${link}`;
+  return `${text}\n\nReview and confirm in Blankmind:\n${link}`;
 }
 
 function whatsappActionButtonVariables(link) {

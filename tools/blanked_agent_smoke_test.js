@@ -157,6 +157,41 @@ function baseContext(overrides = {}) {
   assert.match(appTimeEndFollowup.message_text, /Instagram.*11:00 AM.*12:00 PM|11:00 AM.*12:00 PM.*Instagram/i);
   assert.match(appTimeEndFollowup.message_text, /confirm|want me to use/i);
   assert.doesNotMatch(appTimeEndFollowup.message_text, /from 11:00 AM to\.?$|25-minute|download|permission|App Store/i);
+  const appTimeBareNoon = await call("At 12", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeEndContext,
+  }));
+  assert.strictEqual(appTimeBareNoon.actions.length, 0);
+  assert.match(appTimeBareNoon.message_text, /11:00 AM.*12:00 PM|12:00 PM.*11:00 AM/i);
+  assert.doesNotMatch(appTimeBareNoon.message_text, /12:00 AM/i);
+  assert.match(appTimeBareNoon.message_text, /confirm|want me to use/i);
+  const appTimeBareNoonConfirmedContext = [
+    ...appTimeEndContext,
+    { role: "user", content: "At 12" },
+    { role: "assistant", content: appTimeBareNoon.message_text },
+  ];
+  const appTimeBareNoonConfirmed = await call("yes", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeBareNoonConfirmedContext,
+  }));
+  assert.deepStrictEqual(appTimeBareNoonConfirmed.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.strictEqual(appTimeBareNoonConfirmed.actions[0].end_minute, 12 * 60);
+  assert.doesNotMatch(appTimeBareNoonConfirmed.message_text, /apps\.apple\.com|download|create a plan|12:00 AM/i);
+  const appTimeInstalledContext = [
+    ...appTimeBareNoonConfirmedContext,
+    { role: "user", content: "yes" },
+    { role: "assistant", content: appTimeBareNoonConfirmed.message_text },
+  ];
+  const appTimeInstalledContinuation = await call("I have it", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeInstalledContext,
+  }));
+  assert.deepStrictEqual(appTimeInstalledContinuation.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.match(appTimeInstalledContinuation.message_text, /plan.*ready|prepared|review/i);
+  assert.doesNotMatch(appTimeInstalledContinuation.message_text, /apps\.apple\.com|download|create a plan/i);
   const appTimeConfirmedContext = [
     ...appTimeEndContext,
     { role: "user", content: "12pm" },

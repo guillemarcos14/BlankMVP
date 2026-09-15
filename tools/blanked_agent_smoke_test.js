@@ -129,6 +129,21 @@ function baseContext(overrides = {}) {
   assert.strictEqual(missingApp.actions.length, 0);
   assert.match(missingApp.response_text, /where|app|loop/i);
 
+  const appTimeContext = [
+    { role: "user", content: "How can I scroll less in the morning?" },
+    { role: "assistant", content: "Got it. Before making a block, tell me where the scrolling usually starts: app, moment, or time of day." },
+  ];
+  const appTimeFollowup = await call("11am Instagram", baseContext({
+    channel: "whatsapp",
+    assistant_channel: "whatsapp",
+    recent_messages: appTimeContext,
+    memory: { conversation_state: { recent_messages: appTimeContext } },
+  }));
+  assert.strictEqual(appTimeFollowup.actions.length, 0);
+  assert.match(appTimeFollowup.message_text, /Instagram.*11:00 AM|11:00 AM.*Instagram/i);
+  assert.match(appTimeFollowup.message_text, /what time.*end|end.*time/i);
+  assert.doesNotMatch(appTimeFollowup.message_text, /25-minute|download|permission|App Store/i);
+
   const breakfastWithoutTime = await call("I usually use social media after breakfast", baseContext({
     channel: "whatsapp",
     assistant_channel: "whatsapp",

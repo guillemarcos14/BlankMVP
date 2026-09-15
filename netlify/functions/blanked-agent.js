@@ -1375,6 +1375,7 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const timeMatch = cleanText(prompt, 120).match(/\b(?:around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   const timeText = timeMatch ? `${timeMatch[1]}:${String(timeMatch[2] || "00").padStart(2, "0")}${timeMatch[3] ? ` ${timeMatch[3].toUpperCase()}` : ""}` : "";
   const hasRecentAmbiguousLoss = /lose control|what do you lose control|do you mean|a qué te refieres|qué quieres decir/i.test(recentText);
+  const hasRecentScrollContextQuestion = /where the scrolling usually starts|where .*scrolling .*starts|app, moment, or time of day|app, momento o hora del día/i.test(recentText);
   const recentTiming = recentAppTiming(context);
   const recentRelative = recentRelativeTimeQuestion(context);
   const relativeMinute = recentRelative ? looseSingleTime(prompt) : null;
@@ -1419,6 +1420,29 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       ],
       primary_label: "Plan block",
       secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (app !== "the app" && timeText && hasRecentScrollContextQuestion) {
+    const message = language === "es"
+      ? `Entendido: ${app} es la app y las ${timeText} es cuando empieza. ¿A qué hora debería terminar la protección?`
+      : `Got it: ${app} is the app and ${timeText} is when it starts. What time should the protection end?`;
+    return {
+      intent: "social",
+      title: "Scroll Window",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${app} y las ${timeText} son el punto de partida.` : `Read: ${app} and ${timeText} are the starting point.`,
+        language === "es" ? "Patrón: todavía falta la hora final para definir una franja útil." : "Pattern: the end time is still needed for a useful window.",
+        language === "es" ? "Movimiento: dime cuándo termina la franja y la convierto en una protección concreta." : "Move: tell me when the window ends and I can turn it into a concrete boundary.",
+      ],
+      primary_label: language === "es" ? "Decir hora final" : "Tell me end time",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
       actions: [],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
@@ -1750,6 +1774,8 @@ function fallbackPlan(prompt, context = {}) {
   if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
   const deterministicContext = ambiguousDigitalMomentPlan(prompt, language);
   if (deterministicContext) return deterministicContext;
+  const contextualFollowup = conversationalFollowupPlan(prompt, context, language);
+  if (contextualFollowup) return contextualFollowup;
   const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;

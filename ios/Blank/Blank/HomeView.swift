@@ -478,11 +478,12 @@ struct HomeView: View {
     private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.blankInter(size: 34, weight: .bold, relativeTo: .title2))
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .foregroundStyle(color)
+                .tracking(-0.6)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-                .frame(maxWidth: .infinity, minHeight: 49, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -505,11 +506,12 @@ struct HomeView: View {
             setMessage(for: result)
         } label: {
             Text(title)
-                .font(.blankInter(size: 34, weight: .bold, relativeTo: .title2))
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .foregroundStyle(titleColor)
+                .tracking(-0.6)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
-                .frame(maxWidth: .infinity, minHeight: 49, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

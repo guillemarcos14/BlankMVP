@@ -629,7 +629,12 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   const reviewOnlyAppPresence = decision.type === "setup" && decision.slot === "app_presence";
   if (reviewOnlyAppPresence) actions = buildSemanticReviewAction(state, context);
   if (decision.type === "setup" && decision.slot === "permissions") actions = [{type:"request_screen_time_permission"}];
-  if (decision.type === "setup" && decision.slot === "app_selection") actions = [{type:"open_app_picker"}];
+  if (decision.type === "setup" && decision.slot === "app_selection") {
+    const executable = semanticActionFromFacts(state, context)[0];
+    actions = executable
+      ? [{ ...executable, type:"open_app_picker", ...(executable.type === "set_daily_limit" ? { name:"Daily Limit" } : {}) }]
+      : [{type:"open_app_picker"}];
+  }
   if (decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state)) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
   return { state, handled, decision, actions, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state), responseText:renderSemanticResponse(state,decision,context,prompt), patch, extractionValidation };

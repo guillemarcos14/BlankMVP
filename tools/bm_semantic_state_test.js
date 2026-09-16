@@ -94,7 +94,8 @@ test("category never expands to invented apps", () => {
 });
 test("preselected apps never silently replace requested named apps", () => {
   const results = chat(["Block TikTok now for 30 minutes once","yes"]);
-  assert.equal(results[1].decision.slot,"app_selection"); assert.deepEqual(results[1].actions,[{type:"open_app_picker"}]);
+  assert.equal(results[1].decision.slot,"app_selection");
+  assert.deepEqual(results[1].actions,[{type:"open_app_picker",minutes:30,hard_mode:false}]);
 });
 test("explicit selected-apps reference can use known selection", () => {
   const results = chat(["Block my selected apps now for 30 minutes once","yes"], {...DEVICE,selected_app_names:undefined});
@@ -259,6 +260,9 @@ test("model can ground a novel literal app without inventing device selection", 
   const r=advanceSemanticState({prompt:"Forest",previousState:previous,context:DEVICE,now:NOW,extraction:{set:{apps:["Forest"]},fields:[{slot:"apps",value:["Forest"],evidence:"Forest"}]}});
   equalSlot(r,"apps",["Forest"]); none(r);
   const confirmed=turn("yes",r.state); assert.equal(confirmed.decision.slot,"app_selection");
+  assert.equal(confirmed.actions[0].type,"open_app_picker");
+  assert.equal(confirmed.actions[0].minutes,30);
+  assert.deepEqual(confirmed.actions[0].app_names,undefined);
 });
 test("model cannot use stale or negated atomic evidence", () => {
   const args={prompt:"Not Forest, please",state:turn("Block apps now for 30 minutes once").state,context:DEVICE};

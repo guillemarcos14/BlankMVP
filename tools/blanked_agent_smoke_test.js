@@ -229,7 +229,11 @@ function baseContext(overrides = {}) {
   noAction(pickerProposal);
   const picker = await follow("yes",pickerProposal);
   assert.deepStrictEqual(picker.actions.map(a=>a.type),["open_app_picker"]);
-  for (const field of ["minutes","start_minute","end_minute","weekdays","duration_days"]) assert.strictEqual(picker.actions[0][field],null);
+  assert.strictEqual(picker.actions[0].minutes,null);
+  assert.strictEqual(picker.actions[0].start_minute,1140);
+  assert.strictEqual(picker.actions[0].end_minute,1200);
+  assert.deepStrictEqual(picker.actions[0].weekdays,[1,2,3,4,5,6,7]);
+  assert.strictEqual(picker.actions[0].duration_days,7);
   const claimedSelection = await call("I have already selected the app. Now block it.",baseContext({has_selected_apps:false,selection_count:0}));
   noAction(claimedSelection); question(claimedSelection,"apps");
   assert.strictEqual(fact(claimedSelection,"apps"),null);

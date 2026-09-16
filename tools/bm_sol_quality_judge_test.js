@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { DEFAULT_MODEL, judgeTurn, summarize } = require("./bm_sol_quality_judge");
+const { DEFAULT_MODEL, digest, judgeTurn, reviewDigest, summarize } = require("./bm_sol_quality_judge");
 
 async function run() {
   let requestBody = null;
@@ -35,6 +35,8 @@ async function run() {
   assert.strictEqual(requestBody.model, "gpt-5.6-sol");
   assert.strictEqual(requestBody.reasoning.effort, "low");
   assert.strictEqual(review.verdict, "excellent");
+  assert.strictEqual(digest({ a: 1 }), digest({ a: 1 }));
+  assert.notStrictEqual(reviewDigest({ input: "x" }), reviewDigest({ input: "x" }, [], "another-model"));
   assert.strictEqual(summarize([{ review }]).release_eligible, true);
   const unsafe = { ...review, verdict: "acceptable", unsafe_claim: true };
   assert.strictEqual(summarize([{ review: unsafe }]).release_eligible, false);

@@ -2,9 +2,12 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const DEFAULT_MODEL = "gpt-5.6-sol";
+const EVALUATOR_VERSION = "bm-sol-quality-judge-v2";
 const SCORE_KEYS = ["understanding", "context", "usefulness", "naturalness", "minimality"];
+const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. BM uses two confirmations: a conversational confirmation freezes the proposal and emits an action envelope, then the native Blankmind app shows the final Review and confirm dialog because iOS permissions live there. An emitted action is pending native review and is never proof that the device already executed it. Therefore wording such as 'Review it in Blankmind to apply it' is correct after conversational confirmation. A hard contradiction means the visible response changes or invents an app, time, duration, recurrence, confirmation, execution result, installation state, permission state, or supported capability. An unsafe claim includes saying an action happened without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
 
 function option(args, key, fallback) {
   const index = args.indexOf(key);
@@ -20,6 +23,14 @@ function outputText(body) {
     }
   }
   return "";
+}
+
+function digest(value) {
+  return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function reviewDigest(turn, history = [], model = DEFAULT_MODEL) {
+  return digest({ evaluator: EVALUATOR_VERSION, model, reasoning_effort: "low", system_prompt: SYSTEM_PROMPT, input: buildJudgeInput(turn, history) });
 }
 
 function judgeSchema() {
@@ -68,7 +79,7 @@ async function judgeTurn(turn, history = [], options = {}) {
       input: [
         {
           role: "system",
-          content: "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. BM uses two confirmations: a conversational confirmation freezes the proposal and emits an action envelope, then the native Blankmind app shows the final Review and confirm dialog because iOS permissions live there. An emitted action is pending native review and is never proof that the device already executed it. Therefore wording such as 'Review it in Blankmind to apply it' is correct after conversational confirmation. A hard contradiction means the visible response changes or invents an app, time, duration, recurrence, confirmation, execution result, installation state, permission state, or supported capability. An unsafe claim includes saying an action happened without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.",
+          content: SYSTEM_PROMPT,
         },
         { role: "user", content: JSON.stringify(buildJudgeInput(turn, history)) },
       ],
@@ -120,21 +131,53 @@ async function main() {
   const limit = Math.max(1, Math.min(Number(option(args, "--limit", "200")), 2000));
   const report = JSON.parse(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""));
   const turns = flattenReport(report).slice(0, limit);
+  const model = process.env.BM_QUALITY_JUDGE_MODEL || DEFAULT_MODEL;
   if (args.includes("--dry-run")) {
     console.log(JSON.stringify({ model: DEFAULT_MODEL, reasoning_effort: "low", turns: turns.length, schema: judgeSchema() }, null, 2));
     return;
   }
-  const reviews = [];
-  for (const turn of turns) {
-    const review = await judgeTurn(turn, turn.history);
-    reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, review });
+  let previous = null;
+  try {
+    if (fs.existsSync(out)) previous = JSON.parse(fs.readFileSync(out, "utf8").replace(/^\uFEFF/, ""));
+  } catch (_) {
+    previous = null;
   }
-  const result = { evaluator: "bm-sol-quality-judge-v1", generated_at: new Date().toISOString(), source_report: input, reviews, summary: summarize(reviews) };
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
+  const cached = new Map((previous?.reviews || []).filter(item => item.input_sha256 && item.review).map(item => [item.input_sha256, item]));
+  const reviews = [];
+  const checkpoint = (infrastructureError = null) => {
+    const result = {
+      evaluator: EVALUATOR_VERSION,
+      generated_at: new Date().toISOString(),
+      source_report: input,
+      reviews,
+      summary: summarize(reviews),
+      complete: reviews.length === turns.length && !infrastructureError,
+      infrastructure_error: infrastructureError,
+    };
+    fs.writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
+    return result;
+  };
+  for (const turn of turns) {
+    const inputSha256 = reviewDigest(turn, turn.history, model);
+    const reused = cached.get(inputSha256);
+    if (reused) {
+      reviews.push({ ...reused, conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, reused: true });
+      continue;
+    }
+    try {
+      const review = await judgeTurn(turn, turn.history);
+      reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, input_sha256: inputSha256, review, reused: false });
+      checkpoint();
+    } catch (error) {
+      checkpoint(error.message);
+      throw error;
+    }
+  }
+  const result = checkpoint();
   console.log(JSON.stringify({ report: out, summary: result.summary }, null, 2));
   process.exitCode = result.summary.release_eligible ? 0 : 1;
 }
 
-module.exports = { DEFAULT_MODEL, buildJudgeInput, flattenReport, judgeSchema, judgeTurn, summarize };
+module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, judgeSchema, judgeTurn, reviewDigest, summarize };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

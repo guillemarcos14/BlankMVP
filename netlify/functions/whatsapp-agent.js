@@ -275,7 +275,11 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
 }
 
 function whatsappReplyText(plan) {
-  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
+  const text = cleanText(plan.message_text || plan.response_text, 480)
+    .replace(/(?:https?|blank):\/\/\S+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 320) || "I can help with that in Blanked.";
   const hasAction = Array.isArray(plan.actions) && plan.actions.some((action) => action && PENDING_ACTION_TYPES.has(action.type));
   if (hasAction && !/\b(?:open|abrir)\s+(?:blankmind|blanked)\b/i.test(text)) {
     return `${text}\n\nOpen Blankmind to review and apply it.`;

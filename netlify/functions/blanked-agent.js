@@ -204,13 +204,6 @@ function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
   };
 }
 
-function blankmindAppDownloadUrl() {
-  return cleanText(
-    process.env.BLANKMIND_APP_DOWNLOAD_URL || "https://apps.apple.com/es/app/blanked/id6789519152",
-    240,
-  );
-}
-
 function messagingChannel(context = {}) {
   const channel = cleanText(context.channel || context.assistant_channel, 30).toLowerCase();
   return channel === "whatsapp" || channel === "sms" ? channel : "";
@@ -316,14 +309,9 @@ function appendAppPresenceGuidance(plan, prompt, context = {}, language = "en") 
     };
   }
 
-  const downloadUrl = blankmindAppDownloadUrl();
-  const guidance = presence.state === "stale"
-    ? language === "es"
-      ? `Para aplicarlo, abre Blankmind para actualizar los permisos. Si ya no la tienes instalada, descárgala aquí: ${downloadUrl}.`
-      : `To apply it, open Blankmind so it can use the phone permissions. If you no longer have it installed, download it here: ${downloadUrl}.`
-    : language === "es"
-      ? `Para aplicarlo necesitas Blankmind, porque ahí están los permisos para bloquear apps. Si no la tienes, descárgala aquí: ${downloadUrl}. Si ya la tienes, ábrela y seguimos.`
-      : `To apply it, you need Blankmind because the phone permissions live there. If you do not have it, download it here: ${downloadUrl}. If you already have it, open it and we can continue.`;
+  const guidance = language === "es"
+    ? "El plan queda preparado. Abre Blankmind para revisarlo y aplicarlo."
+    : "The plan is ready. Open Blankmind to review and apply it.";
   const current = naturalChannelText(plan.message_text || plan.response_text || "", 320)
     .replace(/\bBlanked App\b/gi, "Blankmind")
     .replace(/\bBlanked\b/gi, "Blankmind");
@@ -3443,7 +3431,7 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
             app_capabilities: appCapabilities(context),
             memory_rules: [
               "Use context.memory.main_apps, bedtime_minute, weak_hours, pattern_cluster, and last_plan_outcome when present.",
-              "For WhatsApp and SMS, use app_presence_state as the authority. If it is never_seen or stale, do not claim the app is uninstalled, do not return executable actions, and give a conditional natural instruction to open or download Blankmind. If it is recently_seen, do not recommend downloading it.",
+              "For WhatsApp and SMS, never infer that the app is uninstalled from app_presence_state. A stale or missing heartbeat may justify asking the person to open Blankmind, but never add an installation or App Store link. Installation guidance is handled only by the delivery layer after it proves that no app installation is linked.",
               "If a relative moment such as breakfast is present without its actual end time, ask for that time and return no actions. Never invent a default clock time or start a generic mode.",
               "If last_plan_outcome is broke, reduce intensity or move protection earlier instead of making the plan stricter.",
               "If last_plan_outcome is held, repeat the stable plan before increasing difficulty.",

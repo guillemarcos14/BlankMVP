@@ -1,5 +1,11 @@
 # BM: evaluación semántica y replay
 
+## Juez independiente de calidad
+
+La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión; cualquier contradicción dura o afirmación de ejecución sin evidencia suspende el caso aunque la media sea alta.
+
+El juez conoce el contrato real de doble confirmación: la confirmación conversacional congela la propuesta y la confirmación nativa autoriza la ejecución. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`.
+
 ## 1. Qué demuestra cada resultado
 
 `tools/bm_semantic_oracle.js` no importa el parser, reducer, renderer ni actionGate de BM. Compara hechos esperados escritos en el dataset con el estado y la acción obtenidos. Comprueba intención, slots, decisión, transición, procedencia/confianza, confirmación, permisos, presencia, acciones prematuras y contradicciones visibles. Las acciones se comparan completas salvo identificadores y etiquetas de presentación; no basta con acertar `type` o una hora.

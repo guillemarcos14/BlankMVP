@@ -93,6 +93,7 @@ async function run() {
   assert.strictEqual(installGuidance.semantic_state.next_question, "app_presence");
   assert.match(installGuidance.message_text, /Blankmind/);
   assert.match(installGuidance.message_text, /review|apply/i);
+  assert.doesNotMatch(installGuidance.message_text, /apps\.apple\.com|download|descarga/i);
   assert.strictEqual(installGuidance.review_only_actions, true);
 
   const incompleteRequest = await request("Block Instagram", { channel: "whatsapp" });
@@ -106,6 +107,7 @@ async function run() {
   });
   assert.deepStrictEqual(staleGuidance.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(staleGuidance.semantic_state.next_question, "app_presence");
+  assert.doesNotMatch(staleGuidance.message_text, /apps\.apple\.com|download|descarga/i);
 
   const recentContext = {
     channel: "whatsapp", has_selected_apps: true, selected_app_names: ["Instagram"], screen_time_authorized: true,

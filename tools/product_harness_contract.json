@@ -78,6 +78,7 @@
       { "name": "bm_semantic_state", "run": "node tools/bm_semantic_state_test.js" },
       { "name": "bm_semantic_extraction", "run": "node tools/bm_semantic_extraction_test.js" },
       { "name": "bm_semantic_oracle_mutations", "run": "node tools/bm_semantic_oracle_test.js" },
+      { "name": "bm_sol_quality_judge", "run": "node tools/bm_sol_quality_judge_test.js" },
       { "name": "bm_semantic_store", "run": "node tools/bm_semantic_store_test.js" },
       { "name": "bm_channel_contract", "run": "node tools/bm_channel_contract_test.js" },
       { "name": "bm_sms_pending_action", "run": "node tools/bm_sms_pending_action_test.js" },

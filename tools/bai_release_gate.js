@@ -16,9 +16,14 @@ const hasApiKey = Boolean(process.env.OPENAI_API_KEY);
 const forceModel = args.has("--model");
 const quick = args.has("--quick");
 const production = args.has("--production");
+const qualityJudge = args.has("--quality-judge");
 const save = args.has("--save");
 const wideCount = argValue("--count", "125");
 const seed = argValue("--seed", "20260910");
+
+if (qualityJudge && !hasApiKey) {
+  throw new Error("OPENAI_API_KEY_required_for_quality_judge");
+}
 
 function run(label, commandArgs, options = {}) {
   console.log(`\n== ${label} ==`);
@@ -29,7 +34,7 @@ function run(label, commandArgs, options = {}) {
       ...(options.env || {}),
       ...(options.diagnostic ? { OPENAI_API_KEY: "" } : {}),
     },
-    encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 180000, windowsHide: true,
+    encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: options.timeoutMs || 180000, windowsHide: true,
   });
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   const item = { name: label, args: commandArgs, passed: result.status === 0 && !result.error, exit_code: result.status, output, error: result.error?.message || null };
@@ -86,7 +91,15 @@ for (const [label, file] of [
 
 const replayArgs = ["tools/bm_semantic_replay.js", "--dataset", "tools/datasets/bm_semantic_development_v2.json", "--reviews", "tools/datasets/bm_semantic_development_reviews.json", "--repeats", "2", "--concurrency", "4"];
 run("Reviewed multi-turn semantic replay", [...replayArgs, "--out", "tmp/bm-semantic/development-gate.json"]);
-if (forceModel || (hasApiKey && !quick)) run("Active model repeated semantic replay", [...replayArgs, "--model", "--out", "tmp/bm-semantic/active-model-gate.json"]);
+if (forceModel || qualityJudge || (hasApiKey && !quick)) run("Active model repeated semantic replay", [...replayArgs, "--model", "--out", "tmp/bm-semantic/active-model-gate.json"]);
+if (qualityJudge) {
+  run("Independent GPT-5.6 Sol Low quality review", [
+    "tools/bm_sol_quality_judge.js",
+    "--input", "tmp/bm-semantic/active-model-gate.json",
+    "--limit", argValue("--quality-limit", "48"),
+    "--out", "tmp/bm-semantic/sol-quality-release-gate.json",
+  ], { timeoutMs: 600000 });
+}
 
 run("BM web/app smoke", ["tools/blanked_agent_smoke_test.js"]);
 run("BM harness runtime", ["tools/bm_harness_test.js"]);
@@ -101,7 +114,8 @@ if (production) run("Deployed planner semantic replay", [...replayArgs, "--url",
 
 report.finished_at = new Date().toISOString();
 report.automated_checks_passed = report.checks.length > 0 && report.checks.every(check => check.passed);
-report.active_model_checked = forceModel || (hasApiKey && !quick);
+report.active_model_checked = forceModel || qualityJudge || (hasApiKey && !quick);
+report.independent_quality_judge_checked = qualityJudge;
 report.limitations = ["Original evaluator scores are diagnostic, never averaged with semantic checks.", "Automated checks do not verify an unseen holdout, real Postgres concurrency, native compilation or physical execution. Those release requirements remain mandatory."];
 const out = path.resolve(rootDir, argValue("--report", "tmp/bm-semantic/release-gate.json"));
 fs.mkdirSync(path.dirname(out), { recursive: true });

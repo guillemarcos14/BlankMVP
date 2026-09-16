@@ -184,7 +184,12 @@ async function ensureAssistantConnectionForPhone({ channel, channelUser }) {
     channel: normalizedChannel,
     channelUser: normalizedPhone,
   });
-  return { channel: normalizedChannel, channelUser: normalizedPhone, connectCode };
+  return {
+    channel: normalizedChannel,
+    channelUser: normalizedPhone,
+    connectCode,
+    appInstallId: cleanText(identity.app_install_id, 160),
+  };
 }
 
 async function recordAssistantMemory({ channel, channelUser, memory = {}, source = "" }) {

@@ -15,6 +15,7 @@ Ultima actualizacion: 2026-09-16
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-16: En MacinCloud FF368, el checkout `codex/conversational-agentic-blanked` quedó actualizado (`git pull --ff-only`, ya estaba al día) y `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`. Quedó abierto Simulator en `iPhone 17`, iOS `26.3`.
 - 2026-09-16: Eliminada la animación de movimiento/respiración de `hold the screen to unblank`; el texto ahora se desvanece linealmente siguiendo `unblankHoldProgress`. El cooldown fija el instante inicial para mostrar `01:00` exacto. Commit `2ea0294` subido; harness y `git diff --check` OK. Recompilado en MacinCloud FF368 con `** BUILD SUCCEEDED **`.
 - 2026-09-16: Ajustada la Home dark en `HomeView.swift`: `hold the screen to unblank` y el cooldown quedan alineados a la izquierda con `menu`/`unblank`; la barra de hold ocupa todo el ancho inferior y la instrucción incorpora una animación de respiración suave. Validado con `git diff --check`, product harness con `--enforce-scope` y `xcodebuild` en MacinCloud FF368 (`** BUILD SUCCEEDED **`).
 - 2026-09-14: Corregido BM para reconocer `breakfast`/`desayuno` como momento relativo. Si falta la hora de finalización, pregunta primero y no propone `Social mode` ni otra acción; con la hora guardada crea la franja desde ese momento. Añadida regresión al smoke test.

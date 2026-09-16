@@ -4,7 +4,7 @@
 
 La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión; cualquier contradicción dura o afirmación de ejecución sin evidencia suspende el caso aunque la media sea alta.
 
-El juez conoce el contrato real de doble confirmación: la confirmación conversacional congela la propuesta y la confirmación nativa autoriza la ejecución. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`.
+El juez conoce el contrato real de doble confirmación: la confirmación conversacional congela la propuesta y la confirmación nativa autoriza la ejecución. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`. Con `--production` evalúa además las respuestas obtenidas del endpoint desplegado y guarda `tmp/bm-semantic/sol-quality-deployed-gate.json`.
 
 ## 1. Qué demuestra cada resultado
 

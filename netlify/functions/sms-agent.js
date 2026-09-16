@@ -883,4 +883,5 @@ exports.handler = async (event) => {
 
 exports.actionDeepLink = actionDeepLink;
 exports.pendingActionFromMemory = pendingActionFromMemory;
+exports.pendingAssistantActionFromPlan = pendingAssistantActionFromPlan;
 exports.verifyTwilioSignature = verifyTwilioSignature;

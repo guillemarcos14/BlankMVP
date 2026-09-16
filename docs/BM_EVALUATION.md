@@ -1,5 +1,22 @@
 # BM: evaluación semántica y replay
 
+## Gate de release v3
+
+El resultado del gate separa unidades que antes podían confundirse: **grupos de checks**, **conversaciones únicas**, **turnos únicos**, repeticiones, incidentes históricos y casos físicos. Un `17/17` significa únicamente que aprobaron 17 grupos automatizados; no significa 17 conversaciones ni una release validada.
+
+`tools/bm_evaluator_integrity_gate.js` reproduce seis fallos observados en WhatsApp y muta cada condición que los detecta. Solo aprueba si el comportamiento correcto pasa y todos los mutantes fallan. `tools/bm_action_envelope_contract_test.js` verifica que los campos críticos de una acción —incluidos `source_mode_name` y `copy_mode`— sobreviven al contrato canónico, la cola SMS, el canal y el decodificador iOS.
+
+La autorización final es independiente: `tools/bm_release_readiness_gate.js` exige el commit, deploy backend, build iOS y hash del artefacto exactos; 200 conversaciones únicas con modelo activo y juez independiente; y 20 casos físicos con trazas, estado observado y evidencia enlazada al mismo candidato. Si falta cualquiera de esas pruebas, `production_release_verified` permanece en `false`; ningún promedio puede compensarlo.
+
+```powershell
+node tools/bm_evaluator_integrity_gate.js
+node tools/bm_action_envelope_contract_test.js
+node tools/bm_release_readiness_gate.js --init --evidence tmp/bm-release/evidence.json
+node tools/bai_release_gate.js --quality-judge --dataset tools/datasets/<release-set>.json --reviews tools/datasets/<release-reviews>.json --release-evidence tmp/bm-release/evidence.json
+```
+
+El dataset de release debe contener al menos 200 conversaciones realmente distintas; repetir seis conversaciones no aumenta esa cobertura. La plantilla generada es evidencia por completar, no evidencia válida. Los incidentes históricos son reconstrucciones de fallos observados; evitan regresiones conocidas, pero no sustituyen una ejecución física nueva.
+
 ## Juez independiente de calidad
 
 La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión; cualquier contradicción dura o afirmación de ejecución sin evidencia suspende el caso aunque la media sea alta.

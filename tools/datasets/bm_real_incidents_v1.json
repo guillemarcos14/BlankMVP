@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "bm-real-incidents-v1",
+  "frozen_at": "2026-09-16T12:00:00Z",
+  "purpose": "Regression corpus derived from failures observed during physical WhatsApp and iPhone testing. It evaluates hard state and action facts, not conversational taste.",
+  "incidents": [
+    {
+      "id": "physical-repeated-request-must-reset-confirmation",
+      "source": "physical_whatsapp",
+      "failure_class": "stale_confirmation",
+      "runner": "semantic",
+      "prompts": ["Block Instagram now for 5 minutes", "Once", "Yes", "Block Instagram now for 5 minutes"],
+      "context": {
+        "channel": "whatsapp",
+        "screen_time_authorized": true,
+        "has_selected_apps": true,
+        "selected_app_names": ["Instagram"],
+        "app_presence_state": "recently_seen"
+      },
+      "assertions": [
+        { "path": "turns.3.decision.slot", "op": "eq", "value": "recurrence" },
+        { "path": "turns.3.actions", "op": "length", "value": 0 },
+        { "path": "turns.3.state.slots.confirmation", "op": "absent" }
+      ]
+    },
+    {
+      "id": "physical-natural-yea-confirms-exact-proposal",
+      "source": "physical_whatsapp",
+      "failure_class": "confirmation_language",
+      "runner": "semantic",
+      "prompts": ["Block Instagram now for 5 minutes once", "Yea"],
+      "context": {
+        "channel": "whatsapp",
+        "screen_time_authorized": true,
+        "has_selected_apps": true,
+        "selected_app_names": ["Instagram"],
+        "app_presence_state": "recently_seen"
+      },
+      "assertions": [
+        { "path": "turns.1.decision.type", "op": "eq", "value": "ready" },
+        { "path": "turns.1.actions.0.type", "op": "eq", "value": "start_protection" },
+        { "path": "turns.1.actions.0.minutes", "op": "eq", "value": 5 }
+      ]
+    },
+    {
+      "id": "physical-picker-must-preserve-confirmed-plan",
+      "source": "physical_whatsapp",
+      "failure_class": "action_payload_loss",
+      "runner": "semantic",
+      "prompts": ["Block Instagram now for 5 minutes", "Once", "Yes"],
+      "context": {
+        "channel": "whatsapp",
+        "screen_time_authorized": true,
+        "has_selected_apps": false,
+        "selected_app_names": [],
+        "app_presence_state": "recently_seen"
+      },
+      "assertions": [
+        { "path": "turns.2.decision.slot", "op": "eq", "value": "app_selection" },
+        { "path": "turns.2.actions.0.type", "op": "eq", "value": "open_app_picker" },
+        { "path": "turns.2.actions.0.minutes", "op": "eq", "value": 5 },
+        { "path": "turns.2.actions.0.hard_mode", "op": "eq", "value": false }
+      ]
+    },
+    {
+      "id": "physical-exact-saved-plan-must-create-copy",
+      "source": "physical_whatsapp",
+      "failure_class": "destructive_mode_reuse",
+      "runner": "semantic",
+      "prompts": ["Block Instagram now for 5 minutes", "Once", "Yes"],
+      "context": {
+        "channel": "whatsapp",
+        "screen_time_authorized": true,
+        "has_selected_apps": true,
+        "selected_app_names": [],
+        "available_mode_catalog": [
+          { "id": "mode-instagram", "name": "Instagram only", "app_names": [], "selection_count": 1, "has_selection": true }
+        ],
+        "app_presence_state": "recently_seen"
+      },
+      "assertions": [
+        { "path": "turns.2.actions.0.type", "op": "eq", "value": "activate_mode" },
+        { "path": "turns.2.actions.0.source_mode_name", "op": "eq", "value": "Instagram only" },
+        { "path": "turns.2.actions.0.copy_mode", "op": "eq", "value": true },
+        { "path": "turns.2.actions.0.minutes", "op": "eq", "value": 5 },
+        { "path": "turns.2.actions.0.type", "op": "not_eq", "value": "open_app_picker" }
+      ]
+    },
+    {
+      "id": "physical-copy-fields-must-survive-channel-envelope",
+      "source": "physical_whatsapp",
+      "failure_class": "cross_layer_contract_drift",
+      "runner": "transport",
+      "plan": {
+        "message_text": "Open Blankmind to review and apply it.",
+        "actions": [
+          {
+            "type": "activate_mode",
+            "name": "Instagram only",
+            "source_mode_name": "Instagram only",
+            "copy_mode": true,
+            "minutes": 5,
+            "hard_mode": false
+          }
+        ]
+      },
+      "app_names": ["Instagram"],
+      "assertions": [
+        { "path": "delivered.type", "op": "eq", "value": "activate_mode" },
+        { "path": "delivered.source_mode_name", "op": "eq", "value": "Instagram only" },
+        { "path": "delivered.copy_mode", "op": "eq", "value": true },
+        { "path": "delivered.minutes", "op": "eq", "value": 5 },
+        { "path": "delivered.app_names", "op": "eq", "value": ["Instagram"] }
+      ]
+    },
+    {
+      "id": "physical-whatsapp-must-not-send-review-url",
+      "source": "physical_whatsapp",
+      "failure_class": "wrong_delivery_surface",
+      "runner": "reply_contract",
+      "reply": "Got it. Open Blankmind to review and apply it.",
+      "assertions": [
+        { "path": "reply", "op": "includes", "value": "Open Blankmind" },
+        { "path": "reply", "op": "excludes", "value": "http" },
+        { "path": "reply", "op": "excludes", "value": "review-action" }
+      ]
+    }
+  ]
+}

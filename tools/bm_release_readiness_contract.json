@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "id": "bm-release-readiness-v1",
+  "minimums": {
+    "historical_incidents": 6,
+    "historical_mutation_detection_rate": 1,
+    "unique_conversations": 200,
+    "physical_cases": 20,
+    "physical_groups": {
+      "immediate_block": 4,
+      "schedule": 4,
+      "daily_limit": 3,
+      "app_state": 3,
+      "permissions_selection": 3,
+      "robustness": 3
+    }
+  },
+  "rules": [
+    "Every physical case must target the exact candidate commit, backend deploy and iOS build.",
+    "Every physical case must include a trace id, observed device state and a local evidence file whose SHA-256 is verified.",
+    "The iOS artifact path must exist and its measured SHA-256 must match the candidate.",
+    "No hard failure, unverified result or failed physical case can be averaged away.",
+    "The evaluator integrity gate must detect every declared historical mutation.",
+    "A compiled build is not a distributed or physically verified build."
+  ]
+}

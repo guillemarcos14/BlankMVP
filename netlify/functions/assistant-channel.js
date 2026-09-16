@@ -291,3 +291,5 @@ exports.handler = async (event) => {
     return json(500, { error: "assistant_channel_failed", detail: error.message });
   }
 };
+
+exports.normalizePendingAction = normalizePendingAction;

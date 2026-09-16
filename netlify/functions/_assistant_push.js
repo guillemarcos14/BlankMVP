@@ -8,16 +8,41 @@ function base64url(value) {
   return Buffer.from(value).toString("base64url");
 }
 
-function normalizedPrivateKey() {
-  return String(process.env.APNS_AUTH_KEY || "").replace(/\\n/g, "\n").trim();
+function apnsCredentials() {
+  const raw = String(process.env.APNS_AUTH_KEY || "").replace(/\\n/g, "\n").trim();
+  const compact = raw.match(/^([A-Za-z0-9_-]{43})\.([A-Z0-9]{10})\.([A-Z0-9]{10})$/);
+  if (!compact) {
+    return {
+      privateKey: raw,
+      keyId: String(process.env.APNS_KEY_ID || "").trim(),
+      teamId: String(process.env.APNS_TEAM_ID || "").trim(),
+    };
+  }
+
+  const privateScalar = Buffer.from(compact[1], "base64url");
+  const ecdh = crypto.createECDH("prime256v1");
+  ecdh.setPrivateKey(privateScalar);
+  const publicKey = ecdh.getPublicKey(null, "uncompressed");
+  return {
+    privateKey: crypto.createPrivateKey({
+      format: "jwk",
+      key: {
+        kty: "EC",
+        crv: "P-256",
+        d: compact[1],
+        x: publicKey.subarray(1, 33).toString("base64url"),
+        y: publicKey.subarray(33, 65).toString("base64url"),
+      },
+    }),
+    keyId: compact[2],
+    teamId: compact[3],
+  };
 }
 
 function providerToken() {
   const now = Math.floor(Date.now() / 1000);
   if (cachedProviderToken && now - cachedProviderTokenAt < 45 * 60) return cachedProviderToken;
-  const keyId = String(process.env.APNS_KEY_ID || "").trim();
-  const teamId = String(process.env.APNS_TEAM_ID || "").trim();
-  const privateKey = normalizedPrivateKey();
+  const { keyId, teamId, privateKey } = apnsCredentials();
   if (!keyId || !teamId || !privateKey) return "";
   const header = base64url(JSON.stringify({ alg: "ES256", kid: keyId }));
   const claims = base64url(JSON.stringify({ iss: teamId, iat: now }));
@@ -101,4 +126,4 @@ async function sendAssistantActionPush(devicePush, action) {
   });
 }
 
-module.exports = { normalizeDevicePush, pushPayload, sendAssistantActionPush };
+module.exports = { apnsCredentials, normalizeDevicePush, pushPayload, sendAssistantActionPush };

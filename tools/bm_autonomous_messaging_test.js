@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { normalizeDevicePush, pushPayload } = require("../netlify/functions/_assistant_push");
+const { apnsCredentials, normalizeDevicePush, pushPayload } = require("../netlify/functions/_assistant_push");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -26,6 +26,16 @@ assert.equal(executable.bm_action_id, "action-1");
 const setup = pushPayload({ id: "action-2", type: "open_app_picker" });
 assert.equal(setup.aps["content-available"], 1);
 assert.match(setup.aps.alert.body, /selecting the apps/i);
+
+const previousAuthKey = process.env.APNS_AUTH_KEY;
+const compactScalar = Buffer.concat([Buffer.alloc(31), Buffer.from([1])]).toString("base64url");
+process.env.APNS_AUTH_KEY = `${compactScalar}.D9A2SJAVZ2.GS54UV79RG`;
+const compactCredentials = apnsCredentials();
+assert.equal(compactCredentials.keyId, "D9A2SJAVZ2");
+assert.equal(compactCredentials.teamId, "GS54UV79RG");
+assert.equal(compactCredentials.privateKey.type, "private");
+if (previousAuthKey === undefined) delete process.env.APNS_AUTH_KEY;
+else process.env.APNS_AUTH_KEY = previousAuthKey;
 
 const assistantChannel = read("netlify/functions/assistant-channel.js");
 const smsAgent = read("netlify/functions/sms-agent.js");

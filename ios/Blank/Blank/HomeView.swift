@@ -556,7 +556,13 @@ struct HomeView: View {
     private var activePrimaryContent: some View {
         Group {
             if isHoldingToUnblank {
-                HoldToUnblankInstruction()
+                Text("hold the screen to unblank")
+                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                    .tracking(-1.1)
+                    .foregroundStyle(Color.white)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.78)
+                    .opacity(1 - unblankHoldProgress)
             } else if let cooldownText {
                 Text(cooldownText)
                     .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
@@ -982,7 +988,9 @@ struct HomeView: View {
     private func scheduleDelayedManualUnlock(cooldownSeconds requestedCooldownSeconds: Int? = nil) {
         guard delayedManualUnlockTask == nil else { return }
         let cooldownSeconds = requestedCooldownSeconds ?? sessionStore.manualUnblankCooldownSeconds
-        let unlockAt = Date().addingTimeInterval(TimeInterval(cooldownSeconds))
+        let startedAt = Date()
+        let unlockAt = startedAt.addingTimeInterval(TimeInterval(cooldownSeconds))
+        now = startedAt
         delayedManualUnlockAt = unlockAt
         updateDelayedUnlockMessage(now: Date())
         Task {
@@ -3637,28 +3645,6 @@ private func minuteOfDay(from date: Date) -> Int {
 private extension FamilyActivitySelection {
     var blankedSelectionCount: Int {
         applicationTokens.count + categoryTokens.count + webDomainTokens.count
-    }
-}
-
-private struct HoldToUnblankInstruction: View {
-    @State private var isBreathing = false
-
-    var body: some View {
-        Text("hold the screen to unblank")
-            .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-            .tracking(-1.1)
-            .foregroundStyle(Color.white)
-            .lineLimit(3)
-            .minimumScaleFactor(0.78)
-            .scaleEffect(isBreathing ? 1.015 : 0.975, anchor: .leading)
-            .opacity(isBreathing ? 1 : 0.72)
-            .animation(
-                .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
-                value: isBreathing
-            )
-            .onAppear {
-                isBreathing = true
-            }
     }
 }
 

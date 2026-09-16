@@ -2748,7 +2748,7 @@ private struct RelapseReviewSheet: View {
                     .padding(.bottom, bottomInset)
                     .frame(
                         width: contentWidth,
-                        minHeight: max(proxy.size.height - topInset, 0),
+                        height: max(proxy.size.height - topInset, 0),
                         alignment: .topLeading
                     )
                 }

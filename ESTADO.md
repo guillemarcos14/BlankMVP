@@ -660,3 +660,5 @@ Why now + hold 2026-09-16: el interlineado de `hold the screen to unblank` usa `
 Home dark hold 2026-09-16: ajustado `lineSpacing(-18)` en `hold the screen to unblank` para igualar visualmente la separación entre sus líneas con la separación del nav. Commit `fdbe595`; harness enforce y detector Impeccable `[]`. El build remoto queda pendiente porque el entorno no permite subir código a GitHub.
 
 Compilación MacinCloud 2026-09-16: `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`, pero FF368 estaba en `3cf98af` y no contiene `fdbe595`; la copia remota tampoco expone los fuentes Swift para sincronizar manualmente el ajuste.
+
+Aceptación visual 2026-09-16: Guillem confirma que las Homes y la pantalla Why Now quedan perfectas tras la última compilación en MacinCloud.

@@ -658,3 +658,5 @@ Why now 2026-09-16: igualadas las filas con Home: tipografía Inter bold de 40 p
 Why now + hold 2026-09-16: el interlineado de `hold the screen to unblank` usa `lineSpacing(-8)` como el nav; Why Now conserva el color del título, usa `#8d8e89` en las opciones, mantiene el color de `skip` y centra `why now?` con el mismo tratamiento vertical del texto principal de Home dark. Commit `237682e`; harness enforce, detector Impeccable `[]` y build MacinCloud confirmado con `** BUILD SUCCEEDED **`.
 
 Home dark hold 2026-09-16: ajustado `lineSpacing(-18)` en `hold the screen to unblank` para igualar visualmente la separación entre sus líneas con la separación del nav. Commit `fdbe595`; harness enforce y detector Impeccable `[]`. El build remoto queda pendiente porque el entorno no permite subir código a GitHub.
+
+Compilación MacinCloud 2026-09-16: `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`, pero FF368 estaba en `3cf98af` y no contiene `fdbe595`; la copia remota tampoco expone los fuentes Swift para sincronizar manualmente el ajuste.

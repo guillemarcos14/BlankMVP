@@ -552,6 +552,19 @@ function whatsappReplyText(plan, fallbackText) {
     : `${clean}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
 }
 
+function whatsappSetupButton(plan, appNames = []) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+    .find(item => item && ["open_app_picker", "request_screen_time_permission"].includes(item.type));
+  if (!action) return null;
+  const link = reviewActionLink(action, appNames);
+  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
+  if (!link || !contentSid) return null;
+  return {
+    contentSid,
+    contentVariables: whatsappActionButtonVariables(link),
+  };
+}
+
 async function recordMessageConnection(connectCode, from, channel) {
   try {
     await recordAssistantChannel({
@@ -714,12 +727,13 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   const actionLink = actionDeepLink(actions, responseApps, plan.blocking_data);
   const modelFollowup = naturalReplyText(plan.followup_text || "");
   const primaryPendingAction = (Array.isArray(actions) ? actions : []).find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  let queuedAction = null;
   if (channel === "whatsapp" || channel === "sms") {
     try {
-      const queued = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      queuedAction = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
       const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
         || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
-      if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
+      if (!queuedAction && linkedConnection?.connectCode && invalidatesQueuedAction) {
         await recordAssistantMemory({
           channel,
           channelUser: from,
@@ -732,7 +746,17 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
     }
   }
   if (channel === "whatsapp") {
-    return { text: whatsappReplyText(plan, message) };
+    const actionButton = queuedAction ? whatsappSetupButton(plan, responseApps) : null;
+    const cleanReply = whatsappReplyText(plan, message)
+      .replace(/\n\n(?:Select the apps to apply it|Selecciona las apps para aplicarlo):\nhttps?:\/\/\S+/i, "")
+      .trim();
+    if (actionButton) return { text: cleanReply, actionButton };
+    const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+    return {
+      text: primaryPendingAction && ["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)
+        ? `${cleanReply}\n\n${spanish ? "Abre Blankmind para elegir las aplicaciones." : "Open Blankmind to choose the apps."}`
+        : cleanReply,
+    };
   }
   if (channel === "sms" && primaryPendingAction && !["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)) {
     return { text: whatsappReplyText(plan, message) };
@@ -884,10 +908,10 @@ exports.handler = async (event) => {
       await sendWhatsAppMessage(from, reply.text);
       await sendWhatsAppMessage(from, "", reply.actionButton);
     } catch (error) {
-      // A failed template must not leave the user without the actionable link
-      // or cause a retry to duplicate the already delivered text.
+      // Never expose the raw setup URL. The queued action remains recoverable
+      // from Blankmind and through the APNs notification.
       try {
-        await sendWhatsAppMessage(from, reply.actionText || reply.text);
+        await sendWhatsAppMessage(from, "Open Blankmind to choose the apps and apply the plan.");
       } catch (_) {
         if (!String(error?.message || "").includes("twilio_whatsapp_send_failed")) throw error;
       }

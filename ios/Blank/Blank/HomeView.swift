@@ -1617,19 +1617,25 @@ struct HomeView: View {
 
     private var contextualPickerHeaderText: String {
         if let modeName = sessionStore.pendingPlanModeName {
-            return "Create \(modeName) mode"
+            return "Select apps for \(modeName)"
         }
-        return "Select \(formattedPendingPlanAppNames) to apply this plan."
+        return "Select \(formattedPendingPlanAppNames)"
     }
 
     private var contextualPickerFooterText: String {
         guard let modeName = sessionStore.pendingPlanModeName else {
-            return "Blanked will use this selection for the plan."
+            return "Tap Done to use this selection for the plan."
         }
         if sessionStore.pendingPlanShouldActivate {
-            return "Choose apps once. Blanked will save \(modeName) and start it now. Next time, the WhatsApp button starts this mode directly."
+            return "Tap Done to save \(modeName) and start the block now."
         }
-        return "Choose apps once. Blanked will save \(modeName) so WhatsApp can start it directly next time."
+        if sessionStore.pendingPlanSchedule != nil {
+            return "Tap Done to save \(modeName) and add its schedule."
+        }
+        if sessionStore.pendingPlanDailyLimitMinutes != nil {
+            return "Tap Done to save \(modeName) and apply its daily limit."
+        }
+        return "Tap Done to save \(modeName)."
     }
 
     private var formattedPendingPlanAppNames: String {

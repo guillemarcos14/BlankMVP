@@ -292,11 +292,7 @@ function whatsappReplyText(plan) {
   if (!action) return text;
   const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
-    const apps = Array.isArray(plan.blocking_data?.apps) ? plan.blocking_data.apps : [];
-    const link = require("./_bm_action_link").reviewActionLink(action, apps);
-    return link
-      ? `${text}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
-      : `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
+    return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
   }
   if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
   return text;

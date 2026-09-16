@@ -771,8 +771,13 @@ final class SessionStore: ObservableObject {
 
     func createOrUpdateMode(named name: String, selection: FamilyActivitySelection, appNames: [String] = []) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let modeName = cleanName.isEmpty ? "New mode" : cleanName
-        let knownAppNames = appNames.isEmpty ? Self.inferredAssistantApps(from: modeName) : appNames
+        let knownAppNames = appNames.isEmpty
+            ? Self.inferredAssistantApps(from: cleanName)
+            : Self.normalizedAssistantDisplayAppNames(appNames)
+        let requestedAppsName = knownAppNames.joined(separator: " + ")
+        let modeName = requestedAppsName.isEmpty
+            ? (cleanName.isEmpty ? "New mode" : cleanName)
+            : requestedAppsName
         if let existing = focusModes.first(where: { Self.normalizedModeName($0.name) == Self.normalizedModeName(modeName) }) {
             currentModeId = existing.id
             self.selection = selection
@@ -1258,6 +1263,17 @@ final class SessionStore: ObservableObject {
             guard normalized.contains(" \(alias) "), !seen.contains(app) else { return nil }
             seen.insert(app)
             return app
+        }
+    }
+
+    private static func normalizedAssistantDisplayAppNames(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.compactMap { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = normalizedAssistantAppName(trimmed)
+            guard !trimmed.isEmpty, !normalized.isEmpty, !seen.contains(normalized) else { return nil }
+            seen.insert(normalized)
+            return trimmed
         }
     }
 

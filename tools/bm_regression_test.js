@@ -20,6 +20,7 @@ const assistantChannel = fs.readFileSync(path.join(ROOT, "netlify/functions/assi
 const assistantChannelShared = fs.readFileSync(path.join(ROOT, "netlify/functions/_assistant_channel.js"), "utf8");
 const bmContext = fs.readFileSync(path.join(ROOT, "netlify/functions/bm-context.js"), "utf8");
 const whatsapp = fs.readFileSync(path.join(ROOT, "netlify/functions/whatsapp-agent.js"), "utf8");
+const smsAgent = fs.readFileSync(path.join(ROOT, "netlify/functions/sms-agent.js"), "utf8");
 const agent = fs.readFileSync(path.join(ROOT, "netlify/functions/blanked-agent.js"), "utf8");
 const openPage = fs.readFileSync(path.join(ROOT, "web/landing/open.html"), "utf8");
 const android = fs.readFileSync(
@@ -162,6 +163,10 @@ check("messaging_actions_execute_without_native_confirmation", () => {
   assert.match(assistantChannel, /last_assistant_action_outcome/);
   assert.match(home, /status:\s*"verified"/);
   assert.match(home, /blankPendingAssistantActionId/);
+  assert.match(sessionStore, /requestedAppsName = knownAppNames\.joined\(separator: " \+ "\)/);
+  assert.match(smsAgent, /TWILIO_WHATSAPP_ACTION_CONTENT_SID/);
+  assert.match(smsAgent, /whatsappSetupButton/);
+  assert.doesNotMatch(whatsapp, /reviewActionLink\(action, apps\)/);
 });
 
 check("assistant_context_sync_reaches_messaging_identity", () => {

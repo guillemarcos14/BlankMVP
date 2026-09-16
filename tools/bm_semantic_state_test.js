@@ -96,7 +96,7 @@ test("category never expands to invented apps", () => {
 test("preselected apps never silently replace requested named apps", () => {
   const results = chat(["Block TikTok now for 30 minutes once","yes"]);
   assert.equal(results[1].decision.slot,"app_selection");
-  assert.deepEqual(results[1].actions,[{type:"open_app_picker",minutes:30,hard_mode:false}]);
+  assert.deepEqual(results[1].actions,[{type:"open_app_picker",minutes:30,hard_mode:false,name:"TikTok"}]);
 });
 test("explicit selected-apps reference can use known selection", () => {
   const results = chat(["Block my selected apps now for 30 minutes once","yes"], {...DEVICE,selected_app_names:undefined});

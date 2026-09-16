@@ -434,6 +434,12 @@ function matchingMode(state, context) {
   }) || null;
 }
 
+function requestedAppsModeName(state) {
+  const apps = (value(state,"apps") || [])
+    .filter(app => app && app !== "selected_apps" && !String(app).startsWith("mode:"));
+  return apps.length ? apps.join(" + ").slice(0, 60) : "BM Plan";
+}
+
 function capabilityGap(state, context) {
   const channel = fold(context.channel || context.assistant_channel);
   const native = ["ios", "android", "app"].includes(channel);
@@ -474,7 +480,7 @@ function semanticActionFromFacts(state, context = {}) {
   const mode = matchingMode(state,context);
   return [{
     type:"apply_schedule",
-    name:mode ? `${mode.name} copy` : `Block ${(value(state,"apps") || []).join(" + ")}`,
+    name:mode ? `${mode.name} copy` : requestedAppsModeName(state),
     ...(mode ? { source_mode_name:mode.name, copy_mode:true } : {}),
     start_minute:start.minute,
     end_minute:end,
@@ -646,8 +652,12 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   if (decision.type === "setup" && decision.slot === "app_selection") {
     const executable = semanticActionFromFacts(state, context)[0];
     actions = executable
-      ? [{ ...executable, type:"open_app_picker", ...(executable.type === "set_daily_limit" ? { name:"Daily Limit" } : {}) }]
-      : [{type:"open_app_picker"}];
+      ? [{
+          ...executable,
+          type:"open_app_picker",
+          name:executable.type === "set_daily_limit" ? "Daily Limit" : requestedAppsModeName(state),
+        }]
+      : [{type:"open_app_picker",name:requestedAppsModeName(state)}];
   }
   if (decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state)) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);

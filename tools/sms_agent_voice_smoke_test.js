@@ -280,7 +280,17 @@ async function whatsappTextHasNoAudioAttachment() {
 }
 
 async function whatsappMissingSelectionCarriesConfirmedProtection() {
-  await withAssistantMemoryMock(async () => {
+  const previousTwilio = {
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+    content: process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID,
+  };
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+  process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID = "HXchooseapps";
+  await withAssistantMemoryMock(async ({ twilioCalls }) => {
     const send = (body, sid) => smsHandler({
       httpMethod: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
@@ -291,9 +301,14 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
     const second = await send("Once", "SMselection-2");
     assert.match(second.body, /Do you confirm/i);
     const third = await send("Yes", "SMselection-3");
-    assert.match(third.body, /Select the apps to apply it/i);
-    assert.match(third.body, /review-action/);
-    assert.match(third.body, /open_app_picker/);
+    assert.doesNotMatch(third.body, /https?:\/\/|review-action|open_app_picker/i);
+    assert.strictEqual(twilioCalls.length, 2);
+    const textMessage = new URLSearchParams(twilioCalls[0].body);
+    const buttonMessage = new URLSearchParams(twilioCalls[1].body);
+    assert.doesNotMatch(textMessage.get("Body") || "", /https?:\/\//);
+    assert.strictEqual(buttonMessage.get("ContentSid"), "HXchooseapps");
+    assert.match(buttonMessage.get("ContentVariables") || "", /review-action/);
+    assert.match(buttonMessage.get("ContentVariables") || "", /open_app_picker/);
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
@@ -301,10 +316,15 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
     });
     const pending = JSON.parse(polled.body).pending_action;
     assert.strictEqual(pending.type, "open_app_picker");
+    assert.strictEqual(pending.name, "Instagram");
     assert.strictEqual(pending.minutes, 5);
     assert.strictEqual(pending.hard_mode, false);
     assert.deepStrictEqual(pending.app_names, ["Instagram"]);
   }, []);
+  for (const [key, value] of Object.entries(previousTwilio)) {
+    const envKey = { sid: "TWILIO_ACCOUNT_SID", token: "TWILIO_AUTH_TOKEN", from: "TWILIO_WHATSAPP_FROM_NUMBER", content: "TWILIO_WHATSAPP_ACTION_CONTENT_SID" }[key];
+    if (value == null) delete process.env[envKey]; else process.env[envKey] = value;
+  }
 }
 
 async function whatsappExactSavedModeQueuesIndependentCopy() {

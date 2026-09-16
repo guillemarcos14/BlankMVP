@@ -418,24 +418,16 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
-                minimalHomeRow("stats", color: BlankColors.homeLightSecondary) {
-                    openSection(.report)
-                }
-
-                minimalHomeRow("plan", color: BlankColors.homeLightSecondary) {
-                    openSection(.modes)
-                }
-
                 minimalHomeRow("sessions", color: BlankColors.homeLightSecondary) {
                     openSection(.sessions)
                 }
 
-                minimalHomeRow("settings", color: BlankColors.homeLightSecondary) {
-                    openSection(.settings)
+                minimalHomeRow("progress", color: BlankColors.homeLightSecondary) {
+                    openSection(.report)
                 }
 
-                minimalHomeRow("emergency", color: BlankColors.homeLightSecondary) {
-                    openSection(.emergency)
+                minimalHomeRow("settings", color: BlankColors.homeLightSecondary) {
+                    openSection(.settings)
                 }
 
                 minimalStatus
@@ -598,20 +590,14 @@ struct HomeView: View {
             minimalHomeRow("unblank", color: BlankColors.homeDarkSecondary) {
                 beginFullScreenUnblankHold()
             }
-            minimalHomeRow("stats", color: BlankColors.homeDarkSecondary) {
-                openSection(.report)
-            }
-            minimalHomeRow("plan", color: BlankColors.homeDarkSecondary) {
-                openSection(.modes)
-            }
             minimalHomeRow("sessions", color: BlankColors.homeDarkSecondary) {
                 openSection(.sessions)
             }
+            minimalHomeRow("progress", color: BlankColors.homeDarkSecondary) {
+                openSection(.report)
+            }
             minimalHomeRow("settings", color: BlankColors.homeDarkSecondary) {
                 openSection(.settings)
-            }
-            minimalHomeRow("emergency", color: BlankColors.homeDarkSecondary) {
-                openSection(.emergency)
             }
 
             Button {

@@ -673,3 +673,5 @@ Home dark hold 2026-09-16: ajustado `lineSpacing(-18)` en `hold the screen to un
 Compilación MacinCloud 2026-09-16: `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`, pero FF368 estaba en `3cf98af` y no contiene `fdbe595`; la copia remota tampoco expone los fuentes Swift para sincronizar manualmente el ajuste.
 
 Aceptación visual 2026-09-16: Guillem confirma que las Homes y la pantalla Why Now quedan perfectas tras la última compilación en MacinCloud.
+
+TestFlight 2026-09-16: preparada y subida la build `1.9 (74)` de `codex/conversational-agentic-blanked` en `53dacf7`; el build `73` ya existía en App Store Connect. Product harness `31/31` y `git diff --check` pasan. Archive y distribución confirmados en Xcode Organizer; sesión de MacinCloud cerrada.

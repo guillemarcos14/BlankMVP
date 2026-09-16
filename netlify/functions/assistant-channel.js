@@ -158,6 +158,8 @@ function normalizePendingAction(value) {
     id,
     type,
     name: cleanText(value.name, 80) || null,
+    source_mode_name: cleanText(value.source_mode_name, 80) || null,
+    copy_mode: value.copy_mode === true,
     minutes: Number.isInteger(value.minutes) ? Math.min(Math.max(value.minutes, 5), 240) : null,
     hard_mode: value.hard_mode === true,
     start_minute: Number.isInteger(value.start_minute) ? Math.min(Math.max(value.start_minute, 0), 1439) : null,

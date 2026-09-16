@@ -1743,6 +1743,8 @@ function action(type, values = {}) {
     minutes: values.minutes ?? null,
     hard_mode: values.hard_mode ?? null,
     name: values.name ?? null,
+    ...(values.source_mode_name ? { source_mode_name: values.source_mode_name } : {}),
+    ...(values.copy_mode === true ? { copy_mode: true } : {}),
     start_minute: values.start_minute ?? null,
     end_minute: values.end_minute ?? null,
     weekdays: values.weekdays ?? null,
@@ -2865,6 +2867,8 @@ const actionSchema = {
     minutes: { type: ["integer", "null"], minimum: 5, maximum: 240 },
     hard_mode: { type: ["boolean", "null"] },
     name: { type: ["string", "null"], maxLength: 40 },
+    source_mode_name: { type: ["string", "null"], maxLength: 40 },
+    copy_mode: { type: ["boolean", "null"] },
     start_minute: { type: ["integer", "null"], minimum: 0, maximum: 1439 },
     end_minute: { type: ["integer", "null"], minimum: 0, maximum: 1439 },
     weekdays: { type: ["array", "null"], items: { type: "integer", minimum: 1, maximum: 7 }, maxItems: 7 },
@@ -3360,6 +3364,8 @@ function normalizeAction(candidate) {
     minutes: candidate.minutes == null ? null : cleanNumber(candidate.minutes, 30, 5, 240),
     hard_mode: candidate.hard_mode === true ? true : candidate.hard_mode === false ? false : null,
     name: candidate.name == null ? null : cleanText(candidate.name, 40),
+    source_mode_name: candidate.source_mode_name == null ? null : cleanText(candidate.source_mode_name, 40),
+    copy_mode: candidate.copy_mode === true,
     start_minute: candidateStart,
     end_minute: candidateEnd,
     weekdays: Array.isArray(candidate.weekdays) ? Array.from(new Set(candidate.weekdays.map((day) => cleanNumber(day, 1, 1, 7)))).slice(0, 7) : null,
@@ -3378,12 +3384,14 @@ function normalizeAction(candidate) {
     duration_days: normalized.duration_days,
   });
   if (type === "switch_mode") return action(type, { name: normalized.name });
-  if (type === "activate_mode") return action(type, { name: normalized.name, minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
+  if (type === "activate_mode") return action(type, { name: normalized.name, source_mode_name: normalized.source_mode_name, copy_mode: normalized.copy_mode, minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "start_protection") return action(type, { minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "pause_rules") return action(type, { hours: normalized.hours });
   if (type === "apply_schedule") {
     return action(type, {
       name: normalized.name,
+      source_mode_name: normalized.source_mode_name,
+      copy_mode: normalized.copy_mode,
       start_minute: normalized.start_minute,
       end_minute: normalized.end_minute,
       weekdays: normalized.weekdays,

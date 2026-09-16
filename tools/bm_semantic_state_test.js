@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { advanceSemanticState, normalizeSemanticState, buildSemanticActions, extractSemanticPatch, validateSemanticPatch, TTL_MS } = require("../netlify/functions/bm-semantic-state");
+const { normalizeModeCatalog } = require("../netlify/functions/bm-context");
 const NOW = Date.parse("2026-09-15T10:00:00Z");
 const DEVICE = { channel:"ios", screen_time_authorized:true, has_selected_apps:true, selected_app_names:["Instagram"] };
 let checks = 0;
@@ -103,7 +104,21 @@ test("explicit selected-apps reference can use known selection", () => {
 });
 test("verified exact saved mode uses only that mode", () => {
   const results = chat(["Block TikTok now for 30 minutes once","yes"], {...DEVICE,available_mode_catalog:[{name:"TikTok only",app_names:["TikTok"]}]});
-  assert.deepEqual(results[1].actions,[{type:"activate_mode",name:"TikTok only",minutes:30,hard_mode:false}]);
+  assert.deepEqual(results[1].actions,[{type:"activate_mode",name:"TikTok only",source_mode_name:"TikTok only",copy_mode:true,minutes:30,hard_mode:false}]);
+});
+test("legacy named mode recovers its exact app metadata", () => {
+  const catalog = normalizeModeCatalog([{name:"Instagram only",app_names:[],selection_count:1,has_selection:true}]);
+  assert.deepEqual(catalog[0].app_names,["Instagram"]);
+  const results = chat(["Block Instagram now for 5 minutes once","yes"], {...DEVICE,selected_app_names:[],available_mode_catalog:catalog});
+  assert.deepEqual(results[1].actions,[{type:"activate_mode",name:"Instagram only",source_mode_name:"Instagram only",copy_mode:true,minutes:5,hard_mode:false}]);
+});
+test("scheduled request reuses exact saved mode without app picker", () => {
+  const catalog = normalizeModeCatalog([{name:"Instagram only",app_names:[],selection_count:1,has_selection:true}]);
+  const results = chat(["Block Instagram from 10am to 11am every day for 7 days","yes"], {...DEVICE,selected_app_names:[],available_mode_catalog:catalog});
+  assert.deepEqual(results[1].actions,[{
+    type:"apply_schedule",name:"Instagram only copy",source_mode_name:"Instagram only",copy_mode:true,start_minute:600,end_minute:660,
+    weekdays:[1,2,3,4,5,6,7],duration_days:7,
+  }]);
 });
 test("bare ambiguous times ask AM/PM", () => {
   const r = turn("Block Instagram from 10 to 7 every day"); equalSlot(r,"start",null); equalSlot(r,"end",null); none(r);

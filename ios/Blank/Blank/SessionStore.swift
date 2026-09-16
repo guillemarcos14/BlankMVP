@@ -5,8 +5,10 @@ import WidgetKit
 enum AssistantPendingAction: Equatable {
     case startProtection(minutes: Int?, hardMode: Bool, appNames: [String])
     case activateMode(name: String, minutes: Int?, hardMode: Bool, appNames: [String])
+    case duplicateAndActivateMode(sourceName: String, minutes: Int?, hardMode: Bool, appNames: [String])
     case switchMode(name: String)
     case applySchedule(name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
+    case duplicateModeAndApplySchedule(sourceName: String, name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
     case setDailyLimit(minutes: Int?, appNames: [String])
     case allowOnly
     case adultFilter
@@ -660,6 +662,31 @@ final class SessionStore: ObservableObject {
     }
 
     @discardableResult
+    func duplicateMode(named sourceName: String) -> BlankFocusMode? {
+        let target = Self.normalizedModeName(sourceName)
+        guard !target.isEmpty,
+              let source = focusModes.first(where: { Self.normalizedModeName($0.name) == target }),
+              let selectionData = source.selectionData,
+              let copiedSelection = Self.selection(from: selectionData),
+              (!copiedSelection.applicationTokens.isEmpty
+                || !copiedSelection.categoryTokens.isEmpty
+                || !copiedSelection.webDomainTokens.isEmpty) else { return nil }
+        let baseName = "\(source.name) copy"
+        var copyName = baseName
+        var suffix = 2
+        let existingNames = Set(focusModes.map { Self.normalizedModeName($0.name) })
+        while existingNames.contains(Self.normalizedModeName(copyName)) {
+            copyName = "\(baseName) \(suffix)"
+            suffix += 1
+        }
+        let copy = BlankFocusMode(name: copyName, selectionData: selectionData, appNames: source.appNames)
+        focusModes.append(copy)
+        currentModeId = copy.id
+        selection = copiedSelection
+        return copy
+    }
+
+    @discardableResult
     func restoreSavedSelectionForAssistant(appNames: [String] = []) -> Bool {
         let targets = appNames
             .map(Self.normalizedAssistantAppName)
@@ -1212,7 +1239,7 @@ final class SessionStore: ObservableObject {
     }
 
     private static func inferredAssistantApps(from value: String) -> [String] {
-        let normalized = " (normalizedModeName(value)) "
+        let normalized = " \(normalizedModeName(value)) "
         let aliases: [(String, String)] = [
             ("instagram", "Instagram"),
             ("insta", "Instagram"),

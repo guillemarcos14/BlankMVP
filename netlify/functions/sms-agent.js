@@ -485,6 +485,8 @@ function pendingAssistantActionFromPlan(plan, appNames = []) {
   const payload = {
     type: action.type,
     name: action.name || null,
+    source_mode_name: action.source_mode_name || null,
+    copy_mode: action.copy_mode === true,
     minutes: Number.isInteger(action.minutes) ? action.minutes : null,
     hard_mode: action.hard_mode === true,
     start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,

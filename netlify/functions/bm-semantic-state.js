@@ -444,7 +444,7 @@ function capabilityGap(state, context) {
   const explicitSelection = apps.length === 1 && apps[0] === "selected_apps" && context.has_selected_apps === true;
   const namedSelection = context.has_selected_apps === true && Array.isArray(context.selected_app_names) && same([...context.selected_app_names].sort(), [...apps].sort());
   const mode = matchingMode(state,context);
-  if (!explicitSelection && !namedSelection && !(mode && value(state,"start")?.type === "now")) return "app_selection";
+  if (!explicitSelection && !namedSelection && !mode) return "app_selection";
   return null;
 }
 
@@ -462,11 +462,25 @@ function semanticActionFromFacts(state, context = {}) {
   if (start.type === "now") {
     if (duration < 5 || duration > 240) return [];
     const mode = matchingMode(state,context);
-    return [{ type:mode ? "activate_mode" : "start_protection", ...(mode ? { name:mode.name } : {}), minutes:duration, hard_mode:value(state,"hard_mode") ?? false }];
+    return [{
+      type:mode ? "activate_mode" : "start_protection",
+      ...(mode ? { name:mode.name, source_mode_name:mode.name, copy_mode:true } : {}),
+      minutes:duration,
+      hard_mode:value(state,"hard_mode") ?? false,
+    }];
   }
   // Canonical state uses ISO Monday=1. Both native Calendar APIs use Sunday=1.
   const nativeWeekdays = recurrence.weekdays.map(day => day === 7 ? 1 : day+1).sort((a,b)=>a-b);
-  return [{ type:"apply_schedule", name:`Block ${(value(state,"apps") || []).join(" + ")}`, start_minute:start.minute, end_minute:end, weekdays:nativeWeekdays, duration_days:value(state,"schedule_horizon_days") }];
+  const mode = matchingMode(state,context);
+  return [{
+    type:"apply_schedule",
+    name:mode ? `${mode.name} copy` : `Block ${(value(state,"apps") || []).join(" + ")}`,
+    ...(mode ? { source_mode_name:mode.name, copy_mode:true } : {}),
+    start_minute:start.minute,
+    end_minute:end,
+    weekdays:nativeWeekdays,
+    duration_days:value(state,"schedule_horizon_days"),
+  }];
 }
 
 function buildSemanticActions(state, context = {}) {

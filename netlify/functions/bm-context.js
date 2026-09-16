@@ -90,6 +90,24 @@ function normalizeStringArray(value, maxItems = 8, maxLength = 80) {
     .slice(0, maxItems);
 }
 
+function inferAppNamesFromModeName(value) {
+  const normalized = ` ${clean(value, 80).toLowerCase().replace(/[-_]+/g, " ")} `;
+  const aliases = [
+    ["instagram", "Instagram"], ["insta", "Instagram"], ["tik tok", "TikTok"],
+    ["tiktok", "TikTok"], ["youtube", "YouTube"], ["reddit", "Reddit"],
+    ["twitter", "Twitter"], ["facebook", "Facebook"], ["snapchat", "Snapchat"],
+    ["whatsapp", "WhatsApp"],
+  ];
+  const apps = [];
+  const seen = new Set();
+  for (const [alias, app] of aliases) {
+    if (!normalized.includes(` ${alias} `) || seen.has(app)) continue;
+    seen.add(app);
+    apps.push(app);
+  }
+  return apps;
+}
+
 function normalizeModeCatalog(value, maxItems = 12) {
   if (!Array.isArray(value)) return [];
   return value
@@ -101,7 +119,8 @@ function normalizeModeCatalog(value, maxItems = 12) {
       if (!mode || typeof mode !== "object" || Array.isArray(mode)) return null;
       const name = clean(mode.name, 60);
       if (!name) return null;
-      const normalized = { name, app_names: normalizeStringArray(mode.app_names || mode.apps, 8, 60) };
+      const suppliedApps = normalizeStringArray(mode.app_names || mode.apps, 8, 60);
+      const normalized = { name, app_names: suppliedApps.length ? suppliedApps : inferAppNamesFromModeName(name) };
       const id = clean(mode.id, 80);
       if (id) normalized.id = id;
       if (Number.isFinite(mode.selection_count)) normalized.selection_count = Math.max(0, Math.round(mode.selection_count));

@@ -31,6 +31,8 @@ fileprivate struct AssistantInboxAction: Decodable {
     let durationDays: Int?
     let hours: Int?
     let appNames: [String]?
+    let copyMode: Bool?
+    let sourceModeName: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -44,6 +46,8 @@ fileprivate struct AssistantInboxAction: Decodable {
         case durationDays = "duration_days"
         case hours
         case appNames = "app_names"
+        case copyMode = "copy_mode"
+        case sourceModeName = "source_mode_name"
     }
 
     func toPendingAction() -> AssistantPendingAction? {
@@ -52,11 +56,30 @@ fileprivate struct AssistantInboxAction: Decodable {
         case "start_protection":
             return .startProtection(minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
         case "activate_mode":
+            if copyMode == true {
+                return .duplicateAndActivateMode(
+                    sourceName: sourceModeName ?? name ?? "Routine",
+                    minutes: minutes,
+                    hardMode: hardMode ?? false,
+                    appNames: apps
+                )
+            }
             return .activateMode(name: name ?? "Routine", minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
         case "switch_mode":
             return .switchMode(name: name ?? "Routine")
         case "apply_schedule":
             guard let startMinute, let endMinute else { return nil }
+            if copyMode == true {
+                return .duplicateModeAndApplySchedule(
+                    sourceName: sourceModeName ?? name ?? "Routine",
+                    name: name ?? "AI Plan",
+                    startMinute: min(max(startMinute, 0), 1439),
+                    endMinute: min(max(endMinute, 0), 1439),
+                    weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                    durationDays: min(max(durationDays ?? 7, 1), 14),
+                    appNames: apps
+                )
+            }
             return .applySchedule(
                 name: name ?? "AI Plan",
                 startMinute: min(max(startMinute, 0), 1439),
@@ -1126,10 +1149,14 @@ struct HomeView: View {
             return minutes.map { "Start protection now for \($0) minutes using \(target)?" } ?? "Start protection now using \(target), with no duration added?"
         case .activateMode(let name, let minutes, _, _):
             return minutes.map { "Start \(name) mode for \($0) minutes?" } ?? "Start \(name) mode now, without adding a duration?"
+        case .duplicateAndActivateMode(let sourceName, let minutes, _, _):
+            return minutes.map { "Copy \(sourceName) and start the copy for \($0) minutes?" } ?? "Copy \(sourceName) and start the copy now?"
         case .switchMode(let name):
             return "Switch to \(name) mode?"
         case .applySchedule(let name, let start, let end, _, let days, _):
             return "Add \(name) as a new protection window from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, _, let days, _):
+            return "Copy \(sourceName) and schedule the copy from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
         case .setDailyLimit(let minutes, _):
             return minutes.map { "Set a daily limit of \($0) minutes?" } ?? "Set a daily limit after you choose its duration?"
         case .allowOnly:
@@ -1211,6 +1238,24 @@ struct HomeView: View {
                 status: sessionStore.isBlankActive ? "verified" : "failed",
                 detail: sessionStore.isBlankActive ? "mode_active" : "mode_not_active"
             )
+        case .duplicateAndActivateMode(let sourceName, let minutes, let hardMode, _):
+            guard sessionStore.duplicateMode(named: sourceName) != nil else {
+                message = "I couldn't find the saved \(sourceName) plan to copy."
+                messageAction = nil
+                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
+                return
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+            finishPendingAssistantAction(
+                status: sessionStore.isBlankActive ? "verified" : "failed",
+                detail: sessionStore.isBlankActive ? "mode_copy_active" : "mode_copy_not_active"
+            )
         case .switchMode(let name):
             if sessionStore.selectBestMode(matching: name) {
                 message = "\(name) mode selected."
@@ -1251,6 +1296,25 @@ struct HomeView: View {
             message = "Added \(name) without replacing your existing protection windows."
             messageAction = nil
             finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
+        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, let weekdays, let days, _):
+            guard let copy = sessionStore.duplicateMode(named: sourceName) else {
+                message = "I couldn't find the saved \(sourceName) plan to copy."
+                messageAction = nil
+                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
+                return
+            }
+            sessionStore.applyAdaptivePlan(
+                startMinute: start,
+                endMinute: end,
+                durationDays: days,
+                activateCurrentWindow: false,
+                name: copy.name,
+                weekdays: weekdays
+            )
+            applyScreenTimeControls()
+            message = "Copied \(sourceName) as \(copy.name) and added the requested protection window."
+            messageAction = nil
+            finishPendingAssistantAction(status: "verified", detail: "mode_copy_schedule_persisted")
         case .setDailyLimit(let minutes, let appNames):
             guard let minutes else {
                 message = "Tell BM how many minutes per day you want to allow before activating this limit."

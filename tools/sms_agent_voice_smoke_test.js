@@ -13,7 +13,7 @@ const { handler: smsHandler, actionDeepLink } = require("../netlify/functions/sm
 const { handler: audioHandler } = require("../netlify/functions/assistant-audio");
 const { handler: assistantChannelHandler } = require("../netlify/functions/assistant-channel");
 
-async function withAssistantMemoryMock(callback, selectedAppNames = ["Instagram"]) {
+async function withAssistantMemoryMock(callback, selectedAppNames = ["Instagram"], availableModeCatalog = []) {
   const rows = new Map();
   const twilioCalls = [];
   const originalFetch = global.fetch;
@@ -35,6 +35,7 @@ async function withAssistantMemoryMock(callback, selectedAppNames = ["Instagram"
                   has_selected_apps: true,
                   selection_count: 1,
                   selected_app_names: selectedAppNames,
+                  available_mode_catalog: availableModeCatalog,
                   screen_time_authorized: true,
                   app_presence: {
                     app_present: true,
@@ -62,6 +63,7 @@ async function withAssistantMemoryMock(callback, selectedAppNames = ["Instagram"
                 has_selected_apps: true,
                 selection_count: 1,
                 selected_app_names: selectedAppNames,
+                available_mode_catalog: availableModeCatalog,
                 screen_time_authorized: true,
                 app_presence: {
                   app_present: true,
@@ -308,6 +310,32 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
   }, []);
 }
 
+async function whatsappExactSavedModeQueuesIndependentCopy() {
+  await withAssistantMemoryMock(async () => {
+    const send = (body, sid) => smsHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+      body: new URLSearchParams({ From: "whatsapp:+34600000003", Body: body, MessageSid: sid }).toString(),
+    });
+    assert.match((await send("Block Instagram now for 5 minutes", "SMcopy-1")).body, /once or recurring/i);
+    assert.match((await send("Once", "SMcopy-2")).body, /Do you confirm/i);
+    const confirmed = await send("Yes", "SMcopy-3");
+    assert.match(confirmed.body, /Open Blankmind to review and apply it/i);
+    assert.doesNotMatch(confirmed.body, /Select exactly Instagram/i);
+
+    const polled = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "whatsapp" }),
+    });
+    const pending = JSON.parse(polled.body).pending_action;
+    assert.strictEqual(pending.type, "activate_mode");
+    assert.strictEqual(pending.name, "Instagram only");
+    assert.strictEqual(pending.source_mode_name, "Instagram only");
+    assert.strictEqual(pending.copy_mode, true);
+    assert.strictEqual(pending.minutes, 5);
+  }, [], [{ name: "Instagram only", app_names: [], selection_count: 1, has_selection: true }]);
+}
+
 async function whatsappInputAudioGetsTranscribedTextReply() {
   const previousApiKey = process.env.OPENAI_API_KEY;
   const originalFetch = global.fetch;
@@ -417,6 +445,7 @@ async function smsSignatureAndMidnightLinkChecks() {
   await whatsappBlockingFollowupKeepsPendingContract();
   await whatsappTextHasNoAudioAttachment();
   await whatsappMissingSelectionCarriesConfirmedProtection();
+  await whatsappExactSavedModeQueuesIndependentCopy();
   await whatsappInputAudioGetsTranscribedTextReply();
   await audioEndpointIsDisabled();
   await smsSignatureAndMidnightLinkChecks();

@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-16
 
 ## Resumen actual
+- 2026-09-16: Corrección BM integrada y publicada en Netlify `getblank` desde `29cf543`, deploy `6aaa44e8a1ae618cfcda5c6d`. Producción verificada con corrección 3→7 días, `Yea` y `It’s already opened`: enlace `apply_schedule` conservado como revisión (`review_only_actions: true`), sin ejecución automática y sin prompt repetido. Product harness `25/25`, core `84/84`, release gate automatizado `16/16`; Supabase sin cambios.
 - 2026-09-16: La confirmación conversacional acepta también `Yeah`, `Yea` y `Yep`, cubriendo la variante observada en WhatsApp. Validado en el core y en product harness `25/25`.
 - 2026-09-16: Verificación remota tras nueva prueba: `https://getblank.netlify.app/.netlify/functions/blanked-agent` todavía devuelve la versión anterior (`actions: []`, sin `review_only_actions` y con el prompt repetido). La corrección local no es visible en producción porque aún no se ha integrado ni desplegado.
 - 2026-09-16: Corregido el transporte de planes BM completos y confirmados cuando falta heartbeat reciente: WhatsApp/SMS generan enlace de revisión marcado `review_only_actions`; la ejecución sigue bloqueada hasta las comprobaciones nativas de Blankmind. Los follow-ups de instalación ya no repiten el prompt. Validado con product harness `25/25`, core `83/83`, smokes de presencia/WhatsApp/SMS y release gate automatizado `16/16`. Sin deploy.

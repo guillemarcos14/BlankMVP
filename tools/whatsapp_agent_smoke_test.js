@@ -233,7 +233,8 @@ async function linkIncludesRequestedApps() {
     const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.plan.confirm", text: { body: "Yes" } }] } }] }] }) });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
     assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
-    assert.match(outboundText, /Open Blankmind to review and apply/i);
+    assert.match(outboundText, /applying it now/i);
+    assert.doesNotMatch(outboundText, /Open Blankmind/i);
     const pendingRows = [...semanticMemoryRows.values()].flat()
       .map((row) => row.payload?.properties?.memory?.pending_assistant_action)
       .filter(Boolean);
@@ -343,7 +344,8 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /Open Blankmind to review and apply/i);
+    assert.match(requests[0].Body, /applying it now/i);
+    assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;

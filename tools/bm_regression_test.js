@@ -146,14 +146,18 @@ check("immediate_protection_does_not_invent_duration", () => {
   assert.doesNotMatch(whatsapp, /start-focus.*minutes.*30/);
 });
 
-check("whatsapp_actions_require_native_confirmation", () => {
-  assert.match(whatsapp, /Open Blankmind to review and apply it/);
+check("messaging_actions_execute_without_native_confirmation", () => {
+  assert.match(whatsapp, /I'm applying it now/);
+  assert.doesNotMatch(whatsapp, /Open Blankmind to review and apply it/);
   assert.match(assistantChannel, /poll_pending_action/);
   assert.match(assistantChannel, /ack_pending_action/);
+  assert.match(assistantChannel, /register_device_push/);
   assert.match(blankApp, /action == "review-action"/);
+  assert.match(blankApp, /didReceiveRemoteNotification/);
+  assert.match(blankApp, /AssistantBackgroundActionRunner/);
   assert.match(sessionStore, /pendingAssistantAction/);
-  assert.match(home, /Review and confirm/);
   assert.match(home, /AssistantActionInboxClient/);
+  assert.match(home, /confirmPendingAssistantAction\(\)/);
   assert.match(assistantChannel, /execution_started/);
   assert.match(assistantChannel, /last_assistant_action_outcome/);
   assert.match(home, /status:\s*"verified"/);

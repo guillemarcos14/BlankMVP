@@ -1,8 +1,10 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct BlankApp: App {
+    @UIApplicationDelegateAdaptor(BlankAppDelegate.self) private var appDelegate
     @StateObject private var sessionStore = SessionStore()
     @StateObject private var membershipStore = MembershipStore()
     @StateObject private var purchaseStore = StoreKitPurchaseStore()
@@ -23,6 +25,7 @@ struct BlankApp: App {
                 .environmentObject(screenTimeBlocker)
                 .environment(\.font, .blankBody)
                 .task {
+                    appDelegate.registerForRemoteActions()
                     await purchaseStore.loadProducts()
                     if BlankedRuntimeMode.legacyAccessEnabled {
                         await membershipStore.refreshIfNeeded()
@@ -102,6 +105,10 @@ struct BlankApp: App {
         }
 
         if action == "review-action" {
+            if ["open_app_picker", "request_screen_time_permission"].contains(components?.stringQueryItem("type") ?? "") {
+                BlankSharedState.defaults.set(true, forKey: "blankAssistantPollAfterOpen")
+                return
+            }
             requestAssistantActionConfirmation(from: components)
             return
         }
@@ -356,6 +363,196 @@ struct BlankApp: App {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
         return URL(string: trimmed)
+    }
+}
+
+@MainActor
+final class BlankAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        registerForRemoteActions()
+        return true
+    }
+
+    func registerForRemoteActions() {
+        UIApplication.shared.registerForRemoteNotifications()
+        registerStoredTokenIfPossible()
+    }
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        BlankSharedState.defaults.set(token, forKey: "blankAssistantPushToken")
+        registerStoredTokenIfPossible()
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        BlankSharedState.defaults.removeObject(forKey: "blankAssistantPushToken")
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard userInfo["bm_action_id"] != nil else {
+            completionHandler(.noData)
+            return
+        }
+        Task { @MainActor in
+            let outcome = await AssistantBackgroundActionRunner().run()
+            completionHandler(outcome)
+        }
+    }
+
+    private func registerStoredTokenIfPossible() {
+        let defaults = BlankSharedState.defaults
+        let token = defaults.string(forKey: "blankAssistantPushToken") ?? ""
+        let code = defaults.string(forKey: "blankAssistantConnectCode") ?? ""
+        let rawChannel = defaults.string(forKey: "blankAssistantPreferredChannel") ?? ""
+        let channel = rawChannel == "whatsApp" ? "whatsapp" : rawChannel.lowercased()
+        guard !token.isEmpty, !code.isEmpty, ["whatsapp", "sms"].contains(channel) else { return }
+        let phone = defaults.string(forKey: "blankAssistantPhoneNumber") ?? ""
+        #if DEBUG
+        let environment = "sandbox"
+        #else
+        let environment = "production"
+        #endif
+        Task {
+            _ = await AssistantActionInboxClient().registerDevicePush(
+                token: token,
+                environment: environment,
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phone
+            )
+        }
+    }
+}
+
+@MainActor
+private struct AssistantBackgroundActionRunner {
+    func run() async -> UIBackgroundFetchResult {
+        let defaults = BlankSharedState.defaults
+        let code = defaults.string(forKey: "blankAssistantConnectCode") ?? ""
+        let rawChannel = defaults.string(forKey: "blankAssistantPreferredChannel") ?? ""
+        let channel = rawChannel == "whatsApp" ? "whatsapp" : rawChannel.lowercased()
+        let phone = defaults.string(forKey: "blankAssistantPhoneNumber") ?? ""
+        guard ["whatsapp", "sms"].contains(channel),
+              let remote = await AssistantActionInboxClient().poll(connectCode: code, channel: channel, phoneNumber: phone),
+              let action = remote.toPendingAction() else { return .noData }
+
+        if case .openAppPicker = action { return .noData }
+        if case .configureAndOpenAppPicker = action { return .noData }
+        if case .configureAndOpenDailyLimitPicker = action { return .noData }
+        if case .requestScreenTimePermission = action { return .noData }
+
+        let client = AssistantActionInboxClient()
+        await client.acknowledge(actionId: remote.id, status: "confirmed", connectCode: code, channel: channel, phoneNumber: phone)
+        await client.acknowledge(actionId: remote.id, status: "execution_started", connectCode: code, channel: channel, phoneNumber: phone)
+
+        let store = SessionStore(defaults: defaults)
+        let blocker = ScreenTimeBlocker()
+        await blocker.restore(selection: store.selection)
+        blocker.refreshAuthorizationStatus()
+        guard blocker.authorizationStatus == .approved else {
+            await client.acknowledge(actionId: remote.id, status: "failed", connectCode: code, channel: channel, phoneNumber: phone, detail: "screen_time_permission_required")
+            return .failed
+        }
+
+        let outcome = execute(action, store: store, blocker: blocker)
+        await client.acknowledge(
+            actionId: remote.id,
+            status: outcome.verified ? "verified" : "failed",
+            connectCode: code,
+            channel: channel,
+            phoneNumber: phone,
+            detail: outcome.detail
+        )
+        return outcome.verified ? .newData : .failed
+    }
+
+    private func execute(
+        _ action: AssistantPendingAction,
+        store: SessionStore,
+        blocker: ScreenTimeBlocker
+    ) -> (verified: Bool, detail: String) {
+        switch action {
+        case .startProtection(let minutes, let hardMode, let appNames):
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames),
+                  store.duplicateMode(named: store.currentMode.name) != nil else {
+                return (false, "exact_saved_selection_required")
+            }
+            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
+            apply(store: store, blocker: blocker)
+            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "protection_not_active")
+        case .activateMode(let name, let minutes, let hardMode, _):
+            guard store.duplicateMode(named: name) != nil else { return (false, "source_mode_not_found") }
+            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
+            apply(store: store, blocker: blocker)
+            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "mode_copy_not_active")
+        case .duplicateAndActivateMode(let sourceName, let minutes, let hardMode, _):
+            guard store.duplicateMode(named: sourceName) != nil else { return (false, "source_mode_not_found") }
+            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
+            apply(store: store, blocker: blocker)
+            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "mode_copy_not_active")
+        case .applySchedule(_, let start, let end, let weekdays, let days, let appNames):
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames),
+                  let copy = store.duplicateMode(named: store.currentMode.name) else {
+                return (false, "exact_saved_selection_required")
+            }
+            store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: copy.name, weekdays: weekdays)
+            apply(store: store, blocker: blocker)
+            return (true, "mode_copy_schedule_persisted")
+        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, let weekdays, let days, _):
+            guard let copy = store.duplicateMode(named: sourceName) else { return (false, "source_mode_not_found") }
+            store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: copy.name, weekdays: weekdays)
+            apply(store: store, blocker: blocker)
+            return (true, "mode_copy_schedule_persisted")
+        case .setDailyLimit(let minutes, let appNames):
+            guard let minutes, store.restoreSavedSelectionForAssistant(appNames: appNames),
+                  store.duplicateMode(named: store.currentMode.name) != nil else {
+                return (false, "exact_saved_selection_required")
+            }
+            store.dailyLimitMinutes = minutes
+            store.dailyLimitEnabled = true
+            store.refreshDailyLimitMonitoring()
+            apply(store: store, blocker: blocker)
+            return (store.dailyLimitEnabled && store.dailyLimitMinutes == minutes, "daily_limit_state_checked")
+        case .allowOnly:
+            store.allowOnlyModeEnabled = true
+            apply(store: store, blocker: blocker)
+            return (store.allowOnlyModeEnabled, "allow_only_state_checked")
+        case .adultFilter:
+            store.adultContentBlockingEnabled = true
+            apply(store: store, blocker: blocker)
+            return (store.adultContentBlockingEnabled, "adult_filter_state_checked")
+        case .pauseRules(let hours):
+            store.enableVacationMode(hours: hours)
+            apply(store: store, blocker: blocker)
+            return (store.isVacationModeActive, "pause_state_checked")
+        case .disablePause:
+            store.disableVacationMode()
+            apply(store: store, blocker: blocker)
+            return (!store.isVacationModeActive, "resume_state_checked")
+        case .applyAIPlan:
+            store.applyAIPlan()
+            apply(store: store, blocker: blocker)
+            return (true, "ai_plan_persisted")
+        case .switchMode(let name):
+            return (store.selectBestMode(matching: name), "mode_selected")
+        case .openAppPicker, .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker, .requestScreenTimePermission:
+            return (false, "foreground_setup_required")
+        }
+    }
+
+    private func apply(store: SessionStore, blocker: ScreenTimeBlocker) {
+        blocker.updateAdvancedControls(
+            allowOnlyModeEnabled: store.allowOnlyModeEnabled,
+            adultContentBlockingEnabled: store.adultContentBlockingEnabled
+        )
+        blocker.updateSelection(store.selection, isBlankActive: store.isBlankActive)
     }
 }
 

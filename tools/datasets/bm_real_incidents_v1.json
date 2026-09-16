@@ -118,9 +118,10 @@
       "source": "physical_whatsapp",
       "failure_class": "wrong_delivery_surface",
       "runner": "reply_contract",
-      "reply": "Got it. Open Blankmind to review and apply it.",
+      "reply": "Got it. I'm applying it now.",
       "assertions": [
-        { "path": "reply", "op": "includes", "value": "Open Blankmind" },
+        { "path": "reply", "op": "excludes", "value": "Open Blankmind" },
+        { "path": "reply", "op": "includes", "value": "applying it now" },
         { "path": "reply", "op": "excludes", "value": "http" },
         { "path": "reply", "op": "excludes", "value": "review-action" }
       ]

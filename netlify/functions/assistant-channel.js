@@ -13,6 +13,7 @@ const {
   sendAssistantMessage,
 } = require("./_assistant_channel");
 const { identityForAppInstall, identityForPhone } = require("./_identity");
+const { normalizeDevicePush } = require("./_assistant_push");
 
 async function registerPreference(body) {
   const connectCode = normalizeConnectCode(body.connect_code);
@@ -140,6 +141,26 @@ async function syncContext(body) {
       : 0,
     attached_channel: connection?.channel || "",
   });
+}
+
+async function registerDevicePush(body) {
+  const result = await connectedChannel(body);
+  if (result.error) return json(400, { error: result.error });
+  if (!result.connection) return json(200, { ok: true, registered: false, reason: "not_linked" });
+  const devicePush = normalizeDevicePush({
+    token: body.device_token,
+    environment: body.environment,
+    app_install_id: body.app_install_id,
+    updated_at: new Date().toISOString(),
+  });
+  if (!devicePush) return json(400, { error: "invalid_device_token" });
+  await recordAssistantMemory({
+    channel: result.connection.channel,
+    channelUser: result.connection.channelUser,
+    memory: { assistant_device_push: devicePush },
+    source: "assistant_device_push_registered",
+  });
+  return json(200, { ok: true, registered: true, environment: devicePush.environment });
 }
 
 const PENDING_ACTION_TYPES = new Set([
@@ -271,6 +292,27 @@ async function acknowledgePendingAction(body) {
       : { pending_assistant_action: updated },
     source: `assistant_action_${status}`,
   });
+  if (terminal) {
+    const spanish = String(memory.language || "").toLowerCase().startsWith("es");
+    let message;
+    if (status === "verified") {
+      const target = pending.app_names.length ? pending.app_names.join(", ") : (pending.source_mode_name || pending.name || "the requested apps");
+      if (["start_protection", "activate_mode"].includes(pending.type)) {
+        message = spanish
+          ? `${target} ${pending.minutes ? `está bloqueado durante ${pending.minutes} minutos` : "está bloqueado"}.`
+          : `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
+      } else if (pending.type === "apply_schedule") {
+        message = spanish ? "El nuevo horario de bloqueo ya está aplicado." : "The new blocking schedule is applied.";
+      } else {
+        message = spanish ? "Hecho. El cambio está aplicado y verificado." : "Done. The change is applied and verified.";
+      }
+    } else {
+      message = spanish
+        ? "No he podido aplicar el bloqueo en el iPhone. No se ha marcado como completado."
+        : "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
+    }
+    try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The verified outcome remains recorded. */ }
+  }
   return json(200, { ok: true, acknowledged: true, status });
 }
 
@@ -283,6 +325,7 @@ exports.handler = async (event) => {
     const action = cleanText(body.action, 60).toLowerCase();
     if (action === "register_preference") return registerPreference(body);
     if (action === "sync_context") return syncContext(body);
+    if (action === "register_device_push") return registerDevicePush(body);
     if (action === "send_proactive") return sendProactive(body);
     if (action === "poll_pending_action") return pollPendingAction(body);
     if (action === "ack_pending_action") return acknowledgePendingAction(body);

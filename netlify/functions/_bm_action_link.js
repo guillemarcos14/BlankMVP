@@ -1,4 +1,4 @@
-// Channel links transport a proposal. Only the native confirmation flow may execute it.
+// Links are only for setup that requires the user to select apps or grant permission.
 const REVIEW_TYPES = new Set([
   "start_protection", "activate_mode", "apply_schedule", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause",

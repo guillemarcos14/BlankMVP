@@ -157,25 +157,21 @@ async function smsCommandOpensStoredAction() {
       body: new URLSearchParams({ From: "+34600000000", Body: "Yes", MessageSid: "SMsms-confirm" }).toString(),
     });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.match(confirmed.body, /Reply BLOCK/);
+    assert.match(confirmed.body, /applying it now/i);
+    assert.doesNotMatch(confirmed.body, /Reply BLOCK|Open Blankmind|Open Blanked/i);
     assert.doesNotMatch(confirmed.body, /https?:\/\//);
 
-    const second = await smsHandler({
+    const polled = await assistantChannelHandler({
       httpMethod: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
-      body: new URLSearchParams({
-        From: "+34600000000",
-        Body: "BLOCK",
-        MessageSid: "SMsms-block",
-      }).toString(),
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "sms" }),
     });
-    assert.strictEqual(second.statusCode, 200, second.body);
-    assert.match(second.body, /Open Blanked: https:\/\/getblank\.netlify\.app\/open\?action=review-action/);
-    assert.match(second.body, /type=apply_schedule/);
-    assert.match(second.body, /start=1320/);
-    assert.match(second.body, /end=420/);
-    assert.match(second.body, /days=7/);
-    assert.match(second.body, /apps=Instagram/);
+    assert.strictEqual(polled.statusCode, 200, polled.body);
+    const pending = JSON.parse(polled.body).pending_action;
+    assert.strictEqual(pending.type, "apply_schedule");
+    assert.strictEqual(pending.start_minute, 1320);
+    assert.strictEqual(pending.end_minute, 420);
+    assert.strictEqual(pending.duration_days, 7);
+    assert.deepStrictEqual(pending.app_names, ["Instagram"]);
   });
 }
 
@@ -224,9 +220,9 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       body: new URLSearchParams({ From: "whatsapp:+34600000001", Body: "Yes", MessageSid: "SMpending-3" }).toString(),
     });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.match(confirmed.body, /Open Blankmind to review and apply it/i);
+    assert.match(confirmed.body, /applying it now/i);
     assert.doesNotMatch(confirmed.body, /https?:\/\/|review-action|ContentSid/i);
-    assert.strictEqual((confirmed.body.match(/Open Blankmind/gi) || []).length, 1);
+    assert.doesNotMatch(confirmed.body, /Open Blankmind/i);
     assert.strictEqual(twilioCalls.length, 0, "Twilio WhatsApp must not send a duplicate review template");
 
     const polled = await assistantChannelHandler({
@@ -295,8 +291,9 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
     const second = await send("Once", "SMselection-2");
     assert.match(second.body, /Do you confirm/i);
     const third = await send("Yes", "SMselection-3");
-    assert.match(third.body, /Select exactly Instagram/i);
-    assert.doesNotMatch(third.body, /https?:\/\/|review-action/i);
+    assert.match(third.body, /Select the apps to apply it/i);
+    assert.match(third.body, /review-action/);
+    assert.match(third.body, /open_app_picker/);
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
@@ -320,7 +317,8 @@ async function whatsappExactSavedModeQueuesIndependentCopy() {
     assert.match((await send("Block Instagram now for 5 minutes", "SMcopy-1")).body, /once or recurring/i);
     assert.match((await send("Once", "SMcopy-2")).body, /Do you confirm/i);
     const confirmed = await send("Yes", "SMcopy-3");
-    assert.match(confirmed.body, /Open Blankmind to review and apply it/i);
+    assert.match(confirmed.body, /applying it now/i);
+    assert.doesNotMatch(confirmed.body, /Open Blankmind/i);
     assert.doesNotMatch(confirmed.body, /Select exactly Instagram/i);
 
     const polled = await assistantChannelHandler({

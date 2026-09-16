@@ -11,7 +11,7 @@ enum HomeSection: Hashable {
     case timer
 }
 
-fileprivate struct AssistantInboxResponse: Decodable {
+struct AssistantInboxResponse: Decodable {
     let pendingAction: AssistantInboxAction?
 
     enum CodingKeys: String, CodingKey {
@@ -19,7 +19,7 @@ fileprivate struct AssistantInboxResponse: Decodable {
     }
 }
 
-fileprivate struct AssistantInboxAction: Decodable {
+struct AssistantInboxAction: Decodable {
     let id: String
     let type: String
     let name: String?
@@ -134,7 +134,7 @@ fileprivate struct AssistantInboxAction: Decodable {
     }
 }
 
-fileprivate struct AssistantActionInboxClient {
+struct AssistantActionInboxClient {
     func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
         guard let data = try? await request(
             action: "poll_pending_action",
@@ -159,6 +159,18 @@ fileprivate struct AssistantActionInboxClient {
         )
     }
 
+    func registerDevicePush(token: String, environment: String, connectCode: String, channel: String, phoneNumber: String) async -> Bool {
+        guard (try? await request(
+            action: "register_device_push",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            deviceToken: token,
+            environment: environment
+        )) != nil else { return false }
+        return true
+    }
+
     private func request(
         action: String,
         connectCode: String,
@@ -166,7 +178,9 @@ fileprivate struct AssistantActionInboxClient {
         phoneNumber: String,
         actionId: String? = nil,
         status: String? = nil,
-        detail: String? = nil
+        detail: String? = nil,
+        deviceToken: String? = nil,
+        environment: String? = nil
     ) async throws -> Data {
         guard let rawBaseURL = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
             throw URLError(.badURL)
@@ -189,6 +203,8 @@ fileprivate struct AssistantActionInboxClient {
         if let actionId { body["action_id"] = actionId }
         if let status { body["status"] = status }
         if let detail, !detail.isEmpty { body["detail"] = detail }
+        if let deviceToken, !deviceToken.isEmpty { body["device_token"] = deviceToken }
+        if let environment, !environment.isEmpty { body["environment"] = environment }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
@@ -359,6 +375,9 @@ struct HomeView: View {
             if !isPresented {
                 var assistantActionApplied = false
                 if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
+                    if contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                    }
                     if let modeName = sessionStore.pendingPlanModeName,
                        contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.createOrUpdateMode(
@@ -366,24 +385,9 @@ struct HomeView: View {
                             selection: contextualPlanSelection,
                             appNames: sessionStore.pendingPlanAppNames
                         )
-                        if sessionStore.pendingPlanShouldActivate {
-                            let result = withAnimation(.easeInOut(duration: 0.65)) {
-                                sessionStore.activateBlank(
-                                    durationMinutes: sessionStore.pendingPlanDurationMinutes,
-                                    hardMode: sessionStore.pendingPlanHardMode
-                                )
-                            }
-                            screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-                            setMessage(for: result)
-                            activeSection = nil
-                            assistantActionApplied = sessionStore.isBlankActive
-                        } else {
-                            message = "\(modeName) mode saved."
-                            messageAction = nil
-                        }
-                    } else if sessionStore.pendingPlanShouldActivate,
-                              contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.selection = contextualPlanSelection
+                    }
+                    if sessionStore.pendingPlanShouldActivate,
+                       contextualPlanSelection.blankedSelectionCount > 0 {
                         let result = withAnimation(.easeInOut(duration: 0.65)) {
                             sessionStore.activateBlank(
                                 durationMinutes: sessionStore.pendingPlanDurationMinutes,
@@ -419,8 +423,12 @@ struct HomeView: View {
                         message = "Added \(schedule.name) without replacing your existing protection windows."
                         messageAction = nil
                         assistantActionApplied = true
+                    } else if let modeName = sessionStore.pendingPlanModeName,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        message = "\(modeName) mode saved."
+                        messageAction = nil
+                        assistantActionApplied = true
                     } else {
-                        sessionStore.selection = contextualPlanSelection
                         assistantActionApplied = contextualPlanSelection.blankedSelectionCount > 0
                     }
                 }
@@ -1362,6 +1370,7 @@ struct HomeView: View {
             sessionStore.requestBlockConfiguration(
                 appNames: appNames,
                 startsFreshSelection: true,
+                modeName: appNames.isEmpty ? (schedule?.name ?? "BM Plan") : appNames.joined(separator: " + "),
                 shouldActivate: schedule == nil,
                 durationMinutes: durationMinutes,
                 hardMode: hardMode,
@@ -1371,6 +1380,7 @@ struct HomeView: View {
             sessionStore.requestBlockConfiguration(
                 appNames: appNames,
                 startsFreshSelection: true,
+                modeName: appNames.isEmpty ? "BM Daily Limit" : appNames.joined(separator: " + "),
                 dailyLimitMinutes: minutes
             )
         case .requestScreenTimePermission:
@@ -1482,6 +1492,7 @@ struct HomeView: View {
             "app_presence": BlankmindAppPresence.payload(
                 appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
             ),
+            "device_execution_ready": !(BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? "").isEmpty,
             "schedule": sessionStore.assistantScheduleContext(),
             "allow_only_mode_enabled": sessionStore.allowOnlyModeEnabled,
             "adult_content_blocking_enabled": sessionStore.adultContentBlockingEnabled,
@@ -1533,8 +1544,10 @@ struct HomeView: View {
                 guard let remoteAction,
                       let pendingAction = remoteAction.toPendingAction(),
                       sessionStore.pendingAssistantAction == nil else { return }
+                BlankSharedState.defaults.removeObject(forKey: "blankAssistantPollAfterOpen")
                 pendingAssistantActionId = remoteAction.id
                 sessionStore.requestAssistantActionConfirmation(pendingAction)
+                confirmPendingAssistantAction()
             }
         }
     }

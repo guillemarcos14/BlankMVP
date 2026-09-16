@@ -4,13 +4,14 @@
 
 El resultado del gate separa unidades que antes podían confundirse: **grupos de checks**, **conversaciones únicas**, **turnos únicos**, repeticiones, incidentes históricos y casos físicos. Un `17/17` significa únicamente que aprobaron 17 grupos automatizados; no significa 17 conversaciones ni una release validada.
 
-`tools/bm_evaluator_integrity_gate.js` reproduce seis fallos observados en WhatsApp y muta cada condición que los detecta. Solo aprueba si el comportamiento correcto pasa y todos los mutantes fallan. `tools/bm_action_envelope_contract_test.js` verifica que los campos críticos de una acción —incluidos `source_mode_name` y `copy_mode`— sobreviven al contrato canónico, la cola SMS, el canal y el decodificador iOS.
+`tools/bm_evaluator_integrity_gate.js` reproduce seis fallos observados en WhatsApp y muta cada condición que los detecta. Solo aprueba si el comportamiento correcto pasa y todos los mutantes fallan. `tools/bm_action_envelope_contract_test.js` verifica que los campos críticos de una acción —incluidos `source_mode_name` y `copy_mode`— sobreviven al contrato canónico, la cola SMS, el canal y el decodificador iOS. `tools/bm_autonomous_messaging_test.js` exige que una selección exacta guardada se duplique y ejecute sin segunda confirmación nativa; si no existe, exige enlace directo al selector y aplicación automática al aceptar.
 
 La autorización final es independiente: `tools/bm_release_readiness_gate.js` exige el commit, deploy backend, build iOS y hash del artefacto exactos; 200 conversaciones únicas con modelo activo y juez independiente; y 20 casos físicos con trazas, estado observado y evidencia enlazada al mismo candidato. Si falta cualquiera de esas pruebas, `production_release_verified` permanece en `false`; ningún promedio puede compensarlo.
 
 ```powershell
 node tools/bm_evaluator_integrity_gate.js
 node tools/bm_action_envelope_contract_test.js
+node tools/bm_autonomous_messaging_test.js
 node tools/bm_release_readiness_gate.js --init --evidence tmp/bm-release/evidence.json
 node tools/bai_release_gate.js --quality-judge --dataset tools/datasets/<release-set>.json --reviews tools/datasets/<release-reviews>.json --release-evidence tmp/bm-release/evidence.json
 ```
@@ -19,7 +20,7 @@ El dataset de release debe contener al menos 200 conversaciones realmente distin
 
 ## Juez independiente de calidad
 
-La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión; cualquier contradicción dura o afirmación de ejecución sin evidencia suspende el caso aunque la media sea alta.
+La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión. Tras confirmación conversacional, pedir abrir Blankmind o una segunda confirmación cuando existe selección exacta es fallo duro. Afirmar éxito antes del acuse positivo del dispositivo también suspende el caso.
 
 El juez conoce el contrato real de doble confirmación: la confirmación conversacional congela la propuesta y la confirmación nativa autoriza la ejecución. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`. Con `--production` evalúa además las respuestas obtenidas del endpoint desplegado y guarda `tmp/bm-semantic/sol-quality-deployed-gate.json`.
 
@@ -112,7 +113,7 @@ El nuevo test modifica deliberadamente horarios, duración, apps, recurrencia, h
 
 No aprobar una release si queda cualquier fallo duro, revisión visible pendiente, resultado de modelo ocultado por fallback o gate existente fallido. Exigir coincidencia de estado y siguiente paso, correcciones que invaliden confirmación, acciones equivalentes, cero valores inventados y cero acciones prematuras en desarrollo y un holdout nuevo. Repetir el modelo activo y comprobar que no aparecen variantes semánticas graves.
 
-Los tests de contexto por canal verifican el backend compartido, no la entrega del proveedor ni la ejecución en dispositivos. La release necesita además gates de transporte/presencia/persistencia, compilación nativa y smoke final real de permisos, revisión, ejecución y verificación. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.
+Los tests de contexto por canal verifican el backend compartido, no la entrega de APNs ni la ejecución en dispositivos. La release necesita además gates de transporte/persistencia, compilación nativa y smoke final real de: copia no destructiva, ejecución en segundo plano, acuse verificado, fallo honesto cuando iOS no despierta y selector con aplicación automática cuando falta una selección exacta. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.
 
 No presentar `114/114`, la ausencia de crashes, las métricas blandas o una suite determinista repetida como prueba de comprensión general. La evidencia final debe nombrar dataset, versión de contrato, hash de implementación, fuentes reales, repeticiones, fallos pendientes y alcance de las revisiones independientes.
 

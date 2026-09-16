@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { sendAssistantActionPush } = require("./_assistant_push");
 const { json, parseJsonBody } = require("./_membership");
 const {
   attachAssistantUserContext,
@@ -231,6 +232,8 @@ function pendingActionFromPlan(plan, prompt = "") {
   const payload = {
     type: action.type,
     name: action.name || null,
+    source_mode_name: action.source_mode_name || null,
+    copy_mode: action.copy_mode === true,
     minutes: Number.isInteger(action.minutes) ? action.minutes : null,
     hard_mode: action.hard_mode === true,
     start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
@@ -264,6 +267,7 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
   }
   const existing = memory.pending_assistant_action;
   if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
+    try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
     return existing;
   }
   await recordAssistantMemory({
@@ -272,19 +276,29 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
     memory: { pending_assistant_action: pending },
     source: "assistant_action_pending",
   });
+  try { await sendAssistantActionPush(memory.assistant_device_push, pending); } catch (_) { /* Polling remains the fallback. */ }
   return pending;
 }
 
 function whatsappReplyText(plan) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ACTION_TYPES.has(item.type));
   const text = cleanText(plan.message_text || plan.response_text, 480)
     .replace(/(?:https?|blank):\/\/\S+/gi, "")
+    .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
+    .replace(/[^.?!]*(?:review|revisa|revisar)[^.?!]*(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim()
     .slice(0, 320) || "I can help with that in Blanked.";
-  const hasAction = Array.isArray(plan.actions) && plan.actions.some((action) => action && PENDING_ACTION_TYPES.has(action.type));
-  if (hasAction && !/\b(?:open|abrir)\s+(?:blankmind|blanked)\b/i.test(text)) {
-    return `${text}\n\nOpen Blankmind to review and apply it.`;
+  if (!action) return text;
+  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+  if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
+    const apps = Array.isArray(plan.blocking_data?.apps) ? plan.blocking_data.apps : [];
+    const link = require("./_bm_action_link").reviewActionLink(action, apps);
+    return link
+      ? `${text}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
+      : `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
   }
+  if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
   return text;
 }
 
@@ -533,7 +547,17 @@ async function processMessage(message) {
     }
   }
   try {
-    await queuePendingAssistantAction(linkedConnection, plan, prompt);
+    const queued = await queuePendingAssistantAction(linkedConnection, plan, prompt);
+    const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
+      || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
+    if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
+      await recordAssistantMemory({
+        channel: linkedConnection.channel,
+        channelUser: linkedConnection.channelUser,
+        memory: { pending_assistant_action: null },
+        source: "assistant_action_invalidated",
+      });
+    }
   } catch (error) {
     if (semanticPersistenceRequired()) throw error;
   }

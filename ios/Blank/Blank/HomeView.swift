@@ -461,40 +461,42 @@ struct HomeView: View {
 
     private func activeMinimalHome(layout: HomeLayoutMetrics) -> some View {
         ZStack(alignment: .topLeading) {
-            activePrimaryContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            ZStack(alignment: .topLeading) {
+                activePrimaryContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer(minLength: 0)
 
-                if isActiveNavExpanded {
-                    activeExpandedNavigation
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .bottom)),
-                            removal: .opacity.combined(with: .move(edge: .top))
-                        ))
-                } else {
-                    VStack(alignment: .leading, spacing: -8) {
-                        minimalStartRow
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    if isActiveNavExpanded {
+                        activeExpandedNavigation
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .bottom)),
+                                removal: .opacity.combined(with: .move(edge: .top))
+                            ))
+                    } else {
+                        VStack(alignment: .leading, spacing: -8) {
+                            minimalStartRow
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Button("unblank") {
-                            beginFullScreenUnblankHold()
+                            Button("unblank") {
+                                beginFullScreenUnblankHold()
+                            }
+                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                            .tracking(-0.8)
+                            .foregroundStyle(BlankColors.homeDarkSecondary)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                            .buttonStyle(.plain)
                         }
-                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                        .tracking(-0.8)
-                        .foregroundStyle(BlankColors.homeDarkSecondary)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                        .buttonStyle(.plain)
+                        .transition(.opacity)
                     }
-                    .transition(.opacity)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .padding(.horizontal, layout.horizontalPadding)
+            .padding(.bottom, layout.bottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding(.horizontal, layout.horizontalPadding)
-        .padding(.bottom, layout.bottomPadding)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .overlay {
             if isHoldingToUnblank {
                 Color.clear
@@ -503,8 +505,8 @@ struct HomeView: View {
                     .overlay(alignment: .bottom) {
                         GeometryReader { proxy in
                             Rectangle()
-                                .fill(Color.white.opacity(0.20))
-                                .frame(width: proxy.size.width * unblankHoldProgress, height: 2)
+                                .fill(Color.white.opacity(0.28))
+                                .frame(width: proxy.size.width * unblankHoldProgress, height: 3)
                                 .frame(maxHeight: .infinity, alignment: .bottomLeading)
                         }
                         .allowsHitTesting(false)
@@ -552,30 +554,28 @@ struct HomeView: View {
 
     @ViewBuilder
     private var activePrimaryContent: some View {
-        if isHoldingToUnblank {
-            Text("hold the screen to unblank")
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-1.1)
-                .foregroundStyle(Color.white)
-                .lineLimit(3)
-                .minimumScaleFactor(0.78)
-        } else if let cooldownText {
-            Text(cooldownText)
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-1.1)
-                .foregroundStyle(BlankColors.homeDarkSecondary)
-                .monospacedDigit()
-                .lineLimit(2)
-                .minimumScaleFactor(0.72)
-        } else if let timerCountdownText {
-            Text(timerCountdownText)
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-1.1)
-                .foregroundStyle(BlankColors.homeDarkSecondary)
-                .monospacedDigit()
-                .lineLimit(2)
-                .minimumScaleFactor(0.72)
+        Group {
+            if isHoldingToUnblank {
+                HoldToUnblankInstruction()
+            } else if let cooldownText {
+                Text(cooldownText)
+                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                    .tracking(-1.1)
+                    .foregroundStyle(BlankColors.homeDarkSecondary)
+                    .monospacedDigit()
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+            } else if let timerCountdownText {
+                Text(timerCountdownText)
+                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                    .tracking(-1.1)
+                    .foregroundStyle(BlankColors.homeDarkSecondary)
+                    .monospacedDigit()
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var activeExpandedNavigation: some View {
@@ -3637,6 +3637,28 @@ private func minuteOfDay(from date: Date) -> Int {
 private extension FamilyActivitySelection {
     var blankedSelectionCount: Int {
         applicationTokens.count + categoryTokens.count + webDomainTokens.count
+    }
+}
+
+private struct HoldToUnblankInstruction: View {
+    @State private var isBreathing = false
+
+    var body: some View {
+        Text("hold the screen to unblank")
+            .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+            .tracking(-1.1)
+            .foregroundStyle(Color.white)
+            .lineLimit(3)
+            .minimumScaleFactor(0.78)
+            .scaleEffect(isBreathing ? 1.015 : 0.975, anchor: .leading)
+            .opacity(isBreathing ? 1 : 0.72)
+            .animation(
+                .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
+                value: isBreathing
+            )
+            .onAppear {
+                isBreathing = true
+            }
     }
 }
 

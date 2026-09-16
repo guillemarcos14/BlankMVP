@@ -39,6 +39,16 @@ async function identityForPhone(phoneE164) {
   return rows[0] || null;
 }
 
+async function identityForAppInstall(appInstallId) {
+  const installId = cleanText(appInstallId, 160);
+  if (!installId) return null;
+  const rows = await supabaseFetch(
+    `blankmind_identity_links?app_install_id=eq.${encodeURIComponent(installId)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] || null;
+}
+
 async function ensureIdentityForAuthUser({ authUserId, phoneE164 = "" }) {
   const userId = cleanText(authUserId, 80);
   if (!userId) throw new Error("missing_auth_user_id");
@@ -104,6 +114,7 @@ async function linkAppInstall({ authUserId, appInstallId }) {
 module.exports = {
   cleanText,
   ensureIdentityForAuthUser,
+  identityForAppInstall,
   identityForAuthUser,
   identityForPhone,
   linkAppInstall,

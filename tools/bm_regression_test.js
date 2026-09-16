@@ -154,6 +154,10 @@ check("whatsapp_actions_require_native_confirmation", () => {
   assert.match(sessionStore, /pendingAssistantAction/);
   assert.match(home, /Review and confirm/);
   assert.match(home, /AssistantActionInboxClient/);
+  assert.match(assistantChannel, /execution_started/);
+  assert.match(assistantChannel, /last_assistant_action_outcome/);
+  assert.match(home, /status:\s*"verified"/);
+  assert.match(home, /blankPendingAssistantActionId/);
 });
 
 check("assistant_context_sync_reaches_messaging_identity", () => {

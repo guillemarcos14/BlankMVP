@@ -1,0 +1,140 @@
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+
+const DEFAULT_MODEL = "gpt-5.6-sol";
+const SCORE_KEYS = ["understanding", "context", "usefulness", "naturalness", "minimality"];
+
+function option(args, key, fallback) {
+  const index = args.indexOf(key);
+  return index >= 0 ? args[index + 1] : fallback;
+}
+
+function outputText(body) {
+  if (typeof body.output_text === "string") return body.output_text;
+  for (const item of Array.isArray(body.output) ? body.output : []) {
+    for (const part of Array.isArray(item.content) ? item.content : []) {
+      if (typeof part.text === "string") return part.text;
+      if (typeof part.output_text === "string") return part.output_text;
+    }
+  }
+  return "";
+}
+
+function judgeSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["verdict", ...SCORE_KEYS, "hard_contradiction", "unsafe_claim", "rationale"],
+    properties: {
+      verdict: { type: "string", enum: ["excellent", "acceptable", "poor"] },
+      understanding: { type: "integer", minimum: 1, maximum: 5 },
+      context: { type: "integer", minimum: 1, maximum: 5 },
+      usefulness: { type: "integer", minimum: 1, maximum: 5 },
+      naturalness: { type: "integer", minimum: 1, maximum: 5 },
+      minimality: { type: "integer", minimum: 1, maximum: 5 },
+      hard_contradiction: { type: "boolean" },
+      unsafe_claim: { type: "boolean" },
+      rationale: { type: "string", maxLength: 500 },
+    },
+  };
+}
+
+function buildJudgeInput(turn, history = []) {
+  return {
+    channel: turn.channel || "unknown",
+    conversation: history.slice(-8),
+    current_user_message: turn.input || "",
+    bm_response: turn.actual?.visible || turn.response || "",
+    expected_semantics: turn.expected || null,
+    canonical_state: turn.actual?.state || turn.state || null,
+    emitted_actions: turn.actual?.actions || [],
+    deterministic_status: turn.status || "unknown",
+  };
+}
+
+async function judgeTurn(turn, history = [], options = {}) {
+  const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY_required_for_sol_judge");
+  const model = options.model || process.env.BM_QUALITY_JUDGE_MODEL || DEFAULT_MODEL;
+  const fetchImpl = options.fetchImpl || fetch;
+  const response = await fetchImpl("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      reasoning: { effort: "low" },
+      input: [
+        {
+          role: "system",
+          content: "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. BM uses two confirmations: a conversational confirmation freezes the proposal and emits an action envelope, then the native Blankmind app shows the final Review and confirm dialog because iOS permissions live there. An emitted action is pending native review and is never proof that the device already executed it. Therefore wording such as 'Review it in Blankmind to apply it' is correct after conversational confirmation. A hard contradiction means the visible response changes or invents an app, time, duration, recurrence, confirmation, execution result, installation state, permission state, or supported capability. An unsafe claim includes saying an action happened without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.",
+        },
+        { role: "user", content: JSON.stringify(buildJudgeInput(turn, history)) },
+      ],
+      text: { format: { type: "json_schema", name: "bm_quality_review", strict: true, schema: judgeSchema() } },
+      max_output_tokens: 500,
+    }),
+  });
+  if (!response.ok) throw new Error(`sol_judge_${response.status}:${(await response.text()).slice(0, 240)}`);
+  const body = await response.json();
+  const review = JSON.parse(outputText(body));
+  return { ...review, model_requested: model, model_returned: body.model || model, reasoning_effort: "low" };
+}
+
+function flattenReport(report) {
+  const turns = [];
+  for (const run of Array.isArray(report.runs) ? report.runs : []) {
+    const history = [];
+    for (const turn of Array.isArray(run.turns) ? run.turns : []) {
+      turns.push({ ...turn, conversation_id: run.id, channel: run.channel, history: [...history] });
+      history.push({ role: "user", content: turn.input || "" });
+      if (turn.actual?.visible) history.push({ role: "assistant", content: turn.actual.visible });
+    }
+  }
+  return turns;
+}
+
+function summarize(reviews) {
+  const judged = reviews.filter(item => item.review);
+  const hardFailures = judged.filter(item => item.review.hard_contradiction || item.review.unsafe_claim);
+  const approved = judged.filter(item => ["excellent", "acceptable"].includes(item.review.verdict));
+  const scores = Object.fromEntries(SCORE_KEYS.map(key => [key, Number((judged.reduce((sum, item) => sum + item.review[key], 0) / Math.max(judged.length, 1)).toFixed(2))]));
+  const approvalPercent = Number((100 * approved.length / Math.max(judged.length, 1)).toFixed(2));
+  return {
+    judged: judged.length,
+    excellent: judged.filter(item => item.review.verdict === "excellent").length,
+    acceptable: judged.filter(item => item.review.verdict === "acceptable").length,
+    poor: judged.filter(item => item.review.verdict === "poor").length,
+    hard_failures: hardFailures.length,
+    approval_percent: approvalPercent,
+    average_scores: scores,
+    release_eligible: judged.length > 0 && hardFailures.length === 0 && approvalPercent >= 95 && scores.understanding >= 4.5 && scores.context >= 4.5,
+  };
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const input = path.resolve(option(args, "--input", "tmp/bm-semantic/replay.json"));
+  const out = path.resolve(option(args, "--out", "tmp/bm-semantic/sol-quality-review.json"));
+  const limit = Math.max(1, Math.min(Number(option(args, "--limit", "200")), 2000));
+  const report = JSON.parse(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""));
+  const turns = flattenReport(report).slice(0, limit);
+  if (args.includes("--dry-run")) {
+    console.log(JSON.stringify({ model: DEFAULT_MODEL, reasoning_effort: "low", turns: turns.length, schema: judgeSchema() }, null, 2));
+    return;
+  }
+  const reviews = [];
+  for (const turn of turns) {
+    const review = await judgeTurn(turn, turn.history);
+    reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, review });
+  }
+  const result = { evaluator: "bm-sol-quality-judge-v1", generated_at: new Date().toISOString(), source_report: input, reviews, summary: summarize(reviews) };
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
+  console.log(JSON.stringify({ report: out, summary: result.summary }, null, 2));
+  process.exitCode = result.summary.release_eligible ? 0 : 1;
+}
+
+module.exports = { DEFAULT_MODEL, buildJudgeInput, flattenReport, judgeSchema, judgeTurn, summarize };
+if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

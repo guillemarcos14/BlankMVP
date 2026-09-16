@@ -12,6 +12,7 @@ const {
   proactiveGate,
   sendAssistantMessage,
 } = require("./_assistant_channel");
+const { identityForAppInstall, identityForPhone } = require("./_identity");
 
 async function registerPreference(body) {
   const connectCode = normalizeConnectCode(body.connect_code);
@@ -172,6 +173,10 @@ function normalizePendingAction(value) {
     summary: cleanText(value.summary, 320),
     created_at: cleanText(value.created_at, 40),
     expires_at: new Date(expiresAt).toISOString(),
+    status: cleanText(value.status, 24) || "queued",
+    delivered_at: cleanText(value.delivered_at, 40),
+    confirmed_at: cleanText(value.confirmed_at, 40),
+    execution_started_at: cleanText(value.execution_started_at, 40),
   };
   if (type === "apply_schedule" && (
     !Number.isInteger(action.start_minute)
@@ -182,9 +187,15 @@ function normalizePendingAction(value) {
 }
 
 async function connectedChannel(body) {
-  const connectCode = normalizeConnectCode(body.connect_code);
   const preferredChannel = cleanChannel(body.preferred_channel || body.channel);
-  if (!connectCode || !preferredChannel) return { error: "missing_connect_code_or_channel" };
+  if (!preferredChannel) return { error: "missing_channel" };
+  let connectCode = normalizeConnectCode(body.connect_code);
+  if (!connectCode) {
+    const identity = await identityForAppInstall(body.app_install_id)
+      || await identityForPhone(body.user_phone || body.phone_number);
+    connectCode = normalizeConnectCode(identity?.assistant_connect_code);
+  }
+  if (!connectCode) return { error: "installation_not_linked" };
   const connection = await findAssistantConnection(connectCode, preferredChannel);
   return { connectCode, preferredChannel, connection };
 }
@@ -204,6 +215,16 @@ async function pollPendingAction(body) {
       source: "assistant_action_expired",
     });
   }
+  if (pending && pending.status === "queued") {
+    const delivered = { ...memory.pending_assistant_action, status: "delivered", delivered_at: new Date().toISOString() };
+    await recordAssistantMemory({
+      channel: result.connection.channel,
+      channelUser: result.connection.channelUser,
+      memory: { pending_assistant_action: delivered },
+      source: "assistant_action_delivered",
+    });
+    Object.assign(pending, normalizePendingAction(delivered));
+  }
   return json(200, {
     ok: true,
     linked: true,
@@ -214,9 +235,9 @@ async function pollPendingAction(body) {
 async function acknowledgePendingAction(body) {
   const result = await connectedChannel(body);
   const actionId = cleanText(body.action_id, 80);
-  const status = ["confirmed", "dismissed", "received"].includes(cleanText(body.status, 20).toLowerCase())
+  const status = ["received", "confirmed", "execution_started", "verified", "failed", "dismissed"].includes(cleanText(body.status, 24).toLowerCase())
     ? cleanText(body.status, 20).toLowerCase()
-    : "resolved";
+    : "failed";
   if (result.error || !actionId) return json(400, { error: result.error || "missing_action_id" });
   if (!result.connection) return json(200, { ok: true, acknowledged: false, reason: "not_linked" });
 
@@ -225,10 +246,27 @@ async function acknowledgePendingAction(body) {
   if (!pending || pending.id !== actionId) {
     return json(200, { ok: true, acknowledged: false, reason: pending ? "action_mismatch" : "no_pending_action" });
   }
+  const now = new Date().toISOString();
+  const terminal = ["verified", "failed", "dismissed"].includes(status);
+  const timestampKey = status === "confirmed" ? "confirmed_at"
+    : status === "execution_started" ? "execution_started_at"
+      : status === "received" ? "delivered_at" : "resolved_at";
+  const updated = { ...memory.pending_assistant_action, status, [timestampKey]: now };
   await recordAssistantMemory({
     channel: result.connection.channel,
     channelUser: result.connection.channelUser,
-    memory: { pending_assistant_action: null },
+    memory: terminal
+      ? {
+          pending_assistant_action: null,
+          last_assistant_action_outcome: {
+            id: actionId,
+            type: pending.type,
+            status,
+            resolved_at: now,
+            detail: cleanText(body.detail, 240),
+          },
+        }
+      : { pending_assistant_action: updated },
     source: `assistant_action_${status}`,
   });
   return json(200, { ok: true, acknowledged: true, status });

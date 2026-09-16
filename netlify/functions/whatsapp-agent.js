@@ -245,6 +245,7 @@ function pendingActionFromPlan(plan, prompt = "") {
     id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
     fingerprint,
     ...payload,
+    status: "queued",
     summary: cleanText(plan.message_text || plan.response_text, 320),
     created_at: createdAt,
     expires_at: expiresAt,

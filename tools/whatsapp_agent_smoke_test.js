@@ -13,6 +13,12 @@ const semanticMemoryRows = new Map();
 
 function recentAssistantMemoryResponse(target, options = {}) {
   if (!String(target).startsWith("https://supabase.test/rest/v1/")) return null;
+  if (String(target).includes("/blankmind_identity_links")) {
+    const rows = String(target).includes("app_install_id=eq.install-1")
+      ? [{ assistant_connect_code: "ABC123", app_install_id: "install-1" }]
+      : [];
+    return { ok: true, status: 200, text: async () => JSON.stringify(rows), json: async () => rows };
+  }
   if ((options.method || "GET").toUpperCase() === "POST") {
     const row = JSON.parse(options.body || "{}");
     if (row.anonymous_user_id && row.payload) {
@@ -251,6 +257,28 @@ async function linkIncludesRequestedApps() {
     });
     assert.strictEqual(acknowledged.statusCode, 200, acknowledged.body);
     assert.strictEqual(JSON.parse(acknowledged.body).acknowledged, true);
+
+    const stillPending = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp" }),
+    });
+    const stillPendingBody = JSON.parse(stillPending.body);
+    assert.strictEqual(stillPending.statusCode, 200, stillPending.body);
+    assert.strictEqual(stillPendingBody.pending_action.id, pendingRows[0].id);
+    assert.strictEqual(stillPendingBody.pending_action.status, "confirmed");
+
+    const verified = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "ack_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp", action_id: pendingRows[0].id, status: "verified", detail: "schedule_persisted" }),
+    });
+    assert.strictEqual(verified.statusCode, 200, verified.body);
+    assert.strictEqual(JSON.parse(verified.body).status, "verified");
+
+    const terminalPoll = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp" }),
+    });
+    assert.strictEqual(JSON.parse(terminalPoll.body).pending_action, null);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;

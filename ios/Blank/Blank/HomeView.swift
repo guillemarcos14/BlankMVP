@@ -370,6 +370,8 @@ struct HomeView: View {
             sessionStore.refreshDailyLimitMonitoring()
             syncAssistantContext()
         }
+        .onChange(of: sessionStore.focusModes) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.isBlankActive) { isActive in
             if !isActive {
                 isActiveNavExpanded = false
@@ -377,7 +379,10 @@ struct HomeView: View {
                 unblankHoldProgress = 0
                 isAnimatingUnblankHold = false
             }
+            syncAssistantContext()
         }
+        .onChange(of: sessionStore.dailyLimitMinutes) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.dailyLimitEnabled) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
             syncAssistantContext()

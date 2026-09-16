@@ -198,11 +198,12 @@ check("adaptive_schedule_appends_windows", () => {
   assert.doesNotMatch(ios, /sessionStore\.schedule\.windows = \[window\]/);
 });
 
-check("why_now_layout_is_centered", () => {
+check("why_now_layout_preserves_conversational_design", () => {
   const whyNowBlock = blockBetween(home, "private struct RelapseReviewSheet", "private struct RelapseReasonTile");
-  assert.match(whyNowBlock, /frame\(maxWidth: \.infinity, maxHeight: \.infinity, alignment: \.top\)/);
-  assert.match(whyNowBlock, /HStack\(spacing: 0\)/);
-  assert.match(home, /requestAssistantActionConfirmation\(\.applyAIPlan\)/);
+  assert.match(whyNowBlock, /ZStack\(alignment: \.bottomLeading\)/);
+  assert.match(whyNowBlock, /frame\(maxWidth: \.infinity, maxHeight: \.infinity, alignment: \.leading\)/);
+  assert.match(whyNowBlock, /VStack\(alignment: \.leading, spacing: -8\)/);
+  assert.match(home, /sessionStore\.recordRelapseReview\(reason\)[\s\S]{0,160}sessionStore\.applyAIPlan\(\)/);
 });
 
 check("assistant_actions_reuse_saved_modes_and_ignore_stale_timer", () => {

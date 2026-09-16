@@ -19,16 +19,15 @@ keystore.properties
 # Generated deploy artifacts
 /web/*.zip
 
-# Local screenshot/debug dumps
+# Local screenshot/debug dumps and generated test artifacts
 /blank-*.png
 /screenshots/
 /screenshots/*.xml
 /screenshots/*.preferences_pb
+/tmp/
 
 # Generated visual experiments
 /tools/generated_backgrounds/
-/tmp/product-harness/
-/tmp/reports/
 /tools/reports/product_harness_*.json
 /tools/reports/bai_synthetic_conversation_suite_*.json
 /tools/reports/blanked_agent_eval_*.json

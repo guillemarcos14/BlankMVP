@@ -2701,9 +2701,10 @@ private struct RelapseReviewSheet: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let contentWidth = min(max(proxy.size.width - 48, 0), 420)
+            let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
+            let contentWidth = min(max(proxy.size.width - horizontalPadding * 2, 0), 420)
             let topInset = proxy.safeAreaInsets.top
-            let bottomInset = max(proxy.safeAreaInsets.bottom + 18, 28)
+            let bottomInset = max(proxy.safeAreaInsets.bottom + 18, 34) + 51
 
             ZStack {
                 BlankColors.homeLightBackground
@@ -2713,7 +2714,7 @@ private struct RelapseReviewSheet: View {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("why now?")
                             .font(.blankInter(size: 48, weight: .bold, relativeTo: .largeTitle))
-                            .tracking(-1.4)
+                            .tracking(-0.6)
                             .foregroundStyle(BlankColors.homeLightInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
@@ -2721,7 +2722,7 @@ private struct RelapseReviewSheet: View {
 
                         Spacer(minLength: 24)
 
-                        VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: -8) {
                             ForEach(RelapseReviewReason.allCases) { reason in
                                 Button {
                                     onSelect(reason)
@@ -2730,20 +2731,21 @@ private struct RelapseReviewSheet: View {
                                 }
                                 .buttonStyle(RelapseReasonButtonStyle())
                             }
-                        }
 
-                        Button {
-                            onDismiss()
-                        } label: {
-                            Text("skip")
-                                .font(.blankInter(size: 30, weight: .bold, relativeTo: .title2))
-                                .tracking(-0.6)
-                                .foregroundStyle(BlankColors.homeLightSecondary)
-                                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                                .contentShape(Rectangle())
+                            Button {
+                                onDismiss()
+                            } label: {
+                                Text("skip")
+                                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                                    .tracking(-0.6)
+                                    .foregroundStyle(BlankColors.homeLightSecondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.top, 2)
                     }
                     .padding(.bottom, bottomInset)
                     .frame(
@@ -2765,13 +2767,13 @@ private struct RelapseReasonTile: View {
     var body: some View {
         HStack {
             Text(reason.title.lowercased())
-                .font(.blankInter(size: 30, weight: .bold, relativeTo: .title2))
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .tracking(-0.6)
                 .foregroundStyle(BlankColors.homeLightInk)
                 .lineLimit(1)
-                .minimumScaleFactor(0.78)
+                .minimumScaleFactor(0.72)
         }
-        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         .contentShape(Rectangle())
     }
 }

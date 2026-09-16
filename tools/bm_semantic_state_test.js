@@ -356,5 +356,15 @@ test("recurring protection cannot turn now into a repeating clock or a one-off a
     equalSlot(results[1],"start",{type:"now"}); assert.equal(results[1].decision.slot,"start"); results.forEach(none); assert.deepEqual(buildSemanticActions(results[1].state,DEVICE),[]);
   }
 });
+test("repeating an already confirmed request starts a fresh unconfirmed proposal", () => {
+  const completed = chat(["Block Instagram now for 5 minutes", "Just once", "Yes"])[2];
+  assert.equal(completed.state.status, "ready");
+  const repeated = turn("Block Instagram now for 5 minutes", completed.state);
+  equalSlot(repeated, "recurrence", null);
+  equalSlot(repeated, "confirmation", null);
+  assert.equal(repeated.decision.slot, "recurrence");
+  assert.match(repeated.responseText, /once or recurring/i);
+  none(repeated);
+});
 
 console.log(`BM semantic state: ${checks}/${checks} independent transition and invariant checks passed`);

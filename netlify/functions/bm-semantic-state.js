@@ -348,6 +348,16 @@ function reduceSemanticState(previous, patch, { language, now = Date.now() } = {
   state.revision += 1;
   state.updated_at = new Date(now).toISOString();
   if (language) state.language = language === "es" ? "es" : "en";
+  const startsNewBlockAfterConfirmation = patch.intent === "block"
+    && Object.hasOwn(patch.set, "action_type")
+    && value(state, "confirmation")?.status === "confirmed";
+  if (startsNewBlockAfterConfirmation) {
+    // Repeating the same request is a new proposal, not permission to reuse the
+    // previous conversational confirmation or facts omitted from this turn.
+    state.slots = Object.fromEntries(SLOT_NAMES.map(k => [k, null]));
+    state.last_action_fingerprint = null;
+    state.errors = [];
+  }
   if (patch.intent && patch.intent !== state.intent) {
     // A new intention closes the previous action, including every authorization.
     if (patch.intent !== "block" || state.intent !== "advice") {

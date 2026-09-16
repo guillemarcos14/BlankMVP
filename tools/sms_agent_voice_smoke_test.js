@@ -237,6 +237,25 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
     assert.strictEqual(polledBody.pending_action.type, "start_protection");
     assert.strictEqual(polledBody.pending_action.minutes, 5);
     assert.deepStrictEqual(polledBody.pending_action.app_names, ["Instagram"]);
+
+    const repeated = await smsHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+      body: new URLSearchParams({
+        From: "whatsapp:+34600000001",
+        Body: "Block Instagram now for 5 minutes",
+        MessageSid: "SMpending-repeat",
+      }).toString(),
+    });
+    assert.strictEqual(repeated.statusCode, 200, repeated.body);
+    assert.match(repeated.body, /once or recurring/i);
+    assert.doesNotMatch(repeated.body, /Open Blankmind|https?:\/\/|review-action/i);
+
+    const afterRepeat = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "whatsapp" }),
+    });
+    assert.strictEqual(JSON.parse(afterRepeat.body).pending_action, null, afterRepeat.body);
   });
   for (const [key, value] of Object.entries(previousTwilio)) {
     const envKey = { sid: "TWILIO_ACCOUNT_SID", token: "TWILIO_AUTH_TOKEN", from: "TWILIO_WHATSAPP_FROM_NUMBER", enabled: "TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED", content: "TWILIO_WHATSAPP_REVIEW_CONTENT_SID" }[key];

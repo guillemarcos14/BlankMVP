@@ -697,7 +697,16 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   const modelFollowup = naturalReplyText(plan.followup_text || "");
   if (channel === "whatsapp") {
     try {
-      await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      const queued = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      if (!queued && linkedConnection?.connectCode && plan.semantic_state?.intent === "block"
+        && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status)) {
+        await recordAssistantMemory({
+          channel,
+          channelUser: from,
+          memory: { pending_assistant_action: null },
+          source: "assistant_action_invalidated",
+        });
+      }
     } catch (error) {
       if (semanticPersistenceRequired()) throw error;
     }

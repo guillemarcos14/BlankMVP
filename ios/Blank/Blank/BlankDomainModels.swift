@@ -1098,6 +1098,14 @@ struct DigitalWellnessFeaturesClient {
                 recommendations: ["Configure the backend URL to sync wellness features."],
                 next_step: "Run a release-configured build.",
                 risk_window: payload.weekly.worst_focus_window,
+                plan_update: DigitalWellnessPlanUpdate(
+                    title: "Protect your next risk window.",
+                    evidence: "Debug build generated a local plan proposal.",
+                    proposed_start_minute: 21 * 60 + 30,
+                    proposed_end_minute: 7 * 60,
+                    duration_days: 5,
+                    action_label: "Apply preventive block"
+                ),
                 behavior_forecast: DigitalWellnessBehaviorForecast(
                     window: payload.weekly.worst_focus_window ?? "Learning",
                     risk_score: 40,
@@ -1111,15 +1119,7 @@ struct DigitalWellnessFeaturesClient {
                     variant: "same_window_same_apps",
                     success_metric: "Completed sessions without emergency exits."
                 ),
-                recommendation_id: nil,
-                plan_update: DigitalWellnessPlanUpdate(
-                    title: "Protect your next risk window.",
-                    evidence: "Debug build generated a local plan proposal.",
-                    proposed_start_minute: 21 * 60 + 30,
-                    proposed_end_minute: 7 * 60,
-                    duration_days: 5,
-                    action_label: "Apply preventive block"
-                )
+                recommendation_id: nil
             )
         }
         #endif

@@ -699,12 +699,8 @@ struct HomeView: View {
 
                 minimalStatus
 
+                #if targetEnvironment(simulator)
                 HStack(spacing: 18) {
-                    minimalUtilityRow("assistant") {
-                        showingAssistantConnect = true
-                    }
-
-                    #if targetEnvironment(simulator)
                     minimalUtilityRow("onboarding") {
                         openOnboardingDemo()
                     }
@@ -712,9 +708,9 @@ struct HomeView: View {
                     minimalUtilityRow("pro") {
                         enableDemoPro()
                     }
-                    #endif
                 }
                 .padding(.top, 7)
+                #endif
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

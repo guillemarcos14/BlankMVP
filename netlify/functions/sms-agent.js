@@ -467,6 +467,73 @@ function naturalReplyText(text) {
     .trim();
 }
 
+const PENDING_ASSISTANT_ACTION_TYPES = new Set([
+  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
+  "open_app_picker", "request_screen_time_permission",
+]);
+
+function pendingAssistantActionFromPlan(plan, appNames = []) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+    .find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  if (!action) return null;
+  if (action.type === "apply_schedule" && (
+    !Number.isInteger(action.start_minute)
+    || !Number.isInteger(action.end_minute)
+    || action.start_minute === action.end_minute
+  )) return null;
+  const payload = {
+    type: action.type,
+    name: action.name || null,
+    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
+    hard_mode: action.hard_mode === true,
+    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
+    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
+    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
+    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
+    hours: Number.isInteger(action.hours) ? action.hours : null,
+    app_names: (Array.isArray(appNames) ? appNames : []).filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps").slice(0, 12),
+  };
+  const createdAt = new Date().toISOString();
+  return {
+    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
+    fingerprint: crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32),
+    ...payload,
+    status: "queued",
+    summary: cleanText(plan.message_text || plan.response_text, 320),
+    created_at: createdAt,
+    expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+async function queuePendingAssistantAction(connection, plan, appNames) {
+  if (!connection?.connectCode) return null;
+  const pending = pendingAssistantActionFromPlan(plan, appNames);
+  if (!pending) return null;
+  const memory = await getAssistantMemory(connection.channel, connection.channelUser);
+  const existing = memory.pending_assistant_action;
+  if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) return existing;
+  await recordAssistantMemory({
+    channel: connection.channel,
+    channelUser: connection.channelUser,
+    memory: { pending_assistant_action: pending },
+    source: "assistant_action_pending",
+  });
+  return pending;
+}
+
+function whatsappReplyText(plan, fallbackText) {
+  const clean = naturalReplyText(plan.message_text || plan.response_text || fallbackText)
+    .replace(/(?:https?|blank):\/\/\S+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 320) || "I can help with that in Blankmind.";
+  const hasAction = Array.isArray(plan.actions) && plan.actions.some((action) => action && PENDING_ASSISTANT_ACTION_TYPES.has(action.type));
+  return hasAction && !/\b(?:open|abrir)\s+(?:blankmind|blanked)\b/i.test(clean)
+    ? `${clean}\n\nOpen Blankmind to review and apply it.`
+    : clean;
+}
+
 async function recordMessageConnection(connectCode, from, channel) {
   try {
     await recordAssistantChannel({
@@ -532,7 +599,7 @@ function memoryFactsFromText(text) {
   return facts;
 }
 
-async function askBAI(prompt, from, channel) {
+async function askBAI(prompt, from, channel, linkedConnection = null) {
   let savedMemory = {};
   try {
     savedMemory = await getAssistantMemory(channel, from);
@@ -628,6 +695,14 @@ async function askBAI(prompt, from, channel) {
     : Array.isArray(plan.semantic_state?.slots?.apps?.value) ? plan.semantic_state.slots.apps.value : memory.main_apps;
   const actionLink = actionDeepLink(actions, responseApps, plan.blocking_data);
   const modelFollowup = naturalReplyText(plan.followup_text || "");
+  if (channel === "whatsapp") {
+    try {
+      await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+    } catch (error) {
+      if (semanticPersistenceRequired()) throw error;
+    }
+    return { text: whatsappReplyText(plan, message) };
+  }
   if (channel === "sms" && plan.semantic_state && !actionLink) {
     try {
       await recordAssistantMemory({
@@ -667,19 +742,6 @@ async function askBAI(prompt, from, channel) {
     return {
       text: `${message}\n\n${smsActionCue(actions)}`,
       actionText: `${actionSentence(actions, responseApps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-    };
-  }
-  if (channel === "whatsapp" && actionLink) {
-    const contentSid = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM_NUMBER
-      ? (process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED === "true" ? cleanText(process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID, 80) : "")
-      : "";
-    return {
-      text: contentSid ? message : `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      actionText: `${actionSentence(actions, responseApps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      actionButton: contentSid ? {
-        contentSid,
-        contentVariables: whatsappActionButtonVariables(actionLink),
-      } : null,
     };
   }
   return {
@@ -762,9 +824,10 @@ exports.handler = async (event) => {
 
   const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
+  let linkedConnection = null;
   if (!connectCode) {
     try {
-      await ensureAssistantConnectionForPhone({ channel, channelUser: from });
+      linkedConnection = await ensureAssistantConnectionForPhone({ channel, channelUser: from });
     } catch (_) {
       // Automatic identity matching is additive; legacy CONNECT remains available.
     }
@@ -776,7 +839,7 @@ exports.handler = async (event) => {
       ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)) }
       : command
         ? await smsCommandReply(from, command)
-      : await askBAI(prompt, from, channel);
+      : await askBAI(prompt, from, channel, linkedConnection);
   } catch (error) {
     try { await releaseAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* Leave the provider request failed. */ }
     throw error;

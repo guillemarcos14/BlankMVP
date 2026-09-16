@@ -11,12 +11,18 @@ delete process.env.TWILIO_AUTH_TOKEN;
 
 const { handler: smsHandler, actionDeepLink } = require("../netlify/functions/sms-agent");
 const { handler: audioHandler } = require("../netlify/functions/assistant-audio");
+const { handler: assistantChannelHandler } = require("../netlify/functions/assistant-channel");
 
 async function withAssistantMemoryMock(callback) {
   const rows = new Map();
+  const twilioCalls = [];
   const originalFetch = global.fetch;
   global.fetch = async (target, options = {}) => {
     const url = String(target);
+    if (url.startsWith("https://supabase.test/rest/v1/blankmind_identity_links")) {
+      const identity = [{ phone_e164: "+34600000001", assistant_connect_code: "ABC123", app_install_id: "install-sms-wa" }];
+      return { ok: true, status: 200, text: async () => JSON.stringify(identity), json: async () => identity };
+    }
     if (url.startsWith("https://supabase.test/rest/v1/digital_wellness_feature_payloads")) {
       if ((options.method || "GET").toUpperCase() === "POST") {
         const row = JSON.parse(options.body || "{}");
@@ -71,10 +77,14 @@ async function withAssistantMemoryMock(callback) {
       const result = [...(rows.get(key) || [seeded])].reverse(); // API contract is newest first; do not mutate backing rows.
       return { ok: true, status: 200, text: async () => JSON.stringify(result), json: async () => result };
     }
+    if (/^https:\/\/api\.twilio\.com\/2010-04-01\/Accounts\//.test(url)) {
+      twilioCalls.push({ url, body: String(options.body || "") });
+      return { ok: true, status: 201, text: async () => "{}", json: async () => ({}) };
+    }
     return originalFetch(target, options);
   };
   try {
-    return await callback();
+    return await callback({ rows, twilioCalls });
   } finally {
     global.fetch = originalFetch;
   }
@@ -168,18 +178,30 @@ async function smsCommandOpensStoredAction() {
 }
 
 async function whatsappBlockingFollowupKeepsPendingContract() {
-  await withAssistantMemoryMock(async () => {
+  const previousTwilio = {
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+    enabled: process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED,
+    content: process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID,
+  };
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "test-token";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+  process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED = "true";
+  process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID = "HXreview";
+  await withAssistantMemoryMock(async ({ twilioCalls }) => {
     const first = await smsHandler({
       httpMethod: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
       body: new URLSearchParams({
         From: "whatsapp:+34600000001",
-        Body: "Block Instagram",
+        Body: "Block Instagram now for 5 minutes",
         MessageSid: "SMpending-1",
       }).toString(),
     });
     assert.strictEqual(first.statusCode, 200, first.body);
-    assert.match(first.body, /When should it start: now or at what exact time/i);
+    assert.match(first.body, /once|days/i);
     assert.doesNotMatch(first.body, /https?:\/\//);
 
     const second = await smsHandler({
@@ -187,12 +209,12 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
       body: new URLSearchParams({
         From: "whatsapp:+34600000001",
-        Body: "Start now for an hour. Only one time",
+        Body: "Just once",
         MessageSid: "SMpending-2",
       }).toString(),
     });
     assert.strictEqual(second.statusCode, 200, second.body);
-    assert.match(second.body, /Instagram.*60 minutes.*once.*confirm/i);
+    assert.match(second.body, /Instagram.*5 minutes.*once.*confirm/i);
     assert.doesNotMatch(second.body, /https?:\/\//);
     const confirmed = await smsHandler({
       httpMethod: "POST",
@@ -200,10 +222,26 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       body: new URLSearchParams({ From: "whatsapp:+34600000001", Body: "Yes", MessageSid: "SMpending-3" }).toString(),
     });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.match(confirmed.body, /type=start_protection/);
-    assert.match(confirmed.body, /apps=Instagram/);
-    assert.match(confirmed.body, /minutes=60/);
+    assert.match(confirmed.body, /Open Blankmind to review and apply it/i);
+    assert.doesNotMatch(confirmed.body, /https?:\/\/|review-action|ContentSid/i);
+    assert.strictEqual((confirmed.body.match(/Open Blankmind/gi) || []).length, 1);
+    assert.strictEqual(twilioCalls.length, 0, "Twilio WhatsApp must not send a duplicate review template");
+
+    const polled = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "whatsapp" }),
+    });
+    const polledBody = JSON.parse(polled.body);
+    assert.strictEqual(polled.statusCode, 200, polled.body);
+    assert.strictEqual(polledBody.linked, true);
+    assert.strictEqual(polledBody.pending_action.type, "start_protection");
+    assert.strictEqual(polledBody.pending_action.minutes, 5);
+    assert.deepStrictEqual(polledBody.pending_action.app_names, ["Instagram"]);
   });
+  for (const [key, value] of Object.entries(previousTwilio)) {
+    const envKey = { sid: "TWILIO_ACCOUNT_SID", token: "TWILIO_AUTH_TOKEN", from: "TWILIO_WHATSAPP_FROM_NUMBER", enabled: "TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED", content: "TWILIO_WHATSAPP_REVIEW_CONTENT_SID" }[key];
+    if (value == null) delete process.env[envKey]; else process.env[envKey] = value;
+  }
 }
 
 async function whatsappTextHasNoAudioAttachment() {

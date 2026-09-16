@@ -565,6 +565,7 @@ struct HomeView: View {
                     .foregroundStyle(Color.white)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
+                    .lineSpacing(-8)
                     .opacity(1 - unblankHoldProgress)
                     .transition(.opacity)
             } else if let cooldownText {
@@ -2702,59 +2703,49 @@ private struct RelapseReviewSheet: View {
     var body: some View {
         GeometryReader { proxy in
             let horizontalPadding = min(max(proxy.size.width * 0.075, 28), 36)
-            let contentWidth = min(max(proxy.size.width - horizontalPadding * 2, 0), 420)
-            let topInset = proxy.safeAreaInsets.top
             let bottomInset = max(proxy.safeAreaInsets.bottom + 18, 34) + 51
 
             ZStack {
                 BlankColors.homeLightBackground
                     .ignoresSafeArea()
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("why now?")
-                            .font(.blankInter(size: 48, weight: .bold, relativeTo: .largeTitle))
-                            .tracking(-0.6)
-                            .foregroundStyle(BlankColors.homeLightInk)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                            .padding(.top, max(48, proxy.size.height * 0.28))
+                ZStack(alignment: .bottomLeading) {
+                    Text("why now?")
+                        .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                        .tracking(-1.1)
+                        .foregroundStyle(BlankColors.homeLightInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
 
-                        Spacer(minLength: 24)
-
-                        VStack(alignment: .leading, spacing: -8) {
-                            ForEach(RelapseReviewReason.allCases) { reason in
-                                Button {
-                                    onSelect(reason)
-                                } label: {
-                                    RelapseReasonTile(reason: reason)
-                                }
-                                .buttonStyle(RelapseReasonButtonStyle())
-                            }
-
+                    VStack(alignment: .leading, spacing: -8) {
+                        ForEach(RelapseReviewReason.allCases) { reason in
                             Button {
-                                onDismiss()
+                                onSelect(reason)
                             } label: {
-                                Text("skip")
-                                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                    .tracking(-0.6)
-                                    .foregroundStyle(BlankColors.homeLightSecondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.72)
-                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                    .contentShape(Rectangle())
+                                RelapseReasonTile(reason: reason)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(RelapseReasonButtonStyle())
                         }
+
+                        Button {
+                            onDismiss()
+                        } label: {
+                            Text("skip")
+                                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                                .tracking(-0.6)
+                                .foregroundStyle(BlankColors.homeLightSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, bottomInset)
-                    .frame(
-                        width: contentWidth,
-                        height: max(proxy.size.height - topInset, 0),
-                        alignment: .topLeading
-                    )
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, horizontalPadding)
             }
         }
         .preferredColorScheme(.light)
@@ -2769,7 +2760,7 @@ private struct RelapseReasonTile: View {
             Text(reason.title.lowercased())
                 .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .tracking(-0.6)
-                .foregroundStyle(BlankColors.homeLightInk)
+                .foregroundStyle(BlankColors.homeLightOption)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }

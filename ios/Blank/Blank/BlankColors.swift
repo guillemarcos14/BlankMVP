@@ -41,6 +41,7 @@ enum BlankColors {
     static let newLookDarkSecondary = Color(red: 0.290, green: 0.290, blue: 0.305)
     static let homeLightBackground = Color(red: 248 / 255.0, green: 249 / 255.0, blue: 244 / 255.0)
     static let homeLightInk = Color(red: 48 / 255.0, green: 49 / 255.0, blue: 43 / 255.0)
+    static let homeLightOption = Color(red: 141 / 255.0, green: 142 / 255.0, blue: 137 / 255.0)
     static let homeLightSecondary = Color(red: 199 / 255.0, green: 200 / 255.0, blue: 194 / 255.0)
     static let homeDarkBackground = Color(red: 27 / 255.0, green: 27 / 255.0, blue: 29 / 255.0)
     static let homeDarkSecondary = Color(red: 70 / 255.0, green: 70 / 255.0, blue: 66 / 255.0)

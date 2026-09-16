@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-16
 
 ## Resumen actual
+- 2026-09-16: Implementado el transporte BM WhatsApp→app sin enlaces largos. WhatsApp guarda propuestas confirmadas en una bandeja pendiente; iOS las consulta y conserva la confirmación nativa antes de aplicar. Commit `66ac9ed`, Netlify `getblank` deploy `6aaa4d03f7a768e226799dac`. Product harness `25/25`, release gate automatizado `16/16`; falta compilar/distribuir la build iOS para la prueba física.
 - 2026-09-16: Corrección BM integrada y publicada en Netlify `getblank` desde `29cf543`, deploy `6aaa44e8a1ae618cfcda5c6d`. Producción verificada con corrección 3→7 días, `Yea` y `It’s already opened`: enlace `apply_schedule` conservado como revisión (`review_only_actions: true`), sin ejecución automática y sin prompt repetido. Product harness `25/25`, core `84/84`, release gate automatizado `16/16`; Supabase sin cambios.
 - 2026-09-16: La confirmación conversacional acepta también `Yeah`, `Yea` y `Yep`, cubriendo la variante observada en WhatsApp. Validado en el core y en product harness `25/25` antes del despliegue.
 - 2026-09-16: Diagnóstico remoto previo al despliegue: `https://getblank.netlify.app/.netlify/functions/blanked-agent` devolvía la versión anterior (`actions: []`, sin `review_only_actions` y con el prompt repetido). La corrección ya está publicada; la verificación posterior consta en la entrada superior.

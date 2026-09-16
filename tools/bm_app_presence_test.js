@@ -125,7 +125,7 @@ async function run() {
   assert.strictEqual(installedContinuation.semantic_state.next_question, "app_presence");
   assert.match(installedContinuation.message_text, /review link above|Nothing has been applied/i);
 
-  const repeatedInstallClaim = await request("I have already opened the app", {
+  const repeatedInstallClaim = await request("It’s already opened", {
     channel: "whatsapp", semantic_state: installedContinuation.semantic_state,
   });
   assert.deepStrictEqual(repeatedInstallClaim.actions.map((item) => item.type), ["apply_schedule"]);

@@ -554,7 +554,7 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   if (decision.type === "confirm") return `${semanticSummary(state)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
   if (decision.type === "ready") return `${semanticSummary(state)}. ${es ? "Revísalo en Blankmind para aplicarlo." : "Review it in Blankmind to apply it."}`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
-    const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|opened it|ya está|ya esta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
+    const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
       ? "Todavía necesito que Blankmind confirme la conexión. Usa el enlace de revisión del mensaje anterior para continuar. No se ha aplicado ningún cambio."
       : "I still need Blankmind to confirm the connection. Use the review link above to continue. Nothing has been applied yet.";

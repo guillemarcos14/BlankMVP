@@ -15,6 +15,7 @@ Ultima actualizacion: 2026-09-16
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-16: `assistant` retirado de la Home y conservado dentro de `settings`, con el callback existente para abrir WhatsApp/SMS/código. Commit `fc78def`; product harness `31/31`, detector Impeccable `[]`, `git diff --check` y build MacinCloud `** BUILD SUCCEEDED **`.
 - 2026-09-16: Corregida la verificación remota de Progress: el primer build usaba `ce50633`, anterior al cambio local. El commit `61e5944` se subió a `codex/conversational-agentic-blanked`, MacinCloud lo actualizó y `xcodebuild` terminó con `** BUILD SUCCEEDED **`; la app se instaló y abrió en Simulator iPhone 17 Pro Max, iOS `26.3`. La home visible confirma `blank / sessions / progress / settings`; el estado dark mantiene `menu` y `unblank`.
 - 2026-09-16: En MacinCloud FF368, el checkout `codex/conversational-agentic-blanked` quedó actualizado (`git pull --ff-only`, ya estaba al día) y `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`. Quedó abierto Simulator en `iPhone 17`, iOS `26.3`.
 - 2026-09-16: Eliminada la animación de movimiento/respiración de `hold the screen to unblank`; el texto ahora se desvanece linealmente siguiendo `unblankHoldProgress`. El cooldown fija el instante inicial para mostrar `01:00` exacto. Commit `2ea0294` subido; harness y `git diff --check` OK. Recompilado en MacinCloud FF368 con `** BUILD SUCCEEDED **`.

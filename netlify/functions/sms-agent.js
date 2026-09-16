@@ -1,13 +1,24 @@
+const crypto = require("crypto");
 const { json, requireMethod } = require("./_membership");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
+const { freshConversationState, deriveAppPresence, buildAgentContext } = require("./bm-context");
+const { reviewActionLink } = require("./_bm_action_link");
+const { sendAssistantActionPush } = require("./_assistant_push");
+const { semanticPersistenceRequired } = require("./_bm_semantic_store");
+const { proposalFingerprint, buildSemanticActions, buildSemanticReviewAction } = require("./bm-semantic-state");
 const {
+  attachAssistantUserContext,
+  claimAssistantInboundMessage,
   connectCodeFromText,
+  completeAssistantInboundMessage,
+  releaseAssistantInboundMessage,
+  ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
-const { buildSignedAudioUrl } = require("./_elevenlabs_voice");
 
 function text(statusCode, body, contentType = "text/plain; charset=utf-8") {
   return {
@@ -164,20 +175,13 @@ async function transcribeAudio(item) {
   if (!response.ok) {
     throw new Error(`openai_transcription_failed_${response.status}:${cleanText(parsed.error?.message || raw, 180)}`);
   }
-  return cleanText(parsed.text, 800);
+  const transcript = cleanText(parsed.text, 800);
+  if (!transcript) throw new Error("twilio_transcription_empty");
+  return transcript;
 }
 
-function twiml(message, mediaUrl = "") {
-  if (!mediaUrl) {
-    return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
-  }
-  return [
-    `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<Response>`,
-    `<Message><Media>${escapeXml(mediaUrl)}</Media></Message>`,
-    `<Message><Body>${escapeXml(message)}</Body></Message>`,
-    `</Response>`,
-  ].join("");
+function twiml(message) {
+  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
 }
 
 function escapeXml(value) {
@@ -196,9 +200,63 @@ function connectReply(from, channel) {
 
 function detectedLanguage(text) {
   const value = cleanText(text, 800).toLowerCase();
-  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
     ? "es"
     : "en";
+}
+
+function isProductionEnvironment() {
+  return process.env.NODE_ENV === "production"
+    || process.env.CONTEXT === "production"
+    || process.env.NETLIFY === "true";
+}
+
+function header(event, name) {
+  const target = name.toLowerCase();
+  const match = Object.entries(event.headers || {}).find(([key]) => key.toLowerCase() === target);
+  return match ? String(match[1] || "") : "";
+}
+
+function timingSafeEqual(left, right) {
+  const leftBuffer = Buffer.from(left || "");
+  const rightBuffer = Buffer.from(right || "");
+  if (!leftBuffer.length || leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function twilioWebhookUrl(event) {
+  const configured = cleanText(process.env.TWILIO_WEBHOOK_URL, 600);
+  if (configured) return configured;
+  const protocol = header(event, "x-forwarded-proto") || "https";
+  const host = header(event, "x-forwarded-host") || header(event, "host");
+  const path = event.path || "/.netlify/functions/sms-agent";
+  return host ? `${protocol}://${host}${path}` : "";
+}
+
+function verifyTwilioSignature(event) {
+  const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
+  const shouldValidate = configured === "true" || (isProductionEnvironment() && configured !== "false");
+  if (!shouldValidate) return true;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const signature = header(event, "x-twilio-signature");
+  const url = twilioWebhookUrl(event);
+  if (!token || !signature || !url) return false;
+  const params = new URLSearchParams(rawBody(event));
+  const canonical = Array.from(params.entries())
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
+    .map(([key, value]) => `${key}${value}`)
+    .join("");
+  const expected = crypto.createHmac("sha1", token).update(`${url}${canonical}`, "utf8").digest("base64");
+  return timingSafeEqual(signature, expected);
+}
+
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^es|^en/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
 }
 
 function actionIntro(actions) {
@@ -235,7 +293,9 @@ function actionSentence(actions, appNames = []) {
     return `This opens Blanked with a protection window for ${appTargetText(appNames)} from ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
   }
   if (first.type === "start_protection") {
-    return `This opens Blanked with a ${clamp(first.minutes || 25, 5, 240)}-minute app block ready to review.`;
+    return Number.isFinite(first.minutes)
+      ? `This opens Blankmind with a ${first.minutes}-minute app block ready to review.`
+      : "This opens Blankmind with an app block ready to review.";
   }
   if (first.type === "activate_mode") {
     return `This opens Blanked with ${cleanText(first.name, 40) || "that"} mode ready to start.`;
@@ -244,7 +304,9 @@ function actionSentence(actions, appNames = []) {
     return "This opens Blanked so you can choose the apps to block.";
   }
   if (first.type === "set_daily_limit") {
-    return `This opens Blanked with a ${clamp(first.minutes || 25, 5, 240)}-minute daily limit ready to review.`;
+    return Number.isFinite(first.minutes)
+      ? `This opens Blankmind with a ${first.minutes}-minute daily limit ready to review.`
+      : "This opens Blankmind to review the daily limit.";
   }
   if (first.type === "enable_allow_only") return "This opens Blanked so you can turn on Allow Only.";
   if (first.type === "enable_adult_filter") return "This opens Blanked so you can turn on adult web protection.";
@@ -313,9 +375,33 @@ function smsActionCue(actions) {
   return "Reply OPEN to review it in Blanked.";
 }
 
-function pendingActionFromMemory(memory = {}) {
+function pendingActionFromMemory(memory = {}, now = Date.now()) {
   const link = cleanText(memory.pending_action_link, 1200);
   if (!link) return null;
+  const expires = Date.parse(memory.pending_action_expires_at || "");
+  if (!Number.isFinite(expires) || expires <= now || expires > now + 2 * 60 * 60 * 1000) return null;
+  const state = freshConversationState(memory.conversation_state, now)?.semantic_state;
+  if (!state || !["ready", "needs_setup"].includes(state.status)) return null;
+  const fingerprint = proposalFingerprint(state);
+  if (memory.pending_proposal_fingerprint !== fingerprint || state.slots?.confirmation?.value?.fingerprint !== fingerprint) return null;
+  const reviewOnlyAppPresence = state.status === "needs_setup" && state.next_question === "app_presence";
+  if (!reviewOnlyAppPresence && !deriveAppPresence(memory.user_context?.app_presence, now).recent) return null;
+  try {
+    const url = new URL(link);
+    const allowed = new URL(process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://getblank.netlify.app");
+    if (url.origin !== allowed.origin || url.pathname !== `${allowed.pathname.replace(/\/$/, "")}/open`
+      || url.searchParams.get("action") !== "review-action") return null;
+    const actions = state.status === "ready" ? buildSemanticActions(state, buildAgentContext({ ...(memory.user_context || {}), channel: "sms" }))
+      : reviewOnlyAppPresence ? buildSemanticReviewAction(state, buildAgentContext({ ...(memory.user_context || {}), channel: "sms" }))
+        : state.next_question === "permissions" ? [{ type: "request_screen_time_permission" }]
+        : state.next_question === "app_selection" ? [{ type: "open_app_picker" }] : [];
+    const expectedLink = actionDeepLink(actions, state.slots?.apps?.value || []);
+    if (!expectedLink) return null;
+    const expected = new URL(expectedLink);
+    url.searchParams.sort();
+    expected.searchParams.sort();
+    if (url.href !== expected.href) return null;
+  } catch (_) { return null; }
   return {
     link,
     summary: cleanText(memory.pending_action_summary, 500),
@@ -327,18 +413,19 @@ async function smsCommandReply(from, command) {
   let memory = {};
   try {
     memory = await getAssistantMemory("sms", from);
-  } catch (_) {
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
     memory = {};
   }
   const pending = pendingActionFromMemory(memory);
   if (command === "REPORT" && !pending) {
-    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step.", speechText: "" };
+    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step." };
   }
   if (!pending) {
-    return { text: "No pending Blanked action. Tell me what you want to block or change.", speechText: "" };
+    return { text: "No pending Blanked action. Tell me what you want to block or change." };
   }
   if (command !== "OPEN" && command !== pending.command && !(command === "START" && pending.command === "BLOCK")) {
-    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.`, speechText: "" };
+    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.` };
   }
   try {
     await recordAssistantMemory({
@@ -348,6 +435,8 @@ async function smsCommandReply(from, command) {
         pending_action_link: null,
         pending_action_summary: null,
         pending_action_command: null,
+        pending_proposal_fingerprint: null,
+        pending_action_expires_at: null,
       },
       source: command,
     });
@@ -355,7 +444,7 @@ async function smsCommandReply(from, command) {
     // Clearing a pending action must never block delivery.
   }
   const intro = pending.summary ? `${pending.summary}\n\n` : "";
-  return { text: `${intro}Open Blanked: ${pending.link}`, speechText: "" };
+  return { text: `${intro}Open Blanked: ${pending.link}` };
 }
 
 function voiceInputSummary(prompt) {
@@ -369,14 +458,6 @@ function withVoiceInputContext(text, prompt) {
   return `${summary}\n\n${text}`;
 }
 
-function naturalVoiceText(text) {
-  return cleanText(text, 800)
-    .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
-    .replace(/\bAction:\s*/gi, "")
-    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
-    .replace(/\bone concrete Blanked action\b/gi, "the next step in Blanked");
-}
-
 function naturalReplyText(text) {
   return cleanText(text, 1400)
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
@@ -385,6 +466,90 @@ function naturalReplyText(text) {
     .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
     .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
     .trim();
+}
+
+const PENDING_ASSISTANT_ACTION_TYPES = new Set([
+  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
+  "open_app_picker", "request_screen_time_permission",
+]);
+
+function pendingAssistantActionFromPlan(plan, appNames = []) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+    .find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  if (!action) return null;
+  if (action.type === "apply_schedule" && (
+    !Number.isInteger(action.start_minute)
+    || !Number.isInteger(action.end_minute)
+    || action.start_minute === action.end_minute
+  )) return null;
+  const payload = {
+    type: action.type,
+    name: action.name || null,
+    source_mode_name: action.source_mode_name || null,
+    copy_mode: action.copy_mode === true,
+    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
+    hard_mode: action.hard_mode === true,
+    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
+    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
+    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
+    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
+    hours: Number.isInteger(action.hours) ? action.hours : null,
+    app_names: (Array.isArray(appNames) ? appNames : []).filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps").slice(0, 12),
+  };
+  const createdAt = new Date().toISOString();
+  return {
+    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
+    fingerprint: crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32),
+    ...payload,
+    status: "queued",
+    summary: cleanText(plan.message_text || plan.response_text, 320),
+    created_at: createdAt,
+    expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+async function queuePendingAssistantAction(connection, plan, appNames) {
+  if (!connection?.connectCode) return null;
+  const pending = pendingAssistantActionFromPlan(plan, appNames);
+  if (!pending) return null;
+  const memory = await getAssistantMemory(connection.channel, connection.channelUser);
+  const existing = memory.pending_assistant_action;
+  if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
+    try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
+    return existing;
+  }
+  await recordAssistantMemory({
+    channel: connection.channel,
+    channelUser: connection.channelUser,
+    memory: { pending_assistant_action: pending },
+    source: "assistant_action_pending",
+  });
+  try { await sendAssistantActionPush(memory.assistant_device_push, pending); } catch (_) { /* Polling remains the fallback. */ }
+  return pending;
+}
+
+function whatsappReplyText(plan, fallbackText) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  const clean = naturalReplyText(plan.message_text || plan.response_text || fallbackText)
+    .replace(/(?:https?|blank):\/\/\S+/gi, "")
+    .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
+    .replace(/[^.?!]*(?:review|revisa|revisar)[^.?!]*(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 320) || "I can help with that in Blankmind.";
+  if (!action) return clean;
+  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+  if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
+    const apps = Array.isArray(plan.blocking_data?.apps) ? plan.blocking_data.apps : [];
+    const link = reviewActionLink(action, apps);
+    return link
+      ? `${clean}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
+      : `${clean}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
+  }
+  return /\b(?:applying|aplicando|executing|ejecutando)\b/i.test(clean)
+    ? clean
+    : `${clean}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
 }
 
 async function recordMessageConnection(connectCode, from, channel) {
@@ -396,6 +561,7 @@ async function recordMessageConnection(connectCode, from, channel) {
       connectCode,
       channelUser: from,
     });
+    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
   } catch (_) {
     return;
   }
@@ -451,22 +617,28 @@ function memoryFactsFromText(text) {
   return facts;
 }
 
-async function askBAI(prompt, from, channel) {
+async function askBAI(prompt, from, channel, linkedConnection = null) {
   let savedMemory = {};
   try {
     savedMemory = await getAssistantMemory(channel, from);
-  } catch (_) {
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt);
-  const language = savedMemory.language || detectedLanguage(prompt);
+  const language = messageLanguage(prompt, savedMemory.language);
+  const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
     ...newFacts,
     language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+    conversation_state: conversationState,
   };
+  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+    ? savedMemory.user_context
+    : {};
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -474,13 +646,16 @@ async function askBAI(prompt, from, channel) {
       prompt,
       locale: "en-US",
       context: {
+        ...userContext,
         channel,
         assistant_channel: channel,
         language,
         allow_spanish_response: true,
-        has_selected_apps: true,
-        screen_time_authorized: true,
+        has_selected_apps: userContext.has_selected_apps === true,
+        screen_time_authorized: userContext.screen_time_authorized === true,
+        user_context: userContext,
         memory,
+        recent_messages: conversationState?.recent_messages || [],
       },
     }),
   });
@@ -495,17 +670,82 @@ async function askBAI(prompt, from, channel) {
 
   if (response.statusCode < 200 || response.statusCode >= 300) {
     const fallback = "BM could not read that yet. Try again in a moment.";
-    return { text: fallback, speechText: fallback };
+    return { text: fallback };
   }
   const parsed = JSON.parse(response.body || "{}");
   const plan = parsed.plan || {};
+  if (plan.blocking_user_request === true) {
+    try {
+      await recordAssistantMemory({
+        channel,
+        channelUser: from,
+        memory: {
+          pending_blocking: plan.blocking_ready === false
+            ? { ...(plan.blocking_data || {}), updated_at: new Date().toISOString() }
+            : null,
+          language,
+        },
+        source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
+      });
+    } catch (_) {
+      // Pending blocking state must never block the user-facing reply.
+    }
+  }
   const message = naturalReplyText(plan.message_text || plan.response_text);
+  try {
+    await recordAssistantConversationTurn({
+      channel,
+      channelUser: from,
+      previousState: savedMemory.conversation_state,
+      userMessage: prompt,
+      assistantMessage: message,
+      semanticState: plan.semantic_state,
+      expectedVersion: savedMemory.semantic_store_version,
+      topic: memory.last_topic || "",
+    });
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
+    // Short-term memory must never block the user-facing reply.
+  }
   const actions = plan.actions || [];
-  const actionLink = actionDeepLink(actions, memory.main_apps);
-  const modelSpeech = naturalVoiceText(plan.speech_text || "");
+  const responseApps = Array.isArray(plan.blocking_data?.apps)
+    ? plan.blocking_data.apps
+    : Array.isArray(plan.semantic_state?.slots?.apps?.value) ? plan.semantic_state.slots.apps.value : memory.main_apps;
+  const actionLink = actionDeepLink(actions, responseApps, plan.blocking_data);
   const modelFollowup = naturalReplyText(plan.followup_text || "");
-  const speechBase = modelSpeech || message;
-  const speechActionCue = actionLink && !/\blink\b/i.test(speechBase) ? "I left the link in the next message." : "";
+  const primaryPendingAction = (Array.isArray(actions) ? actions : []).find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  if (channel === "whatsapp" || channel === "sms") {
+    try {
+      const queued = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
+        || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
+      if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
+        await recordAssistantMemory({
+          channel,
+          channelUser: from,
+          memory: { pending_assistant_action: null },
+          source: "assistant_action_invalidated",
+        });
+      }
+    } catch (error) {
+      if (semanticPersistenceRequired()) throw error;
+    }
+  }
+  if (channel === "whatsapp") {
+    return { text: whatsappReplyText(plan, message) };
+  }
+  if (channel === "sms" && primaryPendingAction && !["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)) {
+    return { text: whatsappReplyText(plan, message) };
+  }
+  if (channel === "sms" && plan.semantic_state && !actionLink) {
+    try {
+      await recordAssistantMemory({
+        channel, channelUser: from,
+        memory: { pending_action_link: null, pending_action_summary: null, pending_action_command: null, pending_proposal_fingerprint: null, pending_action_expires_at: null },
+        source: "semantic_proposal_invalidated",
+      });
+    } catch (_) { /* The authoritative semantic fingerprint already invalidates the cached link. */ }
+  }
   if (channel === "sms" && actionLink) {
     const pendingCommand = commandForAction(actions);
     let pendingStored = false;
@@ -515,8 +755,10 @@ async function askBAI(prompt, from, channel) {
         channelUser: from,
         memory: {
           pending_action_link: actionLink,
-          pending_action_summary: actionSentence(actions, memory.main_apps),
+          pending_action_summary: actionSentence(actions, responseApps),
           pending_action_command: pendingCommand,
+          pending_proposal_fingerprint: plan.semantic_state ? proposalFingerprint(plan.semantic_state) : null,
+          pending_action_expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
           language,
         },
         source: prompt,
@@ -528,37 +770,18 @@ async function askBAI(prompt, from, channel) {
     if (!pendingStored) {
       return {
         text: `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-        actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-        speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+        actionText: `${actionSentence(actions, responseApps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
       };
     }
     return {
       text: `${message}\n\n${smsActionCue(actions)}`,
-      actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
-    };
-  }
-  if (channel === "whatsapp" && actionLink) {
-    const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
-    return {
-      text: contentSid ? message : `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      actionText: `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
-      actionButton: contentSid ? {
-        contentSid,
-        contentVariables: whatsappActionButtonVariables(actionLink),
-      } : null,
-      speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+      actionText: `${actionSentence(actions, responseApps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}`,
     };
   }
   return {
     text: actionLink ? `${message}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : message,
-    actionText: actionLink ? `${actionSentence(actions, memory.main_apps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : "",
-    speechText: naturalVoiceText(speechActionCue ? `${speechBase} ${speechActionCue}` : speechBase),
+    actionText: actionLink ? `${actionSentence(actions, responseApps)}\n\n${modelFollowup || actionIntro(actions)}\n${actionLink}` : "",
   };
-}
-
-function wantsVoiceReply(text) {
-  return /\b(audio|voice|voice note|speak|spoken|say it|nota de voz|audio|voz|hablame|háblame|dimelo|dímelo)\b/i.test(cleanText(text, 800));
 }
 
 function publicOpenLink(actionName, params = {}) {
@@ -576,58 +799,15 @@ function appsQuery(appNames) {
   return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
 }
 
-function actionDeepLink(actions, appNames = []) {
+function actionDeepLink(actions, appNames = [], blockingData = null) {
+  if (blockingData && Array.isArray(blockingData.apps)) {
+    const contractApps = blockingData.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps");
+    if (contractApps.length) appNames = contractApps;
+  }
   const first = primaryAction(actions);
   if (!first) return "";
 
-  if (first.type === "start_protection") {
-    return publicOpenLink("start-focus", {
-      minutes: clamp(first.minutes || 25, 5, 240),
-      hard: first.hard_mode ? "true" : "",
-    });
-  }
-  if (first.type === "activate_mode" && first.name) {
-    return publicOpenLink("mode", {
-      name: first.name,
-      activate: "true",
-      minutes: clamp(first.minutes || 30, 5, 240),
-      hard: first.hard_mode ? "true" : "",
-    });
-  }
-  if (first.type === "apply_schedule") {
-    const start = clamp(first.start_minute || 1260, 0, 1439);
-    const end = clamp(first.end_minute || 1380, 0, 1439);
-    const days = clamp(first.duration_days || 7, 1, 14);
-    const route = Array.isArray(appNames) && appNames.length ? "setup-plan" : "apply-plan";
-    return publicOpenLink(route, {
-      start,
-      end,
-      days,
-      apps: Array.isArray(appNames) && appNames.length ? appNames.slice(0, 8).join(",") : "",
-    });
-  }
-  if (first.type === "set_daily_limit") {
-    return publicOpenLink("daily-limit", { minutes: clamp(first.minutes || 25, 5, 240) });
-  }
-  if (first.type === "open_app_picker") {
-    return publicOpenLink("open-picker");
-  }
-  if (first.type === "request_screen_time_permission") {
-    return publicOpenLink("choose-apps");
-  }
-  if (first.type === "enable_allow_only") {
-    return publicOpenLink("allow-only");
-  }
-  if (first.type === "enable_adult_filter") {
-    return publicOpenLink("adult-filter");
-  }
-  if (first.type === "pause_rules") {
-    return publicOpenLink("pause-rules", { hours: clamp(first.hours || 24, 1, 168) });
-  }
-  if (first.type === "disable_pause") {
-    return publicOpenLink("resume-rules");
-  }
-  return "";
+  return reviewActionLink(first, appNames);
 }
 
 function primaryAction(actions) {
@@ -644,14 +824,30 @@ function clamp(value, lower, upper) {
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
+  if (!verifyTwilioSignature(event)) return text(403, "invalid_twilio_signature");
 
-  const { from, body, media } = parseSmsBody(event);
+  const parsedBody = parseSmsBody(event);
+  const { from, body, media, messageSid } = parsedBody;
+  if (!from) return json(400, { error: "missing_sms_sender" });
+  if (messageSid) {
+    try {
+      const claim = await claimAssistantInboundMessage(channelFromSender(from), from, messageSid);
+      if (!claim.claimed) {
+        return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
+      }
+    } catch (_) {
+      // A temporary memory outage must not discard an inbound message.
+    }
+  }
   const audio = audioMedia(media);
   let prompt = body;
   if (!prompt && audio) {
     try {
       prompt = await transcribeAudio(audio);
     } catch (error) {
+      if (messageSid) {
+        try { await completeAssistantInboundMessage(channelFromSender(from), from, messageSid); } catch (_) { /* best effort */ }
+      }
       return text(200, twiml("I could not understand that voice note yet. Send it as text or try another audio."), "application/xml; charset=utf-8");
     }
   }
@@ -662,24 +858,53 @@ exports.handler = async (event) => {
 
   const connectCode = connectCodeFromText(prompt);
   const channel = channelFromSender(from);
+  let linkedConnection = null;
+  if (!connectCode) {
+    try {
+      linkedConnection = await ensureAssistantConnectionForPhone({ channel, channelUser: from });
+    } catch (_) {
+      // Automatic identity matching is additive; legacy CONNECT remains available.
+    }
+  }
   const command = channel === "sms" ? smsCommand(prompt) : "";
-  const reply = connectCode
-    ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)), speechText: "" }
-    : command
-      ? await smsCommandReply(from, command)
-    : await askBAI(prompt, from, channel);
+  let reply;
+  try {
+    reply = connectCode
+      ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)) }
+      : command
+        ? await smsCommandReply(from, command)
+      : await askBAI(prompt, from, channel, linkedConnection);
+  } catch (error) {
+    try { await releaseAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* Leave the provider request failed. */ }
+    throw error;
+  }
 
-  const shouldAttachAudio = channel === "whatsapp" && !connectCode && (audio || wantsVoiceReply(body));
-  const mediaUrl = shouldAttachAudio
-    ? buildSignedAudioUrl(event, reply.speechText || reply.text)
-    : "";
-  if (channel === "whatsapp" && reply.actionButton && !mediaUrl) {
-    await sendWhatsAppMessage(from, reply.text);
-    await sendWhatsAppMessage(from, "", reply.actionButton);
+  if (channel === "whatsapp" && reply.actionButton) {
+    try {
+      await sendWhatsAppMessage(from, reply.text);
+      await sendWhatsAppMessage(from, "", reply.actionButton);
+    } catch (error) {
+      // A failed template must not leave the user without the actionable link
+      // or cause a retry to duplicate the already delivered text.
+      try {
+        await sendWhatsAppMessage(from, reply.actionText || reply.text);
+      } catch (_) {
+        if (!String(error?.message || "").includes("twilio_whatsapp_send_failed")) throw error;
+      }
+    }
+    if (messageSid) {
+      try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+    }
     return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
   }
-  const baseReplyText = mediaUrl && reply.actionText ? reply.actionText : reply.text;
-  const replyText = audio ? withVoiceInputContext(baseReplyText, prompt) : baseReplyText;
-
-  return text(200, twiml(replyText, mediaUrl), "application/xml; charset=utf-8");
+  const replyText = audio ? withVoiceInputContext(reply.text, prompt) : reply.text;
+  if (messageSid) {
+    try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+  }
+  return text(200, twiml(replyText), "application/xml; charset=utf-8");
 };
+
+exports.actionDeepLink = actionDeepLink;
+exports.pendingActionFromMemory = pendingActionFromMemory;
+exports.pendingAssistantActionFromPlan = pendingAssistantActionFromPlan;
+exports.verifyTwilioSignature = verifyTwilioSignature;

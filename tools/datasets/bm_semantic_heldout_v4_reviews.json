@@ -1,0 +1,101 @@
+[
+  {
+    "response_sha256": "2b12e09bc492115322e8343a57f143b8c723c95df3f72f7655fd746ab328fe1a",
+    "expectation_sha256": "9f341480e74907afaa8a22fc53e201e0748d6cdd3f55e3d32c27f02bad505c54",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All message/response/speech surfaces accurately restate Netflix 18:10-18:45 on Wednesday for six days and request confirmation. Title and neutral buttons agree; no execution is claimed.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "5433ef6d1070c213893c2a376a382731ce5dbad5420ce0a686ffb38f0f96668f",
+    "expectation_sha256": "222070b564fab6ca7b49af79df50d5fa3875b738ecf26395a665000064aa7942",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The confirmed Netflix Wednesday schedule retains both times and six-day horizon in every surface and invites native review to apply. Native weekday4 agrees with ISO weekday3.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "e307f1cb12232ad66649f15a5fc98e66e748f03ae2e1728f18074c3b429cbb01",
+    "expectation_sha256": "8afa32d85860624160d6a8d0a64108604f26e96c6c2277827d27c04abe8adad8",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The full response explicitly preserves TikTok, now, 34 minutes, once and requested hard mode, then asks confirmation. Every title/button is consistent with an unexecuted proposal.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "d7bfe112ddea458098d36e60d45924d7bab18b11fc4b3a406efedc80d59d218a",
+    "expectation_sha256": "1ad789e4651fa444ba79887c80e0796fc7f348fe82e61f4b34141b47b62a34f5",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The confirmed immediate TikTok 34-minute one-time proposal retains hard mode in text and native action. Every surface invites review to apply, without claiming execution.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "85640bd02684073a68c266b291a193e410aa81ce874529412c15a1b64607d1a2",
+    "expectation_sha256": "92004588aef36f2c6bcb73eae6dc72e1e37a66273cd93c3cddcc9ad3e9c38f50",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every message/response/speech/title/button is Spanish. The proposed YouTube 15:20-16:05 daily schedule and three-day horizon are accurate, with confirmation pending.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "ebeecc6192b7ee52ba55a742a0f4e77bd208a4932dc3bebdddce55cc295c2ad9",
+    "expectation_sha256": "f084382a07b5feb77a8235e392b8334f9a59b5b07dce5db49b6d999c9934c199",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Every surface is Spanish and preserves the confirmed YouTube 15:20-16:05 daily three-day proposal; it asks native review to apply and does not claim an active block.",
+    "verdict": "equivalent",
+    "language": "es",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "702f53373a83aea59bedd42d80e333e8f30356c8bd16893d8e92cbe6608ad408",
+    "expectation_sha256": "4cea89f324e13544e54848ddd5bbd39707e3e23dcbe568514669384d334b7361",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "All response surfaces ask only the missing schedule horizon. The statement that schedules support 1-14 days is a capacity explanation, not a fabricated chosen duration. Title and buttons are appropriate for collection.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "ef2e60c719ccfa171077dd246ebfb7cfd7460f378a0cc23c4638699a8766c8cc",
+    "expectation_sha256": "99b195d4edffc5434dadcbfff96e09274b72d37b2332c72bdb66a4a1dd58b81f",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The answer of eleven days is incorporated while Instagram, Friday and 09:25-09:55 remain intact. Every response surface requests confirmation of this exact schedule.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "8be83414a60147e5611ae9f5f03c6d9c5e19f0092026765cfaa0dca211202a75",
+    "expectation_sha256": "1a2bd5e6a6f4869771b8320deb6e4e06308e2b3cace1047172f3cd7fbadec9a6",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The confirmed Instagram Friday 09:25-09:55 eleven-day schedule is presented for review to apply; native weekday6 matches canonical ISO5. No execution is claimed.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "dedac6678e9415afe1f71e5cf77c4fae0e28773d59351aeea4be3b003c6597a1",
+    "expectation_sha256": "4746cd795224a38ed738966920265ec5d05873033c2ecc03aa5516e10ba6fa02",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Both Instagram and Reddit survive in all text surfaces, with now, 23 minutes and once. The title/question request confirmation and do not add apps or a daily limit.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  },
+  {
+    "response_sha256": "fc7268c93291e9801e5f23c1b9432d26276494a38804b9d77b866e60a5982230",
+    "expectation_sha256": "841b443303cb07ab7d63084f41ec57df5eb9d589a8bf8b1691cb1e28eb96cab1",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "Both exact selected apps and the immediate 23-minute one-time proposal are preserved; all text invites native review to apply rather than claiming activation.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent semantic review of complete message, response, speech, title, buttons and bullets against frozen user-intent expectations. Not human certification or proof of native UI behavior."
+  }
+]

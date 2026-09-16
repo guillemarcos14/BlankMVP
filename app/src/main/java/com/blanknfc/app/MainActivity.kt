@@ -20,6 +20,11 @@ import com.blanknfc.app.util.NfcHelper
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
 
@@ -99,6 +104,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        if (action == "handoff") {
+            val token = uri.getQueryParameter("token").orEmpty()
+            lifecycleScope.launch { claimAppHandoff(token) }
+            return
+        }
+
         if (action == "apply-plan" || action == "setup-plan") {
             val start = uri.getQueryParameter("start")?.toIntOrNull()
             val end = uri.getQueryParameter("end")?.toIntOrNull()
@@ -140,6 +151,46 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this@MainActivity, messageRes, Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private suspend fun claimAppHandoff(token: String) {
+        if (token.isBlank()) return
+        val result = runCatching {
+            withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val preferences = getSharedPreferences("blank_identity", MODE_PRIVATE)
+                val installId = preferences.getString("app_install_id", null) ?: UUID.randomUUID().toString().also {
+                    preferences.edit().putString("app_install_id", it).apply()
+                }
+                val connection = (URL(BuildConfig.BLANK_API_BASE_URL.trimEnd('/') + "/app-handoff").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 8_000
+                    readTimeout = 8_000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                connection.outputStream.use { output ->
+                    output.write(JSONObject().apply {
+                        put("action", "claim")
+                        put("handoff_token", token)
+                        put("app_install_id", installId)
+                        put("data_consent", true)
+                    }.toString().toByteArray())
+                }
+                val status = connection.responseCode
+                val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+                val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+                connection.disconnect()
+                if (status !in 200..299) error("handoff_failed_$status")
+                JSONObject(body)
+            }
+        }.getOrNull() ?: return
+
+        val preferences = getSharedPreferences("blank_identity", MODE_PRIVATE)
+        preferences.edit()
+            .putString("assistant_connect_code", result.optString("assistant_connect_code"))
+            .putString("phone_e164", result.optString("phone_e164"))
+            .apply()
+        Toast.makeText(this, "Blankmind connected", Toast.LENGTH_SHORT).show()
     }
 
     private fun handleNfcIntent(intent: Intent) {

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "candidate": {
+    "commit": "",
+    "backend_deploy_id": "",
+    "ios_marketing_version": "1.9",
+    "ios_build": 0,
+    "ios_build_run_id": "",
+    "ios_artifact_path": "",
+    "ios_artifact_sha256": ""
+  },
+  "evaluator": {
+    "integrity_report": "tmp/bm-semantic/evaluator-integrity.json",
+    "release_report": "tmp/bm-semantic/release-gate.json",
+    "active_model_report": "",
+    "quality_report": ""
+  },
+  "conversation_evidence": {
+    "dataset_id": "",
+    "dataset_sha256": "",
+    "unique_conversations": 0,
+    "unique_turns": 0,
+    "hard_failures": 0,
+    "unverified": 0,
+    "independent_quality_pass_rate": 0
+  },
+  "physical_cases": []
+}

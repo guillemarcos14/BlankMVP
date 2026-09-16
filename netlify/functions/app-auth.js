@@ -1,0 +1,68 @@
+const {
+  json,
+  parseJsonBody,
+  requireMethod,
+} = require("./_membership");
+const { cleanText, normalizePhone } = require("./_identity");
+
+function supabasePublicKey() {
+  return process.env.SUPABASE_ANON_KEY
+    || process.env.SUPABASE_PUBLISHABLE_KEY
+    || process.env.SUPABASE_SERVICE_ROLE_KEY
+    || "";
+}
+
+async function authRequest(path, body) {
+  const url = String(process.env.SUPABASE_URL || "").replace(/\/$/, "");
+  const key = supabasePublicKey();
+  if (!url || !key) throw new Error("supabase_auth_not_configured");
+  const response = await fetch(`${url}/auth/v1/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      authorization: `Bearer ${key}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) throw new Error(data.msg || data.message || data.error_description || `supabase_auth_${response.status}`);
+  return data;
+}
+
+async function requestOtp(body) {
+  const phone = normalizePhone(body.phone);
+  const channel = cleanText(body.channel, 20).toLowerCase();
+  if (!phone || !["whatsapp", "sms"].includes(channel)) return json(400, { error: "missing_phone_or_channel" });
+  await authRequest("otp", { phone, create_user: true, channel });
+  return json(200, { ok: true, phone_e164: phone, channel });
+}
+
+async function verifyOtp(body) {
+  const phone = normalizePhone(body.phone);
+  const token = cleanText(body.token || body.code, 12).replace(/\s/g, "");
+  if (!phone || !/^\d{4,8}$/.test(token)) return json(400, { error: "missing_phone_or_code" });
+  const session = await authRequest("verify", { phone, token, type: "sms" });
+  return json(200, {
+    ok: true,
+    access_token: session.access_token || "",
+    refresh_token: session.refresh_token || "",
+    expires_in: session.expires_in || 0,
+    user: session.user || null,
+  });
+}
+
+exports.handler = async (event) => {
+  const methodError = requireMethod(event, "POST");
+  if (methodError) return methodError;
+  try {
+    const body = parseJsonBody(event);
+    const action = cleanText(body.action, 40).toLowerCase();
+    if (action === "request_otp") return await requestOtp(body);
+    if (action === "verify_otp") return await verifyOtp(body);
+    return json(400, { error: "unsupported_action" });
+  } catch (error) {
+    return json(502, { error: "app_auth_failed", detail: error.message });
+  }
+};

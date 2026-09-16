@@ -2,6 +2,33 @@ import FamilyControls
 import Foundation
 import WidgetKit
 
+enum AssistantPendingAction: Equatable {
+    case startProtection(minutes: Int?, hardMode: Bool, appNames: [String])
+    case activateMode(name: String, minutes: Int?, hardMode: Bool, appNames: [String])
+    case duplicateAndActivateMode(sourceName: String, minutes: Int?, hardMode: Bool, appNames: [String])
+    case switchMode(name: String)
+    case applySchedule(name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
+    case duplicateModeAndApplySchedule(sourceName: String, name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
+    case setDailyLimit(minutes: Int?, appNames: [String])
+    case allowOnly
+    case adultFilter
+    case pauseRules(hours: Int)
+    case disablePause
+    case applyAIPlan
+    case openAppPicker(appNames: [String])
+    case configureAndOpenAppPicker(appNames: [String], durationMinutes: Int?, hardMode: Bool, schedule: PendingPlanSchedule?)
+    case configureAndOpenDailyLimitPicker(appNames: [String], minutes: Int)
+    case requestScreenTimePermission
+}
+
+struct PendingPlanSchedule: Equatable {
+    let name: String
+    let startMinute: Int
+    let endMinute: Int
+    let weekdays: [Int]
+    let durationDays: Int
+}
+
 @MainActor
 final class SessionStore: ObservableObject {
     static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
@@ -156,6 +183,9 @@ final class SessionStore: ObservableObject {
     @Published var pendingPlanShouldActivate = false
     @Published var pendingPlanDurationMinutes: Int?
     @Published var pendingPlanHardMode = false
+    @Published var pendingPlanSchedule: PendingPlanSchedule? = nil
+    @Published var pendingPlanDailyLimitMinutes: Int? = nil
+    @Published var pendingAssistantAction: AssistantPendingAction?
 
     #if DEBUG
     private var previewSelectionCount: Int?
@@ -340,7 +370,8 @@ final class SessionStore: ObservableObject {
         forceStarted: Bool = false,
         durationMinutes: Int? = nil,
         hardMode: Bool = false,
-        entryMode: BlankEntryMode = .app
+        entryMode: BlankEntryMode = .app,
+        usePendingWidgetTimer: Bool = true
     ) -> NfcResult {
         guard hasSelectedApps else {
             return .noAppsSelected
@@ -356,7 +387,8 @@ final class SessionStore: ObservableObject {
         isBlankActive = true
         hardBlankActive = hardMode
         blankActiveSince = Date()
-        let selectedDuration = (durationMinutes ?? pendingWidgetTimerMinutes).map { min(max($0, 5), 240) }
+        let pendingDuration = usePendingWidgetTimer ? pendingWidgetTimerMinutes : nil
+        let selectedDuration = (durationMinutes ?? pendingDuration).map { min(max($0, 5), 240) }
         if let selectedDuration, selectedDuration > 0 {
             blankActiveUntil = Date().addingTimeInterval(TimeInterval(selectedDuration * 60))
             deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
@@ -503,7 +535,9 @@ final class SessionStore: ObservableObject {
         modeName: String? = nil,
         shouldActivate: Bool = false,
         durationMinutes: Int? = nil,
-        hardMode: Bool = false
+        hardMode: Bool = false,
+        schedule: PendingPlanSchedule? = nil,
+        dailyLimitMinutes: Int? = nil
     ) {
         pendingPlanAppNames = appNames
         pendingPlanStartsFreshSelection = startsFreshSelection
@@ -512,6 +546,8 @@ final class SessionStore: ObservableObject {
         pendingPlanShouldActivate = shouldActivate
         pendingPlanDurationMinutes = durationMinutes.map { min(max($0, 5), 240) }
         pendingPlanHardMode = hardMode
+        pendingPlanSchedule = schedule
+        pendingPlanDailyLimitMinutes = dailyLimitMinutes.map { min(max($0, 5), 240) }
         shouldOpenBlockConfiguration = true
     }
 
@@ -522,10 +558,20 @@ final class SessionStore: ObservableObject {
         pendingPlanShouldActivate = false
         pendingPlanDurationMinutes = nil
         pendingPlanHardMode = false
+        pendingPlanSchedule = nil
+        pendingPlanDailyLimitMinutes = nil
     }
 
     func requestWidgetTimerSelector() {
         shouldShowWidgetTimerSelector = true
+    }
+
+    func requestAssistantActionConfirmation(_ action: AssistantPendingAction) {
+        pendingAssistantAction = action
+    }
+
+    func clearAssistantActionConfirmation() {
+        pendingAssistantAction = nil
     }
 
     func selectWidgetTimer(minutes: Int?) {
@@ -615,25 +661,134 @@ final class SessionStore: ObservableObject {
         return false
     }
 
+    @discardableResult
+    func duplicateMode(named sourceName: String) -> BlankFocusMode? {
+        let target = Self.normalizedModeName(sourceName)
+        guard !target.isEmpty,
+              let source = focusModes.first(where: { Self.normalizedModeName($0.name) == target }),
+              let selectionData = source.selectionData,
+              let copiedSelection = Self.selection(from: selectionData),
+              (!copiedSelection.applicationTokens.isEmpty
+                || !copiedSelection.categoryTokens.isEmpty
+                || !copiedSelection.webDomainTokens.isEmpty) else { return nil }
+        let baseName = "\(source.name) copy"
+        var copyName = baseName
+        var suffix = 2
+        let existingNames = Set(focusModes.map { Self.normalizedModeName($0.name) })
+        while existingNames.contains(Self.normalizedModeName(copyName)) {
+            copyName = "\(baseName) \(suffix)"
+            suffix += 1
+        }
+        let copy = BlankFocusMode(name: copyName, selectionData: selectionData, appNames: source.appNames)
+        focusModes.append(copy)
+        currentModeId = copy.id
+        selection = copiedSelection
+        return copy
+    }
+
+    @discardableResult
+    func restoreSavedSelectionForAssistant(appNames: [String] = []) -> Bool {
+        let targets = appNames
+            .map(Self.normalizedAssistantAppName)
+            .filter { !$0.isEmpty }
+        if !targets.isEmpty {
+            let targetSet = Set(targets)
+            if let exact = focusModes.first(where: { mode in
+                Set(Self.assistantAppNames(for: mode)) == targetSet
+            }) {
+                selectMode(exact.id)
+                return hasSelectedApps
+            }
+            return false
+        }
+        if hasSelectedApps { return true }
+
+        let candidates = focusModes.filter { mode in
+            guard let data = mode.selectionData,
+                  let savedSelection = Self.selection(from: data) else { return false }
+            return savedSelection.applicationTokens.count > 0
+                || savedSelection.categoryTokens.count > 0
+                || savedSelection.webDomainTokens.count > 0
+        }
+        let preferred = candidates.first
+        guard let preferred else { return false }
+        selectMode(preferred.id)
+        return hasSelectedApps
+    }
+
+    func assistantModeCatalog() -> [[String: Any]] {
+        focusModes.map { mode in
+            let selection = Self.selection(from: mode.selectionData)
+            let appNames = Self.assistantAppNames(for: mode)
+            return [
+                "id": mode.id.uuidString,
+                "name": mode.name,
+                "app_names": appNames,
+                "selection_count": selection.map {
+                    $0.applicationTokens.count + $0.categoryTokens.count + $0.webDomainTokens.count
+                } ?? 0,
+                "has_selection": selection.map {
+                    !$0.applicationTokens.isEmpty || !$0.categoryTokens.isEmpty || !$0.webDomainTokens.isEmpty
+                } ?? false
+            ]
+        }
+    }
+
+    func assistantScheduleContext() -> [String: Any] {
+        var context: [String: Any] = [
+            "enabled": schedule.enabled,
+            "start_minute": schedule.startMinute,
+            "end_minute": schedule.endMinute,
+            "windows": schedule.windows.map { window in
+                [
+                    "id": window.id.uuidString,
+                    "name": window.name,
+                    "enabled": window.enabled,
+                    "start_minute": window.startMinute,
+                    "end_minute": window.endMinute,
+                    "weekdays": window.weekdays
+                ] as [String: Any]
+            }
+        ]
+        if let pausedUntil = schedulePausedUntil {
+            context["paused_until"] = pausedUntil.timeIntervalSince1970
+        }
+        if let expiresAt = adaptiveScheduleExpiresAt {
+            context["expires_at"] = expiresAt.timeIntervalSince1970
+        }
+        return context
+    }
+
     func createMode(named name: String) {
         let mode = BlankFocusMode(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New mode" : name,
-            selectionData: Self.encodedSelection(selection)
+            selectionData: Self.encodedSelection(selection),
+            appNames: Self.inferredAssistantApps(from: name)
         )
         focusModes.append(mode)
         selectMode(mode.id)
     }
 
-    func createOrUpdateMode(named name: String, selection: FamilyActivitySelection) {
+    func createOrUpdateMode(named name: String, selection: FamilyActivitySelection, appNames: [String] = []) {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let modeName = cleanName.isEmpty ? "New mode" : cleanName
+        let knownAppNames = appNames.isEmpty ? Self.inferredAssistantApps(from: modeName) : appNames
         if let existing = focusModes.first(where: { Self.normalizedModeName($0.name) == Self.normalizedModeName(modeName) }) {
             currentModeId = existing.id
             self.selection = selection
             updateCurrentModeSelection(selection)
+            if !knownAppNames.isEmpty {
+                focusModes = focusModes.map { mode in
+                    guard mode.id == existing.id else { return mode }
+                    var updated = mode
+                    updated.appNames = knownAppNames
+                    updated.updatedAt = Date()
+                    return updated
+                }
+            }
             return
         }
-        let mode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection))
+        let mode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection), appNames: knownAppNames)
         focusModes.append(mode)
         currentModeId = mode.id
         self.selection = selection
@@ -663,19 +818,50 @@ final class SessionStore: ObservableObject {
         schedulePausedUntil = nil
     }
 
-    func applyAdaptivePlan(startMinute: Int, endMinute: Int, durationDays: Int, activateCurrentWindow: Bool = true) {
+    func applyAdaptivePlan(
+        startMinute: Int,
+        endMinute: Int,
+        durationDays: Int,
+        activateCurrentWindow: Bool = true,
+        name: String = "AI Plan",
+        weekdays: [Int] = Array(1...7)
+    ) {
         adaptiveScheduleExpiresAt = Calendar.current.date(
             byAdding: .day,
             value: max(1, min(14, durationDays)),
             to: Date()
         )
-        schedule = BlankFocusSchedule(
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "AI Plan" : name
+        let normalizedWeekdays = Array(Set(weekdays.filter { (1...7).contains($0) })).sorted()
+        let window = BlankHabitWindow(
+            name: cleanName,
             enabled: true,
             startMinute: startMinute,
             endMinute: endMinute,
-            windows: [
-                BlankHabitWindow(name: "AI Plan", enabled: true, startMinute: startMinute, endMinute: endMinute)
-            ]
+            weekdays: normalizedWeekdays.isEmpty ? Array(1...7) : normalizedWeekdays
+        )
+        var windows = schedule.windows
+        if let existingIndex = windows.firstIndex(where: {
+            $0.name.caseInsensitiveCompare(cleanName) == .orderedSame
+                && $0.startMinute == window.startMinute
+                && $0.endMinute == window.endMinute
+        }) {
+            windows[existingIndex] = BlankHabitWindow(
+                id: windows[existingIndex].id,
+                name: cleanName,
+                enabled: true,
+                startMinute: startMinute,
+                endMinute: endMinute,
+                weekdays: window.weekdays
+            )
+        } else {
+            windows.append(window)
+        }
+        schedule = BlankFocusSchedule(
+            enabled: true,
+            startMinute: schedule.startMinute,
+            endMinute: schedule.endMinute,
+            windows: windows
         )
         schedulePausedUntil = nil
         syncRecurringSchedule()
@@ -996,7 +1182,10 @@ final class SessionStore: ObservableObject {
                 case "Focus", "Work":
                     return mode.selectionData == nil ? nil : mode
                 default:
-                    return mode
+                    guard mode.appNames.isEmpty else { return mode }
+                    var inferred = mode
+                    inferred.appNames = Self.inferredAssistantApps(from: mode.name)
+                    return inferred
                 }
             }
             if !migrated.isEmpty {
@@ -1036,6 +1225,45 @@ final class SessionStore: ObservableObject {
             .replacingOccurrences(of: " profile", with: "")
             .split(separator: " ")
             .joined(separator: " ")
+    }
+
+    private static func normalizedAssistantAppName(_ value: String) -> String {
+        let normalized = normalizedModeName(value)
+        switch normalized {
+        case "insta": return "instagram"
+        case "tik tok": return "tiktok"
+        case "yt": return "youtube"
+        case "x": return "twitter"
+        default: return normalized
+        }
+    }
+
+    private static func inferredAssistantApps(from value: String) -> [String] {
+        let normalized = " \(normalizedModeName(value)) "
+        let aliases: [(String, String)] = [
+            ("instagram", "Instagram"),
+            ("insta", "Instagram"),
+            ("tiktok", "TikTok"),
+            ("tik tok", "TikTok"),
+            ("youtube", "YouTube"),
+            ("yt", "YouTube"),
+            ("reddit", "Reddit"),
+            ("twitter", "Twitter"),
+            ("facebook", "Facebook"),
+            ("snapchat", "Snapchat"),
+            ("whatsapp", "WhatsApp")
+        ]
+        var seen = Set<String>()
+        return aliases.compactMap { alias, app in
+            guard normalized.contains(" \(alias) "), !seen.contains(app) else { return nil }
+            seen.insert(app)
+            return app
+        }
+    }
+
+    private static func assistantAppNames(for mode: BlankFocusMode) -> [String] {
+        let names = mode.appNames.isEmpty ? inferredAssistantApps(from: mode.name) : mode.appNames
+        return names.map(normalizedAssistantAppName).sorted()
     }
 
     private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {

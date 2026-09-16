@@ -1,5 +1,17 @@
 import Foundation
 
+enum BlankmindAppPresence {
+    static func payload(appReady: Bool) -> [String: Any] {
+        [
+            "app_present": true,
+            "app_ready": appReady,
+            "platform": "ios",
+            "app_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            "build_number": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "",
+        ]
+    }
+}
+
 enum BlankFunnelAnalytics {
     private static let userIdKey = "blankOnboardingAnonymousUserId"
     private static var seenStepKeys = Set<String>()
@@ -326,6 +338,7 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
     var selectionData: Data?
+    var appNames: [String]
     var createdAt: Date
     var updatedAt: Date
 
@@ -333,6 +346,7 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
         id: UUID = UUID(),
         name: String,
         selectionData: Data? = nil,
+        appNames: [String] = [],
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -341,8 +355,44 @@ struct BlankFocusMode: Codable, Identifiable, Equatable {
             ? "Mode"
             : name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.selectionData = selectionData
+        self.appNames = Self.normalizedAppNames(appNames)
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case selectionData
+        case appNames
+        case createdAt
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        let decodedName = try container.decodeIfPresent(String.self, forKey: .name)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let decodedName, !decodedName.isEmpty {
+            name = decodedName
+        } else {
+            name = "Mode"
+        }
+        selectionData = try container.decodeIfPresent(Data.self, forKey: .selectionData)
+        appNames = Self.normalizedAppNames(try container.decodeIfPresent([String].self, forKey: .appNames) ?? [])
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? createdAt
+    }
+
+    private static func normalizedAppNames(_ names: [String]) -> [String] {
+        var seen = Set<String>()
+        return names.compactMap { rawName in
+            let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !seen.contains(name.lowercased()) else { return nil }
+            seen.insert(name.lowercased())
+            return name
+        }
     }
 }
 

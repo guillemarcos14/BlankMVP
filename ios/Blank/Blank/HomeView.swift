@@ -12,12 +12,218 @@ enum HomeSection: Hashable {
     case settings
 }
 
+struct AssistantInboxResponse: Decodable {
+    let pendingAction: AssistantInboxAction?
+
+    enum CodingKeys: String, CodingKey {
+        case pendingAction = "pending_action"
+    }
+}
+
+struct AssistantInboxAction: Decodable {
+    let id: String
+    let type: String
+    let name: String?
+    let minutes: Int?
+    let hardMode: Bool?
+    let startMinute: Int?
+    let endMinute: Int?
+    let weekdays: [Int]?
+    let durationDays: Int?
+    let hours: Int?
+    let appNames: [String]?
+    let copyMode: Bool?
+    let sourceModeName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case name
+        case minutes
+        case hardMode = "hard_mode"
+        case startMinute = "start_minute"
+        case endMinute = "end_minute"
+        case weekdays
+        case durationDays = "duration_days"
+        case hours
+        case appNames = "app_names"
+        case copyMode = "copy_mode"
+        case sourceModeName = "source_mode_name"
+    }
+
+    func toPendingAction() -> AssistantPendingAction? {
+        let apps = (appNames ?? []).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        switch type {
+        case "start_protection":
+            return .startProtection(minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
+        case "activate_mode":
+            if copyMode == true {
+                return .duplicateAndActivateMode(
+                    sourceName: sourceModeName ?? name ?? "Routine",
+                    minutes: minutes,
+                    hardMode: hardMode ?? false,
+                    appNames: apps
+                )
+            }
+            return .activateMode(name: name ?? "Routine", minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
+        case "switch_mode":
+            return .switchMode(name: name ?? "Routine")
+        case "apply_schedule":
+            guard let startMinute, let endMinute else { return nil }
+            if copyMode == true {
+                return .duplicateModeAndApplySchedule(
+                    sourceName: sourceModeName ?? name ?? "Routine",
+                    name: name ?? "AI Plan",
+                    startMinute: min(max(startMinute, 0), 1439),
+                    endMinute: min(max(endMinute, 0), 1439),
+                    weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                    durationDays: min(max(durationDays ?? 7, 1), 14),
+                    appNames: apps
+                )
+            }
+            return .applySchedule(
+                name: name ?? "AI Plan",
+                startMinute: min(max(startMinute, 0), 1439),
+                endMinute: min(max(endMinute, 0), 1439),
+                weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                durationDays: min(max(durationDays ?? 7, 1), 14),
+                appNames: apps
+            )
+        case "set_daily_limit":
+            return .setDailyLimit(minutes: minutes, appNames: apps)
+        case "enable_allow_only":
+            return .allowOnly
+        case "enable_adult_filter":
+            return .adultFilter
+        case "pause_rules":
+            return .pauseRules(hours: min(max(hours ?? 168, 1), 168))
+        case "disable_pause":
+            return .disablePause
+        case "apply_ai_plan":
+            return .applyAIPlan
+        case "open_app_picker":
+            let pickerName = name ?? ""
+            let pickerSchedule: PendingPlanSchedule?
+            if let startMinute, let endMinute {
+                pickerSchedule = PendingPlanSchedule(
+                    name: pickerName.isEmpty ? "AI Plan" : pickerName,
+                    startMinute: min(max(startMinute, 0), 1439),
+                    endMinute: min(max(endMinute, 0), 1439),
+                    weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                    durationDays: min(max(durationDays ?? 7, 1), 14)
+                )
+            } else {
+                pickerSchedule = nil
+            }
+            if pickerName == "Daily Limit", let minutes {
+                return .configureAndOpenDailyLimitPicker(appNames: apps, minutes: minutes)
+            }
+            if pickerSchedule != nil || minutes != nil || hardMode == true || !pickerName.isEmpty {
+                return .configureAndOpenAppPicker(
+                    appNames: apps,
+                    durationMinutes: minutes,
+                    hardMode: hardMode ?? false,
+                    schedule: pickerSchedule
+                )
+            }
+            return .openAppPicker(appNames: apps)
+        case "request_screen_time_permission":
+            return .requestScreenTimePermission
+        default:
+            return nil
+        }
+    }
+}
+
+struct AssistantActionInboxClient {
+    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
+        guard let data = try? await request(
+            action: "poll_pending_action",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber
+        ), let response = try? JSONDecoder().decode(AssistantInboxResponse.self, from: data) else {
+            return nil
+        }
+        return response.pendingAction
+    }
+
+    func acknowledge(actionId: String, status: String, connectCode: String, channel: String, phoneNumber: String, detail: String = "") async {
+        _ = try? await request(
+            action: "ack_pending_action",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            actionId: actionId,
+            status: status,
+            detail: detail
+        )
+    }
+
+    func registerDevicePush(token: String, environment: String, connectCode: String, channel: String, phoneNumber: String) async -> Bool {
+        guard (try? await request(
+            action: "register_device_push",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            deviceToken: token,
+            environment: environment
+        )) != nil else { return false }
+        return true
+    }
+
+    private func request(
+        action: String,
+        connectCode: String,
+        channel: String,
+        phoneNumber: String,
+        actionId: String? = nil,
+        status: String? = nil,
+        detail: String? = nil,
+        deviceToken: String? = nil,
+        environment: String? = nil
+    ) async throws -> Data {
+        guard let rawBaseURL = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            throw URLError(.badURL)
+        }
+        let base = rawBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, !base.contains("$("), let baseURL = URL(string: base) else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 8
+        var body: [String: Any] = [
+            "action": action,
+            "connect_code": connectCode,
+            "preferred_channel": channel,
+            "user_phone": phoneNumber,
+            "app_install_id": BlankSharedState.appInstallId,
+        ]
+        if let actionId { body["action_id"] = actionId }
+        if let status { body["status"] = status }
+        if let detail, !detail.isEmpty { body["detail"] = detail }
+        if let deviceToken, !deviceToken.isEmpty { body["device_token"] = deviceToken }
+        if let environment, !environment.isEmpty { body["environment"] = environment }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return data
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var assistantConnectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var assistantPreferredChannel = ""
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var assistantPhoneNumber = ""
 
     @State private var now = Date()
     @State private var message: String?
@@ -38,6 +244,10 @@ struct HomeView: View {
     @State private var delayedManualUnlockAt: Date?
     @State private var delayedManualUnlockTask: Task<Void, Never>?
     @State private var showingRelapseReview = false
+    @AppStorage("blankPendingAssistantActionId", store: BlankSharedState.defaults) private var pendingAssistantActionId = ""
+    @State private var assistantActionPollInFlight = false
+    @State private var assistantActionExecutionInFlight = false
+    @State private var lastAssistantActionPollAt = Date.distantPast
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -123,6 +333,7 @@ struct HomeView: View {
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
+            pollPendingAssistantActionIfNeeded(now: date)
             sessionStore.syncFromSharedDefaults(now: date)
             sessionStore.applyScheduleWindow(at: date)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
@@ -137,6 +348,8 @@ struct HomeView: View {
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
+            syncAssistantContext()
+            pollPendingAssistantActionIfNeeded(force: true)
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -148,11 +361,14 @@ struct HomeView: View {
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
+            syncAssistantContext()
+            pollPendingAssistantActionIfNeeded(force: true)
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+            syncAssistantContext()
         }
         .onChange(of: sessionStore.isBlankActive) { isActive in
             if !isActive {
@@ -164,12 +380,14 @@ struct HomeView: View {
         }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             applyScreenTimeControls()
+            syncAssistantContext()
             if sessionStore.allowOnlyModeEnabled && !sessionStore.hasSelectedApps {
                 showingPicker = true
             }
         }
         .onChange(of: sessionStore.adultContentBlockingEnabled) { _ in
             applyScreenTimeControls()
+            syncAssistantContext()
         }
         .onChange(of: sessionStore.shouldOpenBlockConfiguration) { shouldOpen in
             guard shouldOpen else { return }
@@ -183,30 +401,73 @@ struct HomeView: View {
         )
         .onChange(of: showingContextualAppPicker) { isPresented in
             if !isPresented {
+                var assistantActionApplied = false
                 if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
+                    if contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                    }
                     if let modeName = sessionStore.pendingPlanModeName,
                        contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.createOrUpdateMode(named: modeName, selection: contextualPlanSelection)
-                        if sessionStore.pendingPlanShouldActivate {
-                            let result = withAnimation(.easeInOut(duration: 0.65)) {
-                                sessionStore.activateBlank(
-                                    durationMinutes: sessionStore.pendingPlanDurationMinutes,
-                                    hardMode: sessionStore.pendingPlanHardMode
-                                )
-                            }
-                            screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-                            setMessage(for: result)
-                            activeSection = nil
-                        } else {
-                            message = "\(modeName) mode saved."
-                            messageAction = nil
+                        sessionStore.createOrUpdateMode(
+                            named: modeName,
+                            selection: contextualPlanSelection,
+                            appNames: sessionStore.pendingPlanAppNames
+                        )
+                    }
+                    if sessionStore.pendingPlanShouldActivate,
+                       contextualPlanSelection.blankedSelectionCount > 0 {
+                        let result = withAnimation(.easeInOut(duration: 0.65)) {
+                            sessionStore.activateBlank(
+                                durationMinutes: sessionStore.pendingPlanDurationMinutes,
+                                hardMode: sessionStore.pendingPlanHardMode
+                            )
                         }
-                    } else {
+                        applyScreenTimeControls()
+                        setMessage(for: result)
+                        activeSection = nil
+                        assistantActionApplied = sessionStore.isBlankActive
+                    } else if let dailyLimitMinutes = sessionStore.pendingPlanDailyLimitMinutes,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
+                        sessionStore.dailyLimitMinutes = dailyLimitMinutes
+                        sessionStore.dailyLimitEnabled = true
+                        sessionStore.refreshDailyLimitMonitoring()
+                        applyScreenTimeControls()
+                        message = "Daily limit set to \(dailyLimitMinutes) minutes."
+                        messageAction = nil
+                        assistantActionApplied = sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == dailyLimitMinutes
+                    } else if let schedule = sessionStore.pendingPlanSchedule,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        sessionStore.selection = contextualPlanSelection
+                        sessionStore.applyAdaptivePlan(
+                            startMinute: schedule.startMinute,
+                            endMinute: schedule.endMinute,
+                            durationDays: schedule.durationDays,
+                            activateCurrentWindow: false,
+                            name: schedule.name,
+                            weekdays: schedule.weekdays
+                        )
+                        applyScreenTimeControls()
+                        message = "Added \(schedule.name) without replacing your existing protection windows."
+                        messageAction = nil
+                        assistantActionApplied = true
+                    } else if let modeName = sessionStore.pendingPlanModeName,
+                              contextualPlanSelection.blankedSelectionCount > 0 {
+                        message = "\(modeName) mode saved."
+                        messageAction = nil
+                        assistantActionApplied = true
+                    } else {
+                        assistantActionApplied = contextualPlanSelection.blankedSelectionCount > 0
                     }
                 }
                 sessionStore.clearPendingPlanAppNames()
                 contextualPlanSelection = FamilyActivitySelection()
+                if !pendingAssistantActionId.isEmpty {
+                    finishPendingAssistantAction(
+                        status: assistantActionApplied ? "verified" : "failed",
+                        detail: assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_not_completed"
+                    )
+                }
             }
         }
         .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
@@ -217,7 +478,8 @@ struct HomeView: View {
             AssistantConnectSheet(
                 whatsAppNumber: configuredWhatsAppNumber(),
                 smsNumber: configuredSMSNumber(),
-                openURL: openURL
+                openURL: openURL,
+                initialContext: assistantContextPayload()
             )
         }
         .sheet(isPresented: $showingRelink) {
@@ -1070,6 +1332,288 @@ struct HomeView: View {
         sessionStore.shouldOpenBlockConfiguration = false
     }
 
+    private var assistantActionConfirmationMessage: String {
+        guard let action = sessionStore.pendingAssistantAction else {
+            return "No action is waiting for confirmation."
+        }
+        switch action {
+        case .startProtection(let minutes, _, let appNames):
+            let target = appNames.isEmpty ? "the current app selection" : appNames.joined(separator: ", ")
+            return minutes.map { "Start protection now for \($0) minutes using \(target)?" } ?? "Start protection now using \(target), with no duration added?"
+        case .activateMode(let name, let minutes, _, _):
+            return minutes.map { "Start \(name) mode for \($0) minutes?" } ?? "Start \(name) mode now, without adding a duration?"
+        case .duplicateAndActivateMode(let sourceName, let minutes, _, _):
+            return minutes.map { "Copy \(sourceName) and start the copy for \($0) minutes?" } ?? "Copy \(sourceName) and start the copy now?"
+        case .switchMode(let name):
+            return "Switch to \(name) mode?"
+        case .applySchedule(let name, let start, let end, _, let days, _):
+            return "Add \(name) as a new protection window from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, _, let days, _):
+            return "Copy \(sourceName) and schedule the copy from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .setDailyLimit(let minutes, _):
+            return minutes.map { "Set a daily limit of \($0) minutes?" } ?? "Set a daily limit after you choose its duration?"
+        case .allowOnly:
+            return "Enable Allow Only?"
+        case .adultFilter:
+            return "Enable adult web protection?"
+        case .pauseRules(let hours):
+            return "Pause protection rules for \(hours) hours?"
+        case .disablePause:
+            return "Resume protection rules?"
+        case .applyAIPlan:
+            return "Apply the recommended adaptive plan?"
+        case .openAppPicker:
+            return "Open the app picker to choose what Blanked can protect?"
+        case .configureAndOpenAppPicker(let appNames, let durationMinutes, _, let schedule):
+            if let schedule {
+                return "Choose the apps for \(schedule.name) from \(formatMinute(schedule.startMinute)) to \(formatMinute(schedule.endMinute))?"
+            }
+            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
+            return durationMinutes.map { "Choose \(target) and start protection for \($0) minutes?" } ?? "Choose \(target) and start protection now?"
+        case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
+            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
+            return "Choose \(target) and set a daily limit of \(minutes) minutes?"
+        case .requestScreenTimePermission:
+            return "Request Screen Time permission?"
+        }
+    }
+
+    private func confirmPendingAssistantAction() {
+        guard let pendingAction = sessionStore.pendingAssistantAction else { return }
+        assistantActionExecutionInFlight = true
+        sessionStore.clearAssistantActionConfirmation()
+        switch pendingAction {
+        case .startProtection(let minutes, let hardMode, let appNames):
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(
+                    appNames: appNames,
+                    startsFreshSelection: !appNames.isEmpty,
+                    shouldActivate: true,
+                    durationMinutes: minutes,
+                    hardMode: hardMode
+                )
+                return
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+            finishPendingAssistantAction(
+                status: sessionStore.isBlankActive ? "verified" : "failed",
+                detail: sessionStore.isBlankActive ? "protection_active" : "protection_not_active"
+            )
+        case .activateMode(let name, let minutes, let hardMode, let appNames):
+            if !sessionStore.selectBestMode(matching: name) {
+                guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                    sessionStore.requestBlockConfiguration(
+                        appNames: appNames,
+                        startsFreshSelection: !appNames.isEmpty,
+                        modeName: name,
+                        shouldActivate: true,
+                        durationMinutes: minutes,
+                        hardMode: hardMode
+                    )
+                    return
+                }
+                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection, appNames: appNames)
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+            finishPendingAssistantAction(
+                status: sessionStore.isBlankActive ? "verified" : "failed",
+                detail: sessionStore.isBlankActive ? "mode_active" : "mode_not_active"
+            )
+        case .duplicateAndActivateMode(let sourceName, let minutes, let hardMode, _):
+            guard sessionStore.duplicateMode(named: sourceName) != nil else {
+                message = "I couldn't find the saved \(sourceName) plan to copy."
+                messageAction = nil
+                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
+                return
+            }
+            let result = sessionStore.activateBlank(
+                durationMinutes: minutes,
+                hardMode: hardMode,
+                usePendingWidgetTimer: false
+            )
+            applyScreenTimeControls()
+            setMessage(for: result)
+            finishPendingAssistantAction(
+                status: sessionStore.isBlankActive ? "verified" : "failed",
+                detail: sessionStore.isBlankActive ? "mode_copy_active" : "mode_copy_not_active"
+            )
+        case .switchMode(let name):
+            if sessionStore.selectBestMode(matching: name) {
+                message = "\(name) mode selected."
+                messageAction = nil
+            } else if sessionStore.hasSelectedApps {
+                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection)
+                message = "\(name) mode saved."
+                messageAction = nil
+            } else {
+                sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
+                return
+            }
+            finishPendingAssistantAction(status: "verified", detail: "mode_selected")
+        case .applySchedule(let name, let start, let end, let weekdays, let days, let appNames):
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(
+                    appNames: appNames,
+                    startsFreshSelection: !appNames.isEmpty,
+                    schedule: PendingPlanSchedule(
+                        name: name,
+                        startMinute: start,
+                        endMinute: end,
+                        weekdays: weekdays,
+                        durationDays: days
+                    )
+                )
+                return
+            }
+            sessionStore.applyAdaptivePlan(
+                startMinute: start,
+                endMinute: end,
+                durationDays: days,
+                activateCurrentWindow: false,
+                name: name,
+                weekdays: weekdays
+            )
+            applyScreenTimeControls()
+            message = "Added \(name) without replacing your existing protection windows."
+            messageAction = nil
+            finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
+        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, let weekdays, let days, _):
+            guard let copy = sessionStore.duplicateMode(named: sourceName) else {
+                message = "I couldn't find the saved \(sourceName) plan to copy."
+                messageAction = nil
+                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
+                return
+            }
+            sessionStore.applyAdaptivePlan(
+                startMinute: start,
+                endMinute: end,
+                durationDays: days,
+                activateCurrentWindow: false,
+                name: copy.name,
+                weekdays: weekdays
+            )
+            applyScreenTimeControls()
+            message = "Copied \(sourceName) as \(copy.name) and added the requested protection window."
+            messageAction = nil
+            finishPendingAssistantAction(status: "verified", detail: "mode_copy_schedule_persisted")
+        case .setDailyLimit(let minutes, let appNames):
+            guard let minutes else {
+                message = "Tell BM how many minutes per day you want to allow before activating this limit."
+                messageAction = nil
+                finishPendingAssistantAction(status: "failed", detail: "daily_limit_duration_missing")
+                return
+            }
+            guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
+                sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: !appNames.isEmpty)
+                return
+            }
+            sessionStore.dailyLimitMinutes = minutes
+            sessionStore.dailyLimitEnabled = true
+            sessionStore.refreshDailyLimitMonitoring()
+            applyScreenTimeControls()
+            message = "Daily limit set to \(minutes) minutes."
+            messageAction = nil
+            finishPendingAssistantAction(
+                status: sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes ? "verified" : "failed",
+                detail: "daily_limit_state_checked"
+            )
+        case .allowOnly:
+            sessionStore.allowOnlyModeEnabled = true
+            applyScreenTimeControls()
+            finishPendingAssistantAction(status: sessionStore.allowOnlyModeEnabled ? "verified" : "failed", detail: "allow_only_state_checked")
+        case .adultFilter:
+            sessionStore.adultContentBlockingEnabled = true
+            applyScreenTimeControls()
+            finishPendingAssistantAction(status: sessionStore.adultContentBlockingEnabled ? "verified" : "failed", detail: "adult_filter_state_checked")
+        case .pauseRules(let hours):
+            sessionStore.enableVacationMode(hours: hours)
+            applyScreenTimeControls()
+            finishPendingAssistantAction(status: sessionStore.isVacationModeActive ? "verified" : "failed", detail: "pause_state_checked")
+        case .disablePause:
+            sessionStore.disableVacationMode()
+            applyScreenTimeControls()
+            finishPendingAssistantAction(status: sessionStore.isVacationModeActive ? "failed" : "verified", detail: "resume_state_checked")
+        case .applyAIPlan:
+            sessionStore.applyAIPlan()
+            applyScreenTimeControls()
+            finishPendingAssistantAction(status: "verified", detail: "ai_plan_persisted")
+        case .openAppPicker(let appNames):
+            sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: true)
+        case .configureAndOpenAppPicker(let appNames, let durationMinutes, let hardMode, let schedule):
+            sessionStore.requestBlockConfiguration(
+                appNames: appNames,
+                startsFreshSelection: true,
+                modeName: appNames.isEmpty ? (schedule?.name ?? "BM Plan") : appNames.joined(separator: " + "),
+                shouldActivate: schedule == nil,
+                durationMinutes: durationMinutes,
+                hardMode: hardMode,
+                schedule: schedule
+            )
+        case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
+            sessionStore.requestBlockConfiguration(
+                appNames: appNames,
+                startsFreshSelection: true,
+                modeName: appNames.isEmpty ? "BM Daily Limit" : appNames.joined(separator: " + "),
+                dailyLimitMinutes: minutes
+            )
+        case .requestScreenTimePermission:
+            Task {
+                _ = await screenTimeBlocker.requestAuthorization()
+                applyScreenTimeControls()
+                finishPendingAssistantAction(
+                    status: screenTimeBlocker.authorizationStatus == .approved ? "verified" : "failed",
+                    detail: "screen_time_authorization_checked"
+                )
+            }
+        }
+    }
+
+    private func finishPendingAssistantAction(status: String, detail: String) {
+        let actionId = pendingAssistantActionId
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        assistantActionExecutionInFlight = false
+        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        pendingAssistantActionId = ""
+        let phoneNumber = assistantPhoneNumber
+        Task {
+            await AssistantActionInboxClient().acknowledge(
+                actionId: actionId,
+                status: "confirmed",
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
+            )
+            await AssistantActionInboxClient().acknowledge(
+                actionId: actionId,
+                status: "execution_started",
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
+            )
+            await AssistantActionInboxClient().acknowledge(
+                actionId: actionId,
+                status: status,
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber,
+                detail: detail
+            )
+        }
+    }
+
     private var contextualPickerHeaderText: String {
         if let modeName = sessionStore.pendingPlanModeName {
             return "Create \(modeName) mode"
@@ -1110,6 +1654,108 @@ struct HomeView: View {
         guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankSMSPhoneNumber") as? String else { return nil }
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty || trimmed.contains("$(") ? nil : trimmed
+    }
+
+    private func assistantContextPayload() -> [String: Any] {
+        let system = aiSystem
+        var payload: [String: Any] = [
+            "is_blank_active": sessionStore.isBlankActive,
+            "has_selected_apps": sessionStore.hasSelectedApps,
+            "selection_count": sessionStore.selectionCount,
+            "screen_time_authorized": screenTimeBlocker.authorizationStatus == .approved,
+            "emergency_unlocks_remaining": sessionStore.emergencyUnlocksRemaining,
+            "vacation_mode_active": sessionStore.isVacationModeActive,
+            "adherence_score": system.profile.adherenceScore,
+            "weekly_protected_minutes": system.profile.weeklyProtectedMinutes,
+            "weekly_break_count": system.profile.weeklyBreakCount,
+            "risk_window": system.forecast.riskWindow,
+            "recommended_duration_minutes": system.plan.recommendedDurationMinutes,
+            "weekly_goal": system.plan.weeklyGoal,
+            "mode_name": sessionStore.currentMode.name,
+            "available_modes": sessionStore.focusModes.map(\.name),
+            "available_mode_catalog": sessionStore.assistantModeCatalog(),
+            "app_presence": BlankmindAppPresence.payload(
+                appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
+            ),
+            "device_execution_ready": !(BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? "").isEmpty,
+            "schedule": sessionStore.assistantScheduleContext(),
+            "allow_only_mode_enabled": sessionStore.allowOnlyModeEnabled,
+            "adult_content_blocking_enabled": sessionStore.adultContentBlockingEnabled,
+            "daily_limit_enabled": sessionStore.dailyLimitEnabled,
+            "daily_limit_minutes": sessionStore.dailyLimitMinutes,
+            "memory": BlankedAgentMemory.snapshot(system: system),
+        ]
+        if let strongestWindow = system.profile.strongestWindow {
+            payload["strongest_hour"] = strongestWindow
+        }
+        return payload
+    }
+
+    private func syncAssistantContext() {
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        guard !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        let payload = assistantContextPayload()
+        Task {
+            await AssistantContextSyncClient().sync(
+                connectCode: code,
+                channel: channel,
+                phoneNumber: assistantPhoneNumber,
+                payload: payload
+            )
+        }
+    }
+
+    private func pollPendingAssistantActionIfNeeded(force: Bool = false, now: Date = Date()) {
+        guard force || now.timeIntervalSince(lastAssistantActionPollAt) >= 5 else { return }
+        guard !assistantActionPollInFlight,
+              !assistantActionExecutionInFlight,
+              !showingContextualAppPicker,
+              sessionStore.pendingAssistantAction == nil else { return }
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        guard channel == "whatsapp" || channel == "sms" else { return }
+        lastAssistantActionPollAt = now
+        assistantActionPollInFlight = true
+        let phoneNumber = assistantPhoneNumber
+        Task {
+            let remoteAction = await AssistantActionInboxClient().poll(
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
+            )
+            await MainActor.run {
+                assistantActionPollInFlight = false
+                guard let remoteAction,
+                      let pendingAction = remoteAction.toPendingAction(),
+                      sessionStore.pendingAssistantAction == nil else { return }
+                BlankSharedState.defaults.removeObject(forKey: "blankAssistantPollAfterOpen")
+                pendingAssistantActionId = remoteAction.id
+                sessionStore.requestAssistantActionConfirmation(pendingAction)
+                confirmPendingAssistantAction()
+            }
+        }
+    }
+
+    private func dismissPendingAssistantAction(status: String) {
+        let actionId = pendingAssistantActionId
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        pendingAssistantActionId = ""
+        assistantActionExecutionInFlight = false
+        sessionStore.clearAssistantActionConfirmation()
+        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        lastAssistantActionPollAt = Date()
+        let phoneNumber = assistantPhoneNumber
+        Task {
+            await AssistantActionInboxClient().acknowledge(
+                actionId: actionId,
+                status: status,
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
+            )
+        }
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -3459,10 +4105,12 @@ private struct AssistantConnectSheet: View {
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
     @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
     @State private var copiedCode = false
+    @State private var showingPhoneSignIn = false
 
     let whatsAppNumber: String?
     let smsNumber: String?
     let openURL: OpenURLAction
+    let initialContext: [String: Any]
 
     var body: some View {
         GeometryReader { proxy in
@@ -3519,6 +4167,13 @@ private struct AssistantConnectSheet: View {
                             Text(minimalAppearance ? "used to match your connect message." : "Used to match your CONNECT message.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
+
+                            Button("Sign in with your phone") {
+                                showingPhoneSignIn = true
+                            }
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
+                            .foregroundStyle(textColor)
+                            .buttonStyle(.plain)
                         }
 
                         VStack(spacing: 10) {
@@ -3595,6 +4250,10 @@ private struct AssistantConnectSheet: View {
         .onAppear {
             ensureConnectCode()
         }
+        .sheet(isPresented: $showingPhoneSignIn) {
+            AppPhoneSignInSheet(initialPhone: phoneNumber)
+                .environmentObject(sessionStore)
+        }
     }
 
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
@@ -3641,7 +4300,8 @@ private struct AssistantConnectSheet: View {
             await registerAssistantPreference(
                 channel: channel,
                 connectCode: connectCode,
-                userPhone: cleanedUserPhone
+                userPhone: cleanedUserPhone,
+                context: initialContext
             )
             await BlankFunnelAnalytics.track(
                 "assistant_channel_connect_started",
@@ -3655,7 +4315,12 @@ private struct AssistantConnectSheet: View {
         dismiss()
     }
 
-    private func registerAssistantPreference(channel: AssistantChannel, connectCode: String, userPhone: String) async {
+    private func registerAssistantPreference(
+        channel: AssistantChannel,
+        connectCode: String,
+        userPhone: String,
+        context: [String: Any]
+    ) async {
         guard let baseURL = configuredBaseURL() else { return }
         var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
         request.httpMethod = "POST"
@@ -3665,7 +4330,8 @@ private struct AssistantConnectSheet: View {
             "action": "register_preference",
             "connect_code": connectCode,
             "preferred_channel": channel == .whatsApp ? "whatsapp" : "sms",
-            "user_phone": userPhone
+            "user_phone": userPhone,
+            "context": context
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         _ = try? await URLSession.shared.data(for: request)
@@ -3680,6 +4346,177 @@ private struct AssistantConnectSheet: View {
             return nil
         }
         return URL(string: trimmed)
+    }
+}
+
+private struct AppPhoneSignInSheet: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
+    @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @State private var code = ""
+    @State private var channel = "whatsapp"
+    @State private var verificationStarted = false
+    @State private var isWorking = false
+    @State private var errorMessage: String?
+
+    let initialPhone: String
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text("Use the same phone number you verified on the web. Blankmind will link this app install to that account and its WhatsApp or SMS thread.")
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Phone") {
+                    TextField("+1 555 000 0000", text: $phoneNumber)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                    Picker("Send code by", selection: $channel) {
+                        Text("WhatsApp").tag("whatsapp")
+                        Text("SMS").tag("sms")
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if verificationStarted {
+                    Section("Verification code") {
+                        TextField("123456", text: $code)
+                            .keyboardType(.numberPad)
+                            .textContentType(.oneTimeCode)
+                        Button(isWorking ? "Verifying…" : "Verify and connect") {
+                            Task { await verifyCode() }
+                        }
+                        .disabled(isWorking || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                } else {
+                    Section {
+                        Button(isWorking ? "Sending…" : "Send verification code") {
+                            Task { await requestCode() }
+                        }
+                        .disabled(isWorking || phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Connect Blankmind")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear {
+                if phoneNumber.isEmpty { phoneNumber = initialPhone }
+            }
+        }
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private func requestCode() async {
+        await performRequest(action: "request_otp", payload: [
+            "phone": phoneNumber,
+            "channel": channel,
+        ])
+        if errorMessage == nil { verificationStarted = true }
+    }
+
+    private func verifyCode() async {
+        do {
+            isWorking = true
+            errorMessage = nil
+            let auth = try await postJSON(path: "app-auth", payload: [
+                "action": "verify_otp",
+                "phone": phoneNumber,
+                "token": code,
+            ])
+            guard let accessToken = auth["access_token"] as? String, !accessToken.isEmpty else {
+                throw AppPhoneSignInError.message("Blankmind did not return a session.")
+            }
+            let linked = try await postJSON(
+                path: "app-handoff",
+                payload: [
+                    "action": "claim_identity",
+                    "app_install_id": BlankSharedState.appInstallId,
+                    "data_consent": true,
+                ],
+                bearerToken: accessToken
+            )
+            guard let linkedCode = linked["assistant_connect_code"] as? String, !linkedCode.isEmpty else {
+                throw AppPhoneSignInError.message("The account was verified but the assistant link was not created.")
+            }
+            connectCode = linkedCode
+            preferredChannel = channel
+            if let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty {
+                phoneNumber = linkedPhone
+            }
+            connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isWorking = false
+    }
+
+    private func performRequest(action: String, payload: [String: Any]) async {
+        do {
+            isWorking = true
+            errorMessage = nil
+            var body = payload
+            body["action"] = action
+            _ = try await postJSON(path: "app-auth", payload: body)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isWorking = false
+    }
+
+    private func postJSON(path: String, payload: [String: Any], bearerToken: String? = nil) async throws -> [String: Any] {
+        guard let baseURL = configuredBaseURL() else {
+            throw AppPhoneSignInError.message("Blankmind connection is not configured in this build.")
+        }
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let bearerToken { request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization") }
+        request.timeoutInterval = 12
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let result = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            let detail = result["detail"] as? String ?? result["error"] as? String ?? "Request failed."
+            throw AppPhoneSignInError.message(detail.replacingOccurrences(of: "_", with: " "))
+        }
+        return result
+    }
+
+    private func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else { return nil }
+        return URL(string: trimmed)
+    }
+}
+
+private enum AppPhoneSignInError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        if case let .message(value) = self { return value }
+        return nil
     }
 }
 

@@ -3,9 +3,16 @@
 Ultima actualizacion: 2026-09-16
 
 ## Resumen actual
+- 2026-09-16: Implementado el transporte BM WhatsApp→app sin enlaces largos. WhatsApp guarda propuestas confirmadas en una bandeja pendiente; iOS las consulta y conserva la confirmación nativa antes de aplicar. Commit `eca89c4`, Netlify `getblank` deploy `6aaa4e0958b7deec27e448b5`. Product harness `25/25`, release gate automatizado `16/16`; falta compilar/distribuir la build iOS para la prueba física.
+- 2026-09-16: Corrección BM integrada y publicada en Netlify `getblank` desde `29cf543`, deploy `6aaa44e8a1ae618cfcda5c6d`. Producción verificada con corrección 3→7 días, `Yea` y `It’s already opened`: enlace `apply_schedule` conservado como revisión (`review_only_actions: true`), sin ejecución automática y sin prompt repetido. Product harness `25/25`, core `84/84`, release gate automatizado `16/16`; Supabase sin cambios.
+- 2026-09-16: La confirmación conversacional acepta también `Yeah`, `Yea` y `Yep`, cubriendo la variante observada en WhatsApp. Validado en el core y en product harness `25/25` antes del despliegue.
+- 2026-09-16: Diagnóstico remoto previo al despliegue: `https://getblank.netlify.app/.netlify/functions/blanked-agent` devolvía la versión anterior (`actions: []`, sin `review_only_actions` y con el prompt repetido). La corrección ya está publicada; la verificación posterior consta en la entrada superior.
+- 2026-09-16: Corregido el transporte de planes BM completos y confirmados cuando falta heartbeat reciente: WhatsApp/SMS generan enlace de revisión marcado `review_only_actions`; la ejecución sigue bloqueada hasta las comprobaciones nativas de Blankmind. Los follow-ups de instalación ya no repiten el prompt. Validado con product harness `25/25`, core `83/83`, smokes de presencia/WhatsApp/SMS y release gate automatizado `16/16`. Sin deploy.
+- 2026-09-15: Auditoría semántica BM entregada localmente en `codex/bm-semantic-audit`: reducer, extracción tipada con evidencia, confirmación exacta, acciones derivadas, persistencia CAS y evaluador independiente. Product harness 25/25 con alcance válido; core 82/82; 42 mutaciones impedidas; batch 960 turnos de seis guiones repetidos; Luna activo 45/45 después de corregir el schema. El legacy conserva 61/114 discrepancias adjudicadas sin aprobación global. No hay nueva release ni migración aplicada; pendientes SQL real, build/prueba iOS y límites funcionales/calidad del informe `docs/BM_SEMANTIC_AUDIT.md`.
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
 - El repo contiene app Android (`app/`), MVP iPhone (`ios/Blank/`), documentos de lanzamiento (`docs/`) y landing estatica (`web/landing/`).
 - Este archivo es la fuente de verdad operativa para continuidad entre sesiones.
+- La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
 - 2026-09-16: Eliminada la animación de movimiento/respiración de `hold the screen to unblank`; el texto ahora se desvanece linealmente siguiendo `unblankHoldProgress`. El cooldown fija el instante inicial para mostrar `01:00` exacto. Commit `2ea0294` subido; harness y `git diff --check` OK. Recompilado en MacinCloud FF368 con `** BUILD SUCCEEDED **`.
@@ -604,6 +611,7 @@ Ultima actualizacion: 2026-09-16
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-15: BM usa estado semántico como autoridad para bloqueos; el modelo aporta evidencia, nunca autorización. Correcciones invalidan confirmación. Sin defaults de horas, duración, apps ni horizonte. La migración 015 y persistencia requerida deben preceder a una futura publicación del backend. Evaluación dura sin compensación por medias; texto nuevo exige revisión independiente. No desplegar desde esta tarea.
 - [cerrada] 2026-07-31: En el programa de embajadores, las comisiones se pagaran semanalmente para reforzar incentivo y velocidad; metodos de pago aceptados: transferencia bancaria o Bizum.
 - [cerrada] 2026-07-31: La atribucion de ventas para embajadores de Blank sera de 60 dias.
 - [cerrada] 2026-07-31: La atribucion del programa de embajadores se hara por codigo de descuento usado en checkout; no se usaran links trackeados en esta fase.

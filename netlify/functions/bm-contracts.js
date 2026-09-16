@@ -64,6 +64,8 @@ function normalizeAction(candidate) {
     minutes: numberOrNull(source.minutes, 5, 240),
     hard_mode: source.hard_mode === true ? true : source.hard_mode === false ? false : null,
     name: clean(source.name, 48) || null,
+    ...(clean(source.source_mode_name, 48) ? { source_mode_name: clean(source.source_mode_name, 48) } : {}),
+    ...(source.copy_mode === true ? { copy_mode: true } : {}),
     start_minute: numberOrNull(source.start_minute, 0, 1439),
     end_minute: numberOrNull(source.end_minute, 0, 1439),
     weekdays: normalizeWeekdays(source.weekdays),

@@ -1,0 +1,595 @@
+{
+  "version": 1,
+  "id": "bm-semantic-reserved-v4",
+  "split": "holdout",
+  "provenance": "Independent final-contract holdout authored only after core freeze82/82 and oracle freeze42 mutations; no runtime outputs used to write expectations. New conversations and wording, no prior failed case copied. Canonical ISO weekday slots; native Sunday1 action weekdays; exact device app selections. Channel contexts test backend, not native UI.",
+  "conversations": [
+    {
+      "id": "reserved_v4_clause_order",
+      "channel": "whatsapp",
+      "context": {
+        "selected_app_names": [
+          "Netflix"
+        ],
+        "has_selected_apps": true,
+        "screen_time_authorized": true,
+        "language": "en",
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Please block Netflix on Wednesdays, 18:10 to 18:45, for 6 days.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Netflix"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1090
+              },
+              "end": 1125,
+              "duration_minutes": 35,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  3
+                ]
+              },
+              "schedule_horizon_days": 6,
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Netflix"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 1090
+              },
+              "end": 1125,
+              "duration_minutes": 35,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  3
+                ]
+              },
+              "schedule_horizon_days": 6,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 1090,
+                "end_minute": 1125,
+                "weekdays": [
+                  4
+                ],
+                "duration_days": 6
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reserved_v4_immediate_hard",
+      "channel": "sms",
+      "context": {
+        "selected_app_names": [
+          "TikTok"
+        ],
+        "has_selected_apps": true,
+        "screen_time_authorized": true,
+        "language": "en",
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "For this one time, block TikTok now for 34 minutes in hard mode.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": true,
+              "requested_capability": null,
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 34,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Confirmed",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": true,
+              "requested_capability": null,
+              "apps": [
+                "TikTok"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 34,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 34,
+                "hard_mode": true
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reserved_v4_spanish_schedule",
+      "channel": "ios",
+      "context": {
+        "selected_app_names": [
+          "YouTube"
+        ],
+        "has_selected_apps": true,
+        "screen_time_authorized": true,
+        "language": "es",
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Quiero bloquear YouTube de 15:20 a 16:05 todos los días durante 3 días.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 920
+              },
+              "end": 965,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "schedule_horizon_days": 3,
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "es"
+          }
+        },
+        {
+          "input": "Sí",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "YouTube"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 920
+              },
+              "end": 965,
+              "duration_minutes": 45,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "schedule_horizon_days": 3,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 920,
+                "end_minute": 965,
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
+                "duration_days": 3
+              }
+            ],
+            "language": "es"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reserved_v4_horizon_answer",
+      "channel": "web",
+      "context": {
+        "selected_app_names": [
+          "Instagram"
+        ],
+        "has_selected_apps": true,
+        "screen_time_authorized": true,
+        "language": "en",
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram from 09:25 to 09:55 on Fridays.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 565
+              },
+              "end": 595,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  5
+                ]
+              },
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "schedule_horizon_days"
+              ],
+              "status": "collecting",
+              "next_question": "schedule_horizon_days"
+            },
+            "decision": {
+              "type": "ask",
+              "slot": "schedule_horizon_days"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "For 11 days.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 565
+              },
+              "end": 595,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  5
+                ]
+              },
+              "schedule_horizon_days": 11,
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "time",
+                "minute": 565
+              },
+              "end": 595,
+              "duration_minutes": 30,
+              "recurrence": {
+                "type": "weekly",
+                "weekdays": [
+                  5
+                ]
+              },
+              "schedule_horizon_days": 11,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 565,
+                "end_minute": 595,
+                "weekdays": [
+                  6
+                ],
+                "duration_days": 11
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reserved_v4_exact_pair",
+      "channel": "android",
+      "context": {
+        "selected_app_names": [
+          "Instagram",
+          "Reddit"
+        ],
+        "has_selected_apps": true,
+        "screen_time_authorized": true,
+        "language": "en",
+        "app_presence": {
+          "app_present": true,
+          "app_ready": true,
+          "last_seen_at": "2026-09-15T16:00:00Z"
+        }
+      },
+      "turns": [
+        {
+          "input": "Block Instagram and Reddit now for 23 minutes, once.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Instagram",
+                "Reddit"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 23,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "schedule_horizon_days": null,
+              "confirmation": null,
+              "pending_slots": [
+                "confirmation"
+              ],
+              "status": "awaiting_confirmation",
+              "next_question": "confirmation"
+            },
+            "decision": {
+              "type": "confirm",
+              "slot": "confirmation"
+            },
+            "actions": [],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "apps": [
+                "Instagram",
+                "Reddit"
+              ],
+              "app_category": null,
+              "moment": null,
+              "start": {
+                "type": "now"
+              },
+              "end": null,
+              "duration_minutes": 23,
+              "recurrence": {
+                "type": "once",
+                "weekdays": []
+              },
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 23,
+                "hard_mode": false
+              }
+            ],
+            "language": "en"
+          }
+        }
+      ]
+    }
+  ]
+}

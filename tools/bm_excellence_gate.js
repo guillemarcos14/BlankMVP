@@ -122,6 +122,7 @@ check("durable_store_security", () => {
 for (const relative of [
   "netlify/functions/bm-contracts.js",
   "netlify/functions/bm-context.js",
+  "netlify/functions/bm-blocking-contract.js",
   "netlify/functions/bm-policy.js",
   "netlify/functions/bm-verification.js",
   "netlify/functions/bm-learning.js",
@@ -135,6 +136,7 @@ runNode("bm_loop_contract", "tools/bm_loop_contract_test.js");
 runNode("bm_regressions", "tools/bm_regression_test.js");
 runNode("product_harness_runtime", "tools/product_harness_test.js");
 runNode("agent_behavior_smoke", "tools/blanked_agent_smoke_test.js");
+runNode("blocking_contract_runtime", "tools/bm_blocking_contract_test.js");
 
 report.finished_at = new Date().toISOString();
 report.passed = report.checks.every((item) => item.status === "passed");

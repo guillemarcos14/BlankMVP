@@ -133,7 +133,7 @@
       ],
       "first_action": {
         "name": "Social",
-        "minutes": 35
+        "minutes": null
       },
       "text_matches": [
         "Social mode|35|lunch|start"
@@ -278,7 +278,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1320,
@@ -322,7 +322,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1260,
@@ -381,10 +381,7 @@
     "prompt": "I feel anxious and keep opening Instagram.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "anxiety|trigger|Pattern"
       ]
@@ -407,7 +404,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -424,7 +420,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 35,
+        "minutes": null,
         "hard_mode": false
       },
       "requires_selected_apps": true,
@@ -456,7 +452,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 30,
+        "minutes": null,
         "hard_mode": true
       }
     }
@@ -662,9 +658,7 @@
     "prompt": "Block Duolingo.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
-      ],
+      "action_types": [],
       "text_matches": [
         "Duolingo|Blanked App|choose"
       ],
@@ -693,7 +687,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 420,
@@ -726,10 +720,7 @@
     "prompt": "I feel guilty after scrolling Instagram for hours.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "guilt|trigger|Pattern"
       ],
@@ -753,7 +744,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -769,9 +759,7 @@
     },
     "expect": {
       "intent": "focus",
-      "action_types": [
-        "request_screen_time_permission"
-      ],
+      "action_types": [],
       "requires_screen_time_authorization": true
     }
   },
@@ -876,10 +864,7 @@
     "prompt": "Twitter makes me compare myself and lose time.",
     "expect": {
       "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "action_types": [],
       "text_matches": [
         "comparison|trigger|Pattern|Twitter"
       ]
@@ -902,7 +887,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1350,
@@ -1079,8 +1064,12 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
+      "action_types": [],
+      "ui_text_matches": [
+        "scroll|morning|app|time"
+      ],
+      "ui_text_not_matches": [
+        "25-minute|daily limit|https?://|blank://"
       ]
     }
   },
@@ -1124,14 +1113,9 @@
     },
     "expect": {
       "intent": "social",
-      "action_types": [
-        "open_app_picker"
-      ],
+      "action_types": [],
       "text_matches": [
         "Instagram|Blanked App|choose"
-      ],
-      "ui_text_matches": [
-        "Choose Instagram in Blanked App first"
       ],
       "ui_text_not_matches": [
         "TikTok|spare time|Set up"
@@ -1157,7 +1141,6 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "set_daily_limit",
         "apply_schedule"
       ],
       "text_matches": [
@@ -1241,7 +1224,7 @@
       "requires_selected_apps": false,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Sleep mode|10:00 PM|7:00 AM|30 minutes"
+        "Sleep mode|10:00 PM|7:00 AM"
       ]
     }
   },
@@ -1256,13 +1239,52 @@
       ]
     },
     "expect": {
-      "intent": "social",
-      "action_types": [
-        "set_daily_limit",
-        "apply_schedule"
-      ],
+      "intent": "general",
+      "action_types": [],
       "text_matches": [
-        "screen habit|Pattern|Move"
+        "not.*saved|available mode|create.*mode"
+      ]
+    }
+  },
+  {
+    "id": "missing_mode_without_catalog_does_not_switch",
+    "prompt": "Start Gaming mode.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not.*created|not.*saved|available mode|create.*mode"
+      ]
+    }
+  },
+  {
+    "id": "missing_mode_phrase_without_catalog_does_not_switch",
+    "prompt": "I'm in Social mode now for 45 minutes.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "not.*created|not.*saved|available mode|create.*mode"
+      ]
+    }
+  },
+  {
+    "id": "missing_mode_spanish_without_catalog_does_not_switch",
+    "prompt": "Activa el modo Gaming durante 45 minutos.",
+    "context": {
+      "available_modes": []
+    },
+    "expect": {
+      "intent": "general",
+      "action_types": [],
+      "text_matches": [
+        "no veo|no.*modo|crear|crea"
       ]
     }
   },
@@ -1655,7 +1677,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1090,
@@ -1700,7 +1722,7 @@
     "expect": {
       "intent": "sleep",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "first_action": {
         "start_minute": 1320,
@@ -1752,7 +1774,7 @@
         "start_protection"
       ],
       "first_action": {
-        "minutes": 25,
+        "minutes": null,
         "hard_mode": true
       },
       "text_matches": [
@@ -1986,7 +2008,7 @@
     "expect": {
       "intent": "social",
       "action_types": [
-        "apply_schedule"
+        "open_app_picker"
       ],
       "text_matches": [
         "YouTube|10:00 PM|7:00 AM"

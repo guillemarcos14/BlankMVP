@@ -7,6 +7,7 @@ const {
   supabaseAuthFetch,
 } = require("./_membership");
 const { decryptToken, revokeToken } = require("./_wearable_oauth");
+const { ensureIdentityForAuthUser, identityForAuthUser } = require("./_identity");
 
 const DATA_TABLES = [
   "digital_wellness_feature_payloads",
@@ -43,6 +44,11 @@ async function linkIdentity(event) {
   if (!anonymousUserId || body.data_consent !== true) {
     return json(400, { error: "missing_consent_or_user_id" });
   }
+
+  await ensureIdentityForAuthUser({
+    authUserId: userId(user),
+    phoneE164: user.phone || "",
+  });
 
   await supabaseFetch("privacy_user_links?on_conflict=auth_user_id", {
     method: "POST",
@@ -87,6 +93,8 @@ async function deleteData(event) {
   if (!user) return json(401, { error: "authentication_required" });
   const authUserId = userId(user);
   const ids = await linkedAnonymousIds(authUserId);
+  const identity = await identityForAuthUser(authUserId);
+  if (identity?.assistant_connect_code) ids.push(`connect:${identity.assistant_connect_code}`);
 
   await revokeWearableTokens(ids);
   for (const anonymousUserId of ids) {
@@ -103,6 +111,14 @@ async function deleteData(event) {
     headers: { prefer: "return=minimal" },
   });
   await supabaseFetch(`privacy_user_links?auth_user_id=eq.${encodeURIComponent(authUserId)}`, {
+    method: "DELETE",
+    headers: { prefer: "return=minimal" },
+  });
+  await supabaseFetch(`app_handoffs?auth_user_id=eq.${encodeURIComponent(authUserId)}`, {
+    method: "DELETE",
+    headers: { prefer: "return=minimal" },
+  });
+  await supabaseFetch(`blankmind_identity_links?auth_user_id=eq.${encodeURIComponent(authUserId)}`, {
     method: "DELETE",
     headers: { prefer: "return=minimal" },
   });

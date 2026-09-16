@@ -1,0 +1,9 @@
+{
+  "sha256": "d731af770a7fc5579871be0916974835a3d87a14298567f702f99b92694070e2",
+  "file": "tools\\datasets\\bm_semantic_heldout_v2.json",
+  "conversations": 4,
+  "turns": 11,
+  "status": "frozen_before_execution",
+  "hash_kind": "utf8_lf_sha256",
+  "line_endings_note": "Frozen with LF. Windows Git may materialize CRLF; normalize CRLF to LF before comparing this original SHA256. No JSON content changes."
+}

@@ -12,7 +12,7 @@ const outPath = outIndex >= 0 ? rawArgs[outIndex + 1] : null;
 const urlIndex = rawArgs.indexOf("--url");
 const endpointUrl = urlIndex >= 0 ? rawArgs[urlIndex + 1] : null;
 
-if (!useModel && !endpointUrl) {
+if (require.main === module && !useModel && !endpointUrl) {
   process.env.OPENAI_API_KEY = "";
 }
 
@@ -32,7 +32,7 @@ function baseContext(overrides = {}) {
   const memory = {
     ...(overrides.memory || {}),
   };
-  return {
+  const context = {
     is_blank_active: false,
     has_selected_apps: true,
     selection_count: 3,
@@ -48,6 +48,15 @@ function baseContext(overrides = {}) {
     ...overrides,
     memory,
   };
+  const channel = String(context.channel || context.assistant_channel || "").toLowerCase();
+  if (["whatsapp", "sms"].includes(channel) && context.app_presence === undefined) {
+    context.app_presence = {
+      app_present: true,
+      app_ready: true,
+      last_seen_at: new Date().toISOString(),
+    };
+  }
+  return context;
 }
 
 async function callAgent(testCase) {
@@ -102,6 +111,36 @@ function actionTypes(plan) {
   return (plan.actions || []).filter((action) => action.type !== "none").map((action) => action.type);
 }
 
+function assertBlockingContract(testCase, plan) {
+  if (plan.blocking_ready !== true && plan.blocking_ready !== false) return false;
+
+  const data = plan.blocking_data;
+  assert.ok(data && typeof data === "object", `${testCase.id}.blocking_data exists`);
+  for (const field of ["apps", "action", "start", "end", "recurrence"]) {
+    assert.ok(Object.prototype.hasOwnProperty.call(data, field), `${testCase.id}.blocking_data.${field}`);
+  }
+
+  const actualActions = actionTypes(plan);
+  if (plan.blocking_ready === false) {
+    assert.deepStrictEqual(actualActions, [], `${testCase.id}.incomplete_block_has_no_actions`);
+    assert.ok(Array.isArray(plan.blocking_missing_fields) && plan.blocking_missing_fields.length > 0, `${testCase.id}.missing_fields`);
+  } else {
+    for (const field of ["apps", "action", "start", "end", "recurrence"]) {
+      assert.ok(data[field] !== null && data[field] !== undefined, `${testCase.id}.complete_blocking_data.${field}`);
+    }
+    assert.ok(actualActions.length > 0, `${testCase.id}.complete_block_has_action`);
+    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit", "activate_mode", "open_app_picker"].includes(type)), `${testCase.id}.complete_block_action_type`);
+    assert.deepStrictEqual(plan.blocking_missing_fields, [], `${testCase.id}.complete_block_has_no_missing_fields`);
+  }
+
+  assert.doesNotMatch(visibleText(plan), DEBUG_TEXT_PATTERN, `${testCase.id}.no_internal_text`);
+  assert.doesNotMatch(visibleText(plan), BANNED_TEXT_PATTERN, `${testCase.id}.no_banned_text`);
+  assert.ok(cleanText(plan.message_text, 320).length >= 30, `${testCase.id}.message_text_present`);
+  assert.ok(qualityScore(plan) >= 2, `${testCase.id}.quality_score`);
+  assert.ok(utilityScore(plan) >= 3, `${testCase.id}.utility_score`);
+  return true;
+}
+
 function qualityScore(plan) {
   const text = visibleText(plan);
   const bullets = Array.isArray(plan.bullets) ? plan.bullets : [];
@@ -127,9 +166,28 @@ function utilityScore(plan) {
 
 function assertPlan(testCase, plan) {
   const expected = testCase.expect;
+  const hasBlockingContract = assertBlockingContract(testCase, plan);
   assert.strictEqual(plan.intent, expected.intent, `${testCase.id}.intent`);
-
   assert.deepStrictEqual(actionTypes(plan), expected.action_types, `${testCase.id}.action_types`);
+
+  if (hasBlockingContract) {
+    if (expected.first_action) {
+      assert.ok(plan.actions && plan.actions[0], `${testCase.id}.first_action exists`);
+      assertSubset(plan.actions[0], expected.first_action, `${testCase.id}.first_action`);
+    }
+    const blockingText = visibleText(plan);
+    const blockingUiText = userVisibleText(plan);
+    for (const pattern of expected.text_matches || []) {
+      assert.match(blockingText, new RegExp(pattern, "i"), `${testCase.id}.text_matches:${pattern}`);
+    }
+    for (const pattern of expected.ui_text_matches || []) {
+      assert.match(blockingUiText, new RegExp(pattern, "i"), `${testCase.id}.ui_text_matches:${pattern}`);
+    }
+    for (const pattern of expected.ui_text_not_matches || []) {
+      assert.doesNotMatch(blockingUiText, new RegExp(pattern, "i"), `${testCase.id}.ui_text_not_matches:${pattern}`);
+    }
+    return;
+  }
 
   if (expected.first_action) {
     assert.ok(plan.actions && plan.actions[0], `${testCase.id}.first_action exists`);
@@ -168,7 +226,7 @@ function assertPlan(testCase, plan) {
   assert.ok(utilityScore(plan) >= minUtility, `${testCase.id}.utility_score`);
 }
 
-(async () => {
+async function main() {
   if (useModel && !process.env.OPENAI_API_KEY) {
     console.error("OPENAI_API_KEY is required for --model eval");
     process.exit(2);
@@ -264,7 +322,11 @@ function assertPlan(testCase, plan) {
     console.log(`Average quality score: ${report.metrics.average_quality_score}/3`);
     console.log(`Average utility score: ${report.metrics.average_utility_score}/5`);
   }
-})().catch((error) => {
+}
+
+module.exports = { assertPlan, assertBlockingContract, qualityScore, utilityScore, baseContext, callAgent };
+
+if (require.main === module) main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

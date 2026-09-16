@@ -12,7 +12,15 @@ const {
   publicLoop,
   loopSummary,
 } = require("./bm-loop");
-const { buildAgentContext } = require("./bm-context");
+const { buildAgentContext, deriveAppPresence } = require("./bm-context");
+const { advanceSemanticState } = require("./bm-semantic-state");
+const { extractWithModel } = require("./bm-semantic-extraction");
+const {
+  incompleteBlockingPlan,
+  isBlockingActionType,
+  publicBlockingData,
+  resolveBlockingContract,
+} = require("./bm-blocking-contract");
 
 function cleanText(value, maxLength = 240) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -76,13 +84,11 @@ function completeNaturalText(value, maxLength = 420) {
 }
 
 function responseLanguage(prompt, context = {}) {
-  const channel = cleanText(context.channel || context.assistant_channel || "", 20).toLowerCase();
-  const appSurface = channel === "app" || channel === "web";
-  const explicit = cleanText(context.language || (appSurface ? "" : context.locale) || "", 20).toLowerCase();
-  if (explicit.startsWith("es")) return "es";
-  if (explicit.startsWith("en")) return "en";
-  if (appSurface) return "en";
   const text = cleanText(prompt, 600).toLowerCase();
+  if (/\b(?:in english|en ingl[eé]s)\b/.test(text)) return "en";
+  if (/\b(?:in spanish|en espa[nñ]ol|en castellano)\b/.test(text)) return "es";
+  const previousLanguage = context.semantic_state?.language || context.memory?.conversation_state?.semantic_state?.language;
+  const explicit = cleanText(previousLanguage || context.language || context.locale || "", 20).toLowerCase();
   const spanishScore = [
     "¿", "á", "é", "í", "ó", "ú", "ñ",
     "como puedo", "cómo puedo", "que deberia", "qué debería", "quiero", "bloquear", "bloquea",
@@ -90,14 +96,16 @@ function responseLanguage(prompt, context = {}) {
     "movil", "móvil", "no uso", "lo necesito", "para siempre", "consejo", "ayudame", "ayúdame",
     "bienestar digital", "redes", "redes sociales", "perdiendo mucho tiempo", "por la noche", "estoy", "me quedo", "scrolleando", "dormir", "fatal",
     "concentrarme", "asistente personal", "controlar mi móvil", "controlar mi movil", "hazme",
-    "recuérdame", "recuerdame", "esta tarde", "esta noche",
+    "recuérdame", "recuerdame", "esta tarde", "esta noche", "reanuda", "reanudar", "reactiva", "reactivar", "quita la pausa", "pausa las reglas",
   ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
   const englishScore = [
     "how can i", "what should i", "block", "after", "phone", "sleep", "work", "study",
-    "instagram", "tiktok", "youtube", "scroll", "focus", "advice", "help me",
+    "scroll", "focus", "advice", "help me", "minutes", "hours", "instead", "only once",
   ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
-  if (spanishScore > englishScore) return "es";
-  return "en";
+  const shortSpanish = /\b(?:vale|minutos|hora|horas|solo|mejor|diario|diariamente|siempre|cada|confirma|confirmo|s[ií]|hoy|ahora)\b/.test(text) ? 2 : 0;
+  if (spanishScore + shortSpanish > englishScore) return "es";
+  if (englishScore > 0) return "en";
+  return explicit.startsWith("es") ? "es" : "en";
 }
 
 function isWebPreview(context = {}) {
@@ -193,6 +201,132 @@ function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
     response_text: append(plan.response_text, 320),
     message_text: append(plan.message_text || plan.response_text, 320),
     speech_text: append(plan.speech_text || plan.message_text || plan.response_text, 420),
+  };
+}
+
+function messagingChannel(context = {}) {
+  const channel = cleanText(context.channel || context.assistant_channel, 30).toLowerCase();
+  return channel === "whatsapp" || channel === "sms" ? channel : "";
+}
+
+function shouldOfferAppPresenceGuidance(prompt, plan, context = {}) {
+  if (!messagingChannel(context) || isWebPreview(context) || isConversationalOnly(prompt)) return false;
+  const actions = Array.isArray(plan?.actions)
+    ? plan.actions.filter((item) => item && item.type && item.type !== "none")
+    : [];
+  const blockingContract = resolveBlockingContract(prompt, context);
+  if (blockingContract.user_request && !blockingContract.ready) return false;
+  return actions.length > 0 || blockingContract.user_request;
+}
+
+function claimsAppInstalled(prompt) {
+  return /^(?:i have (?:it|the app)|already have (?:it|the app)|it(?:'s| is) installed|the app is installed|ya la tengo(?: instalada)?|la app está instalada|la app esta instalada)[.!\s]*$/i.test(cleanText(prompt, 120));
+}
+
+function recentScrollWindow(context = {}) {
+  const messages = recentMessages(context);
+  let start = null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user") continue;
+    const app = namedApp(message.content);
+    if (app === "the app") continue;
+    const minute = looseSingleTime(message.content);
+    if (minute == null) continue;
+    start = { app, startMinute: minute, index };
+    break;
+  }
+  if (!start) return null;
+  for (let index = messages.length - 1; index > start.index; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user" || namedApp(message.content) !== "the app") continue;
+    const endMinute = looseSingleTime(message.content, start.startMinute);
+    if (endMinute == null) continue;
+    return { app: start.app, startMinute: start.startMinute, endMinute };
+  }
+  return null;
+}
+
+function hasConfirmedWindowContext(context = {}) {
+  const messages = recentMessages(context);
+  const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
+  const assistantText = messages
+    .filter((message) => message.role === "assistant")
+    .map((message) => message.content)
+    .join(" ")
+    .toLowerCase();
+  return Boolean(
+    recentScrollWindow(context) &&
+    /want me to use|confirm(?: window| the window)?|confirmar(?: la franja)?|usar esa franja/i.test(assistantText) &&
+    /\b(?:yes|yeah|yep|correct|do it|go ahead|confirm|sí|si|vale|adelante|hazlo)\b/i.test(recentText),
+  );
+}
+
+function isConfirmedPlanContinuation(prompt, plan, context = {}) {
+  const actions = Array.isArray(plan?.actions) ? plan.actions : [];
+  if (!actions.some((item) => item && item.type === "apply_schedule")) return false;
+  const value = cleanText(prompt, 80);
+  const affirmative = /^(?:yes|yeah|yep|correct|do it|go ahead|confirm|confirm window|sí|si|vale|adelante|hazlo|confirmar(?: la franja)?)[.!\s]*$/i.test(value);
+  const latestAssistant = [...recentMessages(context)].reverse().find((message) => message.role === "assistant");
+  const immediateConfirmation = affirmative && Boolean(latestAssistant && /want me to use|confirm(?: window| the window)?|confirmar(?: la franja)?|usar esa franja/i.test(latestAssistant.content));
+  return immediateConfirmation || (claimsAppInstalled(prompt) && hasConfirmedWindowContext(context));
+}
+
+function truncateForTail(value, maxLength) {
+  const text = naturalChannelText(value, maxLength);
+  if (text.length <= maxLength) return text;
+  const candidate = text.slice(0, Math.max(0, maxLength - 1)).trim();
+  const lastSpace = candidate.lastIndexOf(" ");
+  return `${candidate.slice(0, lastSpace > 40 ? lastSpace : candidate.length).trim()}…`;
+}
+
+function appendAppPresenceGuidance(plan, prompt, context = {}, language = "en") {
+  if (!shouldOfferAppPresenceGuidance(prompt, plan, context)) return plan;
+  const presence = deriveAppPresence(context.app_presence);
+  if (presence.state === "recently_seen") return plan;
+
+  if (isConfirmedPlanContinuation(prompt, plan, context)) {
+    const schedule = Array.isArray(plan.actions)
+      ? plan.actions.find((item) => item && item.type === "apply_schedule")
+      : null;
+    const recentWindow = recentScrollWindow(context);
+    const appLabel = recentWindow?.app || recentAppTiming(context)?.app || (language === "es" ? "las apps seleccionadas" : "the selected apps");
+    const startMinute = Number.isFinite(schedule?.start_minute) ? schedule.start_minute : recentWindow?.startMinute ?? 0;
+    const endMinute = Number.isFinite(schedule?.end_minute) ? schedule.end_minute : recentWindow?.endMinute ?? startMinute;
+    const startText = minuteText(startMinute);
+    const endText = minuteText(endMinute);
+    const message = language === "es"
+      ? `Confirmado: el plan protegería ${appLabel} de ${localizeMinuteText(startText, language)} a ${localizeMinuteText(endText, language)}. Abre Blankmind para revisarlo y elige ${appLabel} allí solo si la app te lo pide.`
+      : `Confirmed: the plan will protect ${appLabel} from ${startText} to ${endText}. Open Blankmind to review it, and choose ${appLabel} there only if the app asks you to.`;
+    return {
+      ...plan,
+      response_text: message,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+    };
+  }
+
+  const guidance = language === "es"
+    ? "El plan queda preparado. Abre Blankmind para revisarlo y aplicarlo."
+    : "The plan is ready. Open Blankmind to review and apply it.";
+  const current = naturalChannelText(plan.message_text || plan.response_text || "", 320)
+    .replace(/\bBlanked App\b/gi, "Blankmind")
+    .replace(/\bBlanked\b/gi, "Blankmind");
+  const baseBudget = Math.max(60, 318 - guidance.length);
+  const base = truncateForTail(current, baseBudget);
+  const message = `${base ? `${base} ` : ""}${guidance}`.slice(0, 320);
+  return {
+    ...plan,
+    response_text: message,
+    message_text: message,
+    speech_text: `${base ? `${base} ` : ""}${guidance}`.slice(0, 420),
+    followup_text: "",
+    actions: [],
+    requires_selected_apps: false,
+    requires_screen_time_authorization: false,
   };
 }
 
@@ -426,6 +560,10 @@ function appTargetFromPrompt(prompt = "") {
 }
 
 function appTargetFromPlan(plan = {}) {
+  const blockingApps = plan.blocking_data && Array.isArray(plan.blocking_data.apps)
+    ? plan.blocking_data.apps.filter((app) => app && app !== "selected_apps" && !String(app).startsWith("mode:"))
+    : [];
+  if (blockingApps.length) return blockingApps.join(" and ");
   const text = cleanText(plan.response_text || plan.message_text, 240);
   const match = text.match(/\bprotect\s+([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*){0,2})\s+(?:after|from|around|when|before)\b/);
   return match ? cleanText(match[1], 50) : "";
@@ -436,7 +574,7 @@ function actionMessage(plan, prompt = "", language = "en") {
   if (!actions.length) return "";
   const first = actions[0];
   const promptTarget = appTargetFromPrompt(prompt);
-  const target = promptTarget === "selected apps" ? (appTargetFromPlan(plan) || promptTarget) : promptTarget;
+  const target = appTargetFromPlan(plan) || promptTarget;
   if (first.type === "apply_schedule") {
     const start = minuteText(first.start_minute);
     const end = minuteText(first.end_minute);
@@ -445,29 +583,34 @@ function actionMessage(plan, prompt = "", language = "en") {
       : `Protect ${target} from ${start} to ${end}, before the scroll has momentum.`;
   }
   if (first.type === "start_protection") {
-    const minutes = cleanNumber(first.minutes, 25, 5, 240);
+    const minutes = first.minutes == null ? null : cleanNumber(first.minutes, 25, 5, 240);
     return language === "es"
-      ? `Empezaría un bloqueo de ${minutes} minutos.`
-      : `I’d start a strict ${minutes}-minute block now and leave your current app list as it is.`;
+      ? (minutes == null ? "Empezaría el bloqueo ahora y mantendría tu selección actual de apps." : `Empezaría un bloqueo de ${minutes} minutos.`)
+      : (minutes == null ? "I’d start protection now and leave your current app list as it is." : `I’d start a ${minutes}-minute block now and leave your current app list as it is.`);
   }
   if (first.type === "activate_mode") {
-    const minutes = cleanNumber(first.minutes, 30, 5, 240);
+    const minutes = first.minutes == null ? null : cleanNumber(first.minutes, 30, 5, 240);
     const name = cleanText(first.name, 40) || "that";
     return language === "es"
-      ? `Activaría el modo ${name} durante ${minutes} minutos.`
-      : `Start ${name} mode for ${minutes} minutes.`;
+      ? (minutes == null ? `Activaría el modo ${name} ahora usando las apps ya asignadas a ese modo.` : `Activaría el modo ${name} durante ${minutes} minutos.`)
+      : (minutes == null ? `Start ${name} mode now and use the apps already assigned to that mode.` : `Start ${name} mode for ${minutes} minutes.`);
   }
   if (first.type === "set_daily_limit") {
-    const minutes = cleanNumber(first.minutes, 25, 5, 240);
+    const minutes = first.minutes == null ? null : cleanNumber(first.minutes, 25, 5, 240);
     return language === "es"
-      ? `Pondría un límite diario de ${minutes} minutos.`
-      : `Set a ${minutes}-minute daily limit and review it after a day.`;
+      ? (minutes == null ? "¿Cuántos minutos al día quieres permitir?" : `Pondría un límite diario de ${minutes} minutos.`)
+      : (minutes == null ? "How many minutes per day do you want to allow?" : `Set a ${minutes}-minute daily limit and review it after a day.`);
   }
   if (first.type === "enable_allow_only") return language === "es" ? "Activaría Allow Only para dejar solo lo esencial." : "Turn on Allow Only and leave only the essentials available.";
   if (first.type === "enable_adult_filter") return language === "es" ? "Activaría protección web para contenido adulto." : "Turn on adult web protection before the urge peaks.";
   if (first.type === "pause_rules") return language === "es" ? "Pausaría las reglas con una fecha de vuelta." : "Pause the rules with a clear return point.";
-  if (first.type === "disable_pause") return language === "es" ? "Reactivaría tus reglas." : "Resume your rules and bring the structure back.";
+  if (first.type === "disable_pause") return language === "es" ? "Reactivaría tus reglas y volvería a activar tu protección." : "I’d resume your rules and bring your protection back.";
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
+    if (first.type === "open_app_picker" && first.start_minute != null && first.end_minute != null) {
+      return language === "es"
+        ? `Primero elige ${target} en Blanked App y después podré programar ${localizeMinuteText(minuteText(first.start_minute), language)} a ${localizeMinuteText(minuteText(first.end_minute), language)}.`
+        : `Choose ${target} in Blanked App first, then I can schedule ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
+    }
     return language === "es" ? `Primero elige ${target} en Blanked App.` : `Choose ${target} in Blanked App first.`;
   }
   if (first.type === "apply_ai_plan") return language === "es" ? "Aplicaría el siguiente ajuste recomendado." : "Apply the next recommended adjustment and review the result later.";
@@ -484,6 +627,7 @@ function conversationalMessage(plan, language = "en", prompt = "") {
   if (!actions.length && hasQuestion) return response;
   if (!actions.length && /\bsleep target\b|hora objetivo para dormir/i.test(response)) return response;
   if (!actions.length && /turn it into a Blanked plan|want a Blanked plan|quieres un plan de Blanked|convertirlo en un plan de Blanked/i.test(response)) return response.slice(0, 320);
+  if (!actions.length && move && /tell me|dime|what time|which app|a qu[eé] hora|cu[aá]ndo|app or moment/i.test(response)) return response;
   if (!actions.length && move && !response.toLowerCase().includes(move.toLowerCase())) {
     const normalizedMove = move.charAt(0).toUpperCase() + move.slice(1);
     return `${response} ${normalizedMove.endsWith("?") || normalizedMove.endsWith("¿") ? normalizedMove : normalizedMove + "."}`.slice(0, 320);
@@ -515,10 +659,101 @@ function fallbackFollowupText(plan, language = "en") {
     return "Abre Blanked para revisar el siguiente paso.";
   }
   if (first.type === "apply_schedule") return "Open Blanked to review and apply the window.";
-  if (first.type === "start_protection") return "Open Blanked to start the block.";
-  if (first.type === "activate_mode") return "Open Blanked to start that mode.";
+  if (first.type === "start_protection") return "Open Blanked to review and confirm the block.";
+  if (first.type === "activate_mode") return "Open Blanked to review and confirm that mode.";
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
   return "Open Blanked to review the next step.";
+}
+
+function completeBlockingPlan(contract, language = "en", prompt = "") {
+  if (!contract || !contract.user_request || !contract.ready || !contract.data) return null;
+  const data = contract.data;
+  const apps = Array.isArray(data.apps) ? data.apps : [];
+  const modeName = apps.find((app) => String(app).startsWith("mode:"))?.slice(5) || "";
+  const namedApps = apps.filter((app) => !String(app).startsWith("mode:") && app !== "selected_apps");
+  const appLabel = namedApps.length
+    ? namedApps.join(" and ")
+    : modeName
+      ? `${modeName} mode`
+      : "the selected apps";
+  const modeIntent = modeName && /sleep|dormir|bedtime|night/i.test(modeName)
+    ? "sleep"
+    : modeName && /work|focus|study|estudio/i.test(modeName)
+      ? "focus"
+      : null;
+  const requestedIntent = classify(prompt, {});
+  const blockingIntent = modeIntent || (requestedIntent === "general" ? "social" : requestedIntent);
+  const recurrenceDays = data.recurrence && Array.isArray(data.recurrence.value) ? data.recurrence.value : [0];
+  const durationMinutes = data.end && data.end.type === "duration" ? data.end.value : null;
+  const hardMode = wantsHardMode(prompt);
+  let plannedAction = null;
+  let title = "Immediate Protection";
+  let responseText = "";
+  let bullets = [];
+
+  if (data.action === "daily_limit") {
+    plannedAction = action("set_daily_limit", { minutes: durationMinutes });
+    title = "Daily Limit";
+    responseText = language === "es"
+      ? `Puedo limitar ${appLabel} a ${durationMinutes} minutos al día.`
+      : `I can limit ${appLabel} to ${durationMinutes} minutes per day.`;
+    bullets = language === "es"
+      ? [`Aplicaciones: ${appLabel}.`, `Límite: ${durationMinutes} minutos al día.`, "Revisa la configuración antes de activarla."]
+      : [`Apps: ${appLabel}.`, `Limit: ${durationMinutes} minutes per day.`, "Review the setting before activating it."];
+  } else if (data.start.type === "now") {
+    plannedAction = modeName
+      ? action("activate_mode", { name: modeName, minutes: durationMinutes, hard_mode: hardMode })
+      : action("start_protection", { minutes: durationMinutes, hard_mode: hardMode });
+    const durationText = durationMinutes == null
+      ? (language === "es" ? "sin fecha de fin" : "indefinitely")
+      : `${durationMinutes} ${language === "es" ? "minutos" : "minutes"}`;
+    responseText = language === "es"
+      ? `Puedo bloquear ${appLabel} ahora ${durationText}.`
+      : `I can block ${appLabel} now ${durationText}.`;
+    bullets = language === "es"
+      ? [`Aplicaciones: ${appLabel}.`, "Inicio: ahora.", `Duración: ${durationText}.`]
+      : [`Apps: ${appLabel}.`, "Start: now.", `Duration: ${durationText}.`];
+  } else {
+    const startMinute = Number(data.start.value);
+    const endMinute = data.end.type === "duration"
+      ? (startMinute + Number(data.end.value)) % (24 * 60)
+      : Number(data.end.value);
+    if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute) || startMinute === endMinute) return null;
+    const scheduleAction = action("apply_schedule", {
+      name: modeName || `Block ${namedApps.join(" + ") || "selected apps"}`,
+      start_minute: startMinute,
+      end_minute: endMinute,
+      weekdays: recurrenceDays[0] === 0 ? [1, 2, 3, 4, 5, 6, 7] : recurrenceDays,
+      duration_days: recurrenceDays[0] === 0 ? 1 : 7,
+    });
+    const shouldActivateMode = modeName && (data.start.type === "now" || /\b(?:mode|modo|profile|perfil)\b/i.test(prompt));
+    plannedAction = shouldActivateMode
+      ? [action("activate_mode", { name: modeName, minutes: durationMinutes, hard_mode: hardMode }), scheduleAction]
+      : scheduleAction;
+    title = "Scheduled Protection";
+    responseText = language === "es"
+      ? `Puedo bloquear ${appLabel} de ${minuteText(startMinute)} a ${minuteText(endMinute)}.`
+      : `I can block ${appLabel} from ${minuteText(startMinute)} to ${minuteText(endMinute)}.`;
+    bullets = language === "es"
+      ? [`Aplicaciones: ${appLabel}.`, `Horario: ${minuteText(startMinute)} a ${minuteText(endMinute)}.`, `Repetición: ${recurrenceDays[0] === 0 ? "una vez" : "los días elegidos"}.`]
+      : [`Apps: ${appLabel}.`, `Window: ${minuteText(startMinute)} to ${minuteText(endMinute)}.`, `Repeat: ${recurrenceDays[0] === 0 ? "one time" : "the selected days"}.`];
+  }
+
+  return {
+    intent: blockingIntent,
+    title,
+    response_text: responseText,
+    bullets,
+    primary_label: language === "es" ? "Revisar bloqueo" : "Review block",
+    secondary_label: language === "es" ? "Ahora no" : "Not now",
+    actions: Array.isArray(plannedAction) ? plannedAction : plannedAction ? [plannedAction] : [],
+    requires_selected_apps: contract.app_source === "conversation",
+    requires_screen_time_authorization: true,
+    blocking_ready: true,
+    blocking_user_request: true,
+    blocking_missing_fields: [],
+    blocking_data: publicBlockingData(data),
+  };
 }
 
 function hasExplicitBlockRequest(prompt) {
@@ -667,6 +902,9 @@ function conversationalOnlyPlan(prompt, language = "en") {
     actions: [],
     requires_selected_apps: false,
     requires_screen_time_authorization: false,
+    message_text: response,
+    speech_text: response,
+    followup_text: "",
   };
 }
 
@@ -699,6 +937,15 @@ function asksForPermanentLockout(prompt) {
   const text = paddedText(prompt, 600);
   return contains(text, ["forever", "permanently", "para siempre", "ever again", "impossible to use", "delete my distractions"]) &&
     contains(text, ["block", "blok", "bloquea", "bloquear", "everything", "todo", "phone", "distractions"]);
+}
+
+function asksForRulesAction(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, [
+    "pause my rules", "pause rules", "pause scheduled protection", "resume my rules", "resume rules",
+    "remove pause", "disable pause", "pausa mis reglas", "pausar reglas", "reanuda mis reglas", "reanudar reglas",
+    "quita la pausa", "quitar la pausa", "reactiva mis reglas", "reactivar reglas",
+  ]);
 }
 
 function asksAboutAssistantCapabilities(prompt) {
@@ -883,7 +1130,9 @@ function requestedUnknownApp(prompt) {
 }
 
 function availableModeNames(context = {}) {
-  const modes = Array.isArray(context.available_modes) ? context.available_modes : [];
+  const modes = Array.isArray(context.available_modes) && context.available_modes.length
+    ? context.available_modes
+    : Array.isArray(context.available_mode_catalog) ? context.available_mode_catalog : [];
   return modes
     .map((mode) => typeof mode === "string" ? mode : mode && mode.name)
     .map((name) => cleanText(name, 40))
@@ -912,9 +1161,23 @@ function requestedModeName(prompt, context = {}) {
   return "";
 }
 
+function explicitModeName(prompt) {
+  const text = cleanText(prompt, 600);
+  const prefix = "(?:start|activate|switch\\s+to|use|inicia|activa|cambia\\s+a|usa|i['’]?m\\s+in|estoy\\s+en)";
+  const beforeMode = new RegExp(`\\b${prefix}\\s+(?:the\\s+|el\\s+|la\\s+|al\\s+)?([a-z0-9][a-z0-9 _-]{0,32}?)\\s+(?:mode|modo)\\b`, "i").exec(text);
+  if (beforeMode?.[1]) return cleanText(beforeMode[1], 50);
+  const afterMode = new RegExp(`\\b${prefix}\\s+(?:the\\s+|el\\s+|la\\s+|al\\s+)?(?:mode|modo)\\s+(?:of\\s+|de\\s+)?([a-z0-9][a-z0-9 _-]{0,32}?)(?=\\s+(?:for|during|durante|now|ahora|from|at|a|por)\\b|[.!?,]|$)`, "i").exec(text);
+  return cleanText(afterMode?.[1], 50);
+}
+
 function hasExplicitModeActionRequest(prompt) {
-  const text = cleanText(prompt, 600).toLowerCase();
-  return /\b(?:start|activate|switch\s+to|use|inicia|activa|cambia\s+a|usa)\s+(?:the\s+|el\s+|la\s+)?[a-z0-9][a-z0-9 _-]{0,32}\s+(?:mode|modo)\b/i.test(text);
+  return Boolean(explicitModeName(prompt));
+}
+
+function unavailableModeRequest(prompt, context = {}) {
+  const modes = availableModeNames(context);
+  const requested = explicitModeName(prompt);
+  return requested && (!modes.length || !modes.some((mode) => mode.toLowerCase() === requested.toLowerCase())) ? requested : "";
 }
 
 function hasWorkAppConflict(prompt) {
@@ -962,6 +1225,7 @@ function needsContextBeforeAction(prompt, intent, context = {}) {
 
 function classify(prompt, context = {}) {
   const text = paddedText(prompt, 600);
+  if (asksForRulesAction(prompt)) return "vacation";
   if (hasSleepConversationContext(context) && explicitTimeWindow(prompt, context)) return "sleep";
   if (hasExplicitRelativeMomentContext(prompt)) return "social";
   if (asksWhereToStart(prompt)) return "general";
@@ -970,10 +1234,10 @@ function classify(prompt, context = {}) {
   if (explicitDurationMinutes(prompt) && contains(text, ["hard block", "hard blok", "hard bloquear", "block distractions", "blok everything", "bloquear everything", "bloquea distracciones", "bloquear distractions", "bloquear distracciones"])) return "focus";
   if (contains(text, ["porn", "porno", "adult", "xxx"])) return "adultContent";
   if (contains(text, ["losing control", "perdiendo el control", "urge", "emergency", "reca", "relapse", "broke the block", "break the block", "can't stop", "no puedo parar", "terrible today", "fatal hoy", "no consigo concentrarme"])) return "emergency";
-  if (contains(text, ["sleep", "night", "bed", "dormir", "duermo", "acuesto", "noche", "scrolleando hasta", "scrolling until", "tired", "cansado"])) return "sleep";
+  if (contains(text, ["sleep", "night", "tonight", "this evening", "bed", "dormir", "duermo", "acuesto", "noche", "esta noche", "scrolleando hasta", "scrolling until", "tired", "cansado"])) return "sleep";
   if (contains(text, ["exam", "study", "estudio", "estudiar", "examen", "opos"])) return "study";
   if (contains(text, ["allow only", "whatsapp", "maps", "solo", "only"])) return "allowOnly";
-  if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa", "resume my rules", "resume rules"])) return "vacation";
+  if (contains(text, ["vacation", "holiday", "vacaciones", "pause", "pausa", "resume my rules", "resume rules", "reanuda", "reanudar", "quita la pausa", "quitar la pausa", "disable pause", "remove pause"])) return "vacation";
   if (contains(text, ["week", "semana", "analy", "diagn", "report", "review"])) return "weeklyReview";
   if (contains(text, ["social media", "social apps", "social networks", "redes sociales", "tiktok", "tik tok", "instagram", "insta", " ig ", "youtube", " yt ", "reddit", "twitter", " x ", "facebook", "snapchat", "gaming", "game", "dopamine", "scroll", "doomscroll", "notification", "notifications", "reels", "shorts", "feed", "for you page"])) return "social";
   if (requestedUnknownApp(prompt)) return "social";
@@ -1010,7 +1274,7 @@ function minuteOfDay(hour, minute, meridiem) {
 
 function explicitTimeWindow(prompt, context = {}) {
   const text = cleanText(prompt, 600).toLowerCase();
-  const match = text.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  const match = text.match(/(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (!match) return null;
   const startHour = Number(match[1]);
   const endHour = Number(match[4]);
@@ -1079,13 +1343,19 @@ function scrollUntilSleepTime(prompt) {
     /\buntil\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i.test(text);
 }
 
-function looseSingleTime(prompt) {
+function looseSingleTime(prompt, referenceMinute = null) {
   const text = cleanText(prompt, 600).toLowerCase();
+  if (/\b(?:hours?|hrs?|h|minutes?|mins?|m)\b/i.test(text)) return null;
   const match = text.match(/\b(?:usually|normalmente|sobre|around|at|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   if (!match) return null;
   const rawHour = Number(match[1]);
+  const minute = Number(match[2] || 0);
+  if (!match[3] && rawHour === 12 && Number.isFinite(referenceMinute)) {
+    const referenceHour = Math.floor(referenceMinute / 60);
+    if (referenceHour >= 6 && referenceHour < 12) return 12 * 60 + minute;
+  }
   const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
-  return minuteOfDay(rawHour, Number(match[2] || 0), meridiem);
+  return minuteOfDay(rawHour, minute, meridiem);
 }
 
 function recentMessages(context = {}) {
@@ -1104,7 +1374,9 @@ function recentRelativeTimeQuestion(context = {}) {
   if (!recentAssistant) return null;
   const text = recentAssistant.content.toLowerCase();
   let moment = null;
-  if (contains(text, ["finish dinner", "terminar de cenar", "terminas de cenar"])) {
+  if (contains(text, ["what time do you want to be asleep", "when do you want to be asleep", "when you want to be asleep", "usual bedtime", "hora quieres dormir", "hora habitual de dormir"])) {
+    moment = { key: "bedtime", label: "before bed", startOffset: -30, duration: 30, name: "Bedtime Boundary" };
+  } else if (contains(text, ["finish dinner", "terminar de cenar", "terminas de cenar"])) {
     moment = { key: "dinner", label: "after dinner", startOffset: 10, duration: 90, name: "Dinner Boundary" };
   } else if (contains(text, ["finish eating", "finish lunch", "terminar de comer", "terminas de comer"])) {
     moment = { key: "lunch", label: "after lunch", startOffset: 10, duration: 60, name: "Lunch Boundary" };
@@ -1128,7 +1400,9 @@ function recentAppTiming(context = {}) {
     const match = message.content.match(/\b(?:usually|around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
     if (!match) continue;
     const timeText = `${match[1]}:${String(match[2] || "00").padStart(2, "0")}${match[3] ? ` ${match[3].toUpperCase()}` : ""}`;
-    return { app, timeText };
+    const rawHour = Number(match[1]);
+    const meridiem = match[3] || (rawHour >= 6 && rawHour <= 11 ? "pm" : rawHour === 12 ? "am" : null);
+    return { app, timeText, minute: minuteOfDay(rawHour, Number(match[2] || 0), meridiem) };
   }
   return null;
 }
@@ -1176,11 +1450,145 @@ function ambiguousDigitalMomentPlan(prompt, language = "en") {
 function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   const messages = recentMessages(context);
   const recentText = messages.map((message) => message.content).join(" ").toLowerCase();
+  const recentAssistantMessages = messages.filter((message) => message.role === "assistant");
+  const recentAssistantText = recentAssistantMessages.map((message) => message.content).join(" ").toLowerCase();
+  const latestAssistantText = recentAssistantMessages.length
+    ? recentAssistantMessages[recentAssistantMessages.length - 1].content.toLowerCase()
+    : "";
   const app = namedApp(prompt);
   const timeMatch = cleanText(prompt, 120).match(/\b(?:around|at|sobre|a las)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   const timeText = timeMatch ? `${timeMatch[1]}:${String(timeMatch[2] || "00").padStart(2, "0")}${timeMatch[3] ? ` ${timeMatch[3].toUpperCase()}` : ""}` : "";
   const hasRecentAmbiguousLoss = /lose control|what do you lose control|do you mean|a qué te refieres|qué quieres decir/i.test(recentText);
+  const hasRecentScrollContextQuestion = /where the scrolling usually starts|where .*scrolling .*starts|app, moment, or time of day|app, momento o hora del día|which app pulls you in most.*when does it usually happen|which app.*when does it usually happen|what app.*when.*happen|what app.*what time|which app.*what time|app.*when.*usually happen|app.*time.*usually start/i.test(recentAssistantText);
   const recentTiming = recentAppTiming(context);
+  const recentRelative = recentRelativeTimeQuestion(context);
+  const relativeMinute = recentRelative ? looseSingleTime(prompt) : null;
+  const hasRecentScrollWindowEndQuestion = /what time should (?:the )?(?:protection|boundary|block) end|what time should it become available again|need end time|what time should the protection end|a qué hora debería terminar la protección|hora final/i.test(recentAssistantText);
+  const confirmationWindow = explicitTimeWindow(latestAssistantText, context);
+  const confirmsRecentScrollWindow = /^(?:yes|yeah|yep|correct|do it|go ahead|confirm|confirm window|sí|si|vale|adelante|hazlo|confirmar(?: la franja)?)[.!\s]*$/i.test(cleanText(prompt, 80)) && /confirm(?: window| the window)?|want me to use|use that .*window|confirmar(?: la franja)?|usar esa franja/i.test(latestAssistantText);
+  const recentWindow = recentScrollWindow(context);
+  if (claimsAppInstalled(prompt) && hasConfirmedWindowContext(context) && recentWindow) {
+    const startText = minuteText(recentWindow.startMinute);
+    const endText = minuteText(recentWindow.endMinute);
+    const message = language === "es"
+      ? `Perfecto. El plan ya está preparado para proteger ${recentWindow.app} de ${localizeMinuteText(startText, language)} a ${localizeMinuteText(endText, language)}. Abre Blankmind para revisarlo y elige ${recentWindow.app} allí solo si la app te lo pide.`
+      : `Perfect. The plan is ready to protect ${recentWindow.app} from ${startText} to ${endText}. Open Blankmind to review it, and choose ${recentWindow.app} there only if the app asks you to.`;
+    return {
+      intent: "social",
+      title: "Morning Protection",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentWindow.app} de ${startText} a ${endText}.` : `Read: ${recentWindow.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: el plan ya está creado y solo necesita revisión en la app." : "Pattern: the plan is already created and only needs review in the app.",
+        language === "es" ? "Movimiento: selecciona la app únicamente si Blankmind te lo solicita." : "Move: select the app only if Blankmind asks you to.",
+      ],
+      primary_label: language === "es" ? "Revisar plan" : "Review plan",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [action("apply_schedule", {
+        name: language === "es" ? "Protección de mañana" : "Morning Protection",
+        start_minute: recentWindow.startMinute,
+        end_minute: recentWindow.endMinute,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (recentRelative && relativeMinute != null && recentRelative.key === "bedtime") {
+    const start = ((relativeMinute + recentRelative.startOffset) % (24 * 60) + (24 * 60)) % (24 * 60);
+    const end = (start + recentRelative.duration) % (24 * 60);
+    const appLabel = recentRelative.app || (language === "es" ? "las apps de scroll" : "scroll apps");
+    const message = language === "es"
+      ? `Si quieres estar dormido a las ${minuteText(relativeMinute)}, haría más difíciles las ${appLabel} de ${minuteText(start)} a ${minuteText(end)}.`
+      : `If you want to be asleep by ${minuteText(relativeMinute)}, I’d make ${appLabel} harder to use from ${minuteText(start)} to ${minuteText(end)}.`;
+    return {
+      intent: "sleep",
+      title: "Bedtime Boundary",
+      response_text: message,
+      bullets: [
+        `Read: ${minuteText(relativeMinute)} is the current bedtime target.`,
+        "Pattern: the boundary needs to start before the final scroll.",
+        `Move: protect ${appLabel} from ${minuteText(start)} to ${minuteText(end)}.`
+      ],
+      primary_label: "Plan boundary",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  const followupWindow = recentTiming && recentTiming.minute != null ? explicitTimeWindow(prompt, context) : null;
+  const followupDurationMinutes = recentTiming && recentTiming.minute != null ? conversationalDurationMinutes(prompt) : null;
+  const followupEndMinute = recentTiming && recentTiming.minute != null
+    ? followupWindow?.end ?? (followupDurationMinutes != null
+      ? (recentTiming.minute + followupDurationMinutes) % (24 * 60)
+      : looseSingleTime(prompt, recentTiming.minute))
+    : null;
+  if (recentTiming && recentTiming.minute != null && hasRecentScrollWindowEndQuestion && followupEndMinute != null) {
+    const endMinute = followupEndMinute;
+    const startText = minuteText(followupWindow?.start ?? recentTiming.minute);
+    const endText = minuteText(endMinute);
+    const message = language === "es"
+      ? `Entendido: proteger ${recentTiming.app} de ${startText} a ${endText}. ¿Quieres que use esa franja como protección de la mañana?`
+      : `Got it: protect ${recentTiming.app} from ${startText} to ${endText}. Do you want me to use that as the morning protection window?`;
+    return {
+      intent: "social",
+      title: "Scroll Window",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentTiming.app} de ${startText} a ${endText}.` : `Read: ${recentTiming.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: la franja ya está completa y falta confirmar antes de actuar." : "Pattern: the window is complete and needs confirmation before any action.",
+        language === "es" ? "Movimiento: confirma la franja si quieres convertirla en protección." : "Move: confirm the window if you want to turn it into protection.",
+      ],
+      primary_label: language === "es" ? "Confirmar franja" : "Confirm window",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (recentTiming && recentTiming.minute != null && confirmationWindow && confirmsRecentScrollWindow) {
+    const startText = minuteText(confirmationWindow.start);
+    const endText = minuteText(confirmationWindow.end);
+    const name = language === "es" ? "Protección de mañana" : "Morning Protection";
+    const message = language === "es"
+      ? `Confirmado: el plan protegería ${recentTiming.app} de ${startText} a ${endText}. Abre Blankmind para revisarlo y elige la app solo si te lo pide.`
+      : `Confirmed: the plan will protect ${recentTiming.app} from ${startText} to ${endText}. Open Blankmind to review it, and choose the app only if it asks you to.`;
+    return {
+      intent: "social",
+      title: name,
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${recentTiming.app} de ${startText} a ${endText}.` : `Read: ${recentTiming.app} from ${startText} to ${endText}.`,
+        language === "es" ? "Patrón: has confirmado una franja concreta, no un límite diario inventado." : "Pattern: you confirmed a specific window, not an invented daily limit.",
+        language === "es" ? "Movimiento: revisar el plan y elegir la app solo si Blankmind lo solicita." : "Move: review the plan and choose the app only if Blankmind asks you to.",
+      ],
+      primary_label: language === "es" ? "Aplicar franja" : "Apply window",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [action("apply_schedule", {
+        name,
+        start_minute: confirmationWindow.start,
+        end_minute: confirmationWindow.end,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      })],
+      requires_selected_apps: true,
+      requires_screen_time_authorization: true,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
   if (recentTiming && asksForAdvice(prompt) && /what should i do|what do i do|how would you handle|qué hago|qué debería hacer/i.test(cleanText(prompt, 120))) {
     const message = language === "es"
       ? `Protegería ${recentTiming.app} justo antes de las ${recentTiming.timeText}, para cortar el bucle antes de que empiece. Blanked App puede aplicar esa franja.`
@@ -1196,6 +1604,29 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       ],
       primary_label: "Plan block",
       secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: message,
+      speech_text: message,
+      followup_text: "",
+    };
+  }
+  if (app !== "the app" && timeText && hasRecentScrollContextQuestion) {
+    const message = language === "es"
+      ? `Entendido: ${app} es la app y las ${timeText} es cuando empieza. ¿A qué hora debería terminar la protección?`
+      : `Got it: ${app} is the app and ${timeText} is when it starts. What time should the protection end?`;
+    return {
+      intent: "social",
+      title: "Scroll Window",
+      response_text: message,
+      bullets: [
+        language === "es" ? `Lectura: ${app} y las ${timeText} son el punto de partida.` : `Read: ${app} and ${timeText} are the starting point.`,
+        language === "es" ? "Patrón: todavía falta la hora final para definir una franja útil." : "Pattern: the end time is still needed for a useful window.",
+        language === "es" ? "Movimiento: dime cuándo termina la franja y la convierto en una protección concreta." : "Move: tell me when the window ends and I can turn it into a concrete boundary.",
+      ],
+      primary_label: language === "es" ? "Decir hora final" : "Tell me end time",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
       actions: [],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
@@ -1262,9 +1693,30 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
 
 function explicitDurationMinutes(prompt) {
   const text = cleanText(prompt, 600).toLowerCase();
-  const match = text.match(/(\d{1,3})\s*(?:min|mins|minute|minutes)/i);
+  const match = text.match(/(\d{1,3})\s*[-–]?\s*(?:min|mins|minute|minutes|minutos?)/i);
   if (!match) return null;
   return cleanNumber(match[1], 30, 5, 240);
+}
+
+function conversationalDurationMinutes(prompt) {
+  const text = cleanText(prompt, 120).toLowerCase();
+  if (!text) return null;
+  if (/^half\s+(?:an?\s+)?hours?[.!?\s]*$/i.test(text)) return 30;
+  const unitPattern = /\b(\d{1,3}|a|an|one)\s*(hours?|hrs?|h|minutes?|mins?|m)\b/gi;
+  const parts = [...text.matchAll(unitPattern)];
+  if (!parts.length) return null;
+  const remainder = text
+    .replace(unitPattern, "")
+    .replace(/\b(?:for|about|around|roughly|and|plus)\b/gi, "")
+    .replace(/[.!?,+]/g, " ")
+    .trim();
+  if (remainder) return null;
+  const total = parts.reduce((sum, match) => {
+    const amount = /^(?:a|an|one)$/i.test(match[1]) ? 1 : Number(match[1]);
+    const minutes = /hour|hr|\bh\b/i.test(match[2]) ? amount * 60 : amount;
+    return sum + minutes;
+  }, 0);
+  return Number.isFinite(total) && total > 0 ? Math.min(240, Math.max(1, Math.round(total))) : null;
 }
 
 function wantsHardMode(prompt) {
@@ -1291,6 +1743,8 @@ function action(type, values = {}) {
     minutes: values.minutes ?? null,
     hard_mode: values.hard_mode ?? null,
     name: values.name ?? null,
+    ...(values.source_mode_name ? { source_mode_name: values.source_mode_name } : {}),
+    ...(values.copy_mode === true ? { copy_mode: true } : {}),
     start_minute: values.start_minute ?? null,
     end_minute: values.end_minute ?? null,
     weekdays: values.weekdays ?? null,
@@ -1486,13 +1940,49 @@ function proactivePlan(prompt, context = {}, language = "en") {
 }
 
 function fallbackPlan(prompt, context = {}) {
+  if (appCorrection(prompt)) {
+    const corrected = correctedAppContext(prompt);
+    const appLabel = corrected.app || "that app";
+    const momentLabel = corrected.moment ? corrected.moment.label : "that moment";
+    const question = corrected.moment && corrected.app && corrected.moment.key === "lunch"
+      ? "what time do you usually finish eating?"
+      : corrected.moment ? corrected.moment.question : "when does it usually pull you in?";
+    const responseText = corrected.app || corrected.moment
+      ? `Got it. Then ${appLabel} ${momentLabel} is the thing to solve. ${question.charAt(0).toUpperCase()}${question.slice(1)}`
+      : "Got it. Which app, moment or habit should we focus on instead?";
+    return {
+      intent: corrected.app || corrected.moment ? "social" : "general",
+      title: "Context Corrected",
+      response_text: responseText,
+      bullets: [
+        "Read: the previous app context was wrong.",
+        `Pattern: the real target is ${appLabel}${corrected.moment ? ` ${momentLabel}` : ""}.`,
+        "Move: ask only for the missing timing before creating a boundary."
+      ],
+      primary_label: corrected.app || corrected.moment ? "Tell time" : "Tell pattern",
+      secondary_label: "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+      message_text: responseText,
+      speech_text: responseText,
+      followup_text: "",
+    };
+  }
   const intent = classify(prompt, context);
   const language = responseLanguage(prompt, context);
+  const blockingContract = resolveBlockingContract(prompt, context);
+  const incompleteBlock = incompleteBlockingPlan(blockingContract, language, prompt, context);
+  if (incompleteBlock) return incompleteBlock;
+  const completeBlock = completeBlockingPlan(blockingContract, language, prompt);
+  if (completeBlock) return completeBlock;
   const proactive = proactivePlan(prompt, context, language);
   if (proactive) return proactive;
   if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
   const deterministicContext = ambiguousDigitalMomentPlan(prompt, language);
   if (deterministicContext) return deterministicContext;
+  const contextualFollowup = conversationalFollowupPlan(prompt, context, language);
+  if (contextualFollowup) return contextualFollowup;
   const promptText = cleanText(prompt, 600).toLowerCase();
   const selected = context.has_selected_apps === true;
   const authorized = context.screen_time_authorized === true;
@@ -1508,6 +1998,33 @@ function fallbackPlan(prompt, context = {}) {
   const memoryApp = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 ? cleanText(memory.main_apps[0], 40) : "";
   const promptApp = namedApp(prompt);
   const activeApp = promptApp !== "the app" ? promptApp : memoryApp;
+  const requestedDailyLimitMinutes = explicitDurationMinutes(prompt);
+  if (asksForDailyLimit(prompt) && requestedDailyLimitMinutes == null) {
+    const target = activeApp !== "the app" ? activeApp : "that app";
+    return {
+      intent: "social",
+      title: "Daily Limit",
+      response_text: language === "es"
+        ? `¿Cuántos minutos al día quieres permitir para ${target}?`
+        : `How many minutes per day do you want to allow for ${target}?`,
+      bullets: language === "es"
+        ? [
+          "El límite necesita una cantidad concreta antes de poder aplicarse.",
+          "No voy a inventar una duración por defecto.",
+          "Dime los minutos y lo revisarás antes de activarlo."
+        ]
+        : [
+          "A daily limit needs a concrete amount before it can be applied.",
+          "I will not invent a default duration.",
+          "Tell me the minutes and you can review it before activation."
+        ],
+      primary_label: language === "es" ? "Decir minutos" : "Tell me the minutes",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
   const appCategory = requestedAppCategory(prompt);
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
@@ -1520,6 +2037,25 @@ function fallbackPlan(prompt, context = {}) {
       ? "Feedback: the last plan held, so repeat before increasing difficulty."
       : setupLine;
 
+  const unavailableMode = unavailableModeRequest(prompt, context);
+  if (unavailableMode) {
+    return {
+      intent: "general",
+      title: language === "es" ? "Modo no disponible" : "Mode unavailable",
+      response_text: language === "es"
+        ? `No veo un modo ${unavailableMode} guardado. Créalo en Blankmind App y después podré activarlo.`
+        : `I don’t see a ${unavailableMode} mode saved. Create it in Blankmind App first, then I can activate it.`,
+      bullets: language === "es"
+        ? ["Ese perfil no está entre los modos disponibles.", "No voy a inventar sus apps o ajustes.", "Créalo en Blankmind App y vuelve a pedirme que lo active."]
+        : ["That profile is not among the available modes.", "I will not invent its apps or settings.", "Create it in Blankmind App, then ask me to activate it."],
+      primary_label: language === "es" ? "Crear modo" : "Create mode",
+      secondary_label: language === "es" ? "Ahora no" : "Not now",
+      actions: [],
+      requires_selected_apps: false,
+      requires_screen_time_authorization: false,
+    };
+  }
+
   const asksForModeActivation = contains(promptText, [
     " mode", "modo", "profile", "perfil", "i'm in", "im in", "estoy en", "deep focus", "deep work", "social media", "social apps", "redes sociales"
   ]);
@@ -1528,7 +2064,7 @@ function fallbackPlan(prompt, context = {}) {
   const socialModeFromMemory = modeName.toLowerCase() === "social" && selected && authorized && Array.isArray(memory.main_apps) && memory.main_apps.length > 0;
   const socialModeFromCategory = modeName.toLowerCase() === "social" && appCategory && selected && authorized && hasExplicitBlockRequest(prompt);
   if (modeName && !missingContext && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory || socialModeFromCategory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
-    const requestedDuration = explicitDurationMinutes(prompt) || duration;
+    const requestedDuration = explicitDurationMinutes(prompt);
     const hardMode = wantsHardMode(prompt);
     const modeAction = action("activate_mode", { name: modeName, minutes: requestedDuration, hard_mode: hardMode });
     if (timeWindow) {
@@ -1588,9 +2124,29 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
   if (relativeTimeAnswer && relativeMinute != null && !hasExplicitBlockRequest(prompt)) {
-    const start = (relativeMinute + relativeTimeAnswer.startOffset) % (24 * 60);
+    const start = ((relativeMinute + relativeTimeAnswer.startOffset) % (24 * 60) + (24 * 60)) % (24 * 60);
     const end = (start + relativeTimeAnswer.duration) % (24 * 60);
-    const appLabel = relativeTimeAnswer.app || activeApp || "that app";
+    const appLabel = relativeTimeAnswer.app || activeApp;
+    if (!appLabel) {
+      const message = language === "es"
+        ? `Entendido: tu hora objetivo es ${minuteText(relativeMinute)}. Protegería las apps de scroll de ${minuteText(start)} a ${minuteText(end)}. ¿Qué apps quieres incluir?`
+        : `Got it: your target time is ${minuteText(relativeMinute)}. I’d protect scroll apps from ${minuteText(start)} to ${minuteText(end)}. Which apps should I include?`;
+      return {
+        intent: "sleep",
+        title: "Bedtime Boundary",
+        response_text: message,
+        bullets: [
+          `Read: ${minuteText(relativeMinute)} is the current bedtime target.`,
+          "Pattern: the boundary needs to start before the final scroll.",
+          "Move: choose the exact apps before creating the schedule.",
+        ],
+        primary_label: language === "es" ? "Decir apps" : "Tell apps",
+        secondary_label: language === "es" ? "Ahora no" : "Not now",
+        actions: [],
+        requires_selected_apps: false,
+        requires_screen_time_authorization: false,
+      };
+    }
     return {
       intent: "social",
       title: relativeTimeAnswer.name,
@@ -1673,47 +2229,6 @@ function fallbackPlan(prompt, context = {}) {
         "Move: tell me the time, then I can suggest the right protection."
       ],
       primary_label: "Tell time",
-      secondary_label: "Not now",
-      actions: [],
-      requires_selected_apps: false,
-      requires_screen_time_authorization: false,
-    };
-  }
-
-  if (appCorrection(prompt)) {
-    const corrected = correctedAppContext(prompt);
-    if (corrected.app || corrected.moment) {
-      const appLabel = corrected.app || "that app";
-      const momentLabel = corrected.moment ? corrected.moment.label : "that moment";
-      const question = corrected.moment && corrected.app && corrected.moment.key === "lunch"
-        ? "what time do you usually finish eating?"
-        : corrected.moment ? corrected.moment.question : "when does it usually pull you in?";
-      return {
-        intent: "social",
-        title: "Context Corrected",
-        response_text: `Got it. Then ${appLabel} ${momentLabel} is the thing to solve. ${question.charAt(0).toUpperCase()}${question.slice(1)}`,
-        bullets: [
-          "Read: the previous app context was wrong.",
-          `Pattern: the real target is ${appLabel}${corrected.moment ? ` ${momentLabel}` : ""}.`,
-          "Move: ask only for the missing timing before creating a boundary."
-        ],
-        primary_label: "Tell time",
-        secondary_label: "Not now",
-        actions: [],
-        requires_selected_apps: false,
-        requires_screen_time_authorization: false,
-      };
-    }
-    return {
-      intent: "general",
-      title: "Context Corrected",
-      response_text: "Got it. Which app, moment or habit should we focus on instead?",
-      bullets: [
-        "Read: the previous app context was wrong.",
-        "Pattern: a useful plan needs your real trigger, not a guessed app.",
-        "Move: tell me the app, moment or habit you actually want to improve."
-      ],
-      primary_label: "Tell pattern",
       secondary_label: "Not now",
       actions: [],
       requires_selected_apps: false,
@@ -1931,22 +2446,22 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "social" && asksForImmediateBlock(prompt) && !timeWindow && (promptApp !== "the app" || appCategory || appSelectionClaimed)) {
-    const requestedDuration = explicitDurationMinutes(prompt) || 30;
+    const requestedDuration = explicitDurationMinutes(prompt);
     const target = promptApp !== "the app" ? promptApp : "your selected apps";
     return {
       intent: "social",
       title: "Immediate Protection",
       response_text: language === "es"
-        ? `Bloquearía ${target} ahora durante ${requestedDuration} minutos.`
-        : `I’d block ${target} now for ${requestedDuration} minutes.`,
+        ? (requestedDuration == null ? `Bloquearía ${target} ahora, sin inventar una duración que no has pedido.` : `Bloquearía ${target} ahora durante ${requestedDuration} minutos.`)
+        : (requestedDuration == null ? `I’d block ${target} now without inventing a duration you did not ask for.` : `I’d block ${target} now for ${requestedDuration} minutes.`),
       bullets: language === "es"
         ? [
-          `Movimiento: bloquear ${target} ahora durante ${requestedDuration} minutos.`,
+          requestedDuration == null ? `Movimiento: bloquear ${target} ahora y dejar la duración abierta.` : `Movimiento: bloquear ${target} ahora durante ${requestedDuration} minutos.`,
           "Mantener la selección actual de apps protegidas.",
           "Resultado: comprobar el bloqueo y revisar el resultado al terminar."
         ]
         : [
-          `Move: block ${target} now for ${requestedDuration} minutes.`,
+          requestedDuration == null ? `Move: block ${target} now and leave the duration open.` : `Move: block ${target} now for ${requestedDuration} minutes.`,
           "Keep the current protected app selection.",
           "Result: verify the block and review the outcome when it ends."
         ],
@@ -2000,7 +2515,7 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (modeName && !missingContext && asksForModeActivation && (availableModeMatch || explicitModeRequest || socialModeFromMemory || socialModeFromCategory) && contains(promptText, ["start", "block", "protect", "activate", "use ", "switch", "mode", "modo", "i'm in", "im in", "estoy en", "now", "ahora"])) {
-    const requestedDuration = explicitDurationMinutes(prompt) || duration;
+    const requestedDuration = explicitDurationMinutes(prompt);
     const hardMode = wantsHardMode(prompt);
     const modeAction = action("activate_mode", { name: modeName, minutes: requestedDuration, hard_mode: hardMode });
     if (timeWindow) {
@@ -2075,7 +2590,6 @@ function fallbackPlan(prompt, context = {}) {
       primary_label: "Apply protection",
       secondary_label: "Open report",
       actions: selected && authorized ? [
-        action("set_daily_limit", { minutes: 25 }),
         action("apply_schedule", { name: "Scroll Control", start_minute: weakHours[0] * 60, end_minute: ((weakHours[0] + 1) % 24) * 60, weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })
       ] : [action(selected ? "request_screen_time_permission" : "open_app_picker")],
       requires_selected_apps: !selected,
@@ -2122,7 +2636,9 @@ function fallbackPlan(prompt, context = {}) {
     };
   }
 
-  if (timeWindow && ["sleep", "focus", "social", "general"].includes(intent)) {
+  const relativeRoutineWindow = Boolean(relativeMoment(prompt) && !explicitTimeWindow(prompt, context));
+  const knownRoutineApp = namedApp(prompt) !== "the app" || (Array.isArray(memory.main_apps) && memory.main_apps.length > 0);
+  if (timeWindow && ["sleep", "focus", "social", "general"].includes(intent) && (!relativeRoutineWindow || knownRoutineApp)) {
     const start = minuteText(timeWindow.start);
     const end = minuteText(timeWindow.end);
     const planIntent = intent === "general" ? "social" : intent;
@@ -2164,9 +2680,12 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "focus") {
-    const requestedDuration = explicitDurationMinutes(prompt) || duration;
+    const requestedDuration = explicitDurationMinutes(prompt);
     const hardMode = wantsHardMode(prompt);
-    return { ...base, title: hardMode ? "Strict Focus Protection" : "Focus Protection", response_text: `I’d start a ${hardMode ? "strict " : ""}${requestedDuration}-minute block now and keep your current app list as it is.`, bullets: [`Move: start ${requestedDuration} minutes now.`, "Keep the protected app list unchanged.", `Signal: ${riskWindow}.`], primary_label: "Start now", actions: [action("start_protection", { minutes: requestedDuration, hard_mode: hardMode })], requires_selected_apps: true, requires_screen_time_authorization: true };
+    const responseText = requestedDuration == null
+      ? "I’d start protection now and keep your current app list as it is."
+      : `I’d start a ${hardMode ? "strict " : ""}${requestedDuration}-minute block now and keep your current app list as it is.`;
+    return { ...base, title: hardMode ? "Strict Focus Protection" : "Focus Protection", response_text: responseText, bullets: [requestedDuration == null ? "Move: start protection now without adding an unrequested time limit." : `Move: start ${requestedDuration} minutes now.`, "Keep the protected app list unchanged.", `Signal: ${riskWindow}.`], primary_label: "Start now", actions: [action("start_protection", { minutes: requestedDuration, hard_mode: hardMode })], requires_selected_apps: true, requires_screen_time_authorization: true };
   }
 
   if (intent === "study") {
@@ -2216,7 +2735,7 @@ function fallbackPlan(prompt, context = {}) {
         "Move: use a short hard block, then review what triggered it."
       ],
       primary_label: context.is_blank_active ? "Stay protected" : "Start hard block",
-      actions: context.is_blank_active ? [] : [action("start_protection", { minutes: 30, hard_mode: true })]
+      actions: context.is_blank_active ? [] : [action("start_protection", { minutes: null, hard_mode: true })]
     };
   }
 
@@ -2225,7 +2744,10 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "vacation") {
-    const active = context.vacation_mode_active === true;
+    const rulesText = cleanText(prompt, 600).toLowerCase();
+    const wantsResume = contains(rulesText, ["resume", "reanuda", "reanudar", "remove pause", "disable pause", "quita la pausa", "quitar la pausa", "reactiva", "reactivar"]);
+    const wantsPause = contains(rulesText, ["pause", "pausa", "pausar"]);
+    const active = wantsResume ? true : wantsPause ? false : context.vacation_mode_active === true;
     return { ...base, title: active ? "Resume Rules" : "Pause Rules", response_text: active ? "Your rules are paused; I can bring the structure back." : "Pausing is fine when the context changes, as long as it has an end.", bullets: active ? ["Read: the break is over.", "Pattern: structure should return without changing your selected apps.", "Move: resume schedules now."] : ["Read: your context changed for a short period.", "Pattern: open-ended pauses become accidental relapse.", "Move: pause scheduled protection for 7 days and keep manual blocks available."], primary_label: active ? "Resume rules" : "Pause 7 days", secondary_label: "Advanced", actions: active ? [action("disable_pause")] : [action("pause_rules", { hours: 168 })], requires_selected_apps: false, requires_screen_time_authorization: false };
   }
 
@@ -2248,7 +2770,24 @@ function fallbackPlan(prompt, context = {}) {
     const mealDefault = meal === "breakfast" ? 8 * 60 : meal === "dinner" ? 20 * 60 : 13 * 60;
     const mealDuration = meal === "dinner" ? 90 : 60;
     const momentText = meal ? `after ${meal}` : rememberedRisk || "before the usual scroll window";
-    const startMinute = resolvedMealStart ?? (meal ? mealDefault : 1230);
+    const startMinute = resolvedMealStart ?? (meal ? mealDefault : (weakHours.length > 0 ? weakHours[0] * 60 : null));
+    const hasKnownAppTarget = namedApp(prompt) !== "the app" || (Array.isArray(memory.main_apps) && memory.main_apps.length > 0);
+    const scheduleAction = startMinute == null || !hasKnownAppTarget
+      ? null
+      : action("apply_schedule", {
+        name: meal ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} Protection` : "Scroll Control",
+        start_minute: startMinute,
+        end_minute: (startMinute + (meal ? mealDuration : (weakHours.length > 0 ? 60 : 150))) % (24 * 60),
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        duration_days: 7,
+      });
+    const requestedLimit = explicitDurationMinutes(prompt);
+    const limitAction = requestedLimit == null ? null : action("set_daily_limit", { minutes: requestedLimit });
+    const outcomeMove = lastOutcome === "broke"
+      ? "Move: start the boundary earlier and review what broke the last attempt."
+      : lastOutcome === "held"
+        ? "Move: repeat the boundary that held before making it harder."
+        : "Move: add friction before the scroll has momentum and review whether the window holds.";
     return {
       ...base,
       title: "Scroll Loop",
@@ -2260,11 +2799,9 @@ function fallbackPlan(prompt, context = {}) {
       bullets: [
         "Pattern: the trigger matters more than total screen time.",
         `Move: add friction ${momentText}, before the scroll has momentum.`,
-        "Start with a 25 minute daily limit plus a short protective window."
+        outcomeMove,
       ],
-      actions: meal && resolvedMealStart == null
-        ? []
-        : [action("set_daily_limit", { minutes: 25 }), action("apply_schedule", { name: meal ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} Protection` : "Scroll Control", start_minute: startMinute, end_minute: (startMinute + (meal ? mealDuration : 150)) % (24 * 60), weekdays: [1, 2, 3, 4, 5, 6, 7], duration_days: 7 })]
+      actions: [limitAction, scheduleAction].filter(Boolean),
     };
   }
 
@@ -2330,6 +2867,8 @@ const actionSchema = {
     minutes: { type: ["integer", "null"], minimum: 5, maximum: 240 },
     hard_mode: { type: ["boolean", "null"] },
     name: { type: ["string", "null"], maxLength: 40 },
+    source_mode_name: { type: ["string", "null"], maxLength: 40 },
+    copy_mode: { type: ["boolean", "null"] },
     start_minute: { type: ["integer", "null"], minimum: 0, maximum: 1439 },
     end_minute: { type: ["integer", "null"], minimum: 0, maximum: 1439 },
     weekdays: { type: ["array", "null"], items: { type: "integer", minimum: 1, maximum: 7 }, maxItems: 7 },
@@ -2387,6 +2926,9 @@ function appCapabilities(context = {}) {
     can_start_now: context.is_blank_active !== true,
     has_selected_apps: context.has_selected_apps === true,
     screen_time_authorized: context.screen_time_authorized === true,
+    app_presence_state: context.app_presence_state || "never_seen",
+    app_presence_recent: context.app_presence_recent === true,
+    app_ready: context.app_ready === true,
     available_modes: availableModeNames(context),
     limits: {
       max_start_minutes: 240,
@@ -2398,6 +2940,9 @@ function appCapabilities(context = {}) {
 }
 
 function shouldUseAppLayer(prompt, context = {}) {
+  if (resolveBlockingContract(prompt, context).user_request) return true;
+  if (appCorrection(prompt)) return false;
+  if (asksForRulesAction(prompt)) return true;
   const intent = classify(prompt, context);
   const memory = context.memory && typeof context.memory === "object" ? context.memory : {};
   const hasRememberedScrollPattern = Array.isArray(memory.main_apps) && memory.main_apps.length > 0 &&
@@ -2416,7 +2961,7 @@ function shouldUseAppLayer(prompt, context = {}) {
   if (hasExplicitBlockRequest(prompt) || asksForAdvice(prompt) || asksForPlan(prompt)) return true;
   if (asksWhereToStart(prompt) || asksAboutAssistantCapabilities(prompt)) return true;
   if (asksForUnsupportedReminder(prompt) || asksForBroadAutomation(prompt) || asksForPermanentLockout(prompt)) return true;
-  if (appCorrection(prompt) || asksAboutExactAppList(prompt)) return true;
+  if (asksAboutExactAppList(prompt)) return true;
   if (namedApp(prompt) !== "the app" || requestedAppCategory(prompt) || requestedUnknownApp(prompt)) return true;
   if (explicitTimeWindow(prompt, context) || explicitDurationMinutes(prompt) || relativeMoment(prompt)) return true;
   return false;
@@ -2425,8 +2970,13 @@ function shouldUseAppLayer(prompt, context = {}) {
 function conversationFallbackPlan(prompt, language = "en") {
   const text = cleanText(prompt, 180);
   const lower = cleanText(prompt, 700).toLowerCase();
+  if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
   let fallbackText = language === "es" ? "Estoy aquí. Cuéntame qué ha pasado." : "I'm here. Tell me what's on your mind.";
-  if (isOutOfWellnessScope(prompt)) {
+  if (contains(lower, ["scroll", "scrolling", "doomscroll", "night", "bedtime", "at night", "noche", "cama"])) {
+    fallbackText = language === "es"
+      ? "Empezaría antes de meterte en la cama, no cuando ya estás cansado. Dime a qué hora quieres estar dormido y ajustaré el límite a ese momento."
+      : "I’d start before you get into bed, not once you’re already tired. Tell me when you want to be asleep and I’ll shape the boundary around that.";
+  } else if (isOutOfWellnessScope(prompt)) {
     if (contains(lower, ["sleep", "dormir", "descanso"])) {
       fallbackText = language === "es"
         ? "Puedo ayudarte desde el ángulo de bienestar digital: reducir móvil en la cama, cortar scroll nocturno o crear una barrera antes de dormir. ¿Qué parte del sueño te está rompiendo el móvil?"
@@ -2476,6 +3026,11 @@ function conversationFallbackPlan(prompt, language = "en") {
 async function modelConversationPlan(prompt, context = {}, language = "en") {
   const fallback = conversationFallbackPlan(prompt, language);
   if (isOutOfWellnessScope(prompt)) return { plan: fallback, source: "deterministic_out_of_scope" };
+  if (asksAboutExactAppList(prompt)) return { plan: fallbackPlan(prompt, context), source: "deterministic_privacy" };
+  if (appCorrection(prompt)) {
+    const correction = fallbackPlan(prompt, context);
+    if (correction && correction.title === "Context Corrected") return { plan: correction, source: "deterministic_context_correction" };
+  }
   const deterministicContext = ambiguousDigitalMomentPlan(prompt, language);
   if (deterministicContext) return { plan: deterministicContext, source: "deterministic_digital_context" };
   const contextual = conversationalFollowupPlan(prompt, context, language);
@@ -2546,9 +3101,13 @@ function deterministicNoActionTitle(title) {
     "Digital Wellness Read",
     "Plan Context",
     "Plan Timing",
+    "Scroll Window",
     "Personal Assistant",
     "Automation Setup",
     "Reminder Context",
+    "Daily Limit",
+    "Detalles del bloqueo",
+    "Blocking details",
     "Conversation",
     "Noted",
     "Greeting",
@@ -2590,10 +3149,57 @@ function deterministicActionTitle(title) {
   ]).has(title);
 }
 
+function blockingPickerAction(contract) {
+  const data = contract && contract.data ? contract.data : {};
+  const values = {
+    minutes: data.end && data.end.type === "duration" ? data.end.value : null,
+    hard_mode: false,
+    name: data.action === "daily_limit" ? "Daily Limit" : "Immediate Protection",
+  };
+  if (data.start && data.start.type === "time") {
+    const startMinute = Number(data.start.value);
+    const endMinute = data.end && data.end.type === "duration"
+      ? (startMinute + Number(data.end.value)) % (24 * 60)
+      : Number(data.end && data.end.value);
+    const days = data.recurrence && Array.isArray(data.recurrence.value) ? data.recurrence.value : [0];
+    if (Number.isFinite(startMinute) && Number.isFinite(endMinute)) {
+      values.name = `Block ${Array.isArray(data.apps) ? data.apps.join(" + ") : "selected apps"}`;
+      values.start_minute = startMinute;
+      values.end_minute = endMinute;
+      values.weekdays = days[0] === 0 ? [1, 2, 3, 4, 5, 6, 7] : days;
+      values.duration_days = days[0] === 0 ? 1 : 7;
+    }
+  }
+  return action("open_app_picker", values);
+}
+
 function actionGate(plan, fallback, context = {}, prompt = "") {
-  const proposed = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map(normalizeAction).filter(Boolean) : [];
+  const proposed = Array.isArray(plan.actions) ? plan.actions.slice(0, 4).map((item) => normalizeActionForPrompt(item, prompt)).filter(Boolean) : [];
+  const blockingContract = resolveBlockingContract(prompt, context, plan);
+  const blockingCandidate = blockingContract.user_request || proposed.some((item) => isBlockingActionType(item.type));
+  const missingOnlyApps = blockingContract.user_request
+    && blockingContract.missing_fields.length === 1
+    && blockingContract.missing_fields[0] === "apps"
+    && blockingContract.data
+    && blockingContract.data.start
+    && blockingContract.data.end
+    && context.app_presence_recent === true;
+  if (missingOnlyApps && !["mode", "device_selection"].includes(blockingContract.app_source) && !claimsSelectedApps(prompt)) {
+    return [blockingPickerAction(blockingContract)];
+  }
+  // A user-declared block must remain inert until its contract is complete.
+  // A model/fallback recommendation without an explicit block request still
+  // needs to pass through the normal setup and permission gates below.
+  if (blockingContract.user_request && !blockingContract.ready) return [];
+  if (blockingContract.user_request && blockingContract.ready && !["mode", "device_selection"].includes(blockingContract.app_source) && !claimsSelectedApps(prompt)) {
+    return [blockingPickerAction(blockingContract)];
+  }
   const hasClearFutureWindow = Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt));
-  const fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map(normalizeAction).filter(Boolean) : [];
+  let fallbackActions = Array.isArray(fallback.actions) ? fallback.actions.filter((item) => item && item.type !== "none").map((item) => normalizeActionForPrompt(item, prompt)).filter(Boolean) : [];
+  if (asksForDailyLimit(prompt) && explicitDurationMinutes(prompt) == null) {
+    fallbackActions = fallbackActions.filter((item) => item.type !== "set_daily_limit");
+  }
+  fallbackActions = fallbackActions.filter((item) => isAvailableModeAction(item, context));
   const selected = context.has_selected_apps === true || claimsSelectedApps(prompt);
   const authorized = context.screen_time_authorized === true;
   const promptIntent = classify(prompt, context);
@@ -2616,6 +3222,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
 
   for (const item of proposed) {
     if (!item || item.type === "none") continue;
+    if (!isAvailableModeAction(item, context)) continue;
     if (actionNeedsSelection(item.type) && !selected) {
       setupActions.push(action("open_app_picker"));
       continue;
@@ -2625,7 +3232,7 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
       continue;
     }
     if (item.type === "apply_schedule" && (item.start_minute == null || item.end_minute == null || item.start_minute === item.end_minute)) continue;
-    if (item.type === "switch_mode" && item.name && !availableModeNames(context).some((mode) => mode.toLowerCase() === item.name.toLowerCase())) continue;
+    if (item.type === "set_daily_limit" && asksForDailyLimit(prompt) && explicitDurationMinutes(prompt) == null) continue;
     if (item.type === "start_protection" && promptHasFutureTiming(prompt) && !contains(cleanText(prompt, 600).toLowerCase(), ["now", "ahora"])) continue;
     gated.push(item);
   }
@@ -2633,10 +3240,33 @@ function actionGate(plan, fallback, context = {}, prompt = "") {
   const uniqueSetup = setupActions.filter((item, index, items) => items.findIndex((candidate) => candidate.type === item.type) === index);
   if (uniqueSetup.length > 0) return uniqueSetup.slice(0, 2);
 
+  if (!selected && fallbackActions.some((item) => actionNeedsSelection(item.type))) {
+    return [action("open_app_picker")];
+  }
+  if (!authorized && fallbackActions.some((item) => actionNeedsScreenTime(item.type))) {
+    return [action("request_screen_time_permission")];
+  }
+
   if (gated.length > 0) return gated;
 
-  if (fallbackActions.length > 0 && !adviceOnly && !promptHasFutureTiming(prompt)) return fallbackActions.slice(0, 4).map(normalizeAction).filter(Boolean);
+  if (fallbackActions.length > 0 && !adviceOnly && !promptHasFutureTiming(prompt)) return fallbackActions.slice(0, 4).map((item) => normalizeActionForPrompt(item, prompt)).filter(Boolean);
   return [];
+}
+
+function isAvailableModeAction(item, context = {}) {
+  if (!item || !["switch_mode", "activate_mode"].includes(item.type)) return true;
+  const modes = availableModeNames(context);
+  if (!modes.length) return Boolean(item.name);
+  return Boolean(item.name && modes.some((mode) => mode.toLowerCase() === item.name.toLowerCase()));
+}
+
+function normalizeActionForPrompt(candidate, prompt = "") {
+  const normalized = normalizeAction(candidate);
+  if (!normalized) return null;
+  if (explicitDurationMinutes(prompt) == null && (normalized.type === "start_protection" || normalized.type === "activate_mode" || (normalized.type === "set_daily_limit" && asksForDailyLimit(prompt)))) {
+    normalized.minutes = null;
+  }
+  return normalized;
 }
 
 function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "en") {
@@ -2649,12 +3279,16 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
   const behavior = userFacingText(source.behavior_pattern, 160);
   const nextMove = userFacingText(source.next_move, 160);
   const fallbackBullets = fallback.bullets;
+  const blockingContract = resolveBlockingContract(prompt, context, plan);
+  const hasUserBlockingContract = blockingContract.user_request;
+  const incompleteBlocking = hasUserBlockingContract && !blockingContract.ready;
   const actions = actionGate(plan, fallback, context, prompt);
   const hasExecutableActions = actions.some((item) => item && item.type !== "none");
   const modelProposedAction = Array.isArray(plan.actions) && plan.actions.some((item) => item && item.type && item.type !== "none");
   const preservesScrollLoopActions = fallback.title === "Scroll Loop" && actions.length > 0;
   const shouldUseFallbackPresentation =
     proactiveTrigger(prompt, context) ||
+    incompleteBlocking ||
     deterministicNoActionTitle(fallback.title) ||
     deterministicActionTitle(fallback.title) ||
     (hasExecutableActions && actions.some((item) => item.type === "apply_schedule") && Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt))) ||
@@ -2686,6 +3320,10 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     actions,
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
+    blocking_ready: hasUserBlockingContract ? blockingContract.ready : null,
+    blocking_user_request: hasUserBlockingContract,
+    blocking_missing_fields: hasUserBlockingContract ? blockingContract.missing_fields : [],
+    blocking_data: hasUserBlockingContract ? publicBlockingData(blockingContract.data) : null,
     recommendation_id: cleanText(plan.recommendation_id, 120) || cleanText(context.recommendation_id, 120) || `bm_rec_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`,
   };
   const messageText = conversationalMessage(normalizedPlan, language, prompt);
@@ -2726,6 +3364,8 @@ function normalizeAction(candidate) {
     minutes: candidate.minutes == null ? null : cleanNumber(candidate.minutes, 30, 5, 240),
     hard_mode: candidate.hard_mode === true ? true : candidate.hard_mode === false ? false : null,
     name: candidate.name == null ? null : cleanText(candidate.name, 40),
+    source_mode_name: candidate.source_mode_name == null ? null : cleanText(candidate.source_mode_name, 40),
+    copy_mode: candidate.copy_mode === true,
     start_minute: candidateStart,
     end_minute: candidateEnd,
     weekdays: Array.isArray(candidate.weekdays) ? Array.from(new Set(candidate.weekdays.map((day) => cleanNumber(day, 1, 1, 7)))).slice(0, 7) : null,
@@ -2733,14 +3373,25 @@ function normalizeAction(candidate) {
     hours: candidate.hours == null ? null : cleanNumber(candidate.hours, 168, 1, 168),
   });
   if (type === "set_daily_limit") return action(type, { minutes: normalized.minutes });
-  if (type === "enable_allow_only" || type === "enable_adult_filter" || type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan" || type === "disable_pause") return action(type);
+  if (type === "enable_allow_only" || type === "enable_adult_filter" || type === "request_screen_time_permission" || type === "apply_ai_plan" || type === "disable_pause") return action(type);
+  if (type === "open_app_picker") return action(type, {
+    minutes: normalized.minutes,
+    hard_mode: normalized.hard_mode,
+    name: normalized.name,
+    start_minute: normalized.start_minute,
+    end_minute: normalized.end_minute,
+    weekdays: normalized.weekdays,
+    duration_days: normalized.duration_days,
+  });
   if (type === "switch_mode") return action(type, { name: normalized.name });
-  if (type === "activate_mode") return action(type, { name: normalized.name, minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
+  if (type === "activate_mode") return action(type, { name: normalized.name, source_mode_name: normalized.source_mode_name, copy_mode: normalized.copy_mode, minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "start_protection") return action(type, { minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "pause_rules") return action(type, { hours: normalized.hours });
   if (type === "apply_schedule") {
     return action(type, {
       name: normalized.name,
+      source_mode_name: normalized.source_mode_name,
+      copy_mode: normalized.copy_mode,
       start_minute: normalized.start_minute,
       end_minute: normalized.end_minute,
       weekdays: normalized.weekdays,
@@ -2763,11 +3414,11 @@ function extractResponseText(responseBody) {
   return "";
 }
 
-async function modelPlan(prompt, context, fallback, language) {
+async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { plan: normalizePlan({ plan: fallback }, fallback, context, prompt, language), source: "deterministic_fallback" };
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const response = await fetchImpl("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
@@ -2788,6 +3439,7 @@ async function modelPlan(prompt, context, fallback, language) {
             app_capabilities: appCapabilities(context),
             memory_rules: [
               "Use context.memory.main_apps, bedtime_minute, weak_hours, pattern_cluster, and last_plan_outcome when present.",
+              "For WhatsApp and SMS, never infer that the app is uninstalled from app_presence_state. A stale or missing heartbeat may justify asking the person to open Blankmind, but never add an installation or App Store link. Installation guidance is handled only by the delivery layer after it proves that no app installation is linked.",
               "If a relative moment such as breakfast is present without its actual end time, ask for that time and return no actions. Never invent a default clock time or start a generic mode.",
               "If last_plan_outcome is broke, reduce intensity or move protection earlier instead of making the plan stricter.",
               "If last_plan_outcome is held, repeat the stable plan before increasing difficulty.",
@@ -2819,10 +3471,10 @@ async function modelPlan(prompt, context, fallback, language) {
   }
   const body = await response.json();
   const parsed = JSON.parse(extractResponseText(body));
-  return { plan: normalizePlan(parsed, fallback, context, prompt, language), source: `openai:${model}` };
+  return { plan: normalizePlan(parsed, fallback, context, prompt, language), raw_plan: parsed.plan || parsed, source: `openai:${model}` };
 }
 
-exports.handler = async (event) => {
+exports.handler = async (event, runtime = {}) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
   let harnessRun = null;
@@ -2839,6 +3491,43 @@ exports.handler = async (event) => {
       route: harnessRun.route,
       language,
     });
+    const semanticOptions = {
+      previousState: context.semantic_state || context.memory?.conversation_state?.semantic_state,
+      prompt, context, language,
+    };
+    let semantic = advanceSemanticState(semanticOptions);
+    let semanticExtraction = null;
+    let semanticModelError = null;
+    if (semantic.handled && process.env.OPENAI_API_KEY) {
+      try {
+        semanticExtraction = await extractWithModel({ prompt, previousState: semanticOptions.previousState, context });
+        semantic = advanceSemanticState({ ...semanticOptions, extraction: semanticExtraction.extraction });
+      } catch (error) {
+        semanticModelError = error.name === "TimeoutError" ? "semantic_model_timeout" : error.message;
+        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError });
+      }
+    }
+    recordStage(harnessRun, "semantic_reduced", {
+      revision: semantic.state.revision, intent: semantic.state.intent, status: semantic.state.status,
+      pending_slots: semantic.state.pending_slots, errors: semantic.state.errors.map(error => error.code),
+    });
+    if (semantic.handled) {
+      harnessRun.route = "semantic";
+      const plan = semanticPlan(semantic, language, prompt);
+      if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
+        context, previous_state: semanticOptions.previousState || null,
+        extraction: semanticExtraction?.trace || null, deterministic_patch: semantic.patch,
+        extraction_validation: semantic.extractionValidation || null,
+        semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
+        postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",
+      });
+      recordStage(harnessRun, "action_gate", { decision: semantic.decision.type, action_types: plan.actions.map(item => item.type), action_count: plan.actions.length });
+      const loop = createLoop({ prompt, context, plan, runId: harnessRun.run_id, promptHash: harnessRun.prompt_hash, contextFingerprint: harnessRun.context_fingerprint });
+      recordStage(harnessRun, "loop_planned", loopSummary(loop));
+      const source = semanticExtraction?.source || "semantic_state_v1";
+      finishRun(harnessRun, { plan, source });
+      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
+    }
     if (!useAppLayer) {
       let conversationResult;
       try {
@@ -2850,7 +3539,9 @@ exports.handler = async (event) => {
         conversationResult = { plan: conversationFallbackPlan(prompt, language), source: "deterministic_conversation_fallback_after_model_error", error: error.message };
       }
       conversationResult.plan = appendWebConversionNote(conversationResult.plan, prompt, context, language);
+      conversationResult.plan = appendAppPresenceGuidance(conversationResult.plan, prompt, context, language);
       conversationResult.plan = localizePlan(conversationResult.plan, language);
+      conversationResult.plan = enforceSemanticBoundary(conversationResult.plan, semantic, language);
       const gatedSummary = planSummary(conversationResult.plan);
       recordStage(harnessRun, "action_gate", {
         decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
@@ -2889,9 +3580,15 @@ exports.handler = async (event) => {
       recordStage(harnessRun, "planner_completed", { source: result.source });
     } catch (error) {
       recordStage(harnessRun, "planner_fallback", { error_code: error.name || "planner_error" });
-      result = { plan: fallback, source: "deterministic_fallback_after_model_error", error: error.message };
+      result = {
+        plan: normalizePlan({ plan: fallback }, fallback, context, prompt, language),
+        source: "deterministic_fallback_after_model_error",
+        error: error.message,
+      };
     }
+    result.plan = appendAppPresenceGuidance(result.plan, prompt, context, language);
     result.plan = localizePlan(result.plan, language);
+    result.plan = enforceSemanticBoundary(result.plan, semantic, language);
     const gatedSummary = planSummary(result.plan);
     recordStage(harnessRun, "action_gate", {
       decision: gatedSummary.action_count > 0 ? "proposal" : "no_action",
@@ -2928,3 +3625,96 @@ exports.handler = async (event) => {
     return json(500, { error: "blanked_agent_failed", detail: error.message });
   }
 };
+
+function semanticPlan(result, language, prompt) {
+  const plan = {
+    intent: classify(prompt, {}) === "general" ? "social" : classify(prompt, {}),
+    title: result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
+      : result.state.intent === "cancelled" ? (language === "es" ? "Propuesta descartada" : "Proposal discarded")
+      : language === "es"
+      ? result.decision.type === "confirm" ? "Confirmar bloqueo" : result.decision.type === "ready" ? "Revisar bloqueo" : "Detalles del bloqueo"
+      : result.decision.type === "confirm" ? "Confirm protection" : result.decision.type === "ready" ? "Review protection" : "Protection details",
+    response_text: result.responseText,
+    message_text: result.responseText,
+    speech_text: result.responseText,
+    followup_text: "",
+    bullets: [],
+    primary_label: language === "es" ? "Continuar" : "Continue",
+    secondary_label: language === "es" ? "Ahora no" : "Not now",
+    actions: result.actions.map(item => action(item.type, item)),
+    review_only_actions: result.reviewOnlyAppPresence === true,
+     requires_selected_apps: false,
+    requires_screen_time_authorization: false,
+    blocking_ready: result.blockingContract.user_request ? result.blockingContract.ready : null,
+    blocking_user_request: result.blockingContract.user_request,
+    blocking_missing_fields: result.blockingContract.user_request ? result.blockingContract.missing_fields : [],
+    blocking_data: result.blockingContract.data,
+    semantic_state: result.state,
+    semantic_decision: result.decision,
+    recommendation_id: `bm_sem_${crypto.randomUUID()}`,
+  };
+  return plan;
+}
+
+function enforceSemanticBoundary(plan, semantic, language) {
+  const protectionTypes = new Set(["start_protection", "activate_mode", "apply_schedule", "set_daily_limit", "apply_ai_plan", "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "switch_mode"]);
+  const setupCarriesAction = item => ["open_app_picker", "request_screen_time_permission"].includes(item.type)
+    && ["minutes", "start_minute", "end_minute", "duration_days", "weekdays", "hard_mode", "name"].some(key => item[key] != null);
+  if ((plan.actions || []).some(item => protectionTypes.has(item.type) || setupCarriesAction(item))) {
+    // The legacy planner cannot create a new blocking intention or pending slot.
+    // Preserve the reducer's decision, including its absence of an authorized plan.
+    const text = language === "es" ? "No he podido validar una propuesta ejecutable a partir de esa petición. No he aplicado ningún cambio." : "I couldn't validate an executable proposal from that request. I haven't applied any changes.";
+    return { ...plan, title: language === "es" ? "Petición pendiente" : "Request not applied", actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", bullets: [], semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
+  }
+  return { ...plan, semantic_state: semantic.state, semantic_decision: semantic.decision };
+}
+
+// Local evaluation entry point. Never exposed through request flags on the HTTP handler.
+// bm_raw and bm_full use the same model response, so the comparison isolates postprocessing.
+async function traceEvaluationTurn({ prompt, context = {}, mode = "bm_final" }) {
+  if (mode === "bm_final" || mode === "bm_canonical") {
+    let trace = null;
+    const response = await exports.handler({ httpMethod: "POST", body: JSON.stringify({ prompt, context }) }, { captureSemanticTrace: value => { trace = value; } });
+    const result = JSON.parse(response.body);
+    if (response.statusCode !== 200) throw new Error(result.error || "evaluation_handler_failed");
+    return { ...result, ...(trace ? { trace } : {}) };
+  }
+  const normalizedContext = buildAgentContext(context);
+  const language = responseLanguage(prompt, normalizedContext);
+  if (mode === "direct_model") {
+    if (!process.env.OPENAI_API_KEY) throw new Error("active_model_key_missing");
+    const request = {
+      model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
+      input: [
+        { role: "system", content: "You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in the user's language. Do not claim to have performed device actions." },
+        ...(context.recent_messages || []).filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map(m => ({ role: m.role, content: m.content })),
+        { role: "user", content: prompt },
+      ],
+      max_output_tokens: 500,
+    };
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify(request), signal: AbortSignal.timeout(30000),
+    });
+    if (!response.ok) throw new Error(`direct_model_http_${response.status}`);
+    const body = await response.json();
+    const text = extractResponseText(body);
+    return { plan: { response_text: text, message_text: text, actions: [] }, source: `openai:${body.model || request.model}`, trace: { request, raw_text: text, structured_semantics: false } };
+  }
+  const fallback = fallbackPlan(prompt, normalizedContext);
+  let modelRequest = null;
+  const result = await modelPlan(prompt, normalizedContext, fallback, language, async (url, options) => {
+    modelRequest = JSON.parse(options.body);
+    return fetch(url, { ...options, signal: AbortSignal.timeout(30000) });
+  });
+  const rawPlan = result.raw_plan || null;
+  const gatedActions = rawPlan ? actionGate(rawPlan, fallback, normalizedContext, prompt) : result.plan.actions;
+  const finalPlan = localizePlan(appendAppPresenceGuidance(result.plan, prompt, normalizedContext, language), language);
+  return {
+    plan: mode === "bm_raw" ? rawPlan || result.plan : finalPlan,
+    source: result.source,
+    trace: { request: modelRequest, context: normalizedContext, fallback, raw_plan: rawPlan, action_gate: gatedActions, normalized_plan: result.plan, final_plan: finalPlan, schema: agentSchema },
+  };
+}
+
+exports._evaluation = { traceTurn: traceEvaluationTurn };

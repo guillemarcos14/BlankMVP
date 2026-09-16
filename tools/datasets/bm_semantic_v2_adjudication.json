@@ -1,0 +1,48 @@
+{
+  "original_file": "tools\\datasets\\bm_semantic_heldout_v2.json",
+  "original_unchanged": true,
+  "basis": [
+    "ios/Blank/Blank/BlankDomainModels.swift Calendar.component(.weekday) uses Sunday=1",
+    "app/src/main/java/com/blanknfc/app/data/SessionManager.kt Calendar.DAY_OF_WEEK uses Sunday=1",
+    "Canonical state weekday convention ISO Monday=1, with explicit native conversion at buildSemanticActions",
+    "start_protection native action has no app-subset payload; stored device selection includes both apps"
+  ],
+  "changes": [
+    {
+      "conversation": "unseen_v2_app_subtraction",
+      "turn": 3,
+      "field": "state/decision/actions",
+      "before": "ready/start_protection",
+      "after": "needs_setup/app_selection/open_app_picker",
+      "reason": "Device selection still contains Instagram and TikTok. A direct start would block the removed Instagram too, so exact selection setup is required. This corrects a fixture capability assumption, not model behavior."
+    },
+    {
+      "conversation": "unseen_v2_recurrence_substitution",
+      "turn": 2,
+      "field": "state.recurrence.weekdays",
+      "before": [
+        1,
+        7
+      ],
+      "after": [
+        6,
+        7
+      ],
+      "reason": "Logical state stores ISO Monday=1, while native action weekdays use Sunday=1. The original expectation mixed these representations. Native action expectations remain unchanged."
+    },
+    {
+      "conversation": "unseen_v2_recurrence_substitution",
+      "turn": 3,
+      "field": "state.recurrence.weekdays",
+      "before": [
+        1,
+        7
+      ],
+      "after": [
+        6,
+        7
+      ],
+      "reason": "Logical state stores ISO Monday=1, while native action weekdays use Sunday=1. The original expectation mixed these representations. Native action expectations remain unchanged."
+    }
+  ]
+}

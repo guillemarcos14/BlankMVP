@@ -45,6 +45,9 @@ private struct ConversationalHomeView: View {
     @Environment(\.openURL) private var openURL
     @AppStorage("blankOnboardingName", store: BlankSharedState.defaults) private var onboardingName = ""
     @AppStorage("blankWhatsAppConsentGranted", store: BlankSharedState.defaults) private var whatsAppConsentGranted = false
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var assistantConnectCode = ""
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var assistantPreferredChannel = ""
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var assistantPhoneNumber = ""
 
     @State private var input = ""
     @State private var messages: [AgentMessage] = AgentMessage.openingThread
@@ -110,11 +113,15 @@ private struct ConversationalHomeView: View {
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onAppear {
             restoreRuntimeState()
+            restoreConversationIfNeeded()
             openWidgetTimerSelectorIfNeeded()
+            syncAssistantContext()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             restoreRuntimeState()
+            restoreConversationIfNeeded()
+            syncAssistantContext()
         }
         .onReceive(timer) { date in
             now = date
@@ -129,7 +136,10 @@ private struct ConversationalHomeView: View {
         .onChange(of: sessionStore.selection) { selection in
             screenTimeBlocker.updateSelection(selection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+            syncAssistantContext()
         }
+        .onChange(of: sessionStore.focusModes) { _ in syncAssistantContext() }
+        .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             restoreRuntimeState()
             if sessionStore.allowOnlyModeEnabled && !sessionStore.hasSelectedApps {
@@ -730,7 +740,8 @@ private struct ConversationalHomeView: View {
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
                 vacationModeActive: sessionStore.isVacationModeActive,
                 modeName: sessionStore.currentMode.name,
-                availableModes: sessionStore.focusModes.map(\.name)
+                availableModes: sessionStore.focusModes.map(\.name),
+                recentMessages: recentConversationPayload()
             )
         )
         BlankedAgentMemory.recordUserPrompt(text, inferredIntent: fallbackPlan.intent)
@@ -739,27 +750,56 @@ private struct ConversationalHomeView: View {
         messages.append(thinkingMessage)
 
         let context = currentAgentContext()
+        syncAssistantContext(context)
         Task {
             let resolvedPlan: AgentPlan
             do {
                 resolvedPlan = try await BlankedAgentClient().plan(prompt: text, context: context)
             } catch {
-                #if targetEnvironment(simulator)
-                var debugPlan = fallbackPlan
-                debugPlan.source = "local_fallback"
-                debugPlan.modelError = error.localizedDescription
-                resolvedPlan = debugPlan
-                #else
-                resolvedPlan = fallbackPlan
-                #endif
+                var unavailablePlan = fallbackPlan
+                unavailablePlan.actions = []
+                unavailablePlan.requiresSelectedApps = false
+                unavailablePlan.requiresScreenTimeAuthorization = false
+                unavailablePlan.responseText = "I couldn't check that request. Please try again."
+                unavailablePlan.messageText = unavailablePlan.responseText
+                unavailablePlan.source = "remote_unavailable"
+                unavailablePlan.modelError = error.localizedDescription
+                resolvedPlan = unavailablePlan
             }
             await MainActor.run {
                 activePlan = resolvedPlan.hasExecutableActions ? resolvedPlan : nil
                 if let index = messages.firstIndex(where: { $0.id == thinkingMessage.id }) {
                     messages[index].text = resolvedPlan.displayMessageText
                 }
+                BlankedAgentMemory.recordConversationTurn(
+                    userMessage: text,
+                    assistantMessage: resolvedPlan.displayMessageText
+                )
+                if let semanticState = resolvedPlan.semanticState {
+                    BlankedAgentMemory.recordSemanticState(semanticState)
+                }
             }
         }
+    }
+
+    private func restoreConversationIfNeeded() {
+        guard messages.isEmpty else { return }
+        let stored = BlankedAgentMemory.recentConversationMessages()
+        guard !stored.isEmpty else { return }
+        messages = stored.compactMap { item in
+            guard let role = item["role"], let text = item["content"], !text.isEmpty else { return nil }
+            return AgentMessage(role: role == "user" ? .user : .blanked, text: text)
+        }
+    }
+
+    private func recentConversationPayload() -> [[String: String]] {
+        let current = messages
+            .filter { $0.text != "Reading the pattern..." }
+            .suffix(8)
+            .map { message in
+                ["role": message.role == .user ? "user" : "assistant", "content": message.text]
+            }
+        return current.isEmpty ? BlankedAgentMemory.recentConversationMessages() : Array(current)
     }
 
     private func currentAgentContext() -> AgentContext {
@@ -772,8 +812,26 @@ private struct ConversationalHomeView: View {
             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
             vacationModeActive: sessionStore.isVacationModeActive,
             modeName: sessionStore.currentMode.name,
-            availableModes: sessionStore.focusModes.map(\.name)
+            availableModes: sessionStore.focusModes.map(\.name),
+            availableModeCatalog: sessionStore.assistantModeCatalog(),
+            scheduleContext: sessionStore.assistantScheduleContext(),
+            recentMessages: recentConversationPayload()
         )
+    }
+
+    private func syncAssistantContext(_ context: AgentContext? = nil) {
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        guard !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        let snapshot = context ?? currentAgentContext()
+        Task {
+            await AssistantContextSyncClient().sync(
+                connectCode: code,
+                channel: channel,
+                phoneNumber: assistantPhoneNumber,
+                context: snapshot
+            )
+        }
     }
 
     private func canApply(_ plan: AgentPlan) -> Bool {
@@ -817,12 +875,14 @@ private struct ConversationalHomeView: View {
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 appliedLabels.append(agentResultText(result))
             case .applySchedule(let name, let startMinute, let endMinute, let weekdays, let durationDays):
-                sessionStore.applyAdaptivePlan(startMinute: startMinute, endMinute: endMinute, durationDays: durationDays, activateCurrentWindow: false)
-                if var window = sessionStore.schedule.windows.first {
-                    window.name = name
-                    window.weekdays = weekdays
-                    sessionStore.schedule.windows = [window]
-                }
+                sessionStore.applyAdaptivePlan(
+                    startMinute: startMinute,
+                    endMinute: endMinute,
+                    durationDays: durationDays,
+                    activateCurrentWindow: false,
+                    name: name,
+                    weekdays: weekdays
+                )
                 appliedLabels.append("Plan scheduled")
             case .enableAllowOnly:
                 sessionStore.allowOnlyModeEnabled = true
@@ -918,7 +978,7 @@ private struct ConversationalHomeView: View {
             case .startProtection(let minutes, let hardMode):
                 let passed = sessionStore.isBlankActive
                     && sessionStore.hardBlankActive == hardMode
-                    && (minutes <= 0 || sessionStore.blankActiveUntil != nil)
+                    && (minutes == nil || sessionStore.blankActiveUntil != nil)
                 return AgentExecutionCheck(
                     name: "protection_active",
                     expected: "active=true hard_mode=\(hardMode)",
@@ -1298,8 +1358,49 @@ private struct AgentContext {
     var vacationModeActive: Bool
     var modeName: String = "Routine"
     var availableModes: [String] = []
+    var availableModeCatalog: [[String: Any]] = []
+    var scheduleContext: [String: Any] = [:]
+    var recentMessages: [[String: String]] = []
     var memory: [String: Any] {
         BlankedAgentMemory.snapshot(system: system)
+    }
+}
+
+private extension AgentContext {
+    var serializedPayload: [String: Any] {
+        var payload: [String: Any] = [
+            "channel": "ios",
+            "assistant_channel": "app",
+            "is_blank_active": isBlankActive,
+            "has_selected_apps": hasSelectedApps,
+            "selection_count": selectionCount,
+            "screen_time_authorized": screenTimeAuthorized,
+            "emergency_unlocks_remaining": emergencyUnlocksRemaining,
+            "vacation_mode_active": vacationModeActive,
+            "adherence_score": system.profile.adherenceScore,
+            "weekly_protected_minutes": system.profile.weeklyProtectedMinutes,
+            "weekly_break_count": system.profile.weeklyBreakCount,
+            "risk_window": system.forecast.riskWindow,
+            "recommended_duration_minutes": system.plan.recommendedDurationMinutes,
+            "weekly_goal": system.plan.weeklyGoal,
+            "mode_name": modeName,
+            "available_modes": availableModes,
+            "available_mode_catalog": availableModeCatalog,
+            "app_presence": BlankmindAppPresence.payload(appReady: hasSelectedApps && screenTimeAuthorized),
+            "recent_messages": recentMessages,
+            "weak_hours": BlankedAgentMemory.rememberedWeakHours(system: system),
+            "pattern_cluster": BlankedAgentMemory.rememberedPatternCluster(),
+            "last_plan_outcome": BlankedAgentMemory.lastPlanOutcome(system: system),
+            "memory": memory,
+            "schedule": scheduleContext,
+        ]
+        if let strongestWindow = system.profile.strongestWindow {
+            payload["strongest_hour"] = strongestWindow
+        }
+        if let semanticState = BlankedAgentMemory.recentSemanticState() {
+            payload["semantic_state"] = semanticState
+        }
+        return payload
     }
 }
 
@@ -1317,7 +1418,7 @@ private enum AgentIntent: String, Codable {
 }
 
 private enum AgentAction: Equatable {
-    case startProtection(minutes: Int, hardMode: Bool)
+    case startProtection(minutes: Int?, hardMode: Bool)
     case applySchedule(name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int)
     case enableAllowOnly
     case enableAdultFilter
@@ -1499,6 +1600,7 @@ private struct AgentPlan: Identifiable, Equatable {
     var modelError: String? = nil
     var recommendationId: String? = nil
     var loop: AgentLoop? = nil
+    var semanticState: Data? = nil
 
     var executableActionCount: Int {
         actions.filter { $0 != .none }.count
@@ -1514,7 +1616,7 @@ private struct AgentPlan: Identifiable, Equatable {
 }
 
 private struct AgentMessage: Identifiable, Equatable {
-    enum Role {
+    enum Role: Equatable {
         case user
         case blanked
     }
@@ -1534,6 +1636,9 @@ private enum BlankedAgentPlanner {
         }
         if let missingContextPlan = missingContextPlan(for: prompt, intent: intent, context: context) {
             return missingContextPlan
+        }
+        if let bedtime = contextualBedtime(in: prompt, context: context) {
+            return bedtimeBoundaryPlan(bedtime: bedtime, context: context)
         }
         if let window = explicitTimeWindow(in: prompt),
            [.sleep, .focus, .social, .general].contains(intent) {
@@ -1565,6 +1670,36 @@ private enum BlankedAgentPlanner {
         case .general:
             return generalPlan(prompt: prompt, context: context)
         }
+    }
+
+    private static func contextualBedtime(in prompt: String, context: AgentContext) -> Int? {
+        let recentAssistant = context.recentMessages.reversed().first { message in
+            message["role"] == "assistant"
+        }
+        let assistantText = recentAssistant?["content"]?.lowercased() ?? ""
+        guard contains(assistantText, [
+            "what time do you want to be asleep",
+            "when do you want to be asleep",
+            "when you want to be asleep",
+            "usual bedtime",
+            "hora habitual de dormir"
+        ]) else { return nil }
+
+        let text = prompt.lowercased()
+        let pattern = #"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
+        let nsText = text as NSString
+        let range = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, options: [], range: range) else { return nil }
+        func value(_ index: Int) -> String? {
+            let matchRange = match.range(at: index)
+            guard matchRange.location != NSNotFound else { return nil }
+            return nsText.substring(with: matchRange)
+        }
+        guard let hour = Int(value(1) ?? "") else { return nil }
+        let minute = Int(value(2) ?? "") ?? 0
+        let meridiem = value(3) ?? ((6...11).contains(hour) ? "pm" : nil)
+        return minuteOfDay(hour: hour, minute: minute, meridiem: meridiem)
     }
 
     private static func explicitWindowPlan(intent: AgentIntent, window: AgentTimeWindow, context: AgentContext) -> AgentPlan {
@@ -2248,38 +2383,66 @@ private struct BlankedAgentClient {
         )
         plan.source = decoded.source
         plan.modelError = decoded.model_error
+        if let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let remotePlan = body["plan"] as? [String: Any],
+           let semanticState = remotePlan["semantic_state"] as? [String: Any],
+           JSONSerialization.isValidJSONObject(semanticState) {
+            plan.semanticState = try JSONSerialization.data(withJSONObject: semanticState)
+            // Canonical wording is already validated against the proposal by the backend.
+            // Cropping it at the legacy 180-character limit can remove a condition or question.
+            if let message = remotePlan["message_text"] as? String { plan.messageText = message }
+            if let response = remotePlan["response_text"] as? String { plan.responseText = response }
+        }
         return plan
     }
 
     private func payload(prompt: String, context: AgentContext) -> [String: Any] {
-        var contextPayload: [String: Any] = [
-            "is_blank_active": context.isBlankActive,
-            "has_selected_apps": context.hasSelectedApps,
-            "selection_count": context.selectionCount,
-            "screen_time_authorized": context.screenTimeAuthorized,
-            "emergency_unlocks_remaining": context.emergencyUnlocksRemaining,
-            "vacation_mode_active": context.vacationModeActive,
-            "adherence_score": context.system.profile.adherenceScore,
-            "weekly_protected_minutes": context.system.profile.weeklyProtectedMinutes,
-            "weekly_break_count": context.system.profile.weeklyBreakCount,
-            "risk_window": context.system.forecast.riskWindow,
-            "recommended_duration_minutes": context.system.plan.recommendedDurationMinutes,
-            "weekly_goal": context.system.plan.weeklyGoal,
-            "mode_name": context.modeName,
-            "available_modes": context.availableModes,
-            "weak_hours": BlankedAgentMemory.rememberedWeakHours(system: context.system),
-            "pattern_cluster": BlankedAgentMemory.rememberedPatternCluster(),
-            "last_plan_outcome": BlankedAgentMemory.lastPlanOutcome(system: context.system),
-            "memory": context.memory
-        ]
-        if let strongestWindow = context.system.profile.strongestWindow {
-            contextPayload["strongest_hour"] = strongestWindow
-        }
         return [
             "prompt": String(prompt.prefix(500)),
             "locale": Locale.current.identifier,
-            "context": contextPayload
+            "context": context.serializedPayload
         ]
+    }
+
+    private func configuredBaseURL() -> URL? {
+        guard let rawValue = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            return nil
+        }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.contains("$(") else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+}
+
+struct AssistantContextSyncClient {
+    fileprivate func sync(connectCode: String, channel: String, phoneNumber: String, context: AgentContext) async {
+        await sync(
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            payload: context.serializedPayload
+        )
+    }
+
+    func sync(connectCode: String, channel: String, phoneNumber: String, payload: [String: Any]) async {
+        guard let baseURL = configuredBaseURL(),
+              !connectCode.isEmpty else { return }
+        var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 8
+        let body: [String: Any] = [
+            "action": "sync_context",
+            "connect_code": connectCode,
+            "preferred_channel": channel,
+            "user_phone": phoneNumber,
+            "context": payload,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        request.httpBody = data
+        _ = try? await URLSession.shared.data(for: request)
     }
 
     private func configuredBaseURL() -> URL? {
@@ -2341,6 +2504,8 @@ private struct BMLoopClient {
                 "loop_id": loop.loopId,
                 "mode_name": context.modeName,
                 "available_modes": context.availableModes,
+                "available_mode_catalog": context.availableModeCatalog,
+                "schedule": context.scheduleContext,
                 "has_selected_apps": context.hasSelectedApps,
                 "screen_time_authorized": context.screenTimeAuthorized,
                 "device_execution_ready": context.hasSelectedApps && context.screenTimeAuthorized,
@@ -2452,7 +2617,9 @@ private struct BMLoopClient {
     private static func actionPayload(_ action: AgentAction) -> [String: Any]? {
         switch action {
         case .startProtection(let minutes, let hardMode):
-            return ["type": "start_protection", "minutes": minutes, "hard_mode": hardMode]
+            var payload: [String: Any] = ["type": "start_protection", "hard_mode": hardMode]
+            if let minutes { payload["minutes"] = minutes }
+            return payload
         case .applySchedule(let name, let startMinute, let endMinute, let weekdays, let durationDays):
             return ["type": "apply_schedule", "name": name, "start_minute": startMinute, "end_minute": endMinute, "weekdays": weekdays, "duration_days": durationDays]
         case .enableAllowOnly:
@@ -2544,7 +2711,7 @@ private struct RemoteAgentAction: Decodable {
         case "none":
             return AgentAction.none
         case "start_protection":
-            return .startProtection(minutes: clamp(minutes ?? 30, 5, 240), hardMode: hard_mode ?? false)
+            return .startProtection(minutes: minutes.map { clamp($0, 5, 240) }, hardMode: hard_mode ?? false)
         case "apply_schedule":
             return .applySchedule(
                 name: String((name ?? "AI Plan").prefix(40)),
@@ -2592,7 +2759,7 @@ private struct RemoteAgentAction: Decodable {
     }
 }
 
-private enum BlankedAgentMemory {
+enum BlankedAgentMemory {
     private static let defaults = BlankSharedState.defaults
     private static let lastPromptKey = "blankedAgentLastPrompt"
     private static let lastIntentKey = "blankedAgentLastIntent"
@@ -2603,8 +2770,68 @@ private enum BlankedAgentMemory {
     private static let mainAppsKey = "blankedAgentMainApps"
     private static let bedtimeMinuteKey = "blankedAgentBedtimeMinute"
     private static let patternClusterKey = "blankedAgentPatternCluster"
+    private static let conversationKey = "blankedAgentShortConversation"
+    private static let semanticStateKey = "blankedAgentSemanticState"
+    private static let semanticStateTimestampKey = "blankedAgentSemanticStateTimestamp"
+    private static let shortConversationTTL: TimeInterval = 2 * 60 * 60
 
-    static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
+    private struct StoredConversationMessage: Codable {
+        let role: String
+        let content: String
+        let timestamp: TimeInterval
+    }
+
+    static func recentConversationMessages(now: Date = Date()) -> [[String: String]] {
+        let valid = storedConversationMessages(now: now)
+        return valid.map { ["role": $0.role, "content": $0.content] }
+    }
+
+    static func recordSemanticState(_ data: Data, now: Date = Date()) {
+        guard data.count <= 65_536,
+              (try? JSONSerialization.jsonObject(with: data)) is [String: Any] else { return }
+        defaults.set(data, forKey: semanticStateKey)
+        defaults.set(now.timeIntervalSince1970, forKey: semanticStateTimestampKey)
+    }
+
+    static func recentSemanticState(now: Date = Date()) -> [String: Any]? {
+        let storedAt = defaults.double(forKey: semanticStateTimestampKey)
+        let age = now.timeIntervalSince1970 - storedAt
+        guard storedAt > 0, age >= -300, age <= shortConversationTTL,
+              let data = defaults.data(forKey: semanticStateKey), data.count <= 65_536 else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    }
+
+    static func recordConversationTurn(userMessage: String, assistantMessage: String, now: Date = Date()) {
+        let user = userMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        let assistant = assistantMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !user.isEmpty || !assistant.isEmpty else { return }
+        var messages = storedConversationMessages(now: now)
+        let timestamp = now.timeIntervalSince1970
+        if !user.isEmpty {
+            messages.append(StoredConversationMessage(role: "user", content: String(user.prefix(420)), timestamp: timestamp))
+        }
+        if !assistant.isEmpty {
+            messages.append(StoredConversationMessage(role: "assistant", content: String(assistant.prefix(420)), timestamp: timestamp))
+        }
+        let bounded = Array(messages.suffix(8))
+        guard let data = try? JSONEncoder().encode(bounded) else { return }
+        defaults.set(data, forKey: conversationKey)
+    }
+
+    private static func storedConversationMessages(now: Date) -> [StoredConversationMessage] {
+        guard let data = defaults.data(forKey: conversationKey),
+              let decoded = try? JSONDecoder().decode([StoredConversationMessage].self, from: data) else {
+            return []
+        }
+        let current = now.timeIntervalSince1970
+        return decoded.filter { message in
+            message.content.isEmpty == false &&
+                message.timestamp <= current + 300 &&
+                current - message.timestamp <= shortConversationTTL
+        }
+    }
+
+    fileprivate static func recordUserPrompt(_ prompt: String, inferredIntent: AgentIntent) {
         defaults.removeObject(forKey: lastPromptKey)
         defaults.set(inferredIntent.rawValue, forKey: lastIntentKey)
         if let bedtime = explicitBedtimeMinute(in: prompt) {
@@ -2616,7 +2843,7 @@ private enum BlankedAgentMemory {
         defaults.set(patternCluster(for: prompt, intent: inferredIntent), forKey: patternClusterKey)
     }
 
-    static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
+    fileprivate static func recordAppliedPlan(_ plan: AgentPlan, context: AgentContext) {
         defaults.set(plan.title, forKey: lastPlanTitleKey)
         defaults.set(Date().timeIntervalSince1970, forKey: lastPlanAppliedAtKey)
         defaults.set(plan.intent.rawValue, forKey: lastIntentKey)

@@ -1,0 +1,65 @@
+[
+  {
+    "response_sha256": "3d5a8be0468e511a400b9aa4b6a696a7ec77ade4c26fcb425f9b1a8b586e5c11",
+    "expectation_sha256": "a0b8b0397c2750b47e9e1c38bd35e75bb5ad361d16184da250edd19cb432125a",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The morning scrolling advice request is answered by asking when that scrolling starts, with explicit clock format guidance. Your routine and neutral buttons match collecting advice; no block, duration or action is invented.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "5a3bc23f79d6a972b78351f8bb7cff81b33ad1b391f2aecfcde0bcd386abfcee",
+    "expectation_sha256": "69e34b26ba8aa1822586405b3ad7234acacca62dec982d92c1263894becbf7cf",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The short Instagram/11am answer fills app and start. The complete response asks only duration or end time, retains advice framing through Your routine, and claims no execution.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "3d5a8be0468e511a400b9aa4b6a696a7ec77ade4c26fcb425f9b1a8b586e5c11",
+    "expectation_sha256": "a0b8b0397c2750b47e9e1c38bd35e75bb5ad361d16184da250edd19cb432125a",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The request to scroll less in the mornings is treated as advice; the response asks the missing start time without inventing a block or daily limit. All visible fields are consistent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "5a3bc23f79d6a972b78351f8bb7cff81b33ad1b391f2aecfcde0bcd386abfcee",
+    "expectation_sha256": "f9bf13798aa7edd4090b663fa37bad731a1d3a193b309ba460d83f436bd9fa7d",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The Instagram/10am answer is followed by the missing duration/end question. All response surfaces, Your routine title and neutral buttons agree with advice collection and no action.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "df77363cc35c5279579afd6dedeab63f57e3cc78c047595c322cd5fe82685944",
+    "expectation_sha256": "e7cc9a6c1591ab9baa3140eb232752c186da7baa75e98fa080573b0ff4916514",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "After one hour from 10am, the next missing choice is recurrence. Every response surface asks once or recurring and which days; no time conflict or action claim appears. The routine title preserves advice framing.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "df77363cc35c5279579afd6dedeab63f57e3cc78c047595c322cd5fe82685944",
+    "expectation_sha256": "e7cc9a6c1591ab9baa3140eb232752c186da7baa75e98fa080573b0ff4916514",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The explicit 10-to-11am correction remains compatible with the one-hour window. The response correctly keeps recurrence as the next missing choice and does not reinterpret a duration as a clock.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  },
+  {
+    "response_sha256": "1703c86d600162dc5943a91fb6d7ec86ea4ed0f9c04ca253f43edb0d697b37ef",
+    "expectation_sha256": "334bf56145a7a1904066f28a6fbb8a2f9a6b5f6fd4d4c5d9fbb1b04c1871217a",
+    "reviewer": "audit_channels independent agent",
+    "rationale": "The immediate 45-minute block request still omits recurrence. All text asks once versus recurring and days, without a native action or premature confirmation. Protection details and neutral buttons are consistent.",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent AI agent review of all message/response/speech/title/button/bullet surfaces against expected state, next question and action. Not human certification; does not prove naturalness or real-world authorship of observed logs."
+  }
+]

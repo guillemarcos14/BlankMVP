@@ -1,16 +1,37 @@
 const crypto = require("crypto");
+const { sendAssistantActionPush } = require("./_assistant_push");
 const { json, parseJsonBody } = require("./_membership");
 const {
+  attachAssistantUserContext,
+  claimAssistantInboundMessage,
   connectCodeFromText,
+  completeAssistantInboundMessage,
+  releaseAssistantInboundMessage,
+  ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
+const { freshConversationState } = require("./bm-context");
+const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function explicitDurationMinutes(text) {
+  const match = cleanText(text, 600).toLowerCase().match(/(\d{1,3})\s*[-–]?\s*(?:min|mins|minute|minutes|minutos?)/i);
+  if (!match) return null;
+  return Math.min(Math.max(Number(match[1]), 5), 240);
+}
+
+function asksForDailyLimit(text) {
+  const value = cleanText(text, 600).toLowerCase();
+  return /\b(daily limit|per day|each day|every day|l[ií]mite diario|por d[ií]a)\b/i.test(value)
+    || (/\b(limit|l[ií]mite|cap|tope)\b/i.test(value) && /\d+\s*(?:min|mins|minute|minutes|minutos?)/i.test(value));
 }
 
 function header(event, name) {
@@ -32,9 +53,66 @@ function rawBody(event) {
   return event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body;
 }
 
+function isProductionEnvironment() {
+  return process.env.NODE_ENV === "production"
+    || process.env.CONTEXT === "production"
+    || process.env.NETLIFY === "true";
+}
+
+function audioExtension(contentType) {
+  const type = cleanText(contentType, 120).toLowerCase();
+  if (type.includes("ogg")) return "ogg";
+  if (type.includes("mpeg") || type.includes("mp3")) return "mp3";
+  if (type.includes("mp4") || type.includes("m4a")) return "m4a";
+  if (type.includes("wav")) return "wav";
+  if (type.includes("webm")) return "webm";
+  if (type.includes("amr")) return "amr";
+  return "audio";
+}
+
+async function transcribeMetaAudio(message) {
+  const token = process.env.WHATSAPP_ACCESS_TOKEN;
+  const mediaId = cleanText(message.audio_id, 160);
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!token || !mediaId) throw new Error("whatsapp_audio_media_not_configured");
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+  const graphVersion = process.env.WHATSAPP_GRAPH_API_VERSION || "v26.0";
+  const mediaResponse = await fetch(`https://graph.facebook.com/${graphVersion}/${encodeURIComponent(mediaId)}`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!mediaResponse.ok) throw new Error(`whatsapp_media_metadata_failed_${mediaResponse.status}`);
+  const media = await mediaResponse.json();
+  const mediaUrl = cleanText(media.url, 1600);
+  if (!mediaUrl) throw new Error("whatsapp_media_url_missing");
+  const audioResponse = await fetch(mediaUrl, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!audioResponse.ok) throw new Error(`whatsapp_media_download_failed_${audioResponse.status}`);
+  const contentLength = Number(audioResponse.headers?.get?.("content-length") || 0);
+  if (contentLength > 24 * 1024 * 1024) throw new Error("whatsapp_audio_too_large");
+  const audio = Buffer.from(await audioResponse.arrayBuffer());
+  if (audio.length > 24 * 1024 * 1024) throw new Error("whatsapp_audio_too_large");
+  const contentType = cleanText(message.audio_content_type, 120) || "audio/ogg";
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_TRANSCRIPTION_MODEL || "whisper-1");
+  form.append("file", new Blob([audio], { type: contentType }), `whatsapp-audio.${audioExtension(contentType)}`);
+  const transcriptionResponse = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const raw = await transcriptionResponse.text();
+  let parsed = {};
+  try { parsed = raw ? JSON.parse(raw) : {}; } catch (_) { parsed = {}; }
+  if (!transcriptionResponse.ok) throw new Error(`openai_transcription_failed_${transcriptionResponse.status}:${cleanText(parsed.error?.message || raw, 180)}`);
+  const transcript = cleanText(parsed.text, 800);
+  if (!transcript) throw new Error("whatsapp_transcription_empty");
+  return transcript;
+}
+
 function verifySignature(event) {
   const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret) return true;
+  if (!secret) return !isProductionEnvironment() && process.env.WHATSAPP_REQUIRE_SIGNATURE !== "true";
   const signature = header(event, "x-hub-signature-256");
   if (!signature.startsWith("sha256=")) return false;
   const expected = `sha256=${crypto.createHmac("sha256", secret).update(rawBody(event), "utf8").digest("hex")}`;
@@ -59,21 +137,29 @@ function verifyChallenge(event) {
 
 function incomingMessages(body) {
   const messages = [];
-  for (const entry of body.entry || []) {
-    for (const change of entry.changes || []) {
+  for (const entry of Array.isArray(body?.entry) ? body.entry : []) {
+    if (!entry || typeof entry !== "object") continue;
+    for (const change of Array.isArray(entry.changes) ? entry.changes : []) {
+      if (!change || typeof change !== "object") continue;
       const value = change.value || {};
-      for (const message of value.messages || []) {
+      for (const message of Array.isArray(value.messages) ? value.messages : []) {
+        if (!message || typeof message !== "object") continue;
         const text = cleanText(
           (message.text && message.text.body)
           || (message.button && (message.button.text || message.button.payload))
           || (message.interactive && message.interactive.button_reply && (message.interactive.button_reply.title || message.interactive.button_reply.id))
           || (message.interactive && message.interactive.list_reply && (message.interactive.list_reply.title || message.interactive.list_reply.id))
         );
-        if (!text) continue;
+        const from = cleanText(message.from, 40);
+        const audioId = cleanText(message.audio && message.audio.id, 160);
+        const audioContentType = cleanText(message.audio && (message.audio.mime_type || message.audio.mimeType), 120);
+        if ((!text && !audioId) || !from) continue;
         messages.push({
-          from: cleanText(message.from, 40),
+          from,
           id: cleanText(message.id, 120),
           text,
+          audio_id: audioId,
+          audio_content_type: audioContentType,
         });
       }
     }
@@ -108,114 +194,116 @@ function requestedAppNames(text) {
 
 function detectedLanguage(text) {
   const value = cleanText(text, 800).toLowerCase();
-  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales)\b/i.test(value)
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
     ? "es"
     : "en";
 }
 
-function appsQuery(appNames) {
-  const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 8) : [];
-  return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^es|^en/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
 }
 
-function publicOpenLink(actionName, params = {}) {
-  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://getblank.netlify.app").replace(/\/$/, "");
-  const query = new URLSearchParams({ action: actionName });
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null || value === "") continue;
-    query.set(key, String(value));
-  }
-  return `${base}/open?${query.toString()}`;
+const PENDING_ACTION_TYPES = new Set([
+  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
+  "open_app_picker", "request_screen_time_permission",
+]);
+
+function pendingActionFromPlan(plan, prompt = "") {
+  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+    .find((item) => item && PENDING_ACTION_TYPES.has(item.type));
+  if (!action) return null;
+  const contractApps = plan.blocking_data && Array.isArray(plan.blocking_data.apps)
+    ? plan.blocking_data.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps")
+    : [];
+  const appNames = (contractApps.length ? contractApps : requestedAppNames(prompt)).slice(0, 12);
+  if (action.type === "apply_schedule" && (
+    !Number.isInteger(action.start_minute)
+    || !Number.isInteger(action.end_minute)
+    || action.start_minute === action.end_minute
+  )) return null;
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const payload = {
+    type: action.type,
+    name: action.name || null,
+    source_mode_name: action.source_mode_name || null,
+    copy_mode: action.copy_mode === true,
+    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
+    hard_mode: action.hard_mode === true,
+    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
+    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
+    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
+    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
+    hours: Number.isInteger(action.hours) ? action.hours : null,
+    app_names: appNames,
+  };
+  const fingerprint = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
+  return {
+    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
+    fingerprint,
+    ...payload,
+    status: "queued",
+    summary: cleanText(plan.message_text || plan.response_text, 320),
+    created_at: createdAt,
+    expires_at: expiresAt,
+  };
 }
 
-function appLink(action, appNames = []) {
-  const type = action && action.type;
-  if (type === "start_protection") {
-    const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
-    return publicOpenLink("start-focus", { minutes, hard: action.hard_mode ? "true" : "" });
-  }
-  if (type === "activate_mode" && action.name) {
-    const minutes = Number.isFinite(action.minutes) ? action.minutes : 30;
-    return publicOpenLink("mode", { name: action.name, activate: "true", minutes, hard: action.hard_mode ? "true" : "" });
-  }
-  if (type === "apply_schedule") {
-    const start = Number.isFinite(action.start_minute) ? action.start_minute : null;
-    const end = Number.isFinite(action.end_minute) ? action.end_minute : null;
-    if (start == null || end == null) return "";
-    const days = Number.isFinite(action.duration_days) ? action.duration_days : 7;
-    return publicOpenLink(appNames.length ? "setup-plan" : "apply-plan", {
-      start,
-      end,
-      days,
-      apps: appNames.length ? appNames.slice(0, 8).join(",") : "",
-    });
-  }
-  if (type === "enable_allow_only") return publicOpenLink("allow-only");
-  if (type === "enable_adult_filter") return publicOpenLink("adult-filter");
-  if (type === "set_daily_limit") return publicOpenLink("daily-limit", { minutes: Number.isFinite(action.minutes) ? action.minutes : 25 });
-  if (type === "pause_rules") return publicOpenLink("pause-rules", { hours: Number.isFinite(action.hours) ? action.hours : 168 });
-  if (type === "disable_pause") return publicOpenLink("resume-rules");
-  if (type === "switch_mode" && action.name) return publicOpenLink("mode", { name: action.name });
-  if (type === "open_app_picker" || type === "request_screen_time_permission" || type === "apply_ai_plan") {
-    return publicOpenLink("open-picker", { source: "assistant", apps: appNames.length ? appNames.slice(0, 8).join(",") : "" });
-  }
-  return "";
-}
-
-function actionableLink(plan, prompt = "") {
-  const actions = Array.isArray(plan.actions) ? plan.actions : [];
-  const appNames = requestedAppNames(prompt);
-  for (const action of actions) {
-    const link = appLink(action, appNames);
-    if (link) return link;
-  }
-  return "";
-}
-
-function whatsappReplyText(plan, prompt = "") {
-  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
-  const link = actionableLink(plan, prompt);
-  if (!link) return text;
-  return `${text}\n\nOpen Blanked to apply it:\n${link}`;
-}
-
-function whatsappActionButtonVariables(link) {
-  let linkPath = link;
+async function queuePendingAssistantAction(connection, plan, prompt = "") {
+  if (!connection?.connectCode) return null;
+  const pending = pendingActionFromPlan(plan, prompt);
+  if (!pending) return null;
+  let memory = {};
   try {
-    const parsed = new URL(link);
-    linkPath = `${parsed.pathname.replace(/^\//, "")}${parsed.search}`;
-  } catch (_) {
-    linkPath = link.replace(/^https?:\/\/[^/]+\//i, "");
+    memory = await getAssistantMemory(connection.channel, connection.channelUser);
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
   }
-  const configured = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_VARIABLES, 1000);
-  if (configured) {
-    try {
-      const parsed = JSON.parse(configured);
-      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
-        key,
-        String(value)
-          .replace(/\{\{link\}\}/g, link)
-          .replace(/\{\{link_path\}\}/g, linkPath),
-      ]));
-    } catch (_) {
-      return { "1": linkPath };
-    }
+  const existing = memory.pending_assistant_action;
+  if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
+    try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
+    return existing;
   }
-  return { "1": linkPath };
+  await recordAssistantMemory({
+    channel: connection.channel,
+    channelUser: connection.channelUser,
+    memory: { pending_assistant_action: pending },
+    source: "assistant_action_pending",
+  });
+  try { await sendAssistantActionPush(memory.assistant_device_push, pending); } catch (_) { /* Polling remains the fallback. */ }
+  return pending;
 }
 
-async function sendPlanReply(to, plan, prompt = "") {
-  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
-  const link = actionableLink(plan, prompt);
-  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID, 80);
-  if (!link || !contentSid) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
+function whatsappReplyText(plan) {
+  const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ACTION_TYPES.has(item.type));
+  const text = cleanText(plan.message_text || plan.response_text, 480)
+    .replace(/(?:https?|blank):\/\/\S+/gi, "")
+    .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
+    .replace(/[^.?!]*(?:review|revisa|revisar)[^.?!]*(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .slice(0, 320) || "I can help with that in Blanked.";
+  if (!action) return text;
+  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+  if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
+    const apps = Array.isArray(plan.blocking_data?.apps) ? plan.blocking_data.apps : [];
+    const link = require("./_bm_action_link").reviewActionLink(action, apps);
+    return link
+      ? `${text}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
+      : `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
+  }
+  if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
+  return text;
+}
 
-  const textResult = await sendWhatsAppMessage(to, text);
-  const buttonResult = await sendWhatsAppMessage(to, "", {
-    contentSid,
-    contentVariables: whatsappActionButtonVariables(link),
-  });
-  return { text: textResult, button: buttonResult };
+async function sendPlanReply(to, plan) {
+  return sendWhatsAppMessage(to, whatsappReplyText(plan));
 }
 
 function minuteOfDay(hour, minute, meridiem) {
@@ -243,9 +331,10 @@ function lunchEndMinute(text) {
   return mealEndMinute(text, /(lunch|comida|comer|almuerzo)/i);
 }
 
-function memoryFactsFromText(text) {
+function memoryFactsFromText(text, savedMemory = {}) {
   const value = cleanText(text, 800).toLowerCase();
   const apps = requestedAppNames(text);
+  const minutes = explicitDurationMinutes(text);
   const breakfastMinute = breakfastEndMinute(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
@@ -261,6 +350,15 @@ function memoryFactsFromText(text) {
     facts.breakfast_end_minute = breakfastMinute;
     facts.weak_hours = [Math.floor(breakfastMinute / 60)];
   }
+  if (savedMemory.pending_action === "set_daily_limit" && minutes != null) {
+    facts.pending_action = "";
+    facts.pending_app_names = [];
+  } else if (asksForDailyLimit(text) && minutes == null) {
+    facts.pending_action = "set_daily_limit";
+    facts.pending_app_names = apps.length
+      ? apps
+      : (Array.isArray(savedMemory.main_apps) ? savedMemory.main_apps.slice(0, 8) : []);
+  }
   return facts;
 }
 
@@ -268,18 +366,24 @@ async function agentContext(from, prompt) {
   let savedMemory = {};
   try {
     savedMemory = await getAssistantMemory("whatsapp", from);
-  } catch (_) {
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
     savedMemory = {};
   }
-  const newFacts = memoryFactsFromText(prompt);
-  const language = savedMemory.language || detectedLanguage(prompt);
+  const newFacts = memoryFactsFromText(prompt, savedMemory);
+  const language = messageLanguage(prompt, savedMemory.language);
+  const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
     ...newFacts,
     language,
     main_apps: newFacts.main_apps || savedMemory.main_apps,
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
+    conversation_state: conversationState,
   };
+  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+    ? savedMemory.user_context
+    : {};
   if (Object.keys(newFacts).length) {
     try {
       await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
@@ -288,32 +392,37 @@ async function agentContext(from, prompt) {
     }
   }
   return {
+    ...userContext,
     channel: "whatsapp",
     assistant_channel: "whatsapp",
     language,
     allow_spanish_response: true,
-    is_blank_active: false,
-    has_selected_apps: true,
-    selection_count: 1,
-    screen_time_authorized: true,
-    emergency_unlocks_remaining: 3,
-    vacation_mode_active: false,
-    risk_window: "the usual risk window",
-    recommended_duration_minutes: 30,
+    is_blank_active: userContext.is_blank_active === undefined ? false : userContext.is_blank_active,
+    has_selected_apps: userContext.has_selected_apps === true,
+    selection_count: Number.isFinite(userContext.selection_count) ? userContext.selection_count : 0,
+    screen_time_authorized: userContext.screen_time_authorized === true,
+    emergency_unlocks_remaining: Number.isFinite(userContext.emergency_unlocks_remaining) ? userContext.emergency_unlocks_remaining : 3,
+    vacation_mode_active: userContext.vacation_mode_active === undefined ? false : userContext.vacation_mode_active,
+    risk_window: userContext.risk_window || "the usual risk window",
+    recommended_duration_minutes: Number.isFinite(userContext.recommended_duration_minutes) ? userContext.recommended_duration_minutes : 30,
+    user_context: userContext,
     memory,
+    recent_messages: conversationState?.recent_messages || [],
+
   };
 }
 
 async function callBlankedAgent(prompt, from) {
+  const context = await agentContext(from, prompt);
   const response = await blankedAgentHandler({
     httpMethod: "POST",
-    body: JSON.stringify({ prompt, context: await agentContext(from, prompt) }),
+    body: JSON.stringify({ prompt, context }),
   });
   const body = JSON.parse(response.body || "{}");
   if (response.statusCode < 200 || response.statusCode >= 300 || !body.ok) {
     throw new Error(body.error || "blanked_agent_failed");
   }
-  return body.plan;
+  return { plan: body.plan, context };
 }
 
 async function recordAssistantConnection({ channel, connectCode, from }) {
@@ -327,16 +436,31 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
     await recordAssistantMemory({
       channel,
       channelUser: from,
-      memory: { proactive_updates_paused: false },
+      memory: {
+        proactive_updates_paused: false,
+        assistant_connect_code: String(connectCode || "").toUpperCase(),
+        pending_assistant_action: null,
+      },
       source: "assistant_channel_connected",
     });
+    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
   } catch (_) {
     return;
   }
 }
 
 async function processMessage(message) {
-  const connectCode = connectCodeFromText(message.text);
+  let prompt = message.text;
+  if (message.audio_id) {
+    try {
+      const transcript = await transcribeMetaAudio(message);
+      prompt = prompt ? `${prompt}\n${transcript}` : transcript;
+    } catch (_) {
+      return sendWhatsAppMessage(message.from, "I could not understand that voice note yet. Send it as text or try another audio.");
+    }
+  }
+  if (!prompt) return sendWhatsAppMessage(message.from, "I could not read that message yet. Send it as text or try another audio.");
+  const connectCode = connectCodeFromText(prompt);
   if (connectCode) {
     await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
     return sendWhatsAppMessage(
@@ -345,12 +469,23 @@ async function processMessage(message) {
     );
   }
 
-  const command = message.text.toLowerCase();
+  let linkedConnection = null;
+  try {
+    linkedConnection = await ensureAssistantConnectionForPhone({ channel: "whatsapp", channelUser: message.from });
+  } catch (_) {
+    // Automatic identity matching is additive; legacy CONNECT remains available.
+  }
+
+  const command = prompt.toLowerCase();
   if (command === "stop" || command === "disconnect") {
     await recordAssistantMemory({
       channel: "whatsapp",
       channelUser: message.from,
-      memory: { proactive_updates_paused: true, pending_proactive_message: "" },
+      memory: {
+        proactive_updates_paused: true,
+        pending_proactive_message: "",
+        pending_assistant_action: null,
+      },
       source: "assistant_channel_paused",
     });
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
@@ -361,8 +496,15 @@ async function processMessage(message) {
   } catch (_) {
     pendingMemory = {};
   }
+  if (!linkedConnection && pendingMemory.assistant_connect_code) {
+    linkedConnection = {
+      channel: "whatsapp",
+      channelUser: message.from,
+      connectCode: String(pendingMemory.assistant_connect_code).toUpperCase(),
+    };
+  }
   const pendingMessage = cleanText(pendingMemory.pending_proactive_message, 900);
-  if (pendingMessage && acceptsProactiveUpdate(message.text)) {
+  if (pendingMessage && acceptsProactiveUpdate(prompt)) {
     await recordAssistantMemory({
       channel: "whatsapp",
       channelUser: message.from,
@@ -371,8 +513,55 @@ async function processMessage(message) {
     });
     return sendWhatsAppMessage(message.from, pendingMessage);
   }
-  const plan = await callBlankedAgent(message.text, message.from);
-  return sendPlanReply(message.from, plan, message.text);
+  const result = await callBlankedAgent(prompt, message.from);
+  const plan = result.plan;
+  try {
+    await recordAssistantConversationTurn({
+      channel: "whatsapp",
+      channelUser: message.from,
+      previousState: result.context.memory?.conversation_state,
+      userMessage: prompt,
+      assistantMessage: plan.message_text || plan.response_text || "",
+      semanticState: plan.semantic_state,
+      expectedVersion: result.context.memory?.semantic_store_version,
+      topic: result.context.memory?.last_topic || "",
+    });
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
+    // Short-term memory must never block the user-facing reply.
+  }
+  if (plan.blocking_user_request === true) {
+    try {
+      await recordAssistantMemory({
+        channel: "whatsapp",
+        channelUser: message.from,
+        memory: {
+          pending_blocking: plan.blocking_ready === false
+            ? { ...(plan.blocking_data || {}), updated_at: new Date().toISOString() }
+            : null,
+        },
+        source: plan.blocking_ready === false ? "blocking_details_requested" : "blocking_contract_completed",
+      });
+    } catch (_) {
+      // Pending blocking state must never block the user-facing reply.
+    }
+  }
+  try {
+    const queued = await queuePendingAssistantAction(linkedConnection, plan, prompt);
+    const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
+      || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
+    if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
+      await recordAssistantMemory({
+        channel: linkedConnection.channel,
+        channelUser: linkedConnection.channelUser,
+        memory: { pending_assistant_action: null },
+        source: "assistant_action_invalidated",
+      });
+    }
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
+  }
+  return sendPlanReply(message.from, plan);
 }
 
 exports.handler = async (event) => {
@@ -383,12 +572,46 @@ exports.handler = async (event) => {
 
   try {
     const body = parseJsonBody(event);
+    if (!body || typeof body !== "object" || Array.isArray(body)) return json(400, { error: "invalid_whatsapp_payload" });
     const messages = incomingMessages(body);
     const results = [];
+    const seenInRequest = new Set();
     for (const message of messages.slice(0, 5)) {
-      results.push(await processMessage(message));
+      if (message.id) {
+        if (seenInRequest.has(message.id)) {
+          results.push({ skipped: true, reason: "duplicate_inbound" });
+          continue;
+        }
+        seenInRequest.add(message.id);
+        try {
+          const claim = await claimAssistantInboundMessage("whatsapp", message.from, message.id);
+          if (!claim.claimed) {
+            results.push({ skipped: true, reason: "duplicate_inbound" });
+            continue;
+          }
+        } catch (_) {
+          // A temporary memory outage must not discard an inbound message.
+        }
+      }
+      let result;
+      try {
+        result = await processMessage(message);
+      } catch (error) {
+        try { await releaseAssistantInboundMessage("whatsapp", message.from, message.id); } catch (_) { /* Return failure; never deliver an uncommitted action. */ }
+        throw error;
+      }
+      results.push(result);
+      const deliveryFailed = result?.skipped === true && /credentials|template_requires/i.test(result.reason || "")
+        || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");
+      if (message.id && !deliveryFailed) {
+        try {
+          await completeAssistantInboundMessage("whatsapp", message.from, message.id);
+        } catch (_) {
+          // Inbound idempotency is best effort when memory persistence is unavailable.
+        }
+      }
     }
-    return json(200, { ok: true, received: messages.length, results });
+    return json(200, { ok: true, received: Math.min(messages.length, 5), results });
   } catch (error) {
     return json(500, { error: "whatsapp_agent_failed", detail: error.message });
   }

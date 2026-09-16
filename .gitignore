@@ -30,6 +30,8 @@ keystore.properties
 /tmp/product-harness/
 /tmp/reports/
 /tools/reports/product_harness_*.json
+/tools/reports/bai_synthetic_conversation_suite_*.json
+/tools/reports/blanked_agent_eval_*.json
 /web/landing/assets/blank-green-mascot*
 /web/landing/assets/blank-product-square-*.png
 /web/landing/assets/call_*.png

@@ -8,7 +8,7 @@ enum HomeSection: Hashable {
     case schedule
     case report
     case emergency
-    case timer
+    case sessions
     case settings
 }
 
@@ -318,8 +318,8 @@ struct HomeView: View {
                 topNavButton("Plan") {
                     openSection(.modes)
                 }
-                topNavButton("Timer") {
-                    openSection(.timer)
+                topNavButton("Sessions") {
+                    openSection(.sessions)
                 }
             }
             .padding(.horizontal, 22)
@@ -426,8 +426,8 @@ struct HomeView: View {
                     openSection(.modes)
                 }
 
-                minimalHomeRow("timer", color: BlankColors.homeLightSecondary) {
-                    openSection(.timer)
+                minimalHomeRow("sessions", color: BlankColors.homeLightSecondary) {
+                    openSection(.sessions)
                 }
 
                 minimalHomeRow("settings", color: BlankColors.homeLightSecondary) {
@@ -604,8 +604,8 @@ struct HomeView: View {
             minimalHomeRow("plan", color: BlankColors.homeDarkSecondary) {
                 openSection(.modes)
             }
-            minimalHomeRow("timer", color: BlankColors.homeDarkSecondary) {
-                openSection(.timer)
+            minimalHomeRow("sessions", color: BlankColors.homeDarkSecondary) {
+                openSection(.sessions)
             }
             minimalHomeRow("settings", color: BlankColors.homeDarkSecondary) {
                 openSection(.settings)
@@ -2059,8 +2059,8 @@ struct HomeSectionScreen: View {
                 intervention: intervention,
                 onUnlock: onEmergencyUnlock
             )
-        case .timer:
-            TimerScreen(onStart: onTimedBlank)
+        case .sessions:
+            SessionsScreen(onStartTimer: onTimedBlank)
         case .settings:
             SettingsScreen(
                 onOpenEmergency: { onOpenSection(.emergency) },
@@ -2995,6 +2995,205 @@ private struct TechnicalSheetActions<Content: View>: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
+    }
+}
+
+private struct SessionsScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @State private var showingManualTimer = false
+
+    let onStartTimer: (Int, Bool) -> Void
+
+    private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
+    private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
+
+    private var textColor: Color {
+        sessionStore.isBlankActive ? Color.white : BlankColors.minimalInk
+    }
+
+    private var secondaryColor: Color {
+        sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.minimalSecondary
+    }
+
+    private var cardSurface: Color {
+        sessionStore.isBlankActive ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface
+    }
+
+    private var activePlans: [BlankHabitWindow] {
+        sessionStore.schedule.activeWindows
+    }
+
+    private var activePlansSubtitle: String {
+        guard !activePlans.isEmpty else { return "no active plans" }
+        return "\(activePlans.count) active \(activePlans.count == 1 ? "plan" : "plans")"
+    }
+
+    private var blockedTargetsText: String {
+        let count = sessionStore.selectionCount
+        guard count > 0 else { return "choose apps" }
+        return "\(count) \(count == 1 ? "app" : "apps") blocked"
+    }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                TopSheetHeader(
+                    title: "Sessions",
+                    subtitle: activePlansSubtitle,
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 28)
+
+                if activePlans.isEmpty {
+                    emptyPlans
+                } else {
+                    VStack(spacing: 14) {
+                        ForEach(activePlans) { plan in
+                            planCard(plan)
+                        }
+                    }
+                }
+
+                manualTimerButton
+                    .padding(.top, activePlans.isEmpty ? 22 : 16)
+
+                Spacer(minLength: 24)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .background(Color.clear)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .sheet(isPresented: $showingManualTimer) {
+            TimerScreen { minutes, hardMode in
+                showingManualTimer = false
+                onStartTimer(minutes, hardMode)
+            }
+            .environment(\.blankMinimalAppearance, true)
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private var emptyPlans: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("no active plans")
+                .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
+                .tracking(-0.35)
+                .foregroundStyle(textColor)
+
+            Text("Create a plan from WhatsApp or Plan to see it here.")
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(secondaryColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func planCard(_ plan: BlankHabitWindow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(planTitle(for: plan))
+                    .font(.blankInter(size: 23, weight: .bold, relativeTo: .title3))
+                    .tracking(-0.45)
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Spacer(minLength: 8)
+
+                Circle()
+                    .fill(textColor.opacity(0.78))
+                    .frame(width: 7, height: 7)
+                    .accessibilityHidden(true)
+            }
+
+            Text(blockedTargetsText)
+                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                .foregroundStyle(secondaryColor)
+                .padding(.top, 5)
+
+            HStack(spacing: 8) {
+                Text("\(formatMinute(plan.startMinute)) – \(formatMinute(plan.endMinute))")
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(textColor)
+                    .monospacedDigit()
+
+                Spacer(minLength: 8)
+
+                Text(plan.runsEveryDay ? "daily" : "scheduled")
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+            }
+            .padding(.top, 20)
+
+            HStack(spacing: 6) {
+                ForEach(0..<weekdayOrder.count, id: \.self) { index in
+                    let weekday = weekdayOrder[index]
+                    let isSelected = plan.weekdays.contains(weekday)
+
+                    Text(weekdayLabels[index])
+                        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(isSelected ? textColor : secondaryColor.opacity(0.55))
+                        .frame(width: 27, height: 27)
+                        .background {
+                            Circle()
+                                .fill(isSelected ? textColor.opacity(0.12) : textColor.opacity(0.035))
+                        }
+                }
+            }
+            .padding(.top, 12)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(cardSurface)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(planTitle(for: plan)), \(blockedTargetsText), \(formatMinute(plan.startMinute)) to \(formatMinute(plan.endMinute))"
+        )
+    }
+
+    private var manualTimerButton: some View {
+        Button {
+            showingManualTimer = true
+        } label: {
+            HStack(spacing: 12) {
+                Text("manual timer")
+                    .font(.blankInter(size: 19, weight: .bold, relativeTo: .headline))
+                    .tracking(-0.25)
+
+                Spacer(minLength: 8)
+
+                Text("one-off block")
+                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(textColor)
+                    .frame(width: 27, height: 27)
+                    .background(Circle().fill(textColor.opacity(0.10)))
+            }
+            .foregroundStyle(textColor)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Create a manual timer")
+    }
+
+    private func planTitle(for plan: BlankHabitWindow) -> String {
+        let normalizedName = plan.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedName.isEmpty || normalizedName.lowercased().hasPrefix("habit") {
+            return sessionStore.currentMode.name.lowercased()
+        }
+        return normalizedName.lowercased()
     }
 }
 

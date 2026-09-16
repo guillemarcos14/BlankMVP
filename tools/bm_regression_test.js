@@ -140,15 +140,20 @@ check("immediate_protection_does_not_invent_duration", () => {
   const reviewLink = require("../netlify/functions/_bm_action_link").reviewActionLink({ type: "start_protection", minutes: 17 });
   assert.strictEqual(new URL(reviewLink).searchParams.get("action"), "review-action");
   assert.strictEqual(new URL(reviewLink).searchParams.get("minutes"), "17");
-  assert.match(whatsapp, /TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED/);
+  assert.match(whatsapp, /queuePendingAssistantAction/);
+  assert.doesNotMatch(whatsapp, /TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED/);
+  assert.doesNotMatch(whatsapp, /Review and confirm in Blankmind:\\n/);
   assert.doesNotMatch(whatsapp, /start-focus.*minutes.*30/);
 });
 
 check("whatsapp_actions_require_native_confirmation", () => {
-  assert.match(whatsapp, /Review and confirm in Blankmind/);
+  assert.match(whatsapp, /Open Blankmind to review and apply it/);
+  assert.match(assistantChannel, /poll_pending_action/);
+  assert.match(assistantChannel, /ack_pending_action/);
   assert.match(blankApp, /action == "review-action"/);
   assert.match(sessionStore, /pendingAssistantAction/);
   assert.match(home, /Review and confirm/);
+  assert.match(home, /AssistantActionInboxClient/);
 });
 
 check("assistant_context_sync_reaches_messaging_identity", () => {

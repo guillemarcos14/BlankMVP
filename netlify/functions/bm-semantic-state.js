@@ -557,7 +557,7 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
       ? "Todavía necesito que Blankmind confirme la conexión. Usa el enlace de revisión del mensaje anterior para continuar. No se ha aplicado ningún cambio."
-      : "I still need Blankmind to confirm the connection. Use the review link above to continue. Nothing has been applied yet.";
+      : "I still need Blankmind to confirm the connection. Open Blankmind to review and apply the proposal. Nothing has been applied yet.";
     return es
       ? `${semanticSummary(state)}. Abre Blankmind para revisar y aplicar la propuesta.`
       : `${semanticSummary(state)}. Open Blankmind to review and apply the proposal.`;

@@ -123,13 +123,13 @@ async function run() {
   });
   assert.deepStrictEqual(installedContinuation.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(installedContinuation.semantic_state.next_question, "app_presence");
-  assert.match(installedContinuation.message_text, /review link above|Nothing has been applied/i);
+  assert.match(installedContinuation.message_text, /Open Blankmind to review and apply|Nothing has been applied/i);
 
   const repeatedInstallClaim = await request("It’s already opened", {
     channel: "whatsapp", semantic_state: installedContinuation.semantic_state,
   });
   assert.deepStrictEqual(repeatedInstallClaim.actions.map((item) => item.type), ["apply_schedule"]);
-  assert.match(repeatedInstallClaim.message_text, /review link above|Nothing has been applied/i);
+  assert.match(repeatedInstallClaim.message_text, /Open Blankmind to review and apply|Nothing has been applied/i);
 
   const permissionGuidance = await confirmedProposal({ ...recentContext, screen_time_authorized: false });
   assert.deepStrictEqual(permissionGuidance.actions.map((item) => item.type), ["request_screen_time_permission"]);

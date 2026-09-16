@@ -15,7 +15,6 @@ const {
 } = require("./_assistant_channel");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
-const { reviewActionLink } = require("./_bm_action_link");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 
 function cleanText(value, maxLength = 600) {
@@ -208,111 +207,84 @@ function messageLanguage(text, savedLanguage = "") {
   return detectedLanguage(text);
 }
 
-function appsQuery(appNames) {
-  const names = Array.isArray(appNames) ? appNames.filter(Boolean).slice(0, 8) : [];
-  return names.length ? `&apps=${encodeURIComponent(names.join(","))}` : "";
-}
+const PENDING_ACTION_TYPES = new Set([
+  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
+  "open_app_picker", "request_screen_time_permission",
+]);
 
-function publicOpenLink(actionName, params = {}) {
-  const base = (process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://getblank.netlify.app").replace(/\/$/, "");
-  const query = new URLSearchParams({ action: actionName });
-  for (const [key, value] of Object.entries(params)) {
-    if (value == null || value === "") continue;
-    query.set(key, String(value));
-  }
-  return `${base}/open?${query.toString()}`;
-}
-
-function appLink(action, appNames = []) {
-  return reviewActionLink(action, appNames);
-}
-
-function actionableLink(plan, prompt = "") {
-  const actions = Array.isArray(plan.actions) ? plan.actions : [];
+function pendingActionFromPlan(plan, prompt = "") {
+  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+    .find((item) => item && PENDING_ACTION_TYPES.has(item.type));
+  if (!action) return null;
   const contractApps = plan.blocking_data && Array.isArray(plan.blocking_data.apps)
     ? plan.blocking_data.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps")
     : [];
-  const appNames = contractApps.length ? contractApps : requestedAppNames(prompt);
-  for (const action of actions) {
-    const link = appLink(action, appNames);
-    if (link) return link;
-  }
-  return "";
+  const appNames = (contractApps.length ? contractApps : requestedAppNames(prompt)).slice(0, 12);
+  if (action.type === "apply_schedule" && (
+    !Number.isInteger(action.start_minute)
+    || !Number.isInteger(action.end_minute)
+    || action.start_minute === action.end_minute
+  )) return null;
+  const createdAt = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const payload = {
+    type: action.type,
+    name: action.name || null,
+    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
+    hard_mode: action.hard_mode === true,
+    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
+    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
+    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
+    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
+    hours: Number.isInteger(action.hours) ? action.hours : null,
+    app_names: appNames,
+  };
+  const fingerprint = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
+  return {
+    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
+    fingerprint,
+    ...payload,
+    summary: cleanText(plan.message_text || plan.response_text, 320),
+    created_at: createdAt,
+    expires_at: expiresAt,
+  };
 }
 
-function whatsappReplyText(plan, prompt = "") {
-  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
-  const link = actionableLink(plan, prompt);
-  if (!link) return text;
-  return `${text}\n\nReview and confirm in Blankmind:\n${link}`;
-}
-
-function whatsappActionButtonVariables(link) {
-  let linkPath = link;
+async function queuePendingAssistantAction(connection, plan, prompt = "") {
+  if (!connection?.connectCode) return null;
+  const pending = pendingActionFromPlan(plan, prompt);
+  if (!pending) return null;
+  let memory = {};
   try {
-    const parsed = new URL(link);
-    linkPath = `${parsed.pathname.replace(/^\//, "")}${parsed.search}`;
-  } catch (_) {
-    linkPath = link.replace(/^https?:\/\/[^/]+\//i, "");
-  }
-  const configured = cleanText(process.env.TWILIO_WHATSAPP_ACTION_CONTENT_VARIABLES, 1000);
-  if (configured) {
-    try {
-      const parsed = JSON.parse(configured);
-      return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [
-        key,
-        String(value)
-          .replace(/\{\{link\}\}/g, link)
-          .replace(/\{\{link_path\}\}/g, linkPath),
-      ]));
-    } catch (_) {
-      return { "1": linkPath };
-    }
-  }
-  return { "1": linkPath };
-}
-
-async function sendPlanReply(to, plan, prompt = "") {
-  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
-  const link = actionableLink(plan, prompt);
-  // The previous template contained a misleading static CTA label. Only use a
-  // separately approved review template, never the legacy action template.
-  const contentSid = cleanText(process.env.TWILIO_WHATSAPP_REVIEW_CONTENT_SID, 80);
-  const templateEnabled = process.env.TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED === "true"
-    && Boolean(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_WHATSAPP_FROM_NUMBER);
-  // A template can contain a stale static button label that the backend cannot inspect.
-  // Keep the safe text link as the default until the approved template is explicitly verified.
-  if (!link || !contentSid || !templateEnabled) return sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
-
-  let textResult;
-  try {
-    textResult = await sendWhatsAppMessage(to, text);
+    memory = await getAssistantMemory(connection.channel, connection.channelUser);
   } catch (error) {
-    // Outside the WhatsApp session window, the approved template may still be deliverable.
-    const buttonResult = await sendWhatsAppMessage(to, "", {
-      contentSid,
-      contentVariables: whatsappActionButtonVariables(link),
-    });
-    if (!buttonResult?.skipped) return { text: { skipped: true, reason: "session_window_closed" }, button: buttonResult };
-    throw error;
+    if (semanticPersistenceRequired()) throw error;
   }
-  try {
-    const buttonResult = await sendWhatsAppMessage(to, "", {
-      contentSid,
-      contentVariables: whatsappActionButtonVariables(link),
-    });
-    return { text: textResult, button: buttonResult };
-  } catch (_) {
-    // If the approved button is misconfigured, keep the already delivered
-    // reply useful while the session window still permits a text fallback.
-    try {
-      const fallback = await sendWhatsAppMessage(to, whatsappReplyText(plan, prompt));
-      return { text: textResult, button: { skipped: true, reason: "review_template_failed" }, fallback };
-    } catch (_) {
-      // The text reply was already delivered; do not make the provider retry it.
-      return { text: textResult, button: { skipped: true, reason: "review_template_failed" } };
-    }
+  const existing = memory.pending_assistant_action;
+  if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
+    return existing;
   }
+  await recordAssistantMemory({
+    channel: connection.channel,
+    channelUser: connection.channelUser,
+    memory: { pending_assistant_action: pending },
+    source: "assistant_action_pending",
+  });
+  return pending;
+}
+
+function whatsappReplyText(plan) {
+  const text = cleanText(plan.message_text || plan.response_text, 320) || "I can help with that in Blanked.";
+  const hasAction = Array.isArray(plan.actions) && plan.actions.some((action) => action && PENDING_ACTION_TYPES.has(action.type));
+  if (hasAction && !/\b(?:open|abrir)\s+(?:blankmind|blanked)\b/i.test(text)) {
+    return `${text}\n\nOpen Blankmind to review and apply it.`;
+  }
+  return text;
+}
+
+async function sendPlanReply(to, plan) {
+  return sendWhatsAppMessage(to, whatsappReplyText(plan));
 }
 
 function minuteOfDay(hour, minute, meridiem) {
@@ -445,7 +417,11 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
     await recordAssistantMemory({
       channel,
       channelUser: from,
-      memory: { proactive_updates_paused: false },
+      memory: {
+        proactive_updates_paused: false,
+        assistant_connect_code: String(connectCode || "").toUpperCase(),
+        pending_assistant_action: null,
+      },
       source: "assistant_channel_connected",
     });
     await attachAssistantUserContext({ connectCode, channel, channelUser: from });
@@ -474,8 +450,9 @@ async function processMessage(message) {
     );
   }
 
+  let linkedConnection = null;
   try {
-    await ensureAssistantConnectionForPhone({ channel: "whatsapp", channelUser: message.from });
+    linkedConnection = await ensureAssistantConnectionForPhone({ channel: "whatsapp", channelUser: message.from });
   } catch (_) {
     // Automatic identity matching is additive; legacy CONNECT remains available.
   }
@@ -485,7 +462,11 @@ async function processMessage(message) {
     await recordAssistantMemory({
       channel: "whatsapp",
       channelUser: message.from,
-      memory: { proactive_updates_paused: true, pending_proactive_message: "" },
+      memory: {
+        proactive_updates_paused: true,
+        pending_proactive_message: "",
+        pending_assistant_action: null,
+      },
       source: "assistant_channel_paused",
     });
     return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
@@ -495,6 +476,13 @@ async function processMessage(message) {
     pendingMemory = await getAssistantMemory("whatsapp", message.from);
   } catch (_) {
     pendingMemory = {};
+  }
+  if (!linkedConnection && pendingMemory.assistant_connect_code) {
+    linkedConnection = {
+      channel: "whatsapp",
+      channelUser: message.from,
+      connectCode: String(pendingMemory.assistant_connect_code).toUpperCase(),
+    };
   }
   const pendingMessage = cleanText(pendingMemory.pending_proactive_message, 900);
   if (pendingMessage && acceptsProactiveUpdate(prompt)) {
@@ -539,7 +527,12 @@ async function processMessage(message) {
       // Pending blocking state must never block the user-facing reply.
     }
   }
-  return sendPlanReply(message.from, plan, prompt);
+  try {
+    await queuePendingAssistantAction(linkedConnection, plan, prompt);
+  } catch (error) {
+    if (semanticPersistenceRequired()) throw error;
+  }
+  return sendPlanReply(message.from, plan);
 }
 
 exports.handler = async (event) => {

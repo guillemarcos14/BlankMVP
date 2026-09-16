@@ -11,6 +11,167 @@ enum HomeSection: Hashable {
     case timer
 }
 
+fileprivate struct AssistantInboxResponse: Decodable {
+    let pendingAction: AssistantInboxAction?
+
+    enum CodingKeys: String, CodingKey {
+        case pendingAction = "pending_action"
+    }
+}
+
+fileprivate struct AssistantInboxAction: Decodable {
+    let id: String
+    let type: String
+    let name: String?
+    let minutes: Int?
+    let hardMode: Bool?
+    let startMinute: Int?
+    let endMinute: Int?
+    let weekdays: [Int]?
+    let durationDays: Int?
+    let hours: Int?
+    let appNames: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case type
+        case name
+        case minutes
+        case hardMode = "hard_mode"
+        case startMinute = "start_minute"
+        case endMinute = "end_minute"
+        case weekdays
+        case durationDays = "duration_days"
+        case hours
+        case appNames = "app_names"
+    }
+
+    func toPendingAction() -> AssistantPendingAction? {
+        let apps = (appNames ?? []).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        switch type {
+        case "start_protection":
+            return .startProtection(minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
+        case "activate_mode":
+            return .activateMode(name: name ?? "Routine", minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
+        case "switch_mode":
+            return .switchMode(name: name ?? "Routine")
+        case "apply_schedule":
+            guard let startMinute, let endMinute else { return nil }
+            return .applySchedule(
+                name: name ?? "AI Plan",
+                startMinute: min(max(startMinute, 0), 1439),
+                endMinute: min(max(endMinute, 0), 1439),
+                weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                durationDays: min(max(durationDays ?? 7, 1), 14),
+                appNames: apps
+            )
+        case "set_daily_limit":
+            return .setDailyLimit(minutes: minutes, appNames: apps)
+        case "enable_allow_only":
+            return .allowOnly
+        case "enable_adult_filter":
+            return .adultFilter
+        case "pause_rules":
+            return .pauseRules(hours: min(max(hours ?? 168, 1), 168))
+        case "disable_pause":
+            return .disablePause
+        case "apply_ai_plan":
+            return .applyAIPlan
+        case "open_app_picker":
+            let pickerName = name ?? ""
+            let pickerSchedule: PendingPlanSchedule?
+            if let startMinute, let endMinute {
+                pickerSchedule = PendingPlanSchedule(
+                    name: pickerName.isEmpty ? "AI Plan" : pickerName,
+                    startMinute: min(max(startMinute, 0), 1439),
+                    endMinute: min(max(endMinute, 0), 1439),
+                    weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
+                    durationDays: min(max(durationDays ?? 7, 1), 14)
+                )
+            } else {
+                pickerSchedule = nil
+            }
+            if pickerName == "Daily Limit", let minutes {
+                return .configureAndOpenDailyLimitPicker(appNames: apps, minutes: minutes)
+            }
+            if pickerSchedule != nil || minutes != nil || hardMode == true || !pickerName.isEmpty {
+                return .configureAndOpenAppPicker(
+                    appNames: apps,
+                    durationMinutes: minutes,
+                    hardMode: hardMode ?? false,
+                    schedule: pickerSchedule
+                )
+            }
+            return .openAppPicker(appNames: apps)
+        case "request_screen_time_permission":
+            return .requestScreenTimePermission
+        default:
+            return nil
+        }
+    }
+}
+
+fileprivate struct AssistantActionInboxClient {
+    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
+        guard let data = try? await request(
+            action: "poll_pending_action",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber
+        ), let response = try? JSONDecoder().decode(AssistantInboxResponse.self, from: data) else {
+            return nil
+        }
+        return response.pendingAction
+    }
+
+    func acknowledge(actionId: String, status: String, connectCode: String, channel: String, phoneNumber: String) async {
+        _ = try? await request(
+            action: "ack_pending_action",
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            actionId: actionId,
+            status: status
+        )
+    }
+
+    private func request(
+        action: String,
+        connectCode: String,
+        channel: String,
+        phoneNumber: String,
+        actionId: String? = nil,
+        status: String? = nil
+    ) async throws -> Data {
+        guard let rawBaseURL = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String else {
+            throw URLError(.badURL)
+        }
+        let base = rawBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, !base.contains("$("), let baseURL = URL(string: base) else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 8
+        var body: [String: Any] = [
+            "action": action,
+            "connect_code": connectCode,
+            "preferred_channel": channel,
+            "user_phone": phoneNumber,
+            "app_install_id": BlankSharedState.appInstallId,
+        ]
+        if let actionId { body["action_id"] = actionId }
+        if let status { body["status"] = status }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        return data
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
@@ -38,6 +199,9 @@ struct HomeView: View {
     @State private var delayedManualUnlockAt: Date?
     @State private var delayedManualUnlockTask: Task<Void, Never>?
     @State private var showingRelapseReview = false
+    @State private var pendingAssistantActionId = ""
+    @State private var assistantActionPollInFlight = false
+    @State private var lastAssistantActionPollAt = Date.distantPast
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -101,6 +265,7 @@ struct HomeView: View {
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
+            pollPendingAssistantActionIfNeeded(now: date)
             sessionStore.syncFromSharedDefaults(now: date)
             sessionStore.applyScheduleWindow(at: date)
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
@@ -116,6 +281,7 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            pollPendingAssistantActionIfNeeded(force: true)
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -128,6 +294,7 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            pollPendingAssistantActionIfNeeded(force: true)
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
@@ -256,7 +423,7 @@ struct HomeView: View {
             isPresented: Binding(
                 get: { sessionStore.pendingAssistantAction != nil },
                 set: { isPresented in
-                    if !isPresented { sessionStore.clearAssistantActionConfirmation() }
+                    if !isPresented { dismissPendingAssistantAction(status: "dismissed") }
                 }
             ),
             titleVisibility: .visible
@@ -265,7 +432,7 @@ struct HomeView: View {
                 confirmPendingAssistantAction()
             }
             Button("Cancel", role: .cancel) {
-                sessionStore.clearAssistantActionConfirmation()
+                dismissPendingAssistantAction(status: "dismissed")
             }
         } message: {
             Text(assistantActionConfirmationMessage)
@@ -977,7 +1144,23 @@ struct HomeView: View {
 
     private func confirmPendingAssistantAction() {
         guard let pendingAction = sessionStore.pendingAssistantAction else { return }
+        let actionId = pendingAssistantActionId
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
         sessionStore.clearAssistantActionConfirmation()
+        pendingAssistantActionId = ""
+        if !actionId.isEmpty, !code.isEmpty, channel == "whatsapp" || channel == "sms" {
+            let phoneNumber = assistantPhoneNumber
+            Task {
+                await AssistantActionInboxClient().acknowledge(
+                    actionId: actionId,
+                    status: "confirmed",
+                    connectCode: code,
+                    channel: channel,
+                    phoneNumber: phoneNumber
+                )
+            }
+        }
 
         switch pendingAction {
         case .startProtection(let minutes, let hardMode, let appNames):
@@ -1200,6 +1383,53 @@ struct HomeView: View {
                 channel: channel,
                 phoneNumber: assistantPhoneNumber,
                 payload: payload
+            )
+        }
+    }
+
+    private func pollPendingAssistantActionIfNeeded(force: Bool = false, now: Date = Date()) {
+        guard force || now.timeIntervalSince(lastAssistantActionPollAt) >= 5 else { return }
+        guard !assistantActionPollInFlight, sessionStore.pendingAssistantAction == nil else { return }
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        guard !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        lastAssistantActionPollAt = now
+        assistantActionPollInFlight = true
+        let phoneNumber = assistantPhoneNumber
+        Task {
+            let remoteAction = await AssistantActionInboxClient().poll(
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
+            )
+            await MainActor.run {
+                assistantActionPollInFlight = false
+                guard let remoteAction,
+                      let pendingAction = remoteAction.toPendingAction(),
+                      sessionStore.pendingAssistantAction == nil,
+                      remoteAction.id != pendingAssistantActionId else { return }
+                pendingAssistantActionId = remoteAction.id
+                sessionStore.requestAssistantActionConfirmation(pendingAction)
+            }
+        }
+    }
+
+    private func dismissPendingAssistantAction(status: String) {
+        let actionId = pendingAssistantActionId
+        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        pendingAssistantActionId = ""
+        sessionStore.clearAssistantActionConfirmation()
+        guard !actionId.isEmpty, !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        lastAssistantActionPollAt = Date()
+        let phoneNumber = assistantPhoneNumber
+        Task {
+            await AssistantActionInboxClient().acknowledge(
+                actionId: actionId,
+                status: status,
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phoneNumber
             )
         }
     }

@@ -7,6 +7,7 @@ delete process.env.WHATSAPP_ACCESS_TOKEN;
 delete process.env.WHATSAPP_PHONE_NUMBER_ID;
 
 const { handler } = require("../netlify/functions/whatsapp-agent");
+const { handler: assistantChannelHandler } = require("../netlify/functions/assistant-channel");
 
 const semanticMemoryRows = new Map();
 
@@ -192,6 +193,11 @@ async function linkIncludesRequestedApps() {
   };
 
   try {
+    await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.plan.connect", text: { body: "CONNECT ABC123" } }] } }] }] }),
+    });
     const response = await handler({
       httpMethod: "POST",
       headers: {},
@@ -220,8 +226,31 @@ async function linkIncludesRequestedApps() {
     assert.doesNotMatch(outboundText, /review-action/);
     const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.plan.confirm", text: { body: "Yes" } }] } }] }] }) });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.match(outboundText, /https:\/\/getblank\.netlify\.app\/open\?action=review-action/);
-    assert.match(outboundText, /apps=(?:Instagram%2CTikTok|TikTok%2CInstagram)/);
+    assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
+    assert.match(outboundText, /Open Blankmind to review and apply/i);
+    const pendingRows = [...semanticMemoryRows.values()].flat()
+      .map((row) => row.payload?.properties?.memory?.pending_assistant_action)
+      .filter(Boolean);
+    assert.strictEqual(pendingRows.length, 1);
+    assert.strictEqual(pendingRows[0].type, "apply_schedule");
+    assert.deepStrictEqual(pendingRows[0].app_names, ["Instagram", "TikTok"]);
+
+    const polled = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", connect_code: "ABC123", preferred_channel: "whatsapp" }),
+    });
+    const polledBody = JSON.parse(polled.body);
+    assert.strictEqual(polled.statusCode, 200, polled.body);
+    assert.strictEqual(polledBody.linked, true);
+    assert.strictEqual(polledBody.pending_action.id, pendingRows[0].id);
+    assert.deepStrictEqual(polledBody.pending_action.app_names, ["Instagram", "TikTok"]);
+
+    const acknowledged = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "ack_pending_action", connect_code: "ABC123", preferred_channel: "whatsapp", action_id: pendingRows[0].id, status: "confirmed" }),
+    });
+    assert.strictEqual(acknowledged.statusCode, 200, acknowledged.body);
+    assert.strictEqual(JSON.parse(acknowledged.body).acknowledged, true);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;
@@ -284,10 +313,9 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     requests.length = 0;
     const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.button.confirm", text: { body: "Yes" } }] } }] }] }) });
     assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.strictEqual(requests.length, 2);
+    assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.strictEqual(requests[1].ContentSid, "HXbutton");
-    assert.match(requests[1].ContentVariables, /open\?action=review-action/);
+    assert.match(requests[0].Body, /Open Blankmind to review and apply/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;

@@ -5,6 +5,7 @@ const {
   findAssistantConnection,
   attachAssistantUserContext,
   recordAssistantMemory,
+  getAssistantMemory,
   normalizeConnectCode,
   recordAssistantUserContext,
   recordAssistantChannel,
@@ -140,6 +141,99 @@ async function syncContext(body) {
   });
 }
 
+const PENDING_ACTION_TYPES = new Set([
+  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
+  "open_app_picker", "request_screen_time_permission",
+]);
+
+function normalizePendingAction(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const id = cleanText(value.id, 80);
+  const type = cleanText(value.type, 60);
+  const expiresAt = Date.parse(value.expires_at || "");
+  if (!id || !PENDING_ACTION_TYPES.has(type) || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
+  const action = {
+    id,
+    type,
+    name: cleanText(value.name, 80) || null,
+    minutes: Number.isInteger(value.minutes) ? Math.min(Math.max(value.minutes, 5), 240) : null,
+    hard_mode: value.hard_mode === true,
+    start_minute: Number.isInteger(value.start_minute) ? Math.min(Math.max(value.start_minute, 0), 1439) : null,
+    end_minute: Number.isInteger(value.end_minute) ? Math.min(Math.max(value.end_minute, 0), 1439) : null,
+    weekdays: Array.isArray(value.weekdays)
+      ? value.weekdays.filter((day) => Number.isInteger(day) && day >= 1 && day <= 7).slice(0, 7)
+      : [],
+    duration_days: Number.isInteger(value.duration_days) ? Math.min(Math.max(value.duration_days, 1), 14) : null,
+    hours: Number.isInteger(value.hours) ? Math.min(Math.max(value.hours, 1), 168) : null,
+    app_names: Array.isArray(value.app_names)
+      ? value.app_names.map((name) => cleanText(name, 40)).filter(Boolean).slice(0, 12)
+      : [],
+    summary: cleanText(value.summary, 320),
+    created_at: cleanText(value.created_at, 40),
+    expires_at: new Date(expiresAt).toISOString(),
+  };
+  if (type === "apply_schedule" && (
+    !Number.isInteger(action.start_minute)
+    || !Number.isInteger(action.end_minute)
+    || action.start_minute === action.end_minute
+  )) return null;
+  return action;
+}
+
+async function connectedChannel(body) {
+  const connectCode = normalizeConnectCode(body.connect_code);
+  const preferredChannel = cleanChannel(body.preferred_channel || body.channel);
+  if (!connectCode || !preferredChannel) return { error: "missing_connect_code_or_channel" };
+  const connection = await findAssistantConnection(connectCode, preferredChannel);
+  return { connectCode, preferredChannel, connection };
+}
+
+async function pollPendingAction(body) {
+  const result = await connectedChannel(body);
+  if (result.error) return json(400, { error: result.error });
+  if (!result.connection) return json(200, { ok: true, linked: false, pending_action: null });
+
+  const memory = await getAssistantMemory(result.connection.channel, result.connection.channelUser);
+  const pending = normalizePendingAction(memory.pending_assistant_action);
+  if (!pending && memory.pending_assistant_action) {
+    await recordAssistantMemory({
+      channel: result.connection.channel,
+      channelUser: result.connection.channelUser,
+      memory: { pending_assistant_action: null },
+      source: "assistant_action_expired",
+    });
+  }
+  return json(200, {
+    ok: true,
+    linked: true,
+    pending_action: pending,
+  });
+}
+
+async function acknowledgePendingAction(body) {
+  const result = await connectedChannel(body);
+  const actionId = cleanText(body.action_id, 80);
+  const status = ["confirmed", "dismissed", "received"].includes(cleanText(body.status, 20).toLowerCase())
+    ? cleanText(body.status, 20).toLowerCase()
+    : "resolved";
+  if (result.error || !actionId) return json(400, { error: result.error || "missing_action_id" });
+  if (!result.connection) return json(200, { ok: true, acknowledged: false, reason: "not_linked" });
+
+  const memory = await getAssistantMemory(result.connection.channel, result.connection.channelUser);
+  const pending = normalizePendingAction(memory.pending_assistant_action);
+  if (!pending || pending.id !== actionId) {
+    return json(200, { ok: true, acknowledged: false, reason: pending ? "action_mismatch" : "no_pending_action" });
+  }
+  await recordAssistantMemory({
+    channel: result.connection.channel,
+    channelUser: result.connection.channelUser,
+    memory: { pending_assistant_action: null },
+    source: `assistant_action_${status}`,
+  });
+  return json(200, { ok: true, acknowledged: true, status });
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -150,6 +244,8 @@ exports.handler = async (event) => {
     if (action === "register_preference") return registerPreference(body);
     if (action === "sync_context") return syncContext(body);
     if (action === "send_proactive") return sendProactive(body);
+    if (action === "poll_pending_action") return pollPendingAction(body);
+    if (action === "ack_pending_action") return acknowledgePendingAction(body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {
     return json(500, { error: "assistant_channel_failed", detail: error.message });

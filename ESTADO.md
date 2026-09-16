@@ -650,3 +650,5 @@ Ultima actualizacion: 2026-09-16
 - Mantener las actualizaciones de este archivo pequenas e incrementales.
 - No reabrir decisiones marcadas como `[cerrada]` salvo peticion explicita del usuario.
 - Para Screen Time, no sacar conclusiones del build `1.0 (1)`; la siguiente prueba valida es TestFlight `1.0 (2)`.
+
+Home dark + Why now 2026-09-16: refinada la línea temporal como trazo fino y luminoso, el cooldown entra con fade, y Why now pasa a overlay con transición de opacidad. Se eliminó `Protect the next...`; el título queda a media altura y las razones/`skip` ocupan la zona inferior izquierda con la misma jerarquía tipográfica que Home. Harness con `--enforce-scope` y detector Impeccable `[]`; build MacinCloud pendiente porque FF368 volvió a mostrar la pantalla de cierre de sesión.

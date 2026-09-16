@@ -89,6 +89,26 @@ struct HomeView: View {
                 }
 
                 homeSectionScreen(viewportWidth: viewportWidth, viewportHeight: viewportHeight)
+
+                if showingRelapseReview {
+                    RelapseReviewSheet(
+                        onSelect: { reason in
+                            sessionStore.recordRelapseReview(reason)
+                            sessionStore.applyAIPlan()
+                            Task {
+                                await BlankFunnelAnalytics.track(
+                                    "ai_plan_applied",
+                                    properties: ["source": "relapse_review", "reason": reason.rawValue]
+                                )
+                            }
+                            dismissRelapseReview()
+                        },
+                        onDismiss: dismissRelapseReview
+                    )
+                    .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
+                    .transition(.opacity)
+                    .zIndex(20)
+                }
             }
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
@@ -99,6 +119,7 @@ struct HomeView: View {
         .environment(\.blankMinimalAppearance, true)
         .animation(.easeInOut(duration: 0.65), value: sessionStore.isBlankActive)
         .animation(.easeInOut(duration: 0.35), value: activeSection)
+        .animation(.easeInOut(duration: 0.35), value: showingRelapseReview)
         .navigationBarBackButtonHidden()
         .onReceive(timer) { date in
             now = date
@@ -209,22 +230,6 @@ struct HomeView: View {
                 screenTimeBlocker.clear()
             }
             .presentationDetents([.medium])
-        }
-        .fullScreenCover(isPresented: $showingRelapseReview) {
-            RelapseReviewSheet(
-                intervention: relapseIntervention,
-                onSelect: { reason in
-                    sessionStore.recordRelapseReview(reason)
-                    sessionStore.applyAIPlan()
-                    Task {
-                        await BlankFunnelAnalytics.track(
-                            "ai_plan_applied",
-                            properties: ["source": "relapse_review", "reason": reason.rawValue]
-                        )
-                    }
-                }
-            )
-            .preferredColorScheme(.light)
         }
     }
 
@@ -470,10 +475,7 @@ struct HomeView: View {
 
                     if isActiveNavExpanded {
                         activeExpandedNavigation
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .move(edge: .bottom)),
-                                removal: .opacity.combined(with: .move(edge: .top))
-                            ))
+                            .transition(.opacity)
                     } else {
                         VStack(alignment: .leading, spacing: -8) {
                             minimalStartRow
@@ -505,8 +507,9 @@ struct HomeView: View {
                     .overlay(alignment: .bottom) {
                         GeometryReader { proxy in
                             Rectangle()
-                                .fill(Color.white.opacity(0.28))
-                                .frame(width: proxy.size.width * unblankHoldProgress, height: 3)
+                                .fill(Color.white.opacity(0.46))
+                                .frame(width: proxy.size.width * unblankHoldProgress, height: 1.5)
+                                .shadow(color: Color.white.opacity(0.22), radius: 5)
                                 .frame(maxHeight: .infinity, alignment: .bottomLeading)
                         }
                         .allowsHitTesting(false)
@@ -554,7 +557,7 @@ struct HomeView: View {
 
     @ViewBuilder
     private var activePrimaryContent: some View {
-        Group {
+        ZStack(alignment: .leading) {
             if isHoldingToUnblank {
                 Text("hold the screen to unblank")
                     .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
@@ -563,6 +566,7 @@ struct HomeView: View {
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
                     .opacity(1 - unblankHoldProgress)
+                    .transition(.opacity)
             } else if let cooldownText {
                 Text(cooldownText)
                     .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
@@ -571,6 +575,7 @@ struct HomeView: View {
                     .monospacedDigit()
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
+                    .transition(.opacity)
             } else if let timerCountdownText {
                 Text(timerCountdownText)
                     .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
@@ -579,9 +584,12 @@ struct HomeView: View {
                     .monospacedDigit()
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeInOut(duration: 0.35), value: isHoldingToUnblank)
+        .animation(.easeInOut(duration: 0.35), value: delayedManualUnlockAt != nil)
     }
 
     private var activeExpandedNavigation: some View {
@@ -968,7 +976,7 @@ struct HomeView: View {
             message = nil
             messageAction = nil
             closeSection()
-            showingRelapseReview = true
+            presentRelapseReview()
         }
         return unlocked
     }
@@ -1009,7 +1017,19 @@ struct HomeView: View {
             delayedManualUnlockAt = nil
             delayedManualUnlockTask = nil
             setMessage(for: result)
+            presentRelapseReview()
+        }
+    }
+
+    private func presentRelapseReview() {
+        withAnimation(.easeInOut(duration: 0.35)) {
             showingRelapseReview = true
+        }
+    }
+
+    private func dismissRelapseReview() {
+        withAnimation(.easeInOut(duration: 0.35)) {
+            showingRelapseReview = false
         }
     }
 
@@ -2676,13 +2696,14 @@ private struct ForgetBlankConfirmSheet: View {
 }
 
 private struct RelapseReviewSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let intervention: RelapseIntervention
     let onSelect: (RelapseReviewReason) -> Void
+    let onDismiss: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
             let contentWidth = min(max(proxy.size.width - 48, 0), 420)
+            let topInset = proxy.safeAreaInsets.top
+            let bottomInset = max(proxy.safeAreaInsets.bottom + 18, 28)
 
             ZStack {
                 BlankColors.homeLightBackground
@@ -2696,21 +2717,14 @@ private struct RelapseReviewSheet: View {
                             .foregroundStyle(BlankColors.homeLightInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
-                            .padding(.top, proxy.safeAreaInsets.top + 24)
+                            .padding(.top, max(48, proxy.size.height * 0.28))
 
-                        Text(intervention.alternative)
-                            .font(.blankInter(size: 18, weight: .medium, relativeTo: .title3))
-                            .foregroundStyle(BlankColors.mutedInk)
-                            .lineSpacing(4)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 18)
-                            .padding(.bottom, 42)
+                        Spacer(minLength: 24)
 
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(RelapseReviewReason.allCases) { reason in
                                 Button {
                                     onSelect(reason)
-                                    dismiss()
                                 } label: {
                                     RelapseReasonTile(reason: reason)
                                 }
@@ -2719,19 +2733,24 @@ private struct RelapseReviewSheet: View {
                         }
 
                         Button {
-                            dismiss()
+                            onDismiss()
                         } label: {
                             Text("skip")
-                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                                .foregroundStyle(BlankColors.mutedInk)
-                                .frame(maxWidth: .infinity, minHeight: 52)
+                                .font(.blankInter(size: 30, weight: .bold, relativeTo: .title2))
+                                .tracking(-0.6)
+                                .foregroundStyle(BlankColors.homeLightSecondary)
+                                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.top, 28)
-                        .padding(.bottom, max(proxy.safeAreaInsets.bottom + 18, 28))
+                        .padding(.top, 2)
                     }
-                    .frame(width: contentWidth, alignment: .leading)
+                    .padding(.bottom, bottomInset)
+                    .frame(
+                        width: contentWidth,
+                        minHeight: max(proxy.size.height - topInset, 0),
+                        alignment: .topLeading
+                    )
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
@@ -2744,45 +2763,16 @@ private struct RelapseReasonTile: View {
     let reason: RelapseReviewReason
 
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(BlankColors.homeLightSecondary)
-                .frame(width: 24, alignment: .leading)
-
+        HStack {
             Text(reason.title.lowercased())
-                .font(.blankInter(size: 22, weight: .bold, relativeTo: .title3))
-                .tracking(-0.35)
+                .font(.blankInter(size: 30, weight: .bold, relativeTo: .title2))
+                .tracking(-0.6)
                 .foregroundStyle(BlankColors.homeLightInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(BlankColors.homeLightSecondary)
         }
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 68)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(BlankColors.newLookRule)
-                .frame(height: 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private var symbol: String {
-        switch reason {
-        case .bored: return "sparkles"
-        case .anxious: return "waveform.path.ecg"
-        case .tired: return "moon.fill"
-        case .neededApp: return "app.fill"
-        case .procrastinating: return "clock.fill"
-        case .other: return "ellipsis"
-        }
+        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+        .contentShape(Rectangle())
     }
 }
 
@@ -2790,7 +2780,6 @@ private struct RelapseReasonButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.52 : 1)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }

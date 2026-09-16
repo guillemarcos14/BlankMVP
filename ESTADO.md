@@ -1,8 +1,11 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-15
+Ultima actualizacion: 2026-09-16
 
 ## Resumen actual
+- 2026-09-16: La confirmación conversacional acepta también `Yeah`, `Yea` y `Yep`, cubriendo la variante observada en WhatsApp. Validado en el core y en product harness `25/25`.
+- 2026-09-16: Verificación remota tras nueva prueba: `https://getblank.netlify.app/.netlify/functions/blanked-agent` todavía devuelve la versión anterior (`actions: []`, sin `review_only_actions` y con el prompt repetido). La corrección local no es visible en producción porque aún no se ha integrado ni desplegado.
+- 2026-09-16: Corregido el transporte de planes BM completos y confirmados cuando falta heartbeat reciente: WhatsApp/SMS generan enlace de revisión marcado `review_only_actions`; la ejecución sigue bloqueada hasta las comprobaciones nativas de Blankmind. Los follow-ups de instalación ya no repiten el prompt. Validado con product harness `25/25`, core `83/83`, smokes de presencia/WhatsApp/SMS y release gate automatizado `16/16`. Sin deploy.
 - 2026-09-15: Auditoría semántica BM entregada localmente en `codex/bm-semantic-audit`: reducer, extracción tipada con evidencia, confirmación exacta, acciones derivadas, persistencia CAS y evaluador independiente. Product harness 25/25 con alcance válido; core 82/82; 42 mutaciones impedidas; batch 960 turnos de seis guiones repetidos; Luna activo 45/45 después de corregir el schema. El legacy conserva 61/114 discrepancias adjudicadas sin aprobación global. No hay nueva release ni migración aplicada; pendientes SQL real, build/prueba iOS y límites funcionales/calidad del informe `docs/BM_SEMANTIC_AUDIT.md`.
 - BlankMVP es un proyecto para Blank, un bloqueador de apps controlado por NFC.
 - El repo contiene app Android (`app/`), MVP iPhone (`ios/Blank/`), documentos de lanzamiento (`docs/`) y landing estatica (`web/landing/`).

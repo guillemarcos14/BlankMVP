@@ -289,7 +289,7 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
   }
   if (/\b(?:indefinite|indefinitely|forever|para siempre|sin limite|indefinido|indefinidamente)\b/.test(text)) error("duration_minutes", "unbounded_duration");
   if (momentValue && !patch.set.start && state.slots.moment?.value !== momentValue) patch.clear.push("start");
-  if (/^(?:yes|yes please|confirm|confirmed|do it|go ahead|apply it|si|si por favor|confirmo|confirmar|hazlo|adelante|aplicalo)[.!]?$/i.test(full)) {
+  if (/^(?:yes|yeah|yea|yep|yes please|confirm|confirmed|do it|go ahead|apply it|si|si por favor|confirmo|confirmar|hazlo|adelante|aplicalo)[.!]?$/i.test(full)) {
     if (state.intent === "advice" && state.next_question === "action_type") { patch.intent = "block"; put("action_type","strict_block"); }
     else patch.confirmation = true;
   }
@@ -438,8 +438,7 @@ function capabilityGap(state, context) {
   return null;
 }
 
-function buildSemanticActions(state, context = {}) {
-  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state) || capabilityGap(state,context)) return [];
+function semanticActionFromFacts(state, context = {}) {
   const start = value(state,"start"), recurrence = value(state,"recurrence");
   const duration = value(state,"duration_minutes"), end = value(state,"end");
   // Existing native action schema cannot represent a local date. Never turn tomorrow
@@ -458,6 +457,20 @@ function buildSemanticActions(state, context = {}) {
   // Canonical state uses ISO Monday=1. Both native Calendar APIs use Sunday=1.
   const nativeWeekdays = recurrence.weekdays.map(day => day === 7 ? 1 : day+1).sort((a,b)=>a-b);
   return [{ type:"apply_schedule", name:`Block ${(value(state,"apps") || []).join(" + ")}`, start_minute:start.minute, end_minute:end, weekdays:nativeWeekdays, duration_days:value(state,"schedule_horizon_days") }];
+}
+
+function buildSemanticActions(state, context = {}) {
+  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state) || capabilityGap(state,context)) return [];
+  return semanticActionFromFacts(state, context);
+}
+
+// A confirmed proposal may be transported to the native review screen before a
+// fresh app heartbeat arrives. The action is still only a proposal: the app
+// performs the final presence, permission and selection checks before applying it.
+function buildSemanticReviewAction(state, context = {}) {
+  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state)) return [];
+  if (capabilityGap(state, context) !== "app_presence") return [];
+  return semanticActionFromFacts(state, context);
 }
 
 function decideSemanticState(state, context = {}) {
@@ -522,7 +535,7 @@ function knownFactLead(state) {
   return `${es ? "Entendido" : "Got it"}: ${facts.join(" ")}.`;
 }
 
-function renderSemanticResponse(state, decision, context = {}) {
+function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   const es = state.language === "es";
   const capability = value(state,"requested_capability");
   if (capability === "adult_filter") return es ? "La petición es filtrar contenido adulto. Este chat aún no puede configurar ese filtro; revísalo en los controles de Blankmind." : "You're asking to filter adult content. This chat cannot configure that filter yet; review it in Blankmind's controls.";
@@ -540,6 +553,15 @@ function renderSemanticResponse(state, decision, context = {}) {
   if (decision.type === "none") return null;
   if (decision.type === "confirm") return `${semanticSummary(state)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
   if (decision.type === "ready") return `${semanticSummary(state)}. ${es ? "Revísalo en Blankmind para aplicarlo." : "Review it in Blankmind to apply it."}`;
+  if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
+    const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|opened it|ya está|ya esta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
+    if (followup) return es
+      ? "Todavía necesito que Blankmind confirme la conexión. Usa el enlace de revisión del mensaje anterior para continuar. No se ha aplicado ningún cambio."
+      : "I still need Blankmind to confirm the connection. Use the review link above to continue. Nothing has been applied yet.";
+    return es
+      ? `${semanticSummary(state)}. Abre Blankmind para revisar y aplicar la propuesta.`
+      : `${semanticSummary(state)}. Open Blankmind to review and apply the proposal.`;
+  }
   if (decision.slot === "start") {
     const moment=value(state,"moment") || "";
     const event=/after breakfast|despues de desayunar/.test(moment) ? ["breakfast","desayunar"] : /after lunch|despues de comer/.test(moment) ? ["lunch","comer"] : /after dinner|despues de cenar/.test(moment) ? ["dinner","cenar"] : /after work|finish work|work ends|trabajar/.test(moment) ? ["work","trabajar"] : null;
@@ -594,11 +616,13 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   const decision = decideSemanticState(state,context);
   const handled = state.intent === "block" || patch.cancelled || Boolean(value(state,"requested_capability")) || (state.intent === "advice" && decision.type === "ask");
   let actions = decision.type === "ready" ? buildSemanticActions(state,context) : [];
+  const reviewOnlyAppPresence = decision.type === "setup" && decision.slot === "app_presence";
+  if (reviewOnlyAppPresence) actions = buildSemanticReviewAction(state, context);
   if (decision.type === "setup" && decision.slot === "permissions") actions = [{type:"request_screen_time_permission"}];
   if (decision.type === "setup" && decision.slot === "app_selection") actions = [{type:"open_app_picker"}];
   if (decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state)) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
-  return { state, handled, decision, actions, blockingContract:asBlockingContract(state), responseText:renderSemanticResponse(state,decision,context), patch, extractionValidation };
+  return { state, handled, decision, actions, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state), responseText:renderSemanticResponse(state,decision,context,prompt), patch, extractionValidation };
 }
 
-module.exports = { VERSION, TTL_MS, SLOT_NAMES, emptyState, normalizeSemanticState, proposalFingerprint, extractSemanticPatch, validateSemanticPatch, reduceSemanticState, requiredFields, decideSemanticState, buildSemanticActions, renderSemanticResponse, semanticSummary, advanceSemanticState };
+module.exports = { VERSION, TTL_MS, SLOT_NAMES, emptyState, normalizeSemanticState, proposalFingerprint, extractSemanticPatch, validateSemanticPatch, reduceSemanticState, requiredFields, decideSemanticState, buildSemanticActions, buildSemanticReviewAction, renderSemanticResponse, semanticSummary, advanceSemanticState };

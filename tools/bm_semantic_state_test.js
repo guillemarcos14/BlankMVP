@@ -24,6 +24,15 @@ test("data then exact proposal confirmation", () => {
   assert.deepEqual(c.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
   assert.equal(c.state.slots.confirmation.source.text,"Yes");
 });
+test("common affirmative variants confirm the proposal", () => {
+  for (const reply of ["Yeah", "Yea", "Yep"]) {
+    const confirmed = chat(["Block Instagram now for 30 minutes once", reply], { ...DEVICE, channel: "whatsapp" })[1];
+    assert.equal(confirmed.state.slots.confirmation.value.status, "confirmed");
+    assert.equal(confirmed.decision.slot, "app_presence");
+    assert.equal(confirmed.actions[0].type, "start_protection");
+    assert.equal(confirmed.reviewOnlyAppPresence, true);
+  }
+});
 test("a yes while a field is missing never authorizes later proposal", () => {
   const results = chat(["Block Instagram now for 30 minutes","yes","once"]);
   results.forEach(none); assert.equal(results[2].state.status,"awaiting_confirmation");
@@ -172,10 +181,10 @@ test("all supported channels use identical facts", () => {
   for (const r of states) { assert.deepEqual(r.actions,states[0].actions); assert.deepEqual(r.state.slots,states[0].state.slots); }
 });
 test("missing app presence suppresses executable action", () => {
-  const r = chat(["Block Instagram now for 30 minutes once","yes"],{...DEVICE,channel:"whatsapp"})[1]; assert.equal(r.decision.slot,"app_presence"); none(r);
+  const r = chat(["Block Instagram now for 30 minutes once","yes"],{...DEVICE,channel:"whatsapp"})[1]; assert.equal(r.decision.slot,"app_presence"); assert.equal(r.actions[0].type,"start_protection"); assert.equal(r.reviewOnlyAppPresence,true);
 });
 test("app possession claims are not device presence evidence", () => {
-  const r = chat(["Block Instagram now for 30 minutes once","yes","I have it"],{...DEVICE,channel:"whatsapp"})[2]; assert.equal(r.decision.slot,"app_presence"); none(r);
+  const r = chat(["Block Instagram now for 30 minutes once","yes","I have it"],{...DEVICE,channel:"whatsapp"})[2]; assert.equal(r.decision.slot,"app_presence"); assert.equal(r.actions[0].type,"start_protection"); assert.equal(r.reviewOnlyAppPresence,true);
 });
 test("permission setup contains no hidden executable payload", () => {
   const r = chat(["Block Instagram now for 30 minutes once","yes"],{...DEVICE,screen_time_authorized:false})[1]; assert.deepEqual(r.actions,[{type:"request_screen_time_permission"}]);

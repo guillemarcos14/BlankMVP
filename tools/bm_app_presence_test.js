@@ -88,11 +88,12 @@ async function run() {
   }
 
   const installGuidance = await confirmedProposal({ channel: "whatsapp" });
-  assert.deepStrictEqual(installGuidance.actions, []);
+  assert.deepStrictEqual(installGuidance.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(installGuidance.semantic_state.status, "needs_setup");
   assert.strictEqual(installGuidance.semantic_state.next_question, "app_presence");
   assert.match(installGuidance.message_text, /Blankmind/);
-  assert.doesNotMatch(installGuidance.message_text, /review-action|uninstalled/i);
+  assert.match(installGuidance.message_text, /review|apply/i);
+  assert.strictEqual(installGuidance.review_only_actions, true);
 
   const incompleteRequest = await request("Block Instagram", { channel: "whatsapp" });
   assert.deepStrictEqual(incompleteRequest.actions, []);
@@ -103,7 +104,7 @@ async function run() {
     channel: "sms",
     app_presence: { app_present: true, app_ready: true, last_seen_at: new Date(now - 48 * 60 * 60 * 1000).toISOString() },
   });
-  assert.deepStrictEqual(staleGuidance.actions, []);
+  assert.deepStrictEqual(staleGuidance.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(staleGuidance.semantic_state.next_question, "app_presence");
 
   const recentContext = {
@@ -117,11 +118,18 @@ async function run() {
   assert.doesNotMatch(recentPlan.message_text, /apps\.apple\.com|download it here|descárgala aquí/);
 
   // A spoken installation claim is not a fresh app heartbeat.
-  const installedContinuation = await request("I have it", {
+  const installedContinuation = await request("Done", {
     channel: "whatsapp", semantic_state: installGuidance.semantic_state,
   });
-  assert.deepStrictEqual(installedContinuation.actions, []);
+  assert.deepStrictEqual(installedContinuation.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(installedContinuation.semantic_state.next_question, "app_presence");
+  assert.match(installedContinuation.message_text, /review link above|Nothing has been applied/i);
+
+  const repeatedInstallClaim = await request("I have already opened the app", {
+    channel: "whatsapp", semantic_state: installedContinuation.semantic_state,
+  });
+  assert.deepStrictEqual(repeatedInstallClaim.actions.map((item) => item.type), ["apply_schedule"]);
+  assert.match(repeatedInstallClaim.message_text, /review link above|Nothing has been applied/i);
 
   const permissionGuidance = await confirmedProposal({ ...recentContext, screen_time_authorized: false });
   assert.deepStrictEqual(permissionGuidance.actions.map((item) => item.type), ["request_screen_time_permission"]);

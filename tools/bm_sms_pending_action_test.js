@@ -34,6 +34,13 @@ async function prepare() {
   assert.match(response.body, /Reply BLOCK/);
   assert.ok(pendingActionFromMemory(memory), "Confirmed current proposal is available");
 }
+async function prepareWithoutPresence() {
+  memory = { user_context: { screen_time_authorized: true, app_presence: {} } };
+  await send("Block Instagram from 22:00 to 23:00 every day for 3 days.");
+  const response = await send("Yes");
+  assert.match(response.body, /Reply BLOCK/);
+  assert.ok(pendingActionFromMemory(memory), "Confirmed proposal remains reviewable before a fresh heartbeat");
+}
 async function run() {
   await prepare();
   const valid = await send("OPEN");
@@ -70,6 +77,11 @@ async function run() {
   await prepare();
   memory.pending_action_link = memory.pending_action_link.replace("action=review-action", "action=start-focus");
   assert.doesNotMatch((await send("OPEN")).body, /start-focus/);
+
+  await prepareWithoutPresence();
+  const reviewBeforeHeartbeat = await send("OPEN");
+  assert.match(reviewBeforeHeartbeat.body, /action=review-action/);
+  assert.match(reviewBeforeHeartbeat.body, /type=apply_schedule/);
   console.log("SMS pending action tests passed: current review, correction/cancellation, failed deletion, expiry, legacy and tampered-link rejection");
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

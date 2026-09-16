@@ -4,7 +4,7 @@ const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState, deriveAppPresence, buildAgentContext } = require("./bm-context");
 const { reviewActionLink } = require("./_bm_action_link");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
-const { proposalFingerprint, buildSemanticActions } = require("./bm-semantic-state");
+const { proposalFingerprint, buildSemanticActions, buildSemanticReviewAction } = require("./bm-semantic-state");
 const {
   attachAssistantUserContext,
   claimAssistantInboundMessage,
@@ -383,14 +383,16 @@ function pendingActionFromMemory(memory = {}, now = Date.now()) {
   if (!state || !["ready", "needs_setup"].includes(state.status)) return null;
   const fingerprint = proposalFingerprint(state);
   if (memory.pending_proposal_fingerprint !== fingerprint || state.slots?.confirmation?.value?.fingerprint !== fingerprint) return null;
-  if (!deriveAppPresence(memory.user_context?.app_presence, now).recent) return null;
+  const reviewOnlyAppPresence = state.status === "needs_setup" && state.next_question === "app_presence";
+  if (!reviewOnlyAppPresence && !deriveAppPresence(memory.user_context?.app_presence, now).recent) return null;
   try {
     const url = new URL(link);
     const allowed = new URL(process.env.BLANKED_PUBLIC_APP_LINK_BASE || "https://getblank.netlify.app");
     if (url.origin !== allowed.origin || url.pathname !== `${allowed.pathname.replace(/\/$/, "")}/open`
       || url.searchParams.get("action") !== "review-action") return null;
     const actions = state.status === "ready" ? buildSemanticActions(state, buildAgentContext({ ...(memory.user_context || {}), channel: "sms" }))
-      : state.next_question === "permissions" ? [{ type: "request_screen_time_permission" }]
+      : reviewOnlyAppPresence ? buildSemanticReviewAction(state, buildAgentContext({ ...(memory.user_context || {}), channel: "sms" }))
+        : state.next_question === "permissions" ? [{ type: "request_screen_time_permission" }]
         : state.next_question === "app_selection" ? [{ type: "open_app_picker" }] : [];
     const expectedLink = actionDeepLink(actions, state.slots?.apps?.value || []);
     if (!expectedLink) return null;

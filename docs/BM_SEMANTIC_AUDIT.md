@@ -1,6 +1,6 @@
 # Auditoría y reconstrucción semántica de BM
 
-Fecha: 2026-09-15. Base: `a222a4a`. Rama: `codex/bm-semantic-audit`.
+Fecha: 2026-09-16. Base: `6b6a63b`. Rama: `codex/backend-release-bm-semantic-audit-2026-09-15`.
 Cambios locales, sin despliegue Netlify, Supabase o Sites. La validación final y sus límites están al final de este documento.
 
 ## 1. Diagnóstico
@@ -79,7 +79,7 @@ Slots: apps, categoría, momento, tipo de acción, modo duro, capacidad solicita
 1. Cada input modifica una copia del estado anterior; no se concatena el texto antiguo para volver a decidir qué dato gana. Una corrección sustituye el valor y elimina derivados incompatibles.
 2. Cambiar intención cierra la autorización anterior. Cancelar vacía la propuesta; un «sí» posterior no la resucita. Consejo y petición de bloqueo tienen estados distintos.
 3. La confirmación contiene el fingerprint de los hechos exactos. Cambiar apps, acción, tiempos, recurrencia u horizonte invalida la confirmación.
-4. Antes de emitir una acción se comprueban datos, confirmación, presencia, permisos y selección exacta. «Ya tengo la app» no demuestra presencia ni permisos. Un selector sin parámetros es setup, no una orden de bloqueo.
+4. Antes de ejecutar una acción se comprueban datos, confirmación, presencia, permisos y selección exacta. Si la propuesta está completa y confirmada pero falta un heartbeat reciente, el canal puede transportar únicamente una acción marcada como revisión; Blankmind vuelve a comprobar presencia, permisos y selección antes de aplicar. «Ya tengo la app» no demuestra presencia ni permisos. Un selector sin parámetros es setup, no una orden de bloqueo.
 5. Texto y acciones se generan desde el mismo estado. La ruta semántica evita las reescrituras legacy; todos los canales reciben los mismos hechos. El modelo no puede autorizar, inventar apps seleccionadas ni convertir una respuesta libre en una acción.
 
 ### Extracción del modelo
@@ -148,7 +148,7 @@ Los informes extensos están en `tmp/bm-semantic/` y `tmp/bm-audit/`; [BM_EVALUA
 | Evidencia | Resultado y alcance |
 | --- | --- |
 | Product harness | Base original 19/19; validación final ampliada **25/25**, cero reparaciones y cero violaciones de alcance, contra la baseline creada antes de editar. Informe `tmp/bm-audit/final-harness.json`. |
-| Invariantes y transporte | **82/82** checks del core; extracción hostil/valores tipados, smoke integrado de 46 llamadas, memoria, presencia, CAS simulado, enlaces y caché SMS incluidos en los gates. No son 82 conversaciones humanas. |
+| Invariantes y transporte | **83/83** checks del core; extracción hostil/valores tipados, smoke integrado de 46 llamadas, memoria, presencia, CAS simulado, enlaces y caché SMS incluidos en los gates. No son 83 conversaciones humanas. |
 | Mutaciones del oracle | **42 errores deliberados impedidos de aprobarse**: 40 rechazos duros y dos revisiones de texto invalidadas. Incluye modo duro, nombre de modo y cifras observadas frente a duración futura. |
 | Evaluador anterior | Acepta **6/6** planes deliberadamente incorrectos. Su última ejecución original conserva **61/114 discrepancias**; golden 25/25 y amplio 125/125 fueron generación de escenarios (`0/0` calidad), no evaluación del modelo. Adjudicación histórica y diferencias finales en documento separado. |
 | Batch canónico | **960/960** turnos revisados: seis guiones repetidos 40 veces, 240 ejecuciones con concurrencia 12. Mide estabilidad y ejecución del batch, no 240 situaciones distintas. |

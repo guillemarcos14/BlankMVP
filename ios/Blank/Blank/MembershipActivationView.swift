@@ -49,7 +49,7 @@ struct MembershipActivationView: View {
                     } label: {
                         if membershipStore.isChecking {
                             ProgressView()
-                                .tint(.white)
+                                .tint(BlankColors.pureWhite)
                         } else {
                             Text("Activate Blank")
                         }

@@ -2,6 +2,12 @@ import ManagedSettings
 import ManagedSettingsUI
 import UIKit
 
+private enum BlankShieldPalette {
+    static let charcoal = UIColor(red: 51 / 255.0, green: 59 / 255.0, blue: 65 / 255.0, alpha: 1)
+    static let paleSteelBlue = UIColor(red: 173 / 255.0, green: 191 / 255.0, blue: 201 / 255.0, alpha: 1)
+    static let pureWhite = UIColor.white
+}
+
 final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     override func configuration(shielding application: Application) -> ShieldConfiguration {
         makeConfiguration(appName: application.localizedDisplayName ?? "This app")
@@ -14,21 +20,21 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
     private func makeConfiguration(appName: String) -> ShieldConfiguration {
         ShieldConfiguration(
             backgroundBlurStyle: .systemUltraThinMaterialDark,
-            backgroundColor: UIColor(red: 0.05, green: 0.06, blue: 0.06, alpha: 0.92),
+            backgroundColor: BlankShieldPalette.charcoal.withAlphaComponent(0.92),
             icon: nil,
             title: ShieldConfiguration.Label(
                 text: "\(appName) is Blanked",
-                color: .white
+                color: BlankShieldPalette.pureWhite
             ),
             subtitle: ShieldConfiguration.Label(
                 text: "\(appName) is now blocked.\nYou're doing a great job.",
-                color: UIColor(white: 0.72, alpha: 1.0)
+                color: BlankShieldPalette.paleSteelBlue
             ),
             primaryButtonLabel: ShieldConfiguration.Label(
                 text: "Continue focus",
-                color: UIColor(red: 0.12, green: 0.12, blue: 0.13, alpha: 1.0)
+                color: BlankShieldPalette.charcoal
             ),
-            primaryButtonBackgroundColor: .white
+            primaryButtonBackgroundColor: BlankShieldPalette.pureWhite
         )
     }
 }

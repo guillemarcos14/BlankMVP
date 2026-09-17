@@ -106,7 +106,7 @@ private struct ConversationalHomeView: View {
             }
         }
         .ignoresSafeArea()
-        .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+        .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarBackButtonHidden()
@@ -375,7 +375,7 @@ private struct ConversationalHomeView: View {
 
             Text("How can I help\nyou today?")
                 .font(.blankInter(size: 33, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(BlankColors.pureWhite)
                 .multilineTextAlignment(.center)
                 .lineSpacing(0)
                 .tracking(0)
@@ -389,12 +389,12 @@ private struct ConversationalHomeView: View {
     }
 
     private var topBar: some View {
-        let glassTint = Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0).opacity(0.42)
+        let glassTint = BlankColors.paleSteelBlue.opacity(0.42)
         let logoReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.22),
-                Color.white.opacity(0.07),
-                Color.white.opacity(0.00)
+                BlankColors.pureWhite.opacity(0.22),
+                BlankColors.pureWhite.opacity(0.07),
+                BlankColors.pureWhite.opacity(0.00)
             ],
             center: .topLeading,
             startRadius: 0,
@@ -402,10 +402,10 @@ private struct ConversationalHomeView: View {
         )
         let topNavBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.42),
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.04),
-                Color.white.opacity(0.00)
+                BlankColors.pureWhite.opacity(0.42),
+                BlankColors.pureWhite.opacity(0.16),
+                BlankColors.pureWhite.opacity(0.04),
+                BlankColors.pureWhite.opacity(0.00)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -417,8 +417,8 @@ private struct ConversationalHomeView: View {
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.white)
-                    .foregroundColor(Color.white)
+                    .foregroundStyle(BlankColors.pureWhite)
+                    .foregroundColor(BlankColors.pureWhite)
                     .frame(width: 47, height: 47)
                     .background {
                         ZStack {
@@ -429,7 +429,7 @@ private struct ConversationalHomeView: View {
                         }
                         .allowsHitTesting(false)
                     }
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
+                    .shadow(color: BlankColors.charcoal.opacity(0.05), radius: 5, y: 3)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -458,7 +458,7 @@ private struct ConversationalHomeView: View {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
+            .shadow(color: BlankColors.charcoal.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
         .frame(width: 291, height: 47)
@@ -468,8 +468,8 @@ private struct ConversationalHomeView: View {
         Button(action: action) {
             Text(title)
                 .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
-                .foregroundStyle(Color.white)
-                .foregroundColor(Color.white)
+                .foregroundStyle(BlankColors.pureWhite)
+                .foregroundColor(BlankColors.pureWhite)
                 .frame(width: 64, height: 47)
                 .contentShape(Rectangle())
         }
@@ -495,8 +495,8 @@ private struct ConversationalHomeView: View {
             stops: [
                 .init(color: .clear, location: 0),
                 .init(color: .clear, location: topStart),
-                .init(color: .black, location: topEnd),
-                .init(color: .black, location: bottomStart),
+                .init(color: BlankColors.charcoal, location: topEnd),
+                .init(color: BlankColors.charcoal, location: bottomStart),
                 .init(color: .clear, location: bottomEnd),
                 .init(color: .clear, location: 1)
             ],
@@ -513,8 +513,8 @@ private struct ConversationalHomeView: View {
                 .mask(
                     LinearGradient(
                         stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black.opacity(0.9), location: 0.55),
+                            .init(color: BlankColors.charcoal, location: 0),
+                            .init(color: BlankColors.charcoal.opacity(0.9), location: 0.55),
                             .init(color: .clear, location: 1)
                         ],
                         startPoint: .top,
@@ -531,8 +531,8 @@ private struct ConversationalHomeView: View {
                     LinearGradient(
                         stops: [
                             .init(color: .clear, location: 0),
-                            .init(color: .black.opacity(0.9), location: 0.45),
-                            .init(color: .black, location: 1)
+                            .init(color: BlankColors.charcoal.opacity(0.9), location: 0.45),
+                            .init(color: BlankColors.charcoal, location: 1)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -547,7 +547,7 @@ private struct ConversationalHomeView: View {
             TextField(dictation.isRecording ? "Listening..." : "Tell Blanked what you need", text: $input, axis: .vertical)
                 .font(.blankInter(size: 16, relativeTo: .body))
                 .lineLimit(1...2)
-                .foregroundStyle(sessionStore.isBlankActive ? Color.white : BlankColors.ink)
+                .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink)
                 .padding(.leading, 22)
 
             Button {
@@ -555,9 +555,9 @@ private struct ConversationalHomeView: View {
             } label: {
                 Image(systemName: dictation.isRecording ? "stop.fill" : "mic.fill")
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(BlankColors.pureWhite)
                     .frame(width: 40, height: 40)
-                    .background(Circle().fill(dictation.isRecording ? Color.red.opacity(0.86) : BlankColors.ink.opacity(0.66)))
+                    .background(Circle().fill(dictation.isRecording ? BlankColors.red.opacity(0.86) : BlankColors.ink.opacity(0.66)))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(dictation.isRecording ? "Stop dictation" : "Start dictation")
@@ -567,7 +567,7 @@ private struct ConversationalHomeView: View {
             } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(BlankColors.pureWhite)
                     .frame(width: 44, height: 44)
                     .background(Circle().fill(BlankColors.ink.opacity(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.22 : 0.88)))
             }
@@ -580,11 +580,11 @@ private struct ConversationalHomeView: View {
             Capsule()
                 .fill(.ultraThinMaterial)
             Capsule()
-                .fill(Color.white.opacity(sessionStore.isBlankActive ? 0.10 : 0.36))
+                .fill(BlankColors.pureWhite.opacity(sessionStore.isBlankActive ? 0.10 : 0.36))
         }
         .overlay {
             Capsule()
-                .stroke(Color.white.opacity(sessionStore.isBlankActive ? 0.18 : 0.34), lineWidth: 1)
+                .stroke(BlankColors.pureWhite.opacity(sessionStore.isBlankActive ? 0.18 : 0.34), lineWidth: 1)
         }
         .shadow(color: BlankColors.ink.opacity(0.06), radius: 16, x: 0, y: 8)
     }
@@ -613,14 +613,14 @@ private struct ConversationalHomeView: View {
     private func demoButtonLabel(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-            .foregroundStyle(Color.white.opacity(0.92))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.92))
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background {
-                Capsule().fill(Color.white.opacity(0.18))
+                Capsule().fill(BlankColors.pureWhite.opacity(0.18))
             }
             .overlay {
-                Capsule().stroke(Color.white.opacity(0.22), lineWidth: 1)
+                Capsule().stroke(BlankColors.pureWhite.opacity(0.22), lineWidth: 1)
             }
     }
 
@@ -654,7 +654,7 @@ private struct ConversationalHomeView: View {
     }
 
     private var currentSecondaryColor: Color {
-        sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk
     }
 
     private func openSection(_ section: HomeSection) {
@@ -3086,7 +3086,7 @@ private struct AgentBubble: View {
             if message.role == .user { Spacer(minLength: 0) }
             Text(message.text)
                 .font(.blankInter(size: 16, relativeTo: .body))
-                .foregroundStyle(message.role == .user ? Color.white : BlankColors.ink)
+                .foregroundStyle(message.role == .user ? BlankColors.pureWhite : BlankColors.ink)
                 .frame(maxWidth: min(maxWidth * 0.84, 304), alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 15)
@@ -3114,9 +3114,9 @@ private struct AgentBubble: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.78),
-                                    Color.white.opacity(0.48),
-                                    Color(red: 206 / 255.0, green: 224 / 255.0, blue: 246 / 255.0).opacity(0.24)
+                                    BlankColors.pureWhite.opacity(0.78),
+                                    BlankColors.pureWhite.opacity(0.48),
+                                    BlankColors.paleSteelBlue.opacity(0.24)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
@@ -3129,8 +3129,8 @@ private struct AgentBubble: View {
     private var bubbleStroke: LinearGradient {
         LinearGradient(
             colors: message.role == .user
-                ? [Color.white.opacity(0.10), Color.white.opacity(0.02)]
-                : [Color.white.opacity(0.74), Color.white.opacity(0.22), Color.white.opacity(0.04)],
+                ? [BlankColors.pureWhite.opacity(0.10), BlankColors.pureWhite.opacity(0.02)]
+                : [BlankColors.pureWhite.opacity(0.74), BlankColors.pureWhite.opacity(0.22), BlankColors.pureWhite.opacity(0.04)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -3185,7 +3185,7 @@ private struct AgentPlanCard: View {
                             .minimumScaleFactor(0.72)
                             .frame(maxWidth: .infinity)
                             .frame(height: 50)
-                            .foregroundStyle(Color.white)
+                            .foregroundStyle(BlankColors.pureWhite)
                             .background {
                                 Capsule().fill(BlankColors.glassTint.opacity(0.48))
                             }
@@ -3200,7 +3200,7 @@ private struct AgentPlanCard: View {
                         .minimumScaleFactor(0.62)
                         .frame(width: 96, height: 50)
                         .background {
-                            Capsule().fill(Color.white.opacity(0.46))
+                            Capsule().fill(BlankColors.pureWhite.opacity(0.46))
                         }
                         .buttonStyle(.plain)
                 }
@@ -3263,7 +3263,7 @@ private struct AgentStatusPill: View {
         .frame(height: 54)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.38))
+                .fill(BlankColors.pureWhite.opacity(0.38))
         }
     }
 }
@@ -3285,7 +3285,7 @@ private struct AgentQuickAction: View {
             .padding(.horizontal, 12)
             .frame(height: 32)
             .background {
-                Capsule().fill(Color.white.opacity(0.46))
+                Capsule().fill(BlankColors.pureWhite.opacity(0.46))
             }
         }
         .buttonStyle(.plain)

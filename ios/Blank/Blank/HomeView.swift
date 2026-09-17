@@ -408,7 +408,7 @@ struct HomeView: View {
             .frame(width: viewportWidth, height: viewportHeight, alignment: .topLeading)
         }
         .ignoresSafeArea()
-        .foregroundStyle(activeSection == nil ? (sessionStore.isBlankActive ? Color.white : BlankColors.homeLightInk) : (sessionStore.isBlankActive ? Color.white : BlankColors.ink))
+        .foregroundStyle(activeSection == nil ? (sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.homeLightInk) : (sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink))
         .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .environment(\.blankMinimalAppearance, true)
@@ -619,9 +619,9 @@ struct HomeView: View {
         let glassTint = BlankColors.paleSteelBlue.opacity(0.42)
         let logoReflection = RadialGradient(
             colors: [
-                Color.white.opacity(0.22),
-                Color.white.opacity(0.07),
-                Color.white.opacity(0.00)
+                BlankColors.pureWhite.opacity(0.22),
+                BlankColors.pureWhite.opacity(0.07),
+                BlankColors.pureWhite.opacity(0.00)
             ],
             center: .topLeading,
             startRadius: 0,
@@ -629,10 +629,10 @@ struct HomeView: View {
         )
         let topNavBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.42),
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.04),
-                Color.white.opacity(0.00)
+                BlankColors.pureWhite.opacity(0.42),
+                BlankColors.pureWhite.opacity(0.16),
+                BlankColors.pureWhite.opacity(0.04),
+                BlankColors.pureWhite.opacity(0.00)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -644,8 +644,8 @@ struct HomeView: View {
             } label: {
                 Image(systemName: "sparkle")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.white)
-                    .foregroundColor(Color.white)
+                    .foregroundStyle(BlankColors.pureWhite)
+                    .foregroundColor(BlankColors.pureWhite)
                     .frame(width: 47, height: 47)
                     .background {
                         ZStack {
@@ -695,8 +695,8 @@ struct HomeView: View {
         Button(action: action) {
             Text(title)
                 .font(.blankInter(size: 15, weight: .regular, relativeTo: .subheadline))
-                .foregroundStyle(Color.white)
-                .foregroundColor(Color.white)
+                .foregroundStyle(BlankColors.pureWhite)
+                .foregroundColor(BlankColors.pureWhite)
                 .frame(width: 64, height: 47)
                 .contentShape(Rectangle())
         }
@@ -846,9 +846,9 @@ struct HomeView: View {
                     .overlay(alignment: .bottom) {
                         GeometryReader { proxy in
                             Rectangle()
-                                .fill(Color.white.opacity(0.46))
+                                .fill(BlankColors.pureWhite.opacity(0.46))
                                 .frame(width: proxy.size.width * unblankHoldProgress, height: 1.5)
-                                .shadow(color: Color.white.opacity(0.22), radius: 5)
+                                .shadow(color: BlankColors.pureWhite.opacity(0.22), radius: 5)
                                 .frame(maxHeight: .infinity, alignment: .bottomLeading)
                         }
                         .allowsHitTesting(false)
@@ -901,7 +901,7 @@ struct HomeView: View {
                 Text("hold the screen to unblank")
                     .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
                     .tracking(-1.1)
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(BlankColors.pureWhite)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
                     .lineSpacing(1.1)
@@ -984,7 +984,7 @@ struct HomeView: View {
         let title = isActive
             ? (sessionStore.hardBlankActive ? "blank active" : "menu")
             : "blank"
-        let titleColor = isActive ? Color.white : BlankColors.homeLightInk
+        let titleColor = isActive ? BlankColors.pureWhite : BlankColors.homeLightInk
 
         return Button {
             if isActive {
@@ -1070,7 +1070,7 @@ struct HomeView: View {
         VStack(spacing: 28) {
             Text(homeTagline)
                 .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(BlankColors.pureWhite)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .minimumScaleFactor(0.82)
@@ -1088,12 +1088,12 @@ struct HomeView: View {
                let blankActiveSince = sessionStore.blankActiveSince {
                 Text(elapsedText(since: blankActiveSince))
                     .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(Color.white.opacity(0.86))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.86))
                     .monospacedDigit()
                 if let schedulePausedUntil = sessionStore.schedulePausedUntil, now < schedulePausedUntil {
                     Text("Schedule paused \(remainingText(until: schedulePausedUntil))")
                         .font(.blankInter(size: 13, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.58))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.58))
                 }
             }
 
@@ -1108,11 +1108,11 @@ struct HomeView: View {
                             .padding(.top, 8)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.mutedInk)
+                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.mutedInk)
                 } else {
                     Text(message)
                         .font(.blankInter(size: 13, relativeTo: .footnote))
-                        .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.mutedInk)
+                        .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.mutedInk)
                         .multilineTextAlignment(.center)
                         .padding(.top, 8)
                 }
@@ -1142,7 +1142,7 @@ struct HomeView: View {
                 if sessionStore.isBlankActive, !sessionStore.hardBlankActive {
                     GeometryReader { proxy in
                         Capsule()
-                            .fill(Color.white.opacity(0.18))
+                            .fill(BlankColors.pureWhite.opacity(0.18))
                             .frame(width: proxy.size.width * unblankHoldProgress)
                             .frame(maxHeight: .infinity, alignment: .leading)
                     }
@@ -1183,7 +1183,7 @@ struct HomeView: View {
                 } label: {
                     Text("Emergency unlock only")
                         .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                        .foregroundStyle(Color.white.opacity(0.72))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.72))
                 }
                 .buttonStyle(.plain)
             }
@@ -1192,12 +1192,12 @@ struct HomeView: View {
                 Text(cooldownText)
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                     .monospacedDigit()
-                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.62) : BlankColors.mutedInk)
+                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.62) : BlankColors.mutedInk)
             } else if let timerCountdownText {
                 Text(timerCountdownText)
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                     .monospacedDigit()
-                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.62) : BlankColors.mutedInk)
+                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.62) : BlankColors.mutedInk)
             }
         }
     }
@@ -1231,7 +1231,7 @@ struct HomeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
-            .foregroundStyle(Color.white.opacity(0.72))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.72))
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .contentShape(Rectangle())
@@ -2094,10 +2094,10 @@ private struct HomeBlankButtonStyle: ButtonStyle {
         let glassTint = BlankColors.paleSteelBlue.opacity(configuration.isPressed ? 0.58 : 0.48)
         let capsuleBorder = LinearGradient(
             colors: [
-                Color.white.opacity(0.42),
-                Color.white.opacity(0.16),
-                Color.white.opacity(0.04),
-                Color.white.opacity(0.00)
+                BlankColors.pureWhite.opacity(0.42),
+                BlankColors.pureWhite.opacity(0.16),
+                BlankColors.pureWhite.opacity(0.04),
+                BlankColors.pureWhite.opacity(0.00)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -2105,8 +2105,8 @@ private struct HomeBlankButtonStyle: ButtonStyle {
 
         configuration.label
             .font(.blankInter(size: 16, weight: .regular, relativeTo: .headline))
-            .foregroundStyle(Color.white)
-            .foregroundColor(Color.white)
+            .foregroundStyle(BlankColors.pureWhite)
+            .foregroundColor(BlankColors.pureWhite)
             .frame(maxWidth: .infinity)
             .frame(height: 50)
             .background {
@@ -2135,9 +2135,9 @@ private struct GlassCornerHighlight: View {
             .fill(
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.24),
-                        Color.white.opacity(0.08),
-                        Color.white.opacity(0.00)
+                        BlankColors.pureWhite.opacity(0.24),
+                        BlankColors.pureWhite.opacity(0.08),
+                        BlankColors.pureWhite.opacity(0.00)
                     ],
                     center: .center,
                     startRadius: 0,
@@ -2179,8 +2179,8 @@ private struct ModesList: View {
     @State private var newModeName = ""
     @State private var showsManualPlanCreator = false
     @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     @ViewBuilder
     var body: some View {
@@ -2292,7 +2292,7 @@ private struct ModesList: View {
 
     private var newLookRule: some View {
         Rectangle()
-            .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+            .fill(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.newLookRule)
             .frame(height: 1)
             .padding(.top, 26)
             .padding(.bottom, 8)
@@ -2787,7 +2787,7 @@ struct HomeSectionScreen: View {
     let screenTimeStatus: String
     let healthStatus: String
     let onClose: () -> Void
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
 
     var body: some View {
         let contentTop: CGFloat = 94
@@ -2826,7 +2826,7 @@ struct HomeSectionScreen: View {
                                 .font(.system(size: 22, weight: .regular))
                         }
                     }
-                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
+                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
                     .frame(minWidth: 44, minHeight: 44)
                         .contentShape(Rectangle())
                 }
@@ -2883,8 +2883,8 @@ private struct SettingsScreen: View {
     let screenTimeStatus: String
     let healthStatus: String
 
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -2960,8 +2960,8 @@ private struct ScheduleEditorContent: View {
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     let onSave: () -> Void
     @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
         List {
@@ -3344,7 +3344,7 @@ private struct HabitDaysPicker: View {
                             .frame(height: 34)
                             .background {
                                 Capsule()
-                                    .fill(isSelected(day.id) ? Color.white.opacity(0.82) : Color.white.opacity(0.12))
+                                    .fill(isSelected(day.id) ? BlankColors.pureWhite.opacity(0.82) : BlankColors.pureWhite.opacity(0.12))
                             }
                     }
                     .buttonStyle(.plain)
@@ -3377,7 +3377,7 @@ private struct HabitDaysPicker: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 30)
                 .background {
-                    Capsule().fill(Color.white.opacity(Set(selectedWeekdays) == Set(weekdays) ? 0.20 : 0.10))
+                    Capsule().fill(BlankColors.pureWhite.opacity(Set(selectedWeekdays) == Set(weekdays) ? 0.20 : 0.10))
                 }
         }
         .buttonStyle(.plain)
@@ -3586,8 +3586,8 @@ private struct EmergencyScreen: View {
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
     @State private var isConfirming = false
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
         VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 18 : 22) {
@@ -3737,7 +3737,7 @@ private struct RelinkSheet: View {
 private struct TechnicalSettingsSheetLayout<Content: View>: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @ViewBuilder var content: Content
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
 
     var body: some View {
         VStack(spacing: 18) {
@@ -3810,11 +3810,11 @@ private struct SessionsScreen: View {
     private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
 
     private var textColor: Color {
-        sessionStore.isBlankActive ? Color.white : BlankColors.minimalInk
+        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.minimalInk
     }
 
     private var secondaryColor: Color {
-        sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.minimalSecondary
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.minimalSecondary
     }
 
     private var cardSurface: Color {
@@ -3950,11 +3950,11 @@ private struct SessionsScreen: View {
 
                     Text(weekdayLabels[index])
                         .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? BlankColors.charcoal : Color.white) : secondaryColor.opacity(0.55))
+                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite) : secondaryColor.opacity(0.55))
                         .frame(width: 27, height: 27)
                         .background {
                             Circle()
-                                .fill(isSelected ? (sessionStore.isBlankActive ? Color.white : BlankColors.charcoal) : textColor.opacity(0.035))
+                                .fill(isSelected ? (sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal) : textColor.opacity(0.035))
                         }
                 }
             }
@@ -4023,11 +4023,11 @@ private struct ManualModeEditorScreen: View {
     private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
 
     private var textColor: Color {
-        sessionStore.isBlankActive ? Color.white : BlankColors.minimalInk
+        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.minimalInk
     }
 
     private var secondaryColor: Color {
-        sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.minimalSecondary
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.minimalSecondary
     }
 
     private var canSave: Bool {
@@ -4042,19 +4042,19 @@ private struct ManualModeEditorScreen: View {
     }
 
     private var fieldFill: Color {
-        sessionStore.isBlankActive ? Color.white.opacity(0.08) : BlankColors.minimalBackground
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.08) : BlankColors.minimalBackground
     }
 
     private var fieldBorder: Color {
-        sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.minimalInk.opacity(0.10)
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.minimalInk.opacity(0.10)
     }
 
     private var primaryButtonFill: Color {
-        sessionStore.isBlankActive ? Color.white : BlankColors.charcoal
+        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal
     }
 
     private var primaryButtonText: Color {
-        sessionStore.isBlankActive ? BlankColors.charcoal : Color.white
+        sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite
     }
 
     var body: some View {
@@ -4067,7 +4067,7 @@ private struct ManualModeEditorScreen: View {
                         Text("back")
                             .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
                             .tracking(-0.3)
-                            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
+                            .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
                             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                     }
                     .buttonStyle(.plain)
@@ -4252,8 +4252,8 @@ private struct ManualModeEditorScreen: View {
 
     private func dayButton(weekday: Int, label: String) -> some View {
         let isSelected = selectedWeekdays.contains(weekday)
-        let selectedFill = sessionStore.isBlankActive ? Color.white : BlankColors.charcoal
-        let selectedText = sessionStore.isBlankActive ? BlankColors.charcoal : Color.white
+        let selectedFill = sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal
+        let selectedText = sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite
 
         return Button {
             guard repeatsWeekly else { return }
@@ -4299,8 +4299,8 @@ private struct TimerScreen: View {
     @State private var selectedMinutes = 30
     let onStart: (Int, Bool) -> Void
     private let options = [15, 30, 45, 60, 90, 120]
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
     private var recommendedMinutes: Int { sessionStore.digitalWellnessV3.plan.recommendedDurationMinutes }
 
     var body: some View {
@@ -4421,7 +4421,7 @@ private struct TimerScreen: View {
                 .foregroundStyle(secondaryColor)
 
             Rectangle()
-                .fill(sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.newLookRule)
+                .fill(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.newLookRule)
                 .frame(height: 1)
                 .padding(.top, 28)
                 .padding(.bottom, 8)
@@ -4719,8 +4719,8 @@ private struct AssistantConnectSheet: View {
         }
     }
 
-    private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     private var statusText: String {
         guard !connectedAt.isEmpty else {
@@ -4869,7 +4869,7 @@ private struct AppPhoneSignInSheet: View {
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(BlankColors.red)
                     }
                 }
             }

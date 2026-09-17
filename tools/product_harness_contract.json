@@ -11,7 +11,7 @@
     ".gitignore",
     ".env.membership.example",
     "PRODUCTION_CHECKLIST.md",
-    "ios/Blank/Blank/**",
+    "ios/Blank/**",
     "ios/Blank/Blank.xcodeproj/**",
     "app/src/main/**",
     "web/landing/**",

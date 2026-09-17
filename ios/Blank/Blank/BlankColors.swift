@@ -28,6 +28,7 @@ enum BlankColors {
     static let powderGray = Color(red: 228 / 255.0, green: 235 / 255.0, blue: 239 / 255.0)
     static let pureWhite = Color.white
 
+    // Semantic alert color: retained for error/destructive states because the brand palette has no alert equivalent.
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
     static let statusGreen = seafoam
     static let redDark = charcoal
@@ -35,11 +36,11 @@ enum BlankColors {
     static let background = powderGray
     static let surface = pureWhite
     static let text = pureWhite
-    static let secondaryText = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let secondaryText = charcoal.opacity(0.86)
     static let warmBackground = powderGray
     static let warmSurface = pureWhite.opacity(0.92)
     static let ink = charcoal
-    static let mutedInk = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let mutedInk = secondaryText
     static let line = charcoal.opacity(0.14)
     static let airBlue = paleSteelBlue
     static let airMist = powderGray
@@ -50,7 +51,7 @@ enum BlankColors {
     static let activeControlSurface = pureWhite.opacity(0.09)
     static let minimalBackground = powderGray
     static let minimalInk = charcoal
-    static let minimalSecondary = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let minimalSecondary = secondaryText
     static let minimalFaded = paleSteelBlue.opacity(0.72)
     static let minimalCardSurface = pureWhite
     static let darkCardSurface = paleSteelBlue.opacity(0.16)
@@ -58,8 +59,8 @@ enum BlankColors {
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
     static let homeLightBackground = powderGray
     static let homeLightInk = charcoal
-    static let homeLightOption = Color(red: 0.31, green: 0.37, blue: 0.40)
-    static let homeLightSecondary = Color(red: 0.42, green: 0.50, blue: 0.54)
+    static let homeLightOption = secondaryText
+    static let homeLightSecondary = charcoal.opacity(0.68)
     static let homeDarkBackground = charcoal
     static let homeDarkSecondary = paleSteelBlue.opacity(0.46)
     static let newLookRule = charcoal.opacity(0.16)
@@ -94,14 +95,14 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     func makeBody(configuration: Configuration) -> some View {
-        let minimalTextColor = light ? Color.white : BlankColors.minimalInk
-        let minimalSurfaceColor = light ? BlankColors.minimalInk : Color.white
+        let minimalTextColor = light ? BlankColors.pureWhite : BlankColors.minimalInk
+        let minimalSurfaceColor = light ? BlankColors.minimalInk : BlankColors.pureWhite
 
         configuration.label
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
             .frame(maxWidth: 342)
             .frame(height: minimalAppearance ? 52 : 50)
-            .foregroundStyle(minimalAppearance ? minimalTextColor : (light ? BlankColors.ink : Color.white))
+            .foregroundStyle(minimalAppearance ? minimalTextColor : (light ? BlankColors.ink : BlankColors.pureWhite))
             .background {
                 ZStack {
                     if minimalAppearance {
@@ -109,7 +110,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                             .fill(light ? minimalSurfaceColor.opacity(configuration.isPressed ? 0.78 : 1) : minimalSurfaceColor.opacity(configuration.isPressed ? 0.72 : 0.94))
                     } else {
                         Capsule().fill(.ultraThinMaterial)
-                        Capsule().fill(light ? Color.white.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
+                        Capsule().fill(light ? BlankColors.pureWhite.opacity(0.56) : BlankColors.glassTint.opacity(configuration.isPressed ? 0.58 : 0.48))
                         BlankGlassCornerHighlight(width: 92, height: 34, xOffset: -122, yOffset: -17)
                             .clipShape(Capsule())
                         Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
@@ -117,7 +118,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: minimalAppearance ? .clear : charcoal.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : BlankColors.charcoal.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
@@ -138,13 +139,13 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
                             .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.04))
                     } else {
                         Capsule().fill(.ultraThinMaterial)
-                        Capsule().fill(Color.white.opacity(configuration.isPressed ? 0.42 : 0.30))
+                        Capsule().fill(BlankColors.pureWhite.opacity(configuration.isPressed ? 0.42 : 0.30))
                         Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
                     }
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: minimalAppearance ? .clear : charcoal.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : BlankColors.charcoal.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
@@ -165,7 +166,7 @@ struct BlankAtmosphericBackground: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(dimmed ? 0.02 : 0.14),
+                        BlankColors.pureWhite.opacity(dimmed ? 0.02 : 0.14),
                         BlankColors.airMist.opacity(dimmed ? 0.10 : 0.20),
                         BlankColors.airStone.opacity(dimmed ? 0.06 : 0.16)
                     ],
@@ -189,9 +190,9 @@ struct BlankGlassCornerHighlight: View {
             .fill(
                 RadialGradient(
                     colors: [
-                        Color.white.opacity(0.24),
-                        Color.white.opacity(0.08),
-                        Color.white.opacity(0.00)
+                        BlankColors.pureWhite.opacity(0.24),
+                        BlankColors.pureWhite.opacity(0.08),
+                        BlankColors.pureWhite.opacity(0.00)
                     ],
                     center: .center,
                     startRadius: 0,
@@ -220,7 +221,7 @@ private struct BlankGlassCardModifier: ViewModifier {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(.ultraThinMaterial)
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(tintOpacity))
+                            .fill(BlankColors.pureWhite.opacity(tintOpacity))
                         BlankGlassCornerHighlight(width: 104, height: 40, xOffset: -112, yOffset: -22)
                             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                     }
@@ -228,7 +229,7 @@ private struct BlankGlassCardModifier: ViewModifier {
             }
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(minimalAppearance ? Color.clear : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0 : 1)
+                    .stroke(minimalAppearance ? Color.clear : BlankColors.pureWhite.opacity(0.20), lineWidth: minimalAppearance ? 0 : 1)
             )
             .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.045), radius: 14, x: 0, y: 8)
     }
@@ -245,12 +246,12 @@ private struct BlankControlSurfaceModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(minimalAppearance ? (colorScheme == .dark ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface) : Color.white.opacity(tintOpacity))
+                    .fill(minimalAppearance ? (colorScheme == .dark ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface) : BlankColors.pureWhite.opacity(tintOpacity))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
-                        minimalAppearance ? Color.clear : Color.white.opacity(emphasized ? 0.34 : 0.18),
+                        minimalAppearance ? Color.clear : BlankColors.pureWhite.opacity(emphasized ? 0.34 : 0.18),
                         lineWidth: minimalAppearance ? 0 : 0.8
                     )
             }
@@ -323,7 +324,7 @@ struct TopSheetPrimaryButtonLabel: View {
                         Rectangle().fill(BlankColors.minimalInk.opacity(0.08))
                     } else {
                         Capsule().fill(.ultraThinMaterial)
-                        Capsule().fill(Color.white.opacity(0.34))
+                        Capsule().fill(BlankColors.pureWhite.opacity(0.34))
                         BlankGlassCornerHighlight(width: 74, height: 28, xOffset: -44, yOffset: -15)
                             .clipShape(Capsule())
                     }

@@ -36,8 +36,8 @@ struct ReportView: View {
     @AppStorage("blankWellnessLastStress", store: BlankSharedState.defaults) private var lastStress = 0
     @AppStorage("blankWellnessLastQuickLog", store: BlankSharedState.defaults) private var lastQuickLog = ""
 
-    private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
-    private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
+    private var reportPrimary: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
+    private var reportSecondary: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
     private var accentBlue: Color { BlankColors.premiumBlue }
     private var recoveryGreen: Color { BlankColors.seafoam }
     private var sleepBlue: Color { BlankColors.paleSteelBlue }
@@ -332,7 +332,7 @@ struct ReportView: View {
                     Text("back")
                         .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
                         .tracking(-0.3)
-                        .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : accentBlue)
+                        .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : accentBlue)
                         .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                 }
                 .buttonStyle(.plain)
@@ -913,7 +913,7 @@ struct ReportView: View {
                     .foregroundStyle(reportPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background { Capsule().fill(Color.white.opacity(0.16)) }
+                    .background { Capsule().fill(BlankColors.pureWhite.opacity(0.16)) }
             } else {
                 Button {
                     scheduleForecastBlock(forecast, source: "stats_today_weak_window")
@@ -1124,7 +1124,7 @@ struct ReportView: View {
                     .foregroundStyle(reportSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background { Capsule().fill(Color.white.opacity(0.16)) }
+                    .background { Capsule().fill(BlankColors.pureWhite.opacity(0.16)) }
             } else {
                 Button {
                     scheduleForecastBlock(forecast, source: "stats_next_best_block")
@@ -1134,7 +1134,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
-                        .background { Capsule().fill(Color.white.opacity(0.24)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.24)) }
                 }
                 .buttonStyle(.plain)
 
@@ -1187,7 +1187,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.20)) }
                 }
                 .buttonStyle(.plain)
             } else if case .failed(_) = healthKitStore.state {
@@ -1200,7 +1200,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.20)) }
                 }
                 .buttonStyle(.plain)
             } else if case .connected = healthKitStore.state {
@@ -1260,7 +1260,7 @@ struct ReportView: View {
             .foregroundStyle(reportPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background { Capsule().fill(Color.white.opacity(0.16)) }
+            .background { Capsule().fill(BlankColors.pureWhite.opacity(0.16)) }
     }
 
     private func weeklyVisualCapsule(activityDays: [BlankActivityDay], weekly: BlankWeeklyReport) -> some View {
@@ -1351,7 +1351,7 @@ struct ReportView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(reportPrimary)
                     .frame(width: 38, height: 38)
-                    .background { Circle().fill(Color.white.opacity(0.16)) }
+                    .background { Circle().fill(BlankColors.pureWhite.opacity(0.16)) }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Connect health and wearables")
@@ -1374,7 +1374,7 @@ struct ReportView: View {
                     .foregroundStyle(reportPrimary.opacity(0.76))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background { Capsule().fill(Color.white.opacity(0.12)) }
+                    .background { Capsule().fill(BlankColors.pureWhite.opacity(0.12)) }
 
                 Spacer(minLength: 0)
             }
@@ -1398,7 +1398,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
-                        .background { Capsule().fill(Color.white.opacity(0.22)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.22)) }
                         .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
                 }
                 .buttonStyle(.plain)
@@ -1420,7 +1420,7 @@ struct ReportView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
                 .padding(.horizontal, 14)
-                .background { Capsule().fill(Color.white.opacity(0.16)) }
+                .background { Capsule().fill(BlankColors.pureWhite.opacity(0.16)) }
                 .overlay { Capsule().stroke(reportPrimary.opacity(0.08), lineWidth: 1) }
             }
             .buttonStyle(.plain)
@@ -1639,7 +1639,7 @@ struct ReportView: View {
                 .minimumScaleFactor(0.74)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
-                .background { Capsule().fill(Color.white.opacity(0.16)) }
+                .background { Capsule().fill(BlankColors.pureWhite.opacity(0.16)) }
         }
         .buttonStyle(.plain)
     }
@@ -1839,7 +1839,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background { Capsule().fill(Color.white.opacity(0.20)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.20)) }
                 }
                 .buttonStyle(.plain)
 
@@ -2100,7 +2100,7 @@ struct ReportView: View {
                     .padding(.vertical, 10)
                     .background {
                         Capsule()
-                            .fill(Color.white.opacity(0.20))
+                            .fill(BlankColors.pureWhite.opacity(0.20))
                     }
                     .overlay {
                         Capsule()
@@ -2134,7 +2134,7 @@ struct ReportView: View {
                         .padding(.vertical, 11)
                         .background {
                             Capsule()
-                                .fill(Color.white.opacity(0.24))
+                                .fill(BlankColors.pureWhite.opacity(0.24))
                         }
                         .overlay {
                             Capsule()
@@ -2230,7 +2230,7 @@ struct ReportView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background {
-                        Capsule().fill(Color.white.opacity(0.16))
+                        Capsule().fill(BlankColors.pureWhite.opacity(0.16))
                     }
                 }
         }
@@ -2413,7 +2413,7 @@ struct ReportView: View {
                         .padding(.vertical, 11)
                         .background {
                             Capsule()
-                                .fill(Color.white.opacity(0.12))
+                                .fill(BlankColors.pureWhite.opacity(0.12))
                         }
                         .overlay {
                             Capsule()
@@ -2467,7 +2467,7 @@ struct ReportView: View {
                         .padding(.vertical, 11)
                         .background {
                             Capsule()
-                                .fill(Color.white.opacity(0.24))
+                                .fill(BlankColors.pureWhite.opacity(0.24))
                         }
                         .overlay {
                             Capsule()
@@ -2652,7 +2652,7 @@ struct ReportView: View {
                 .padding(.vertical, 11)
                 .background {
                     Capsule()
-                        .fill(Color.white.opacity(0.20))
+                        .fill(BlankColors.pureWhite.opacity(0.20))
                 }
                 .overlay {
                     Capsule()
@@ -2674,7 +2674,7 @@ struct ReportView: View {
             .padding(.vertical, 9)
             .background {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.24))
+                    .fill(BlankColors.pureWhite.opacity(0.24))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -2791,7 +2791,7 @@ struct ReportView: View {
                         .foregroundStyle(reportPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 11)
-                        .background { Capsule().fill(Color.white.opacity(0.22)) }
+                        .background { Capsule().fill(BlankColors.pureWhite.opacity(0.22)) }
                 }
                 .buttonStyle(.plain)
                 .disabled(purchaseStore.isPurchasing)
@@ -3083,7 +3083,7 @@ struct ReportView: View {
         .frame(height: 48)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(sessionStore.isBlankActive ? 0.10 : 0.26))
+                .fill(BlankColors.pureWhite.opacity(sessionStore.isBlankActive ? 0.10 : 0.26))
         }
     }
 
@@ -4727,9 +4727,9 @@ private struct ReportLiquidBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(isActive ? 0.04 : 0.22),
+                    BlankColors.pureWhite.opacity(isActive ? 0.04 : 0.22),
                     (isActive ? BlankColors.ink : BlankColors.background).opacity(isActive ? 0.22 : 0.28),
-                    Color.white.opacity(isActive ? 0.03 : 0.14)
+                    BlankColors.pureWhite.opacity(isActive ? 0.03 : 0.14)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -4757,7 +4757,7 @@ private struct ReportFlatCardModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.12) : Color.white)
+                    .fill(colorScheme == .dark ? BlankColors.pureWhite.opacity(0.12) : BlankColors.pureWhite)
             }
     }
 }
@@ -4778,7 +4778,7 @@ private struct LiquidGlassModifier: ViewModifier {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(.ultraThinMaterial)
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.12))
+                            .fill(BlankColors.pureWhite.opacity(0.12))
                         BlankGlassCornerHighlight(width: 112, height: 42, xOffset: -120, yOffset: -23)
                             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                             .opacity(0.34)
@@ -4787,7 +4787,7 @@ private struct LiquidGlassModifier: ViewModifier {
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(minimalAppearance ? Color.clear : Color.white.opacity(0.20), lineWidth: minimalAppearance ? 0 : 0.7)
+                    .stroke(minimalAppearance ? Color.clear : BlankColors.pureWhite.opacity(0.20), lineWidth: minimalAppearance ? 0 : 0.7)
             }
             .shadow(color: minimalAppearance ? .clear : BlankColors.ink.opacity(0.026), radius: 14, x: 0, y: 8)
     }

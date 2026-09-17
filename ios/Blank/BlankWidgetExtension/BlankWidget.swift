@@ -4,6 +4,12 @@ import ManagedSettings
 import SwiftUI
 import WidgetKit
 
+private enum BlankWidgetPalette {
+    static let charcoal = Color(red: 51 / 255.0, green: 59 / 255.0, blue: 65 / 255.0)
+    static let powderGray = Color(red: 228 / 255.0, green: 235 / 255.0, blue: 239 / 255.0)
+    static let pureWhite = Color.white
+}
+
 struct StartQuickBlockIntent: AppIntent {
     static var title: LocalizedStringResource = "Start Blank"
     static var description = IntentDescription("Starts a quick block with your current Blanked configuration.")
@@ -75,7 +81,7 @@ struct BlankWidgetView: View {
     let entry: BlankWidgetEntry
     @Environment(\.widgetFamily) private var widgetFamily
     private var isActive: Bool { entry.activeState.isActive }
-    private var titleColor: Color { isActive ? Color.white.opacity(0.96) : Color(red: 0.13, green: 0.13, blue: 0.12) }
+    private var titleColor: Color { isActive ? BlankWidgetPalette.pureWhite.opacity(0.96) : BlankWidgetPalette.charcoal }
     private let textColumnInset: CGFloat = 7
     private let timerTopInset: CGFloat = 15
 
@@ -207,7 +213,7 @@ struct BlankWidgetView: View {
     }
 
     private var timerBadgeForeground: Color {
-        isActive ? Color.white : Color(red: 0.13, green: 0.13, blue: 0.12).opacity(0.86)
+        isActive ? BlankWidgetPalette.pureWhite : BlankWidgetPalette.charcoal.opacity(0.86)
     }
 
     private func compactRemainingText(until endsAt: Date) -> String {
@@ -244,8 +250,8 @@ private struct BlankWidgetGlassBackground: View {
 
             LinearGradient(
                 colors: [
-                    isActive ? Color.white.opacity(0.10) : Color.white.opacity(0.52),
-                    isActive ? Color.white.opacity(0.00) : Color.white.opacity(0.08)
+                    isActive ? BlankWidgetPalette.pureWhite.opacity(0.10) : BlankWidgetPalette.pureWhite.opacity(0.52),
+                    isActive ? BlankWidgetPalette.pureWhite.opacity(0.00) : BlankWidgetPalette.pureWhite.opacity(0.08)
                 ],
                 startPoint: .top,
                 endPoint: UnitPoint(x: 0.5, y: 0.48)
@@ -253,8 +259,8 @@ private struct BlankWidgetGlassBackground: View {
 
             RadialGradient(
                 colors: [
-                    isActive ? Color.white.opacity(0.06) : Color.white.opacity(0.34),
-                    Color.white.opacity(0.00)
+                    isActive ? BlankWidgetPalette.pureWhite.opacity(0.06) : BlankWidgetPalette.pureWhite.opacity(0.34),
+                    BlankWidgetPalette.pureWhite.opacity(0.00)
                 ],
                 center: UnitPoint(x: 0.12, y: 0.00),
                 startRadius: 6,
@@ -264,7 +270,7 @@ private struct BlankWidgetGlassBackground: View {
             LinearGradient(
                 colors: [
                     Color.clear,
-                    isActive ? Color.black.opacity(0.34) : Color.black.opacity(0.018)
+                    isActive ? BlankWidgetPalette.charcoal.opacity(0.34) : BlankWidgetPalette.charcoal.opacity(0.018)
                 ],
                 startPoint: UnitPoint(x: 0.50, y: 0.62),
                 endPoint: .bottom
@@ -275,9 +281,9 @@ private struct BlankWidgetGlassBackground: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.white.opacity(0.00),
-                                Color.white.opacity(0.045),
-                                Color.white.opacity(0.00)
+                                BlankWidgetPalette.pureWhite.opacity(0.00),
+                                BlankWidgetPalette.pureWhite.opacity(0.045),
+                                BlankWidgetPalette.pureWhite.opacity(0.00)
                             ],
                             startPoint: .leading,
                             endPoint: .trailing
@@ -291,9 +297,9 @@ private struct BlankWidgetGlassBackground: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            isActive ? Color.white.opacity(0.22) : Color.white.opacity(0.88),
-                            isActive ? Color.white.opacity(0.07) : Color.white.opacity(0.26),
-                            isActive ? Color.white.opacity(0.03) : Color.black.opacity(0.045)
+                            isActive ? BlankWidgetPalette.pureWhite.opacity(0.22) : BlankWidgetPalette.pureWhite.opacity(0.88),
+                            isActive ? BlankWidgetPalette.pureWhite.opacity(0.07) : BlankWidgetPalette.pureWhite.opacity(0.26),
+                            isActive ? BlankWidgetPalette.pureWhite.opacity(0.03) : BlankWidgetPalette.charcoal.opacity(0.045)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -309,11 +315,11 @@ private struct BlankWidgetGlassBackground: View {
             .fill(
                 LinearGradient(
                     colors: isActive ? [
-                        Color(red: 0.17, green: 0.18, blue: 0.16),
-                        Color(red: 0.025, green: 0.035, blue: 0.028)
+                        BlankWidgetPalette.charcoal,
+                        BlankWidgetPalette.charcoal.opacity(0.68)
                     ] : [
-                        Color.white,
-                        Color(red: 0.965, green: 0.962, blue: 0.945)
+                        BlankWidgetPalette.pureWhite,
+                        BlankWidgetPalette.powderGray
                     ],
                     startPoint: .top,
                     endPoint: .bottom

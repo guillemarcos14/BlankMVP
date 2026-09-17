@@ -49,11 +49,11 @@ private enum OnboardingStep: Int, CaseIterable {
 
     var bottomGlowPalette: BottomGlowPalette {
         let palettes: [BottomGlowPalette] = [
-            .init(id: 0, primary: Color(red: 0.48, green: 0.66, blue: 0.84), secondary: Color(red: 0.62, green: 0.76, blue: 0.90), accent: Color(red: 0.34, green: 0.52, blue: 0.72)),
-            .init(id: 1, primary: Color(red: 0.42, green: 0.61, blue: 0.82), secondary: Color(red: 0.55, green: 0.72, blue: 0.88), accent: Color(red: 0.30, green: 0.48, blue: 0.68)),
-            .init(id: 2, primary: Color(red: 0.38, green: 0.58, blue: 0.80), secondary: Color(red: 0.58, green: 0.74, blue: 0.90), accent: Color(red: 0.28, green: 0.46, blue: 0.66)),
-            .init(id: 3, primary: Color(red: 0.36, green: 0.56, blue: 0.78), secondary: Color(red: 0.52, green: 0.70, blue: 0.88), accent: Color(red: 0.32, green: 0.50, blue: 0.70)),
-            .init(id: 4, primary: Color(red: 0.44, green: 0.64, blue: 0.84), secondary: Color(red: 0.60, green: 0.76, blue: 0.91), accent: Color(red: 0.31, green: 0.50, blue: 0.71))
+            .init(id: 0, primary: BlankColors.seafoam, secondary: BlankColors.paleSteelBlue, accent: BlankColors.charcoal),
+            .init(id: 1, primary: BlankColors.paleSteelBlue, secondary: BlankColors.seafoam, accent: BlankColors.charcoal),
+            .init(id: 2, primary: BlankColors.seafoam.opacity(0.84), secondary: BlankColors.paleSteelBlue, accent: BlankColors.charcoal),
+            .init(id: 3, primary: BlankColors.paleSteelBlue.opacity(0.92), secondary: BlankColors.powderGray, accent: BlankColors.seafoam),
+            .init(id: 4, primary: BlankColors.seafoam.opacity(0.92), secondary: BlankColors.paleSteelBlue, accent: BlankColors.pureWhite)
         ]
         return palettes[rawValue % palettes.count]
     }
@@ -211,7 +211,7 @@ struct SetupView: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(minimalAppearance ? BlankColors.minimalInk.opacity(0.86) : Color.white.opacity(0.86))
+                                .foregroundStyle(minimalAppearance ? BlankColors.minimalInk.opacity(0.86) : BlankColors.pureWhite.opacity(0.86))
                                 .frame(width: 42, height: 42)
                         }
                         .buttonStyle(.plain)
@@ -227,7 +227,7 @@ struct SetupView: View {
                         skipToHomeForQA()
                     }
                     .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.78))
+                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : BlankColors.pureWhite.opacity(0.78))
                     .frame(height: 42)
                     .buttonStyle(.plain)
                     .accessibilityLabel("Skip onboarding and open Home")
@@ -268,7 +268,7 @@ struct SetupView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : Color.white)
+        .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
             dailyHours = storedDailyHours
@@ -328,7 +328,7 @@ struct SetupView: View {
                 title: "Your phone is taking more of your life than you think",
                 body: "Let's see how much",
                 bodySize: 18,
-                bodyColor: Color.white.opacity(0.68),
+                bodyColor: BlankColors.pureWhite.opacity(0.68),
                 button: "Continue"
             )
         case .lifetime:
@@ -456,7 +456,7 @@ struct SetupView: View {
             },
             accessory: AnyView(
                 Slider(value: $dailyHours, in: 1...9, step: 0.5)
-                    .tint(Color.white)
+                    .tint(BlankColors.pureWhite)
                     .frame(maxWidth: 330)
                     .onChange(of: dailyHours) { value in
                         storedDailyHours = value
@@ -650,7 +650,7 @@ struct SetupView: View {
                     } label: {
                         if isSubmittingOnboardingResponse {
                             ProgressView()
-                                .tint(Color.white)
+                                .tint(BlankColors.pureWhite)
                         } else {
                             Text("Personalize my plan")
                         }
@@ -661,7 +661,7 @@ struct SetupView: View {
 
                     Text("We do not share the app list or screen time data")
                         .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.52))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.52))
                         .multilineTextAlignment(.center)
                         .lineSpacing(2)
                         .frame(maxWidth: 318)
@@ -688,7 +688,7 @@ struct SetupView: View {
 
             Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again")
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.50))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.50))
                 .multilineTextAlignment(.leading)
                 .lineSpacing(3)
                 .frame(maxWidth: 318, alignment: .leading)
@@ -725,7 +725,7 @@ struct SetupView: View {
             } label: {
                 if purchaseStore.isPurchasing || purchaseStore.isLoading {
                     ProgressView()
-                        .tint(Color.black)
+                        .tint(BlankColors.charcoal)
                 } else {
                     Text("Start 3-day trial")
                 }
@@ -739,7 +739,7 @@ struct SetupView: View {
                 continueFree()
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.82))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
             .buttonStyle(.plain)
             .padding(.top, 13)
 
@@ -753,7 +753,7 @@ struct SetupView: View {
                 }
             }
             .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-            .foregroundStyle(Color.white.opacity(0.70))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.70))
             .buttonStyle(.plain)
             .padding(.top, 13)
 
@@ -764,7 +764,7 @@ struct SetupView: View {
                     continueWithReviewDemoAccess()
                 }
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.82))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
                 .buttonStyle(.plain)
                 .padding(.top, 13)
             }
@@ -772,7 +772,7 @@ struct SetupView: View {
             if let purchaseMessage = purchaseStore.message {
                 Text(purchaseMessage)
                     .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.74))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.74))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 318)
                     .padding(.top, 10)
@@ -928,7 +928,7 @@ struct SetupView: View {
         .frame(width: 276, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.86))
+                .fill(BlankColors.pureWhite.opacity(0.86))
         }
     }
 
@@ -937,7 +937,7 @@ struct SetupView: View {
             .font(.system(size: 25, weight: .semibold))
             .foregroundStyle(BlankColors.ink)
             .frame(width: 74, height: 74)
-            .background(Circle().fill(Color.white.opacity(isCommitmentPressing ? 0.62 : 0.82)))
+            .background(Circle().fill(BlankColors.pureWhite.opacity(isCommitmentPressing ? 0.62 : 0.82)))
             .scaleEffect(isCommitmentPressing ? 0.985 : 1)
             .onLongPressGesture(
                 minimumDuration: 3,
@@ -977,7 +977,7 @@ struct SetupView: View {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.88))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.88))
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -985,7 +985,7 @@ struct SetupView: View {
                         .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                     Text("Get 7 days of Pro when 3 friends activate Blanked with your code")
                         .font(.blankInter(size: 12, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.62))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.62))
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -997,10 +997,10 @@ struct SetupView: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-            .foregroundStyle(Color.white.opacity(0.88))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.88))
             .padding(.horizontal, 12)
             .frame(height: 36)
-            .background(Capsule().fill(Color.white.opacity(0.10)))
+            .background(Capsule().fill(BlankColors.pureWhite.opacity(0.10)))
 
             HStack(spacing: 10) {
                 ShareLink(item: referralShareText) {
@@ -1008,7 +1008,7 @@ struct SetupView: View {
                         .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                         .frame(maxWidth: .infinity)
                         .frame(height: 34)
-                        .background(Capsule().fill(Color.white.opacity(0.16)))
+                        .background(Capsule().fill(BlankColors.pureWhite.opacity(0.16)))
                 }
 
                 Button("Refresh") {
@@ -1019,23 +1019,23 @@ struct SetupView: View {
                 .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                 .frame(maxWidth: .infinity)
                 .frame(height: 34)
-                .background(Capsule().fill(Color.white.opacity(0.26)))
+                .background(Capsule().fill(BlankColors.pureWhite.opacity(0.26)))
             }
             .buttonStyle(.plain)
 
             Text(purchaseStore.isReferralTrialActive ? "Pro pass active: \(purchaseStore.referralTrialRemainingText ?? "active")" : "\(purchaseStore.referralCount)/3 activated friends")
                 .font(.blankInter(size: 11, relativeTo: .caption2))
-                .foregroundStyle(Color.white.opacity(0.46))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.46))
         }
-        .foregroundStyle(Color.white.opacity(0.90))
+        .foregroundStyle(BlankColors.pureWhite.opacity(0.90))
         .padding(14)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+                .fill(BlankColors.pureWhite.opacity(0.08))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.13), lineWidth: 1)
+                .stroke(BlankColors.pureWhite.opacity(0.13), lineWidth: 1)
         }
     }
 
@@ -1057,7 +1057,7 @@ struct SetupView: View {
                 .multilineTextAlignment(.center)
         }
         .font(.blankInter(size: 11, relativeTo: .caption2))
-        .foregroundStyle(Color.white.opacity(0.40))
+        .foregroundStyle(BlankColors.pureWhite.opacity(0.40))
         .lineSpacing(2)
         .frame(maxWidth: 318)
     }
@@ -1067,7 +1067,7 @@ struct SetupView: View {
             presentedLegalDocument = document
         }
         .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption2))
-        .foregroundStyle(Color.white.opacity(0.72))
+        .foregroundStyle(BlankColors.pureWhite.opacity(0.72))
         .buttonStyle(.plain)
     }
 
@@ -1161,11 +1161,11 @@ struct SetupView: View {
             Text(text)
                 .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
         }
-        .foregroundStyle(Color.white.opacity(0.76))
+        .foregroundStyle(BlankColors.pureWhite.opacity(0.76))
         .padding(.horizontal, 16)
         .frame(height: 38)
         .background {
-            Capsule().fill(Color.white.opacity(0.10))
+            Capsule().fill(BlankColors.pureWhite.opacity(0.10))
         }
     }
 
@@ -1844,7 +1844,7 @@ private struct ReferenceOnboardingScene: View {
                         if let secondaryTitle, let secondaryAction {
                             Button(secondaryTitle, action: secondaryAction)
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .footnote))
-                                .foregroundStyle(Color.white.opacity(0.70))
+                                .foregroundStyle(BlankColors.pureWhite.opacity(0.70))
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .center)
                         }
@@ -1897,7 +1897,7 @@ private struct ReferenceOnboardingText: View {
             if let eyebrow, !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.78))
+                    .foregroundStyle(minimalAppearance ? BlankColors.minimalSecondary : BlankColors.pureWhite.opacity(0.78))
                     .padding(.bottom, 2)
             }
 
@@ -1967,13 +1967,13 @@ private struct ReferenceAnimatedLine: View {
 
             Text(line.text)
                 .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
-                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : Color.white) : (minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.96)))
+                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite) : (minimalAppearance ? BlankColors.minimalSecondary : BlankColors.pureWhite.opacity(0.96)))
                 .lineLimit(line.icon == nil ? 2 : 1)
                 .minimumScaleFactor(line.icon == nil ? 0.68 : 0.46)
                 .multilineTextAlignment(.leading)
                 .lineSpacing(0)
                 .tracking(0)
-                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? Color.white.opacity(0.68) : .clear), radius: 10, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.pureWhite.opacity(0.68) : .clear), radius: 10, x: 0, y: 0)
                 .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airMist.opacity(0.52) : .clear), radius: 22, x: 0, y: 0)
                 .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airBlue.opacity(0.34) : .clear), radius: 34, x: 0, y: 0)
 
@@ -1999,9 +1999,9 @@ private struct ReferenceAnimatedLine: View {
         if let icon = line.icon {
             Image(systemName: icon)
                 .font(.system(size: 25, weight: .bold))
-                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : Color.white) : (minimalAppearance ? BlankColors.minimalSecondary : Color.white.opacity(0.96)))
+                .foregroundStyle(line.isAccent ? (minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite) : (minimalAppearance ? BlankColors.minimalSecondary : BlankColors.pureWhite.opacity(0.96)))
                 .frame(width: 28, height: 28)
-                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? Color.white.opacity(0.62) : .clear), radius: 10, x: 0, y: 0)
+                .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.pureWhite.opacity(0.62) : .clear), radius: 10, x: 0, y: 0)
                 .shadow(color: minimalAppearance ? .clear : (line.isAccent ? BlankColors.airMist.opacity(0.38) : .clear), radius: 18, x: 0, y: 0)
         }
     }
@@ -2013,7 +2013,7 @@ private struct ReferenceOnboardingButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
-            .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : Color.white.opacity(configuration.isPressed ? 0.78 : 0.92))
+            .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite.opacity(configuration.isPressed ? 0.78 : 0.92))
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background {
@@ -2022,13 +2022,13 @@ private struct ReferenceOnboardingButtonStyle: ButtonStyle {
                         .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.03))
                 } else {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .fill(Color.black.opacity(configuration.isPressed ? 0.54 : 0.42))
+                        .fill(BlankColors.charcoal.opacity(configuration.isPressed ? 0.54 : 0.42))
                 }
             }
             .overlay {
                 if !minimalAppearance {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .stroke(Color.white.opacity(0.035), lineWidth: 1)
+                        .stroke(BlankColors.pureWhite.opacity(0.035), lineWidth: 1)
                 }
             }
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
@@ -2040,18 +2040,18 @@ private struct PaywallPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.blankInter(size: 15, weight: .semibold, relativeTo: .callout))
-            .foregroundStyle(Color.black.opacity(configuration.isPressed ? 0.68 : 0.92))
+            .foregroundStyle(BlankColors.charcoal.opacity(configuration.isPressed ? 0.68 : 0.92))
             .frame(maxWidth: .infinity)
             .frame(height: 52)
             .background {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(Color.white.opacity(configuration.isPressed ? 0.78 : 0.94))
+                    .fill(BlankColors.pureWhite.opacity(configuration.isPressed ? 0.78 : 0.94))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                    .stroke(BlankColors.pureWhite.opacity(0.22), lineWidth: 1)
             }
-            .shadow(color: Color.white.opacity(configuration.isPressed ? 0.10 : 0.20), radius: 18, x: 0, y: 0)
+            .shadow(color: BlankColors.pureWhite.opacity(configuration.isPressed ? 0.10 : 0.20), radius: 18, x: 0, y: 0)
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
     }
@@ -2073,7 +2073,7 @@ private struct OnboardingHeader: View {
             if !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.58))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.58))
             }
 
             Text(title)
@@ -2087,7 +2087,7 @@ private struct OnboardingHeader: View {
             if !bodyText.isEmpty {
                 Text(bodyText)
                     .font(.blankInter(size: 16, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.68))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.68))
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
                     .frame(maxWidth: 318)
@@ -2111,17 +2111,17 @@ private struct ResultMetricView: View {
 
                 Text(unit)
                     .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
-                    .foregroundStyle(Color.white.opacity(0.82))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
             }
-            .foregroundStyle(Color.white)
+            .foregroundStyle(BlankColors.pureWhite)
             .lineLimit(1)
             .minimumScaleFactor(0.74)
-            .shadow(color: Color.white.opacity(0.46), radius: 10, x: 0, y: 0)
+            .shadow(color: BlankColors.pureWhite.opacity(0.46), radius: 10, x: 0, y: 0)
             .shadow(color: BlankColors.airMist.opacity(0.38), radius: 24, x: 0, y: 0)
 
             Text(caption)
                 .font(.blankInter(size: 15, relativeTo: .subheadline))
-                .foregroundStyle(Color.white.opacity(0.66))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.66))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
         }
@@ -2140,22 +2140,22 @@ private struct OnboardingInsightCard: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(BlankColors.airMist)
                 .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.white.opacity(0.10)))
+                .background(Circle().fill(BlankColors.pureWhite.opacity(0.10)))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.56))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.56))
 
                 Text(value)
                     .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(Color.white.opacity(0.94))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.94))
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
 
                 Text(caption)
                     .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(Color.white.opacity(0.56))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.56))
                     .lineLimit(2)
             }
 
@@ -2165,11 +2165,11 @@ private struct OnboardingInsightCard: View {
         .padding(.vertical, 14)
         .background {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(Color.white.opacity(0.09))
+                .fill(BlankColors.pureWhite.opacity(0.09))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .stroke(BlankColors.pureWhite.opacity(0.12), lineWidth: 1)
         }
     }
 }
@@ -2185,16 +2185,16 @@ private struct OnboardingPlanPreviewRow: View {
                 .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                 .foregroundStyle(BlankColors.ink)
                 .frame(width: 30, height: 30)
-                .background(Circle().fill(Color.white.opacity(0.86)))
+                .background(Circle().fill(BlankColors.pureWhite.opacity(0.86)))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(Color.white.opacity(0.94))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.94))
 
                 Text(detail)
                     .font(.blankInter(size: 13, relativeTo: .footnote))
-                    .foregroundStyle(Color.white.opacity(0.62))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.62))
                     .lineSpacing(2)
             }
 
@@ -2203,11 +2203,11 @@ private struct OnboardingPlanPreviewRow: View {
         .padding(16)
         .background {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(Color.white.opacity(0.09))
+                .fill(BlankColors.pureWhite.opacity(0.09))
         }
         .overlay {
             RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .stroke(BlankColors.pureWhite.opacity(0.12), lineWidth: 1)
         }
     }
 }
@@ -2220,12 +2220,12 @@ private struct PaywallValueRow: View {
         HStack(spacing: 10) {
             Image(systemName: systemName)
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.86))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.86))
                 .frame(width: 20)
 
             Text(text)
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                .foregroundStyle(Color.white.opacity(0.82))
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
                 .lineLimit(2)
 
             Spacer(minLength: 0)
@@ -2233,7 +2233,7 @@ private struct PaywallValueRow: View {
         .padding(.horizontal, 14)
         .frame(minHeight: 34)
         .background {
-            Capsule().fill(Color.white.opacity(0.075))
+            Capsule().fill(BlankColors.pureWhite.opacity(0.075))
         }
     }
 }
@@ -2249,12 +2249,12 @@ private struct OnboardingChoiceButton: View {
             HStack(spacing: 15) {
                 Image(systemName: systemName)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.88))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.88))
                     .frame(width: 22)
 
                 Text(title)
                     .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(Color.white.opacity(0.94))
+                    .foregroundStyle(BlankColors.pureWhite.opacity(0.94))
 
                 Spacer(minLength: 0)
 
@@ -2269,14 +2269,14 @@ private struct OnboardingChoiceButton: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                        .fill(BlankColors.charcoal.opacity(selected ? 0.36 : 0.22))
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+                    .stroke(selected ? BlankColors.pureWhite.opacity(0.42) : BlankColors.pureWhite.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
-            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 12, y: 7)
+            .shadow(color: selected ? BlankColors.pureWhite.opacity(0.08) : .clear, radius: 12, y: 7)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
@@ -2408,7 +2408,7 @@ private struct ReferenceBottomGlow: View {
 
                 LinearGradient(
                     colors: [
-                        Color.white.opacity(0.00),
+                        BlankColors.pureWhite.opacity(0.00),
                         palette.secondary.opacity(0.10),
                         palette.primary.opacity(0.18)
                     ],
@@ -2428,8 +2428,8 @@ private struct ReferenceBottomGlow: View {
             stops: [
                 .init(color: .clear, location: 0.00),
                 .init(color: .clear, location: 0.44),
-                .init(color: .white.opacity(0.20), location: 0.62),
-                .init(color: .white, location: 1.00)
+                .init(color: BlankColors.pureWhite.opacity(0.20), location: 0.62),
+                .init(color: BlankColors.pureWhite, location: 1.00)
             ],
             startPoint: .leading,
             endPoint: .trailing
@@ -2456,10 +2456,10 @@ private struct PlanButton: View {
                         if let badge {
                             Text(badge)
                                 .font(.blankInter(size: 10, weight: .semibold, relativeTo: .caption2))
-                                .foregroundStyle(Color.white.opacity(0.92))
+                                .foregroundStyle(BlankColors.pureWhite.opacity(0.92))
                                 .padding(.horizontal, 7)
                                 .frame(minHeight: 20)
-                                .background(Capsule().fill(Color.white.opacity(0.12)))
+                                .background(Capsule().fill(BlankColors.pureWhite.opacity(0.12)))
                         }
                     }
 
@@ -2468,23 +2468,23 @@ private struct PlanButton: View {
 
                     Text(detail)
                         .font(.blankInter(size: 12, relativeTo: .caption))
-                        .foregroundStyle(Color.white.opacity(0.62))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.62))
                 }
 
                 Spacer(minLength: 0)
 
                 ZStack {
                     Circle()
-                        .stroke(selected ? Color.white.opacity(0.58) : Color.white.opacity(0.26), lineWidth: 1)
+                        .stroke(selected ? BlankColors.pureWhite.opacity(0.58) : BlankColors.pureWhite.opacity(0.26), lineWidth: 1)
                     if selected {
                         Circle()
-                            .fill(Color.white.opacity(0.90))
+                            .fill(BlankColors.pureWhite.opacity(0.90))
                             .padding(4)
                     }
                 }
                 .frame(width: 18, height: 18)
             }
-            .foregroundStyle(Color.white.opacity(0.88))
+            .foregroundStyle(BlankColors.pureWhite.opacity(0.88))
             .padding(.horizontal, 18)
             .padding(.vertical, 17)
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
@@ -2493,14 +2493,14 @@ private struct PlanButton: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(.ultraThinMaterial)
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.black.opacity(selected ? 0.36 : 0.22))
+                        .fill(BlankColors.charcoal.opacity(selected ? 0.36 : 0.22))
                 }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(selected ? Color.white.opacity(0.42) : Color.white.opacity(0.12), lineWidth: selected ? 1.4 : 1)
+                    .stroke(selected ? BlankColors.pureWhite.opacity(0.42) : BlankColors.pureWhite.opacity(0.12), lineWidth: selected ? 1.4 : 1)
             }
-            .shadow(color: selected ? Color.white.opacity(0.08) : .clear, radius: 14, y: 8)
+            .shadow(color: selected ? BlankColors.pureWhite.opacity(0.08) : .clear, radius: 14, y: 8)
             .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)

@@ -26,6 +26,7 @@ const contains = (text, term) => new RegExp(`\\b${escaped(fold(term))}\\b`).test
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const value = (state, name) => state.slots[name]?.value ?? null;
 const minute = (n) => Number.isInteger(n) && n >= 0 && n < 1440;
+const usesSingleDistractionBlock = () => true;
 
 function emptyState(language = "en", now = Date.now()) {
   return { version:VERSION, revision:0, turn:0, updated_at:new Date(now).toISOString(), language:language === "es" ? "es" : "en", intent:"general", slots:Object.fromEntries(SLOT_NAMES.map(k => [k, null])), corrections:[], pending_slots:[], status:"idle", next_question:null, errors:[], last_action_fingerprint:null };
@@ -74,7 +75,10 @@ function normalizeSemanticState(input, now = Date.now()) {
 }
 
 function proposalFingerprint(state) {
-  const facts = Object.fromEntries(SLOT_NAMES.filter(k => k !== "confirmation" && k !== "moment" && k !== "app_category").map(k => [k, value(state, k)]));
+  // App names remain conversational/intelligence context, but they no longer
+  // select the activation target. The executable target is always the single
+  // canonical distraction block, so app wording cannot alter its fingerprint.
+  const facts = Object.fromEntries(SLOT_NAMES.filter(k => !["confirmation", "apps", "moment", "app_category"].includes(k)).map(k => [k, value(state, k)]));
   return createHash("sha256").update(JSON.stringify({ intent:state.intent, ...facts })).digest("hex").slice(0, 24);
 }
 
@@ -131,7 +135,7 @@ function extractApps(text, context) {
   let rest = text;
   const apps = [];
   const catalog = [...APPS];
-  for (const app of [...(context.selected_app_names || []), ...(context.available_app_names || []), ...(context.available_mode_catalog || []).flatMap(m => m?.app_names || [])]) {
+  for (const app of [...(context.selected_app_names || []), ...(context.available_app_names || [])]) {
     if (typeof app === "string" && app.length < 81) catalog.push([app, app]);
   }
   catalog.sort((a, b) => b[0].length - a[0].length);
@@ -199,7 +203,8 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
     if (patch.clear.length) { patch.meaningful=true; return patch; }
   }
   const questionAdvice = /^(?:how (?:can|do|should)|why|what (?:should|can)|can you explain|como (?:puedo|hago)|por que|que (?:puedo|deberia)|explica)/.test(full);
-  const actionRequest = /\b(?:block|bloquea|bloquear|protect|proteger|protege|schedule|programa|programar|set (?:a |an )?(?:daily |\d+[ -])?limit|limita|limitar|daily limit|limite diario|start protection|inicia un bloqueo)\b/.test(full) && !questionAdvice;
+  const modeActivationRequest = usesSingleDistractionBlock(context) && /\b(?:start|activate|use|switch to|inicia|activa|usa|cambia a)\b[^.!?]{0,80}\b(?:mode|modo|profile|perfil)\b/.test(full);
+  const actionRequest = (/\b(?:block|bloquea|bloquear|protect|proteger|protege|schedule|programa|programar|set (?:a |an )?(?:daily |\d+[ -])?limit|limita|limitar|daily limit|limite diario|start protection|inicia un bloqueo)\b/.test(full) || modeActivationRequest) && !questionAdvice;
   const digitalBehavior = /\b(?:(?:doom)?scroll\w*|phone|screen\w*|apps?|social media|m[oó]vil|pantallas?|redes sociales|distra\w*)\b/.test(full) || extractApps(full,context).length > 0;
   const behaviorGoal = /\b(?:i want|i need|i wish|i keep|i usually|i often|i struggle|i.m trying|i am trying|i can.t stop|too much|less|reduce|stop checking|quiero|necesito|me gustaria|suelo|me cuesta|no puedo parar|demasiado|menos)\b/.test(full);
   const advice = questionAdvice || (!actionRequest && digitalBehavior && behaviorGoal);
@@ -208,8 +213,7 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
   if (actionRequest || advice) patch.clear.push("requested_capability");
   const greeting = /^(?:hi|hello|hey|hola|buenas|thanks|thank you|gracias|good morning|buenos dias)[.!]?$/i.test(full);
   if (greeting) return patch;
-  const namedMode = (context.available_modes || []).find(m => typeof m === "string" && contains(text,m) && /\b(?:mode|modo|profile|perfil)\b/.test(text));
-  if (!actionRequest && !advice && !namedMode && state.intent !== "block" && state.intent !== "advice") return patch;
+  if (!actionRequest && !advice && state.intent !== "block" && state.intent !== "advice") return patch;
   if (/\b(?:not (?:hard|strict)|normal (?:mode|block|limit)|regular (?:mode|block|limit)|soft (?:mode|block|limit)|sin modo estricto|bloqueo normal|limite normal)\b/.test(text)) put("hard_mode",false);
   else if (/\b(?:hard (?:mode|block)|strict (?:mode|block)|modo (?:duro|estricto)|bloqueo estricto)\b/.test(text)) put("hard_mode",true);
   const apps = extractApps(text, context);
@@ -227,9 +231,6 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
     } else put("apps", apps);
     patch.clear.push("app_category");
   } else if (/\b(?:social media|social apps|social networks|redes sociales)\b/.test(text)) { put("app_category", "social_apps"); patch.clear.push("apps"); }
-  const mode = (context.available_mode_catalog || []).find(m => m?.name && contains(text, m.name) && /\b(?:mode|modo|profile|perfil)\b/.test(text));
-  if (mode) { put("apps", mode.app_names?.length ? [...new Set(mode.app_names)].sort() : [`mode:${clean(mode.name,60)}`]); if (!advice) { patch.intent = "block"; put("action_type", "strict_block"); } }
-  else if (namedMode) { put("apps",[`mode:${clean(namedMode,60)}`]); if (!advice) { patch.intent="block"; put("action_type","strict_block"); } }
   const moment = text.match(/\b(?:after breakfast|after lunch|after dinner|after work|when (?:i finish work|work ends)|before bed|at nights?|in the (?:mornings?|afternoons?|evenings?)|(?:por|en) las? (?:mananas?|noches?|tardes?)|despues de (?:desayunar|comer|cenar|trabajar)|al terminar de trabajar|antes de dormir)\b/);
   const momentValue = moment ? (/morning|manana/.test(moment[0]) ? "morning" : /afternoon|tarde/.test(moment[0]) ? "afternoon" : /evening/.test(moment[0]) ? "evening" : moment[0].replace(/at nights$/, "at night")) : null;
   if (momentValue) put("moment", momentValue);
@@ -287,6 +288,7 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
     if (!endMatch && new RegExp(`\\b${correctionVerb}\\s+(?:(?:the|el|la)\\s+)?${endRole}\\b`).test(clocksText)) error("end","unresolved_end_correction");
     if (!startMatch && new RegExp(`\\b${correctionVerb}\\s+(?:(?:the|el|la)\\s+)?${startRole}\\b`).test(clocksText)) error("start","unresolved_start_correction");
   }
+  if (modeActivationRequest && !patch.set.start) put("start", { type:"now" });
   if (/\b(?:indefinite|indefinitely|forever|para siempre|sin limite|indefinido|indefinidamente)\b/.test(text)) error("duration_minutes", "unbounded_duration");
   if (momentValue && !patch.set.start && state.slots.moment?.value !== momentValue) patch.clear.push("start");
   if (/^(?:yes|yeah|yea|yep|yes please|confirm|confirmed|do it|go ahead|apply it|si|si por favor|confirmo|confirmar|hazlo|adelante|aplicalo)[.!]?$/i.test(full)) {
@@ -401,14 +403,22 @@ function reduceSemanticState(previous, patch, { language, now = Date.now() } = {
   state.corrections = state.corrections.slice(-20);
   const fingerprint = proposalFingerprint(state);
   if (fingerprint !== oldFingerprint || patch.errors.length) { state.slots.confirmation = null; state.last_action_fingerprint = null; state.revision += 1; }
-  if (patch.confirmation && previous?.next_question === "confirmation" && fingerprint === oldFingerprint && previous.status === "awaiting_confirmation" && !state.errors.length) update("confirmation",{ status:"confirmed", fingerprint });
+  if (patch.confirmation && previous?.next_question === "confirmation" && fingerprint === oldFingerprint && previous.status === "awaiting_confirmation" && !state.errors.length) {
+    update("confirmation",{ status:"confirmed", fingerprint });
+  } else if (state.intent === "block" && patch.meaningful && !state.errors.length) {
+    // An explicit activation request is itself authorization. Once BM has every
+    // operational fact, it must execute the one canonical distraction block
+    // without asking the person to confirm the same instruction again. Keeping
+    // the fingerprinted receipt preserves correction and replay safety.
+    update("confirmation",{ status:"confirmed", fingerprint });
+  }
   return state;
 }
 
-function requiredFields(state) {
+function requiredFields(state, context = {}) {
   if (state.intent !== "block") return [];
   const pending = [];
-  if (!value(state,"apps")?.length) pending.push("apps");
+  if (!usesSingleDistractionBlock(context) && !value(state,"apps")?.length) pending.push("apps");
   if (!value(state,"action_type")) pending.push("action_type");
   if (!value(state,"start")) pending.push("start");
   if (value(state,"end") == null && value(state,"duration_minutes") == null) pending.push("end_or_duration");
@@ -425,33 +435,14 @@ function requiredFields(state) {
   return [...new Set(pending)];
 }
 
-function matchingMode(state, context) {
-  const requested = value(state,"apps") || [];
-  return (context.available_mode_catalog || []).find(mode => {
-    if (!mode?.name) return false;
-    if (requested.length === 1 && requested[0] === `mode:${mode.name}`) return mode.has_selection === true || mode.selection_count > 0;
-    return mode.app_names?.length && same([...mode.app_names].sort(), [...requested].sort());
-  }) || null;
-}
-
-function requestedAppsModeName(state) {
-  const apps = (value(state,"apps") || [])
-    .filter(app => app && app !== "selected_apps" && !String(app).startsWith("mode:"));
-  return apps.length ? apps.join(" + ").slice(0, 60) : "BM Plan";
-}
-
 function capabilityGap(state, context) {
   const channel = fold(context.channel || context.assistant_channel);
   const native = ["ios", "android", "app"].includes(channel);
   const present = native || context.device_execution_ready === true || context.app_presence_recent === true || context.app_presence_state === "recently_seen";
   if (!present) return "app_presence";
   if (context.screen_time_authorized !== true) return "permissions";
-  const apps = value(state,"apps") || [];
-  const explicitSelection = apps.length === 1 && apps[0] === "selected_apps" && context.has_selected_apps === true;
-  const namedSelection = context.has_selected_apps === true && Array.isArray(context.selected_app_names) && same([...context.selected_app_names].sort(), [...apps].sort());
-  const mode = matchingMode(state,context);
-  if (!explicitSelection && !namedSelection && !mode) return "app_selection";
-  return null;
+  if (usesSingleDistractionBlock(context)) return context.has_selected_apps === true ? null : "app_selection";
+  return context.has_selected_apps === true ? null : "app_selection";
 }
 
 function semanticActionFromFacts(state, context = {}) {
@@ -467,21 +458,17 @@ function semanticActionFromFacts(state, context = {}) {
   }
   if (start.type === "now") {
     if (duration < 5 || duration > 240) return [];
-    const mode = matchingMode(state,context);
     return [{
-      type:mode ? "activate_mode" : "start_protection",
-      ...(mode ? { name:mode.name, source_mode_name:mode.name, copy_mode:true } : {}),
+      type:"start_protection",
       minutes:duration,
       hard_mode:value(state,"hard_mode") ?? false,
     }];
   }
   // Canonical state uses ISO Monday=1. Both native Calendar APIs use Sunday=1.
   const nativeWeekdays = recurrence.weekdays.map(day => day === 7 ? 1 : day+1).sort((a,b)=>a-b);
-  const mode = matchingMode(state,context);
   return [{
     type:"apply_schedule",
-    name:mode ? `${mode.name} copy` : requestedAppsModeName(state),
-    ...(mode ? { source_mode_name:mode.name, copy_mode:true } : {}),
+    name:"Protection",
     start_minute:start.minute,
     end_minute:end,
     weekdays:nativeWeekdays,
@@ -490,7 +477,7 @@ function semanticActionFromFacts(state, context = {}) {
 }
 
 function buildSemanticActions(state, context = {}) {
-  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state) || capabilityGap(state,context)) return [];
+  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state,context).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state) || capabilityGap(state,context)) return [];
   return semanticActionFromFacts(state, context);
 }
 
@@ -498,7 +485,7 @@ function buildSemanticActions(state, context = {}) {
 // fresh app heartbeat arrives. The action is still only a proposal: the app
 // performs the final presence, permission and selection checks before applying it.
 function buildSemanticReviewAction(state, context = {}) {
-  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state)) return [];
+  if (state.intent !== "block" || value(state,"requested_capability") || requiredFields(state,context).length || value(state,"confirmation")?.fingerprint !== proposalFingerprint(state)) return [];
   if (capabilityGap(state, context) !== "app_presence") return [];
   return semanticActionFromFacts(state, context);
 }
@@ -519,7 +506,7 @@ function decideSemanticState(state, context = {}) {
     return { type:"ask", slot:state.next_question };
   }
   if (state.intent !== "block") { state.status = "idle"; state.pending_slots = []; state.next_question = null; return { type:"none", slot:null }; }
-  state.pending_slots = requiredFields(state);
+  state.pending_slots = requiredFields(state,context);
   const start = value(state,"start"), recurrence = value(state,"recurrence");
   if (!state.pending_slots.length && ((start.type === "time" && recurrence.type === "once") || (start.type === "now" && (recurrence.date || recurrence.relative_date === "tomorrow")))) state.pending_slots.push("calendar_date");
   if (!state.pending_slots.length && start.type === "now" && (value(state,"duration_minutes") < 5 || value(state,"duration_minutes") > 240)) state.pending_slots.push("duration_minutes");
@@ -538,9 +525,15 @@ function clockMeridiemLabel(v) {
   const hour12 = hour24 % 12 || 12;
   return `${hour12}:${String(v % 60).padStart(2,"0")} ${hour24 < 12 ? "AM" : "PM"}`;
 }
-function semanticSummary(state) {
+function semanticTargetLabel(state, context = {}) {
   const es = state.language === "es";
-  const apps = (value(state,"apps") || []).map(a => a === "selected_apps" ? (es ? "las apps seleccionadas" : "the selected apps") : a.startsWith("mode:") ? (es ? `el modo ${a.slice(5)}` : `${a.slice(5)} mode`) : a).join(es ? " y " : " and ");
+  if (usesSingleDistractionBlock(context)) return es ? "tus distracciones seleccionadas" : "your selected distractions";
+  return es ? "tus distracciones seleccionadas" : "your selected distractions";
+}
+
+function semanticSummary(state, context = {}) {
+  const es = state.language === "es";
+  const apps = semanticTargetLabel(state, context);
   const start = value(state,"start"), duration = value(state,"duration_minutes"), recurrence = value(state,"recurrence");
   const time = start?.type === "now" ? `${es ? "ahora durante" : "now for"} ${duration} ${es ? "minutos" : "minutes"}` : `${es ? "de" : "from"} ${clockLabel(start?.minute || 0)} ${es ? "a" : "to"} ${clockLabel(value(state,"end") || 0)}`;
   const repeat = recurrence?.type === "once" ? (es ? "solo esta vez" : "just once") : recurrence?.type === "daily" ? (es ? "cada día" : "every day") : (recurrence?.weekdays || []).map(d => DAYS[d-1][es ? 1 : 0]).join(es ? " y " : " and ");
@@ -549,9 +542,9 @@ function semanticSummary(state) {
   return `${es ? "Bloquear" : "Block"} ${apps} ${time}, ${repeat}${value(state,"hard_mode") === true ? (es ? ", con modo estricto" : ", with hard mode") : value(state,"hard_mode") === false ? (es ? ", con protección normal" : ", with regular protection") : ""}${start?.type === "time" && horizon ? `, ${es ? "durante" : "for"} ${horizon} ${es ? "días" : "days"}` : ""}`;
 }
 
-function knownFactLead(state) {
+function knownFactLead(state, context = {}) {
   const es = state.language === "es";
-  const apps = (value(state,"apps") || []).map(app => app === "selected_apps" ? (es ? "las apps seleccionadas" : "the selected apps") : app.startsWith("mode:") ? (es ? `el modo ${app.slice(5)}` : `${app.slice(5)} mode`) : app).join(es ? " y " : " and ");
+  const apps = semanticTargetLabel(state, context);
   const start = value(state,"start");
   const end = value(state,"end");
   const duration = value(state,"duration_minutes");
@@ -581,16 +574,16 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   }
   if (decision.type === "cancelled") return es ? "He descartado la propuesta." : "I've discarded the proposal.";
   if (decision.type === "none") return null;
-  if (decision.type === "confirm") return `${semanticSummary(state)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
-  if (decision.type === "ready") return `${semanticSummary(state)}. ${es ? "Confirmado. Lo estoy enviando a tu dispositivo vinculado; te avisaré solo cuando el dispositivo verifique el bloqueo." : "Confirmed. I'm sending it to your linked device; I'll only report success after the device verifies the block."}`;
+  if (decision.type === "confirm") return `${semanticSummary(state,context)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
+  if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado; te avisaré solo cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device; I'll only report success after the device verifies the block."}`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
       ? "Todavía necesito que Blankmind confirme la conexión. Usa el enlace de revisión del mensaje anterior para continuar. No se ha aplicado ningún cambio."
       : "I still need Blankmind to confirm the connection. Open Blankmind to review and apply the proposal. Nothing has been applied yet.";
     return es
-      ? `${semanticSummary(state)}. Abre Blankmind para revisar y aplicar la propuesta.`
-      : `${semanticSummary(state)}. Open Blankmind to review and apply the proposal.`;
+      ? `${semanticSummary(state,context)}. Abre Blankmind para revisar y aplicar la propuesta.`
+      : `${semanticSummary(state,context)}. Open Blankmind to review and apply the proposal.`;
   }
   if (decision.slot === "start") {
     const moment=value(state,"moment") || "";
@@ -611,18 +604,20 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     calendar_date:es ? "La app aún no admite una fecha única en este tipo de programación. Puedo ayudarte a revisarla manualmente en Blankmind." : "The app does not yet support a specific one-off date for this schedule. You can review it manually in Blankmind.",
     app_presence:es ? "Abre Blankmind para comprobar que la app está disponible antes de aplicar la propuesta." : "Open Blankmind so I can check the app is available before you apply the proposal.",
     permissions:es ? "Abre Blankmind y concede el permiso de bloqueo. La propuesta todavía no se ha aplicado." : "Open Blankmind and grant blocking permission. The proposal has not been applied yet.",
-    app_selection:es ? `Selecciona exactamente ${(value(state,"apps") || []).join(" y ")} en Blankmind. La propuesta todavía no se ha aplicado.` : `Select exactly ${(value(state,"apps") || []).join(" and ")} in Blankmind. The proposal has not been applied yet.`,
+    app_selection:usesSingleDistractionBlock(context)
+      ? (es ? "Selecciona una vez todas las apps, categorías y webs que te distraen en Blankmind. Esa misma lista se usará en cada protección." : "Choose all distracting apps, categories, and websites once in Blankmind. The same list will be used for every protection.")
+      : (es ? `Selecciona exactamente ${(value(state,"apps") || []).join(" y ")} en Blankmind. La propuesta todavía no se ha aplicado.` : `Select exactly ${(value(state,"apps") || []).join(" and ")} in Blankmind. The proposal has not been applied yet.`),
   };
   const question = value(state,"action_type") === "daily_limit" && decision.slot === "end_or_duration"
     ? (es ? "¿Cuántos minutos al día quieres permitir?" : "How many minutes per day should the limit allow?")
     : questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
-  const lead = knownFactLead(state);
+  const lead = knownFactLead(state,context);
   return lead ? `${lead} ${question}` : question;
 }
 
-function asBlockingContract(state) {
+function asBlockingContract(state, context = {}) {
   const start = value(state,"start"), end = value(state,"end"), duration = value(state,"duration_minutes"), recurrence = value(state,"recurrence");
-  return { is_blocking_request:state.intent === "block", user_request:state.intent === "block", ready:state.status === "ready", missing_fields:state.pending_slots, app_source:"semantic_state", app_category:value(state,"app_category"), data:state.intent === "block" ? { apps:value(state,"apps"), action:value(state,"action_type") === "daily_limit" ? "daily_limit" : "hard_block", start:start ? { type:start.type, value:start.type === "now" ? "now" : start.minute, source:"semantic_state" } : null, end:duration != null ? {type:"duration",value:duration,source:"semantic_state"} : end != null ? {type:"time",value:end,source:"semantic_state"} : null, recurrence:recurrence ? {type:recurrence.type,value:recurrence.type === "once" ? [0] : recurrence.weekdays,source:"semantic_state"} : null } : null };
+  return { is_blocking_request:state.intent === "block", user_request:state.intent === "block", ready:state.status === "ready", missing_fields:state.pending_slots, app_source:usesSingleDistractionBlock(context) ? "canonical_distraction_selection" : "semantic_state", app_category:value(state,"app_category"), data:state.intent === "block" ? { apps:usesSingleDistractionBlock(context) ? ["selected_apps"] : value(state,"apps"), action:value(state,"action_type") === "daily_limit" ? "daily_limit" : "hard_block", start:start ? { type:start.type, value:start.type === "now" ? "now" : start.minute, source:"semantic_state" } : null, end:duration != null ? {type:"duration",value:duration,source:"semantic_state"} : end != null ? {type:"time",value:end,source:"semantic_state"} : null, recurrence:recurrence ? {type:recurrence.type,value:recurrence.type === "once" ? [0] : recurrence.weekdays,source:"semantic_state"} : null } : null };
 }
 
 function advanceSemanticState({ previousState, prompt, context = {}, language, now = Date.now(), replayHistory = true, extraction } = {}) {
@@ -655,13 +650,13 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
       ? [{
           ...executable,
           type:"open_app_picker",
-          name:executable.type === "set_daily_limit" ? "Daily Limit" : requestedAppsModeName(state),
+          name:executable.type === "set_daily_limit" ? "Daily Limit" : "Distractions",
         }]
-      : [{type:"open_app_picker",name:requestedAppsModeName(state)}];
+      : [{type:"open_app_picker",name:"Distractions"}];
   }
   if (decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state)) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
-  return { state, handled, decision, actions, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state), responseText:renderSemanticResponse(state,decision,context,prompt), patch, extractionValidation };
+  return { state, handled, decision, actions, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText:renderSemanticResponse(state,decision,context,prompt), patch, extractionValidation };
 }
 
 module.exports = { VERSION, TTL_MS, SLOT_NAMES, emptyState, normalizeSemanticState, proposalFingerprint, extractSemanticPatch, validateSemanticPatch, reduceSemanticState, requiredFields, decideSemanticState, buildSemanticActions, buildSemanticReviewAction, renderSemanticResponse, semanticSummary, advanceSemanticState };

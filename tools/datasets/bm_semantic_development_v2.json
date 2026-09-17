@@ -2,7 +2,7 @@
   "version": 1,
   "id": "bm-semantic-development-v2",
   "split": "development",
-  "provenance": "Independently authored expected logical values. Five channel variants and one explicitly labeled reconstruction, not a production transcript. Contract v2 adds an explicitly requested 7-day schedule horizon after native null-to-7 fallback was discovered; original v1 fixtures preserved.",
+  "provenance": "Independently authored scenarios with expected values refreshed for the single canonical distraction selection activation contract: explicit activation input authorizes execution once all operational slots are complete; context and device-readiness gates remain unchanged.",
   "conversations": [
     {
       "id": "whatsapp_duration_correction",
@@ -34,19 +34,21 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
               "end": null,
               "duration_minutes": 30,
               "recurrence": null,
-              "confirmation": null,
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "recurrence"
               ],
               "status": "collecting",
-              "next_question": "recurrence",
-              "schedule_horizon_days": null
+              "next_question": "recurrence"
             },
             "decision": {
               "type": "ask",
@@ -67,6 +69,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -76,19 +80,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 30,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -103,6 +111,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -112,19 +122,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -139,6 +153,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -148,23 +164,17 @@
                 "type": "once",
                 "weekdays": []
               },
+              "schedule_horizon_days": null,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": null
+              "next_question": null
             },
             "decision": {
               "type": "ready",
               "slot": null
             },
-            "actions": [
-              {
-                "type": "start_protection",
-                "minutes": 45,
-                "hard_mode": false
-              }
-            ],
+            "actions": [],
             "language": "en"
           }
         }
@@ -200,19 +210,21 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
               "end": null,
               "duration_minutes": 30,
               "recurrence": null,
-              "confirmation": null,
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "recurrence"
               ],
               "status": "collecting",
-              "next_question": "recurrence",
-              "schedule_horizon_days": null
+              "next_question": "recurrence"
             },
             "decision": {
               "type": "ask",
@@ -233,6 +245,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -242,19 +256,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 30,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -269,6 +287,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -278,19 +298,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -305,6 +329,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -314,23 +340,17 @@
                 "type": "once",
                 "weekdays": []
               },
+              "schedule_horizon_days": null,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": null
+              "next_question": null
             },
             "decision": {
               "type": "ready",
               "slot": null
             },
-            "actions": [
-              {
-                "type": "start_protection",
-                "minutes": 45,
-                "hard_mode": false
-              }
-            ],
+            "actions": [],
             "language": "en"
           }
         }
@@ -366,19 +386,21 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
               "end": null,
               "duration_minutes": 30,
               "recurrence": null,
-              "confirmation": null,
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "recurrence"
               ],
               "status": "collecting",
-              "next_question": "recurrence",
-              "schedule_horizon_days": null
+              "next_question": "recurrence"
             },
             "decision": {
               "type": "ask",
@@ -399,6 +421,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -408,19 +432,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 30,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -435,6 +463,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -444,19 +474,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -471,6 +505,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -480,23 +516,17 @@
                 "type": "once",
                 "weekdays": []
               },
+              "schedule_horizon_days": null,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": null
+              "next_question": null
             },
             "decision": {
               "type": "ready",
               "slot": null
             },
-            "actions": [
-              {
-                "type": "start_protection",
-                "minutes": 45,
-                "hard_mode": false
-              }
-            ],
+            "actions": [],
             "language": "en"
           }
         }
@@ -532,19 +562,21 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
               "end": null,
               "duration_minutes": 30,
               "recurrence": null,
-              "confirmation": null,
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "recurrence"
               ],
               "status": "collecting",
-              "next_question": "recurrence",
-              "schedule_horizon_days": null
+              "next_question": "recurrence"
             },
             "decision": {
               "type": "ask",
@@ -565,6 +597,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -574,19 +608,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 30,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -601,6 +639,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -610,19 +650,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -637,6 +681,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -646,23 +692,17 @@
                 "type": "once",
                 "weekdays": []
               },
+              "schedule_horizon_days": null,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": null
+              "next_question": null
             },
             "decision": {
               "type": "ready",
               "slot": null
             },
-            "actions": [
-              {
-                "type": "start_protection",
-                "minutes": 45,
-                "hard_mode": false
-              }
-            ],
+            "actions": [],
             "language": "en"
           }
         }
@@ -698,19 +738,21 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
               "end": null,
               "duration_minutes": 30,
               "recurrence": null,
-              "confirmation": null,
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "recurrence"
               ],
               "status": "collecting",
-              "next_question": "recurrence",
-              "schedule_horizon_days": null
+              "next_question": "recurrence"
             },
             "decision": {
               "type": "ask",
@@ -731,6 +773,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -740,19 +784,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 30,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -767,6 +815,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -776,19 +826,23 @@
                 "type": "once",
                 "weekdays": []
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": null
+              "schedule_horizon_days": null,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "start_protection",
+                "minutes": 45,
+                "hard_mode": false
+              }
+            ],
             "language": "en"
           }
         },
@@ -803,6 +857,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "now"
               },
@@ -812,23 +868,17 @@
                 "type": "once",
                 "weekdays": []
               },
+              "schedule_horizon_days": null,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": null
+              "next_question": null
             },
             "decision": {
               "type": "ready",
               "slot": null
             },
-            "actions": [
-              {
-                "type": "start_protection",
-                "minutes": 45,
-                "hard_mode": false
-              }
-            ],
+            "actions": [],
             "language": "en"
           }
         }
@@ -857,6 +907,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "time",
                 "minute": 600
@@ -875,13 +927,13 @@
                   7
                 ]
               },
-              "confirmation": null,
+              "schedule_horizon_days": 7,
+              "confirmation": "confirmed",
               "pending_slots": [
                 "end_or_duration"
               ],
               "status": "collecting",
-              "next_question": "end_or_duration",
-              "schedule_horizon_days": 7
+              "next_question": "end_or_duration"
             },
             "decision": {
               "type": "ask",
@@ -902,6 +954,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "time",
                 "minute": 600
@@ -920,19 +974,33 @@
                   7
                 ]
               },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": 7
+              "schedule_horizon_days": 7,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
             },
             "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
+              "type": "ready",
+              "slot": null
             },
-            "actions": [],
+            "actions": [
+              {
+                "type": "apply_schedule",
+                "start_minute": 600,
+                "end_minute": 660,
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ],
+                "duration_days": 7
+              }
+            ],
             "language": "en"
           }
         },
@@ -947,51 +1015,8 @@
               "app_category": null,
               "moment": null,
               "action_type": "strict_block",
-              "start": {
-                "type": "time",
-                "minute": 600
-              },
-              "end": 720,
-              "duration_minutes": null,
-              "recurrence": {
-                "type": "daily",
-                "weekdays": [
-                  1,
-                  2,
-                  3,
-                  4,
-                  5,
-                  6,
-                  7
-                ]
-              },
-              "confirmation": null,
-              "pending_slots": [
-                "confirmation"
-              ],
-              "status": "awaiting_confirmation",
-              "next_question": "confirmation",
-              "schedule_horizon_days": 7
-            },
-            "decision": {
-              "type": "confirm",
-              "slot": "confirmation"
-            },
-            "actions": [],
-            "language": "en"
-          }
-        },
-        {
-          "input": "Yes.",
-          "expect": {
-            "state": {
-              "intent": "block",
-              "apps": [
-                "Instagram"
-              ],
-              "app_category": null,
-              "moment": null,
-              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
               "start": {
                 "type": "time",
                 "minute": 600
@@ -1010,11 +1035,11 @@
                   7
                 ]
               },
+              "schedule_horizon_days": 7,
               "confirmation": "confirmed",
               "pending_slots": [],
               "status": "ready",
-              "next_question": null,
-              "schedule_horizon_days": 7
+              "next_question": null
             },
             "decision": {
               "type": "ready",
@@ -1037,6 +1062,51 @@
                 "duration_days": 7
               }
             ],
+            "language": "en"
+          }
+        },
+        {
+          "input": "Yes.",
+          "expect": {
+            "state": {
+              "intent": "block",
+              "apps": [
+                "Instagram"
+              ],
+              "app_category": null,
+              "moment": null,
+              "action_type": "strict_block",
+              "hard_mode": null,
+              "requested_capability": null,
+              "start": {
+                "type": "time",
+                "minute": 600
+              },
+              "end": 720,
+              "duration_minutes": 120,
+              "recurrence": {
+                "type": "daily",
+                "weekdays": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7
+                ]
+              },
+              "schedule_horizon_days": 7,
+              "confirmation": "confirmed",
+              "pending_slots": [],
+              "status": "ready",
+              "next_question": null
+            },
+            "decision": {
+              "type": "ready",
+              "slot": null
+            },
+            "actions": [],
             "language": "en"
           }
         }

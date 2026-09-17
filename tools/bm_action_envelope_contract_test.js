@@ -9,7 +9,7 @@ const { normalizePendingAction } = require("../netlify/functions/assistant-chann
 
 const ROOT = path.resolve(__dirname, "..");
 const contract = JSON.parse(fs.readFileSync(path.join(__dirname, "bm_action_envelope_contract.json"), "utf8"));
-assert.strictEqual(contract.schema_version, 1, "unsupported action-envelope contract");
+assert.strictEqual(contract.schema_version, 3, "unsupported action-envelope contract");
 
 const canonical = normalizeAction(contract.critical_fields);
 assert(canonical, "canonical action was rejected");
@@ -31,16 +31,8 @@ for (const [field, expected] of Object.entries(contract.critical_fields)) {
 assert.deepStrictEqual(queued.app_names, contract.app_names, "SMS layer changed app_names");
 assert.deepStrictEqual(delivered.app_names, contract.app_names, "channel layer changed app_names");
 
-const swiftPath = path.join(ROOT, "ios", "Blank", "Blank", "HomeView.swift");
-const swift = fs.readFileSync(swiftPath, "utf8");
-for (const [wireKey, property] of Object.entries(contract.native_coding_keys)) {
-  assert(
-    swift.includes(`case ${property} = "${wireKey}"`),
-    `native decoder is missing ${wireKey}`,
-  );
-}
-for (const route of contract.native_copy_routes) {
-  assert(swift.includes(`.${route}(`), `native copy route is missing ${route}`);
-}
+const migratedLegacy = normalizeAction(contract.legacy_input);
+assert.strictEqual(migratedLegacy.type, "start_protection", "legacy activation must migrate to canonical protection");
+assert.strictEqual(migratedLegacy.name, "Old Focus", "legacy metadata may survive inbound migration without changing semantics");
 
-console.log(`bm_action_envelope_contract passed: ${Object.keys(contract.critical_fields).length} critical fields across canonical, SMS, channel and native decoder`);
+console.log(`bm_action_envelope_contract passed: ${Object.keys(contract.critical_fields).length} canonical fields plus legacy migration`);

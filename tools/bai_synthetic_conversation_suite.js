@@ -277,16 +277,11 @@ function buildSpanish(index) {
   ], channelContext("whatsapp"));
 }
 
-function buildMode(index) {
-  const mode = pick(["Work", "Sleep", "Gaming"]);
-  if (mode === "Gaming") {
-    return scenario(`synthetic_mode_${index}_missing`, "modes", "whatsapp", [
-      user("Start Gaming mode.", expect([/Gaming|mode|create|choose|set up|available/i], [/activated|done/i], { mustNotAction: ["activate_mode"] })),
-    ], { ...channelContext("whatsapp"), available_modes: ["Routine", "Work", "Sleep"] });
-  }
-  return scenario(`synthetic_mode_${index}_${mode.toLowerCase()}`, "modes", "whatsapp", [
-    user(`Start ${mode} mode for 45 minutes.`, expect([new RegExp(`${mode} mode`, "i"), /45|start/i], [/download|install/i], { mustAction: ["activate_mode"] })),
-  ], { ...readyMessagingContext(), available_modes: ["Routine", "Work", "Sleep"] });
+function buildSingleSelection(index) {
+  const duration = pick([25, 45, 60]);
+  return scenario(`synthetic_single_selection_${index}_${duration}`, "single_selection", "whatsapp", [
+    user(`Start protection for my selected distractions for ${duration} minutes.`, expect([new RegExp(String(duration)), /start|protection|protect/i], [/download|install|mode list/i], { mustAction: ["start_protection"] })),
+  ], readyMessagingContext());
 }
 
 const builders = [
@@ -298,7 +293,7 @@ const builders = [
   buildActionFit,
   buildScopePrivacy,
   buildSpanish,
-  buildMode,
+  buildSingleSelection,
 ];
 
 function buildScenarios(total) {

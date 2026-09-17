@@ -112,8 +112,7 @@ fun SetupScreen(
     val activity = context.findActivity()
     val lifecycleOwner = LocalLifecycleOwner.current
     val purchaseState by purchaseStore.state.collectAsStateWithLifecycle()
-    val modes by sessionManager.modes.collectAsStateWithLifecycle()
-    val currentModeId by sessionManager.currentModeId.collectAsStateWithLifecycle()
+    val blockedPackages by sessionManager.blockedPackages.collectAsStateWithLifecycle()
     val steps = AndroidOnboardingStep.entries
     var currentStep by rememberSaveable { mutableIntStateOf(0) }
     var setupError by remember { mutableStateOf<SetupError?>(null) }
@@ -127,7 +126,7 @@ fun SetupScreen(
     var dailyHoursText by rememberSaveable { mutableStateOf("4") }
     var selectedPlan by rememberSaveable { mutableStateOf("annual") }
     var personalizationSubmitted by rememberSaveable { mutableStateOf(false) }
-    val selectedAppCount = modes.firstOrNull { it.id == currentModeId }?.packages?.size ?: 0
+    val selectedAppCount = blockedPackages.size
     val dailyHours = dailyHoursText.toDoubleOrNull()?.coerceIn(0.5, 18.0) ?: 4.0
     val weakMoment = weakMomentFor(selectedProfile, dailyHours, distractingAppsText)
     val aiGoal = aiGoalFor(selectedGoal, weakMoment)
@@ -410,9 +409,9 @@ fun SetupScreen(
                             )
                             AndroidOnboardingStep.APPS -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
-                                title = "Choose the apps to protect.",
-                                description = if (selectedAppCount > 0) "$selectedAppCount apps selected. Your exact app list stays on this device." else "Select the Android apps that trigger this pattern. Your exact app list stays on this device.",
-                                statusText = if (selectedAppCount > 0) "Apps ready" else null,
+                                title = "Choose your distractions.",
+                                description = if (selectedAppCount > 0) "$selectedAppCount distractions selected. Blanked will reuse this one private list for every protection." else "Select every app that pulls your attention: social media, games, streaming, or anything else. Blanked will reuse this one private list for every protection.",
+                                statusText = if (selectedAppCount > 0) "Distractions ready" else null,
                                 primaryText = stringResource(R.string.setup_select_apps),
                                 secondaryText = if (selectedAppCount > 0) stringResource(R.string.setup_continue) else null,
                                 onPrimary = onSelectApps,

@@ -10,8 +10,6 @@ const ACTION_TYPES = Object.freeze([
   "set_daily_limit",
   "pause_rules",
   "disable_pause",
-  "switch_mode",
-  "activate_mode",
   "open_app_picker",
   "request_screen_time_permission",
   "apply_ai_plan",
@@ -57,15 +55,16 @@ function normalizeWeekdays(value) {
 
 function normalizeAction(candidate) {
   const source = candidate && typeof candidate === "object" ? candidate : {};
-  const type = clean(source.type, 64);
+  const legacyType = clean(source.type, 64);
+  const type = legacyType === "activate_mode"
+    ? "start_protection"
+    : legacyType === "switch_mode" ? "open_app_picker" : legacyType;
   if (!ACTION_SET.has(type)) return null;
   return {
     type,
     minutes: numberOrNull(source.minutes, 5, 240),
     hard_mode: source.hard_mode === true ? true : source.hard_mode === false ? false : null,
     name: clean(source.name, 48) || null,
-    ...(clean(source.source_mode_name, 48) ? { source_mode_name: clean(source.source_mode_name, 48) } : {}),
-    ...(source.copy_mode === true ? { copy_mode: true } : {}),
     start_minute: numberOrNull(source.start_minute, 0, 1439),
     end_minute: numberOrNull(source.end_minute, 0, 1439),
     weekdays: normalizeWeekdays(source.weekdays),
@@ -99,7 +98,10 @@ function normalizePlan(plan = {}) {
 function validatePlan(plan) {
   const source = plan && typeof plan === "object" ? plan : {};
   const rawActions = Array.isArray(source.actions) ? source.actions : [];
-  const rawActionTypes = rawActions.map((action) => clean(action?.type, 64));
+  const rawActionTypes = rawActions.map((action) => {
+    const type = clean(action?.type, 64);
+    return type === "activate_mode" ? "start_protection" : type === "switch_mode" ? "open_app_picker" : type;
+  });
   const unknownActionTypes = rawActionTypes.filter((type) => type && !ACTION_SET.has(type));
   const malformedActionCount = rawActions.filter((action) => !action || typeof action !== "object" || Array.isArray(action) || !clean(action.type, 64)).length;
   const normalized = normalizePlan(source);

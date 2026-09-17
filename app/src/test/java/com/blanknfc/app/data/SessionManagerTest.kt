@@ -99,27 +99,20 @@ class SessionManagerTest {
     }
 
     @Test
-    fun defaultModesIncludeStudyAndSleepPresets() = runTest {
+    fun oneDistractionSelectionStartsEmpty() = runTest {
         val manager = createManager(backgroundScope)
         advanceUntilIdle()
 
-        val modeNames = manager.modes.first().map { it.name }
-
-        assertTrue(modeNames.contains("Routine"))
-        assertTrue(modeNames.contains("Study"))
-        assertTrue(modeNames.contains("Sleep"))
+        assertTrue(manager.blockedPackages.first().isEmpty())
     }
 
     @Test
-    fun modeAliasSelectsDifferentSavedAppSetBeforeActivation() = runTest {
+    fun updatedDistractionSelectionIsUsedByNextActivation() = runTest {
         val manager = createManager(backgroundScope)
 
-        manager.createMode("Social", setOf("com.instagram.android", "com.zhiliaoapp.musically"))
-        manager.createMode("Deep Focus", setOf("com.slack", "com.google.android.gm"))
+        manager.setBlockedPackages(setOf("com.instagram.android", "com.zhiliaoapp.musically"))
         advanceUntilIdle()
 
-        assertTrue(manager.selectBestModeMatching("social media"))
-        advanceUntilIdle()
         assertEquals(setOf("com.instagram.android", "com.zhiliaoapp.musically"), manager.blockedPackages.first())
 
         assertEquals(SessionManager.NfcResult.BLANKED, manager.activateBlank())

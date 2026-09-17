@@ -13,8 +13,6 @@ const RISK_BY_ACTION = Object.freeze({
   set_daily_limit: "protective",
   pause_rules: "protective",
   disable_pause: "protective",
-  switch_mode: "protective",
-  activate_mode: "protective",
   apply_ai_plan: "high_protective",
 });
 

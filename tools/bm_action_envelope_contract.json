@@ -1,11 +1,9 @@
 {
-  "schema_version": 1,
-  "id": "bm-action-envelope-v1",
+  "schema_version": 3,
+  "id": "bm-action-envelope-v3",
   "critical_fields": {
-    "type": "activate_mode",
-    "name": "Instagram Focus Copy",
-    "source_mode_name": "Instagram Focus",
-    "copy_mode": true,
+    "type": "start_protection",
+    "name": null,
     "minutes": 5,
     "hard_mode": true,
     "start_minute": 540,
@@ -14,13 +12,6 @@
     "duration_days": 7,
     "hours": 24
   },
-  "app_names": ["Instagram"],
-  "native_coding_keys": {
-    "source_mode_name": "sourceModeName",
-    "copy_mode": "copyMode"
-  },
-  "native_copy_routes": [
-    "duplicateAndActivateMode",
-    "duplicateModeAndApplySchedule"
-  ]
+  "app_names": [],
+  "legacy_input": { "type": "activate_mode", "name": "Old Focus", "minutes": 5 }
 }

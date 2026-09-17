@@ -497,7 +497,7 @@ struct SetupView: View {
                         recoveryRevealStep += 1
                     }
                 } else {
-                    sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
+                    sessionStore.applyOnboardingPlan(startHour: recommendedHourPreview)
                     goForward()
                 }
             }
@@ -593,7 +593,7 @@ struct SetupView: View {
             primaryAction: {
                 onboardingGoal = firstTargetText
                 weakMoment = weakMomentPreview
-                sessionStore.applyOnboardingPlan(modeName: onboardingNameText, startHour: recommendedHourPreview)
+                sessionStore.applyOnboardingPlan(startHour: recommendedHourPreview)
                 goForward()
             }
         )
@@ -804,13 +804,13 @@ struct SetupView: View {
     private var appsStep: some View {
         referenceScene(
             lines: [
-                .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose what"),
-                .text(sessionStore.hasSelectedApps ? "is ready with" : "to block", icon: "app.badge.fill"),
-                .text(sessionStore.hasSelectedApps ? "your apps" : onboardingNameText)
+                .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose all"),
+                .text(sessionStore.hasSelectedApps ? "is ready with" : "your distractions", icon: "app.badge.fill"),
+                .text(sessionStore.hasSelectedApps ? "your distractions" : "once")
             ],
             body: sessionStore.hasSelectedApps
                 ? weakMomentPreview
-                : "Pick the apps, categories or websites that trigger this pattern",
+                : "Choose every app, category or website that pulls your attention. This becomes your one reusable protection list.",
             primaryTitle: sessionStore.hasSelectedApps ? "Start first blank" : "Select apps",
             primaryAction: selectAppsOrContinue,
             secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,

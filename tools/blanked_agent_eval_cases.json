@@ -128,15 +128,9 @@
     },
     "expect": {
       "intent": "focus",
-      "action_types": [
-        "activate_mode"
-      ],
-      "first_action": {
-        "name": "Social",
-        "minutes": null
-      },
+      "action_types": [],
       "text_matches": [
-        "Social mode|35|lunch|start"
+        "35|lunch|start|when|what time"
       ],
       "ui_text_not_matches": [
         "those apps|This reads like|social comparison|spare time|if you confirm|Read:|Pattern:|Move:"
@@ -1177,114 +1171,94 @@
     }
   },
   {
-    "id": "existing_work_mode_start",
-    "prompt": "Start Work mode for 45 minutes.",
-    "context": {
-      "available_modes": [
-        "Routine",
-        "Work",
-        "Sleep"
-      ]
-    },
+    "id": "single_selection_start",
+    "prompt": "Start protection for my selected distractions for 45 minutes.",
     "expect": {
       "intent": "focus",
       "action_types": [
-        "activate_mode"
+        "start_protection"
       ],
       "first_action": {
-        "name": "Work",
         "minutes": 45
       },
-      "requires_selected_apps": false,
+      "requires_selected_apps": true,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Work mode|45"
+        "protection|selected distractions|45"
       ]
     }
   },
   {
-    "id": "existing_sleep_mode_schedule",
-    "prompt": "Use Sleep mode from 10 to 7.",
-    "context": {
-      "available_modes": [
-        "Routine",
-        "Work",
-        "Sleep"
-      ]
-    },
+    "id": "single_selection_sleep_schedule",
+    "prompt": "Protect me from my selected distractions from 10 to 7.",
     "expect": {
       "intent": "sleep",
       "action_types": [
-        "activate_mode",
         "apply_schedule"
       ],
-      "first_action": {
-        "name": "Sleep"
-      },
-      "requires_selected_apps": false,
+      "requires_selected_apps": true,
       "requires_screen_time_authorization": true,
       "text_matches": [
-        "Sleep mode|10:00 PM|7:00 AM"
+        "selected distractions|10:00 PM|7:00 AM"
       ]
     }
   },
   {
-    "id": "missing_mode_does_not_switch",
+    "id": "legacy_mode_wording_uses_single_selection",
     "prompt": "Start Gaming mode.",
-    "context": {
-      "available_modes": [
-        "Routine",
-        "Work",
-        "Sleep"
-      ]
-    },
     "expect": {
-      "intent": "general",
+      "intent": "focus",
       "action_types": [],
       "text_matches": [
-        "not.*saved|available mode|create.*mode"
+        "how long|duration|minutes|until"
       ]
     }
   },
   {
-    "id": "missing_mode_without_catalog_does_not_switch",
-    "prompt": "Start Gaming mode.",
-    "context": {
-      "available_modes": []
-    },
+    "id": "legacy_mode_wording_with_duration_uses_single_selection",
+    "prompt": "Start Gaming mode for 45 minutes.",
     "expect": {
-      "intent": "general",
-      "action_types": [],
+      "intent": "focus",
+      "action_types": [
+        "start_protection"
+      ],
+      "first_action": {
+        "minutes": 45
+      },
       "text_matches": [
-        "not.*created|not.*saved|available mode|create.*mode"
+        "45|selected distractions|protection"
       ]
     }
   },
   {
-    "id": "missing_mode_phrase_without_catalog_does_not_switch",
+    "id": "legacy_mode_phrase_with_duration_uses_single_selection",
     "prompt": "I'm in Social mode now for 45 minutes.",
-    "context": {
-      "available_modes": []
-    },
     "expect": {
-      "intent": "general",
-      "action_types": [],
+      "intent": "focus",
+      "action_types": [
+        "start_protection"
+      ],
+      "first_action": {
+        "minutes": 45
+      },
       "text_matches": [
-        "not.*created|not.*saved|available mode|create.*mode"
+        "45|selected distractions|protection"
       ]
     }
   },
   {
-    "id": "missing_mode_spanish_without_catalog_does_not_switch",
+    "id": "legacy_mode_spanish_uses_single_selection",
     "prompt": "Activa el modo Gaming durante 45 minutos.",
-    "context": {
-      "available_modes": []
-    },
     "expect": {
-      "intent": "general",
-      "action_types": [],
+      "intent": "focus",
+      "action_types": [
+        "start_protection"
+      ],
+      "first_action": {
+        "minutes": 45
+      },
       "text_matches": [
-        "no veo|no.*modo|crear|crea"
+        "45|distracciones|protección|proteger"
       ]
     }
   },

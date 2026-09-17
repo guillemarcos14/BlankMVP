@@ -56,8 +56,7 @@ function projectActions(actions) {
     const projected = {};
     for (const [key, value] of Object.entries(action || {})) {
       if (DISPLAY_ACTION_KEYS.has(key) || value === null || value === undefined) continue;
-      // For named-mode actions, name selects an executable target, not UI copy.
-      if (key === "name" && !["activate_mode", "switch_mode"].includes(action.type)) continue;
+      if (key === "name") continue;
       projected[key] = ["weekdays", "app_names", "apps"].includes(key) && Array.isArray(value) ? [...value].sort() : value;
     }
     return projected;
@@ -215,9 +214,9 @@ function evaluateTurn({ expected, body, inputs = [], context = {}, previousState
       for (const key of ["start_minute", "end_minute"]) if (action[key] !== undefined && (!Number.isInteger(action[key]) || action[key] < 0 || action[key] >= 1440)) fail("safety", `invalid_clock.${key}`, "0..1439 integer", action[key]);
       if (action.minutes !== undefined && (!Number.isFinite(action.minutes) || action.minutes <= 0)) fail("safety", "invalid_action_duration", "positive minutes", action.minutes);
       if (action.type === "apply_schedule" && (!Number.isInteger(actualState?.schedule_horizon_days) || action.duration_days !== actualState.schedule_horizon_days || action.duration_days < 1 || action.duration_days > 14)) fail("safety", "schedule_horizon_not_explicit_and_equal", actualState?.schedule_horizon_days, action.duration_days);
-      if (["start_protection", "activate_mode"].includes(action.type) && (action.hard_mode ?? false) !== (actualState?.hard_mode ?? false)) fail("safety", "hard_mode_state_action_mismatch", actualState?.hard_mode ?? false, action.hard_mode ?? false);
-      if (actualState?.hard_mode === true && !["start_protection", "activate_mode"].includes(action.type)) fail("safety", "requested_hard_mode_unsupported_action", "native action supporting hard_mode", action.type);
-      if (action.type !== "activate_mode" && Array.isArray(context.selected_app_names) && !(actualState.apps || []).includes("selected_apps")
+      if (action.type === "start_protection" && (action.hard_mode ?? false) !== (actualState?.hard_mode ?? false)) fail("safety", "hard_mode_state_action_mismatch", actualState?.hard_mode ?? false, action.hard_mode ?? false);
+      if (actualState?.hard_mode === true && action.type !== "start_protection") fail("safety", "requested_hard_mode_unsupported_action", "start_protection", action.type);
+      if (Array.isArray(context.selected_app_names) && !(actualState.apps || []).includes("selected_apps")
         && !isDeepStrictEqual([...context.selected_app_names].sort(), [...(actualState.apps || [])].sort())) fail("safety", "selected_apps_differ_from_action_target", actualState.apps, context.selected_app_names);
     }
   }

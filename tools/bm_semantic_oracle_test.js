@@ -104,22 +104,22 @@ async function main() {
     assert.equal(result.status, "failed", `metric mutation escaped: ${name}`);
     outcomes.push({ name, status: result.status, causes: result.issues.map(issue => issue.code) });
   }
-  const modeInput = "Start Work mode now for 30 minutes, just once.";
-  const modeExpected = { ...structuredClone(expected), state: { ...structuredClone(expected.state), apps: ["mode:Work"], start: { type: "now" }, end: null, duration_minutes: 30, recurrence: { type: "once", weekdays: [] }, schedule_horizon_days: null }, actions: [{ type: "activate_mode", name: "Work", minutes: 30, hard_mode: false }] };
-  const modeBody = fixture();
-  for (const key of ["apps", "start", "end", "duration_minutes", "recurrence", "schedule_horizon_days"]) modeBody.semantic_state.slots[key] = slot(modeExpected.state[key]);
-  for (const item of Object.values(modeBody.semantic_state.slots)) if (item) item.source.text = modeInput;
-  modeBody.plan = { message_text: "Review Work mode for 30 minutes, just once.", actions: structuredClone(modeExpected.actions) };
-  const modeReviews = [{ ...review(modeBody), expectation_sha256: digest(modeExpected), rationale: "Test-only independent review fixture: named Work mode, 30-minute single proposal; no execution claim." }];
-  const modeRun = body => evaluateTurn({ expected: modeExpected, body, inputs: [modeInput], context: { screen_time_authorized: true }, reviews: modeReviews });
-  assert.equal(modeRun(modeBody).status, "passed", "named-mode action baseline passes");
+  const protectionInput = "Start protection now for 30 minutes, just once.";
+  const protectionExpected = { ...structuredClone(expected), state: { ...structuredClone(expected.state), apps: ["selected_apps"], start: { type: "now" }, end: null, duration_minutes: 30, recurrence: { type: "once", weekdays: [] }, schedule_horizon_days: null }, actions: [{ type: "start_protection", minutes: 30, hard_mode: false }] };
+  const protectionBody = fixture();
+  for (const key of ["apps", "start", "end", "duration_minutes", "recurrence", "schedule_horizon_days"]) protectionBody.semantic_state.slots[key] = slot(protectionExpected.state[key]);
+  for (const item of Object.values(protectionBody.semantic_state.slots)) if (item) item.source.text = protectionInput;
+  protectionBody.plan = { message_text: "Review protection for your selected distractions for 30 minutes, just once.", actions: structuredClone(protectionExpected.actions) };
+  const protectionReviews = [{ ...review(protectionBody), expectation_sha256: digest(protectionExpected), rationale: "Test-only independent review fixture: canonical selected-distractions protection, 30-minute single proposal; no execution claim." }];
+  const protectionRun = body => evaluateTurn({ expected: protectionExpected, body, inputs: [protectionInput], context: { screen_time_authorized: true }, reviews: protectionReviews });
+  assert.equal(protectionRun(protectionBody).status, "passed", "single-selection protection baseline passes");
   for (const [name, mutate] of [
-    ["executable mode name", body => { body.plan.actions[0].name = "Other"; }],
-    ["named mode target slot", body => { body.semantic_state.slots.apps.value = ["mode:Other"]; }],
+    ["unexpected named target", body => { body.plan.actions[0].app_names = ["Other"]; }],
+    ["wrong selection target slot", body => { body.semantic_state.slots.apps.value = ["Other"]; }],
     ["native hard-mode flip", body => { body.plan.actions[0].hard_mode = true; }],
   ]) {
-    const body = structuredClone(modeBody); mutate(body); const result = modeRun(body);
-    assert.equal(result.status, "failed", `mode/capability mutation escaped: ${name}`);
+    const body = structuredClone(protectionBody); mutate(body); const result = protectionRun(body);
+    assert.equal(result.status, "failed", `single-selection mutation escaped: ${name}`);
     outcomes.push({ name, status: result.status, causes: result.issues.map(issue => issue.code) });
   }
   assert.throws(() => run(original, { expected: { ...expected, state: { intent: "block" } } }), /oracle_incomplete_state/);

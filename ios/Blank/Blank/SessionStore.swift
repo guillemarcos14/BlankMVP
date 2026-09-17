@@ -4,11 +4,7 @@ import WidgetKit
 
 enum AssistantPendingAction: Equatable {
     case startProtection(minutes: Int?, hardMode: Bool, appNames: [String])
-    case activateMode(name: String, minutes: Int?, hardMode: Bool, appNames: [String])
-    case duplicateAndActivateMode(sourceName: String, minutes: Int?, hardMode: Bool, appNames: [String])
-    case switchMode(name: String)
     case applySchedule(name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
-    case duplicateModeAndApplySchedule(sourceName: String, name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
     case setDailyLimit(minutes: Int?, appNames: [String])
     case allowOnly
     case adultFilter
@@ -31,7 +27,8 @@ struct PendingPlanSchedule: Equatable {
 
 @MainActor
 final class SessionStore: ObservableObject {
-    static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
+    static let canonicalProtectionId = BlankSharedState.canonicalProtectionId
+    static let canonicalProtectionName = BlankSharedState.canonicalProtectionName
 
     @Published var isBlankActive: Bool {
         didSet {
@@ -122,7 +119,6 @@ final class SessionStore: ObservableObject {
     @Published var selection: FamilyActivitySelection {
         didSet {
             saveSelection(selection)
-            updateCurrentModeSelection(selection)
             reloadBlankWidget()
             syncRecurringSchedule()
         }
@@ -134,14 +130,6 @@ final class SessionStore: ObservableObject {
 
     @Published private(set) var usageEvents: [BlankUsageEvent] {
         didSet { saveUsageEvents(usageEvents) }
-    }
-
-    @Published var focusModes: [BlankFocusMode] {
-        didSet { saveFocusModes(focusModes) }
-    }
-
-    @Published var currentModeId: UUID {
-        didSet { defaults.set(currentModeId.uuidString, forKey: Keys.currentModeId) }
     }
 
     @Published var schedule: BlankFocusSchedule {
@@ -178,8 +166,6 @@ final class SessionStore: ObservableObject {
     @Published var shouldScanBlankFromWidget = false
     @Published var shouldShowWidgetTimerSelector = false
     @Published var pendingPlanAppNames: [String] = []
-    @Published var pendingPlanStartsFreshSelection = false
-    @Published var pendingPlanModeName: String?
     @Published var pendingPlanShouldActivate = false
     @Published var pendingPlanDurationMinutes: Int?
     @Published var pendingPlanHardMode = false
@@ -226,17 +212,16 @@ final class SessionStore: ObservableObject {
         nfcTagUid = defaults.string(forKey: Keys.nfcTagUid)
         setupComplete = defaults.bool(forKey: Keys.setupComplete)
         let loadedSelection = Self.loadSelection(from: defaults)
-        let loadedFocusModes = Self.loadFocusModes(from: defaults, fallbackSelection: loadedSelection)
-        let storedModeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:))
-        let loadedModeId = storedModeId.flatMap { id in loadedFocusModes.first(where: { $0.id == id })?.id }
-            ?? loadedFocusModes.first?.id
-            ?? Self.defaultModeId
-
-        selection = loadedSelection
+        let legacyFocusModes = Self.loadLegacyFocusModes(from: defaults)
+        let storedModeId = defaults.string(forKey: Keys.legacyCurrentModeId).flatMap(UUID.init(uuidString:))
+        let legacyCurrentMode = storedModeId.flatMap { id in legacyFocusModes.first(where: { $0.id == id }) }
+            ?? legacyFocusModes.first
+        let canonicalSelection = Self.hasSelection(loadedSelection)
+            ? loadedSelection
+            : (Self.selection(from: legacyCurrentMode?.selectionData) ?? loadedSelection)
+        selection = canonicalSelection
         sessions = Self.loadSessions(from: defaults)
         usageEvents = Self.loadUsageEvents(from: defaults)
-        focusModes = loadedFocusModes
-        currentModeId = loadedModeId
         schedule = Self.loadSchedule(from: defaults)
         deviceActivityTimerScheduled = defaults.bool(forKey: Keys.deviceActivityTimerScheduled)
         pendingWidgetTimerMinutes = BlankSharedState.pendingWidgetTimerMinutes(defaults: defaults)
@@ -259,21 +244,9 @@ final class SessionStore: ObservableObject {
             adaptiveScheduleExpiresAt = nil
         }
 
-        let currentMode = loadedFocusModes.first { $0.id == loadedModeId }
-            ?? loadedFocusModes.first
-            ?? BlankFocusMode(id: Self.defaultModeId, name: "Routine")
-
-        if let currentSelection = Self.selection(from: currentMode.selectionData) {
-            selection = currentSelection
-        }
-
+        defaults.removeObject(forKey: Keys.legacyFocusModes)
+        defaults.removeObject(forKey: Keys.legacyCurrentModeId)
         syncRecurringSchedule()
-    }
-
-    var currentMode: BlankFocusMode {
-        focusModes.first { $0.id == currentModeId }
-            ?? focusModes.first
-            ?? BlankFocusMode(id: Self.defaultModeId, name: "Routine")
     }
 
     var hasSelectedApps: Bool {
@@ -323,7 +296,7 @@ final class SessionStore: ObservableObject {
             events: usageEvents,
             sessions: sessions,
             selectionCount: selectionCount,
-            modeName: currentMode.name,
+            modeName: Self.canonicalProtectionName,
             emergencyUnlocksRemaining: emergencyUnlocksRemaining
         )
     }
@@ -392,7 +365,7 @@ final class SessionStore: ObservableObject {
         if let selectedDuration, selectedDuration > 0 {
             blankActiveUntil = Date().addingTimeInterval(TimeInterval(selectedDuration * 60))
             deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
-                modeId: currentModeId,
+                protectionId: Self.canonicalProtectionId,
                 durationMinutes: selectedDuration
             )
         } else {
@@ -436,7 +409,7 @@ final class SessionStore: ObservableObject {
         if endedReason == .manual {
             lastManualUnblankedAt = endedAt
         }
-        DeviceActivityTimerScheduler.stop(modeId: currentModeId)
+        DeviceActivityTimerScheduler.stop(protectionId: Self.canonicalProtectionId)
         deviceActivityTimerScheduled = false
         endActiveSession(entryMode: entryMode, endedReason: endedReason, broken: broken)
         return .unblanked
@@ -519,7 +492,7 @@ final class SessionStore: ObservableObject {
         blankActiveSince = nil
         blankActiveUntil = nil
         pendingWidgetTimerMinutes = nil
-        DeviceActivityTimerScheduler.stop(modeId: currentModeId)
+        DeviceActivityTimerScheduler.stop(protectionId: Self.canonicalProtectionId)
         deviceActivityTimerScheduled = false
         schedulePausedUntil = nil
         setupComplete = false
@@ -531,8 +504,6 @@ final class SessionStore: ObservableObject {
 
     func requestBlockConfiguration(
         appNames: [String] = [],
-        startsFreshSelection: Bool = false,
-        modeName: String? = nil,
         shouldActivate: Bool = false,
         durationMinutes: Int? = nil,
         hardMode: Bool = false,
@@ -540,9 +511,6 @@ final class SessionStore: ObservableObject {
         dailyLimitMinutes: Int? = nil
     ) {
         pendingPlanAppNames = appNames
-        pendingPlanStartsFreshSelection = startsFreshSelection
-        let cleanModeName = modeName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        pendingPlanModeName = cleanModeName?.isEmpty == false ? cleanModeName : nil
         pendingPlanShouldActivate = shouldActivate
         pendingPlanDurationMinutes = durationMinutes.map { min(max($0, 5), 240) }
         pendingPlanHardMode = hardMode
@@ -553,8 +521,6 @@ final class SessionStore: ObservableObject {
 
     func clearPendingPlanAppNames() {
         pendingPlanAppNames = []
-        pendingPlanStartsFreshSelection = false
-        pendingPlanModeName = nil
         pendingPlanShouldActivate = false
         pendingPlanDurationMinutes = nil
         pendingPlanHardMode = false
@@ -614,124 +580,10 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    func selectMode(_ modeId: UUID) {
-        guard let mode = focusModes.first(where: { $0.id == modeId }) else { return }
-        currentModeId = mode.id
-        selection = Self.selection(from: mode.selectionData) ?? FamilyActivitySelection()
-    }
-
-    @discardableResult
-    func selectMode(named name: String) -> Bool {
-        let target = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard let mode = focusModes.first(where: { $0.name.lowercased() == target }) else { return false }
-        selectMode(mode.id)
-        return true
-    }
-
-    @discardableResult
-    func selectBestMode(matching rawName: String) -> Bool {
-        let target = Self.normalizedModeName(rawName)
-        guard !target.isEmpty else { return false }
-        if let exact = focusModes.first(where: { Self.normalizedModeName($0.name) == target }) {
-            selectMode(exact.id)
-            return true
-        }
-        if let fuzzy = focusModes.first(where: { mode in
-            let normalized = Self.normalizedModeName(mode.name)
-            return normalized.contains(target) || target.contains(normalized)
-        }) {
-            selectMode(fuzzy.id)
-            return true
-        }
-        let aliases: [(keys: [String], modes: [String])] = [
-            (["social", "redes", "instagram", "tiktok", "tik tok", "reels", "shorts"], ["social", "social media", "redes sociales"]),
-            (["deep focus", "focus", "foco", "work", "trabajo"], ["deep focus", "focus", "work"]),
-            (["study", "estudio", "exam", "examen"], ["study", "study mode"]),
-            (["sleep", "night", "bedtime", "dormir", "noche"], ["sleep", "night", "bedtime"])
-        ]
-        for alias in aliases where alias.keys.contains(where: { target.contains($0) }) {
-            if let match = focusModes.first(where: { mode in
-                let normalized = Self.normalizedModeName(mode.name)
-                return alias.modes.contains(where: { normalized.contains($0) || $0.contains(normalized) })
-            }) {
-                selectMode(match.id)
-                return true
-            }
-        }
-        return false
-    }
-
-    @discardableResult
-    func duplicateMode(named sourceName: String) -> BlankFocusMode? {
-        let target = Self.normalizedModeName(sourceName)
-        guard !target.isEmpty,
-              let source = focusModes.first(where: { Self.normalizedModeName($0.name) == target }),
-              let selectionData = source.selectionData,
-              let copiedSelection = Self.selection(from: selectionData),
-              (!copiedSelection.applicationTokens.isEmpty
-                || !copiedSelection.categoryTokens.isEmpty
-                || !copiedSelection.webDomainTokens.isEmpty) else { return nil }
-        let baseName = "\(source.name) copy"
-        var copyName = baseName
-        var suffix = 2
-        let existingNames = Set(focusModes.map { Self.normalizedModeName($0.name) })
-        while existingNames.contains(Self.normalizedModeName(copyName)) {
-            copyName = "\(baseName) \(suffix)"
-            suffix += 1
-        }
-        let copy = BlankFocusMode(name: copyName, selectionData: selectionData, appNames: source.appNames)
-        focusModes.append(copy)
-        currentModeId = copy.id
-        selection = copiedSelection
-        return copy
-    }
-
     @discardableResult
     func restoreSavedSelectionForAssistant(appNames: [String] = []) -> Bool {
-        let targets = appNames
-            .map(Self.normalizedAssistantAppName)
-            .filter { !$0.isEmpty }
-        if !targets.isEmpty {
-            let targetSet = Set(targets)
-            if let exact = focusModes.first(where: { mode in
-                Set(Self.assistantAppNames(for: mode)) == targetSet
-            }) {
-                selectMode(exact.id)
-                return hasSelectedApps
-            }
-            return false
-        }
-        if hasSelectedApps { return true }
-
-        let candidates = focusModes.filter { mode in
-            guard let data = mode.selectionData,
-                  let savedSelection = Self.selection(from: data) else { return false }
-            return savedSelection.applicationTokens.count > 0
-                || savedSelection.categoryTokens.count > 0
-                || savedSelection.webDomainTokens.count > 0
-        }
-        let preferred = candidates.first
-        guard let preferred else { return false }
-        selectMode(preferred.id)
+        _ = appNames
         return hasSelectedApps
-    }
-
-    func assistantModeCatalog() -> [[String: Any]] {
-        focusModes.map { mode in
-            let selection = Self.selection(from: mode.selectionData)
-            let appNames = Self.assistantAppNames(for: mode)
-            return [
-                "id": mode.id.uuidString,
-                "name": mode.name,
-                "app_names": appNames,
-                "selection_count": selection.map {
-                    $0.applicationTokens.count + $0.categoryTokens.count + $0.webDomainTokens.count
-                } ?? 0,
-                "has_selection": selection.map {
-                    !$0.applicationTokens.isEmpty || !$0.categoryTokens.isEmpty || !$0.webDomainTokens.isEmpty
-                } ?? false
-            ]
-        }
     }
 
     func assistantScheduleContext() -> [String: Any] {
@@ -759,66 +611,20 @@ final class SessionStore: ObservableObject {
         return context
     }
 
-    func createMode(named name: String) {
-        let mode = BlankFocusMode(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "New mode" : name,
-            selectionData: Self.encodedSelection(selection),
-            appNames: Self.inferredAssistantApps(from: name)
-        )
-        focusModes.append(mode)
-        selectMode(mode.id)
-    }
-
-    func createOrUpdateMode(named name: String, selection: FamilyActivitySelection, appNames: [String] = []) {
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let knownAppNames = appNames.isEmpty
-            ? Self.inferredAssistantApps(from: cleanName)
-            : Self.normalizedAssistantDisplayAppNames(appNames)
-        let requestedAppsName = knownAppNames.joined(separator: " + ")
-        let modeName = requestedAppsName.isEmpty
-            ? (cleanName.isEmpty ? "New mode" : cleanName)
-            : requestedAppsName
-        if let existing = focusModes.first(where: { Self.normalizedModeName($0.name) == Self.normalizedModeName(modeName) }) {
-            currentModeId = existing.id
-            self.selection = selection
-            updateCurrentModeSelection(selection)
-            if !knownAppNames.isEmpty {
-                focusModes = focusModes.map { mode in
-                    guard mode.id == existing.id else { return mode }
-                    var updated = mode
-                    updated.appNames = knownAppNames
-                    updated.updatedAt = Date()
-                    return updated
-                }
-            }
-            return
-        }
-        let mode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection), appNames: knownAppNames)
-        focusModes.append(mode)
-        currentModeId = mode.id
-        self.selection = selection
-    }
-
-    func saveManualMode(
-        named name: String,
-        selection: FamilyActivitySelection,
+    func saveManualSchedule(
         startMinute: Int,
         endMinute: Int,
         weekdays: [Int],
         repeatsWeekly: Bool
     ) {
-        createOrUpdateMode(named: name, selection: selection)
-
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let savedName = cleanName.isEmpty ? currentMode.name : cleanName
+        let scheduleName = "Protection \(Self.clockLabel(startMinute))"
         var windows = schedule.windows.filter {
-            $0.name.caseInsensitiveCompare(savedName) != .orderedSame
+            $0.name.caseInsensitiveCompare(scheduleName) != .orderedSame
         }
-
         if repeatsWeekly {
             windows.append(
                 BlankHabitWindow(
-                    name: savedName,
+                    name: scheduleName,
                     enabled: true,
                     startMinute: startMinute,
                     endMinute: endMinute,
@@ -826,9 +632,8 @@ final class SessionStore: ObservableObject {
                 )
             )
         }
-
         let first = windows.first ?? BlankHabitWindow(
-            name: savedName,
+            name: scheduleName,
             enabled: false,
             startMinute: startMinute,
             endMinute: endMinute,
@@ -840,7 +645,6 @@ final class SessionStore: ObservableObject {
             endMinute: first.endMinute,
             windows: windows
         )
-        adaptiveScheduleExpiresAt = nil
         schedulePausedUntil = nil
     }
 
@@ -866,17 +670,7 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    func applyOnboardingPlan(modeName: String, startHour: Int) {
-        let cleanName = modeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let planModeName = cleanName.isEmpty ? "My Plan" : cleanName
-
-        if let existingMode = focusModes.first(where: { $0.name == planModeName }) {
-            currentModeId = existingMode.id
-        } else {
-            let mode = BlankFocusMode(name: planModeName, selectionData: Self.encodedSelection(selection))
-            focusModes.append(mode)
-            currentModeId = mode.id
-        }
+    func applyOnboardingPlan(startHour: Int) {
 
         let startMinute = min(max(startHour, 0), 23) * 60
         schedule = BlankFocusSchedule(
@@ -988,26 +782,6 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    func renameMode(_ modeId: UUID, name: String) {
-        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanName.isEmpty else { return }
-        focusModes = focusModes.map { mode in
-            guard mode.id == modeId else { return mode }
-            var updated = mode
-            updated.name = cleanName
-            updated.updatedAt = Date()
-            return updated
-        }
-    }
-
-    func deleteMode(_ modeId: UUID) {
-        guard focusModes.count > 1 else { return }
-        focusModes.removeAll { $0.id == modeId }
-        if currentModeId == modeId, let firstMode = focusModes.first {
-            selectMode(firstMode.id)
-        }
-    }
-
     private func saveSelection(_ selection: FamilyActivitySelection) {
         if let data = Self.encodedSelection(selection) {
             defaults.set(data, forKey: Keys.selection)
@@ -1026,13 +800,13 @@ final class SessionStore: ObservableObject {
 
         let snapshot = currentSelectionSnapshot
         let session = BlankSession(
-            profileId: currentModeId,
+            profileId: Self.canonicalProtectionId,
             strategy: .manual,
             startTag: tag,
             forceStarted: forceStarted,
             entryMode: entryMode,
             selectionSnapshot: snapshot,
-            modeName: currentMode.name,
+            modeName: Self.canonicalProtectionName,
             plannedDurationMinutes: plannedDurationMinutes
         )
         sessions.append(session)
@@ -1179,18 +953,6 @@ final class SessionStore: ObservableObject {
         }
     }
 
-    private func updateCurrentModeSelection(_ selection: FamilyActivitySelection) {
-        guard !focusModes.isEmpty else { return }
-        let encodedSelection = Self.encodedSelection(selection)
-        focusModes = focusModes.map { mode in
-            guard mode.id == currentModeId else { return mode }
-            var updated = mode
-            updated.selectionData = encodedSelection
-            updated.updatedAt = Date()
-            return updated
-        }
-    }
-
     private func saveSessions(_ sessions: [BlankSession]) {
         if let data = try? JSONEncoder().encode(sessions) {
             defaults.set(data, forKey: Keys.sessions)
@@ -1200,12 +962,6 @@ final class SessionStore: ObservableObject {
     private func saveUsageEvents(_ events: [BlankUsageEvent]) {
         if let data = try? JSONEncoder().encode(events) {
             defaults.set(data, forKey: Keys.usageEvents)
-        }
-    }
-
-    private func saveFocusModes(_ modes: [BlankFocusMode]) {
-        if let data = try? JSONEncoder().encode(modes) {
-            defaults.set(data, forKey: Keys.focusModes)
         }
     }
 
@@ -1239,35 +995,12 @@ final class SessionStore: ObservableObject {
         return decoded
     }
 
-    private static func loadFocusModes(from defaults: UserDefaults, fallbackSelection: FamilyActivitySelection) -> [BlankFocusMode] {
-        if let data = defaults.data(forKey: Keys.focusModes),
-           let decoded = try? JSONDecoder().decode([BlankFocusMode].self, from: data),
-           !decoded.isEmpty {
-            let migrated = decoded.compactMap { mode -> BlankFocusMode? in
-                switch mode.name {
-                case "Rutina diaria":
-                    return BlankFocusMode(id: mode.id, name: "Routine", selectionData: mode.selectionData, createdAt: mode.createdAt, updatedAt: mode.updatedAt)
-                case "Estudio":
-                    return nil
-                case "Dormir":
-                    return nil
-                case "Focus", "Work":
-                    return mode.selectionData == nil ? nil : mode
-                default:
-                    guard mode.appNames.isEmpty else { return mode }
-                    var inferred = mode
-                    inferred.appNames = Self.inferredAssistantApps(from: mode.name)
-                    return inferred
-                }
-            }
-            if !migrated.isEmpty {
-                return migrated
-            }
+    private static func loadLegacyFocusModes(from defaults: UserDefaults) -> [LegacyFocusMode] {
+        guard let data = defaults.data(forKey: Keys.legacyFocusModes),
+              let decoded = try? JSONDecoder().decode([LegacyFocusMode].self, from: data) else {
+            return []
         }
-
-        return [
-            BlankFocusMode(id: Self.defaultModeId, name: "Routine", selectionData: encodedSelection(fallbackSelection))
-        ]
+        return decoded
     }
 
     private static func loadSchedule(from defaults: UserDefaults) -> BlankFocusSchedule {
@@ -1287,66 +1020,13 @@ final class SessionStore: ObservableObject {
         return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
     }
 
-    private static func normalizedModeName(_ value: String) -> String {
-        value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: " mode", with: "")
-            .replacingOccurrences(of: " profile", with: "")
-            .split(separator: " ")
-            .joined(separator: " ")
+    private static func hasSelection(_ selection: FamilyActivitySelection) -> Bool {
+        !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
     }
 
-    private static func normalizedAssistantAppName(_ value: String) -> String {
-        let normalized = normalizedModeName(value)
-        switch normalized {
-        case "insta": return "instagram"
-        case "tik tok": return "tiktok"
-        case "yt": return "youtube"
-        case "x": return "twitter"
-        default: return normalized
-        }
-    }
-
-    private static func inferredAssistantApps(from value: String) -> [String] {
-        let normalized = " \(normalizedModeName(value)) "
-        let aliases: [(String, String)] = [
-            ("instagram", "Instagram"),
-            ("insta", "Instagram"),
-            ("tiktok", "TikTok"),
-            ("tik tok", "TikTok"),
-            ("youtube", "YouTube"),
-            ("yt", "YouTube"),
-            ("reddit", "Reddit"),
-            ("twitter", "Twitter"),
-            ("facebook", "Facebook"),
-            ("snapchat", "Snapchat"),
-            ("whatsapp", "WhatsApp")
-        ]
-        var seen = Set<String>()
-        return aliases.compactMap { alias, app in
-            guard normalized.contains(" \(alias) "), !seen.contains(app) else { return nil }
-            seen.insert(app)
-            return app
-        }
-    }
-
-    private static func normalizedAssistantDisplayAppNames(_ values: [String]) -> [String] {
-        var seen = Set<String>()
-        return values.compactMap { value in
-            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            let normalized = normalizedAssistantAppName(trimmed)
-            guard !trimmed.isEmpty, !normalized.isEmpty, !seen.contains(normalized) else { return nil }
-            seen.insert(normalized)
-            return trimmed
-        }
-    }
-
-    private static func assistantAppNames(for mode: BlankFocusMode) -> [String] {
-        let names = mode.appNames.isEmpty ? inferredAssistantApps(from: mode.name) : mode.appNames
-        return names.map(normalizedAssistantAppName).sorted()
+    private static func clockLabel(_ minute: Int) -> String {
+        let normalized = ((minute % (24 * 60)) + (24 * 60)) % (24 * 60)
+        return String(format: "%02d:%02d", normalized / 60, normalized % 60)
     }
 
     private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {
@@ -1396,8 +1076,8 @@ final class SessionStore: ObservableObject {
             Keys.selection,
             Keys.sessions,
             Keys.usageEvents,
-            Keys.focusModes,
-            Keys.currentModeId,
+            Keys.legacyFocusModes,
+            Keys.legacyCurrentModeId,
             Keys.schedule,
             Keys.deviceActivityTimerScheduled,
             Keys.schedulePausedUntil,
@@ -1439,8 +1119,8 @@ final class SessionStore: ObservableObject {
         static let selection = BlankSharedState.Keys.selection
         static let sessions = BlankSharedState.Keys.sessions
         static let usageEvents = BlankSharedState.Keys.usageEvents
-        static let focusModes = "blankFocusModes"
-        static let currentModeId = BlankSharedState.Keys.currentModeId
+        static let legacyFocusModes = "blankFocusModes"
+        static let legacyCurrentModeId = "blankCurrentModeId"
         static let schedule = "blankFocusSchedule"
         static let deviceActivityTimerScheduled = "blankDeviceActivityTimerScheduled"
         static let schedulePausedUntil = "blankSchedulePausedUntil"
@@ -1462,18 +1142,10 @@ extension SessionStore {
     func loadAIDemoData(now: Date = Date()) {
         let calendar = Calendar.current
         let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
-        let modeName = "Focus"
+        let modeName = Self.canonicalProtectionName
         let snapshot = BlankSelectionSnapshot(applicationCount: 3, categoryCount: 1, webDomainCount: 0)
         let weakHour = calendar.component(.hour, from: now.addingTimeInterval(20 * 60))
         let currentWeekday = calendar.component(.weekday, from: now)
-
-        if let studyMode = focusModes.first(where: { $0.name == modeName }) {
-            currentModeId = studyMode.id
-        } else {
-            let studyMode = BlankFocusMode(name: modeName, selectionData: Self.encodedSelection(selection))
-            focusModes.append(studyMode)
-            currentModeId = studyMode.id
-        }
 
         previewSelectionCount = snapshot.totalCount
         isBlankActive = false
@@ -1570,7 +1242,7 @@ extension SessionStore {
         let startedAt = now.addingTimeInterval(TimeInterval(-hoursAgo * 60 * 60))
         let endedAt = startedAt.addingTimeInterval(TimeInterval(durationMinutes * 60))
         return BlankSession(
-            profileId: currentModeId,
+            profileId: Self.canonicalProtectionId,
             strategy: .manual,
             startTag: nfcTagUid,
             startedAt: startedAt,

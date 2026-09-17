@@ -68,11 +68,11 @@ async function prepare() {
   reset();
   await send("Block Instagram now for 18 minutes, once.");
   const response = await send("Yes");
-  assert.match(response.body, /applying it now/i);
+  assert.match(response.body, /sending it to your linked device|applying it now/i);
   assert.doesNotMatch(response.body, /Reply BLOCK|Open Blankmind|review-action/i);
   assert.equal(memory.pending_assistant_action.type, "start_protection");
   assert.equal(memory.pending_assistant_action.minutes, 18);
-  assert.deepStrictEqual(memory.pending_assistant_action.app_names, ["Instagram"]);
+  assert.deepStrictEqual(memory.pending_assistant_action.app_names, []);
 }
 
 async function run() {
@@ -84,7 +84,8 @@ async function run() {
 
   await prepare();
   await send("Actually make it 22 minutes.");
-  assert.equal(memory.pending_assistant_action, null, "A correction must invalidate the previously confirmed command");
+  assert.equal(memory.pending_assistant_action.type, "start_protection", "An explicit correction becomes the new authorized command");
+  assert.equal(memory.pending_assistant_action.minutes, 22);
 
   await prepare();
   await send("Cancel that block.");

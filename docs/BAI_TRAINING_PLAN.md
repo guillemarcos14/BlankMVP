@@ -205,8 +205,8 @@ Latest real gate run:
 Fixes from the debugging passes:
 
 - Short timing replies such as "Usually 9" now use recent conversation context and can create an `apply_schedule` action.
-- Existing mode activation is prioritized before generic sleep-context questions, so "Start Sleep mode for 45 minutes" activates the saved mode.
-- Generic "social media" only maps to Social mode when a saved/known mode context exists; otherwise BAI asks for missing setup/context.
+- Legacy mode wording is interpreted as a request to use the one canonical distraction selection; BM never creates, copies, switches, or activates separate profiles.
+- Generic "social media" uses the canonical distraction selection when it exists; otherwise BM opens the one-time distraction picker.
 - `Reels` is recognized as an app target.
 - Immediate block copy is less template-like.
 - Synthetic scoring now allows good concise messaging answers without forcing unnecessary app-name repetition.

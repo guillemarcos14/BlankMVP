@@ -45,8 +45,7 @@ struct ReportView: View {
 
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
-            sessions: sessionStore.sessions,
-            modes: sessionStore.focusModes
+            sessions: sessionStore.sessions
         )
     }
 
@@ -272,8 +271,8 @@ struct ReportView: View {
                     totalSessionCount: totalSessionCount
                 )
 
-                if !progress.modeActivity.isEmpty {
-                    newLookModesCard(progress: progress)
+                if !progress.protectionActivity.isEmpty {
+                    newLookProtectionCard(progress: progress)
                 }
 
                 if totalSessionCount == 0 && todayFocusTime == 0 {
@@ -642,13 +641,13 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
     }
 
-    private func newLookModesCard(progress: BlankProgressReport) -> some View {
-        let visibleActivities = Array(progress.modeActivity.prefix(3))
+    private func newLookProtectionCard(progress: BlankProgressReport) -> some View {
+        let visibleActivities = Array(progress.protectionActivity.prefix(3))
 
         return VStack(alignment: .leading, spacing: 0) {
-            newLookCardHeader(label: "modes", icon: "square.grid.2x2")
+            newLookCardHeader(label: "protection", icon: "shield.fill")
 
-            Text("protected time by mode")
+            Text("time protected across your distraction list")
                 .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(reportSecondary)
                 .padding(.top, 3)
@@ -1700,7 +1699,7 @@ struct ReportView: View {
 
                 VStack(spacing: 10) {
                     metricRow(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly))
-                    metricRow(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress))
+                    metricRow(title: "Main protection", value: mainProtectionName(progress: progress), caption: mainProtectionCaption(progress: progress))
                     metricRow(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
                 }
 
@@ -1753,12 +1752,12 @@ struct ReportView: View {
 
     private func moreModePerformance(progress: BlankProgressReport) -> some View {
         VStack(spacing: 10) {
-            metricRow(title: "Modes configured", value: "\(sessionStore.focusModes.count)", caption: "Reusable app groups")
-            if !progress.modeActivity.isEmpty {
+            metricRow(title: "Distraction list", value: sessionStore.hasSelectedApps ? "Ready" : "Missing", caption: "One reusable selection")
+            if !progress.protectionActivity.isEmpty {
                 subtleDivider()
-                ForEach(progress.modeActivity.prefix(3).indices, id: \.self) { index in
-                    modeRow(progress.modeActivity[index])
-                    if index < min(progress.modeActivity.count, 3) - 1 {
+                ForEach(progress.protectionActivity.prefix(3).indices, id: \.self) { index in
+                    protectionRow(progress.protectionActivity[index])
+                    if index < min(progress.protectionActivity.count, 3) - 1 {
                         subtleDivider()
                     }
                 }
@@ -2005,7 +2004,7 @@ struct ReportView: View {
 
             VStack(spacing: 10) {
                 statCapsule(title: "Best day", value: bestDayText(report: weekly), caption: bestDayCaption(report: weekly), minHeight: 86)
-                statCapsule(title: "Most used mode", value: mostUsedModeName(progress: progress), caption: mostUsedModeCaption(progress: progress), minHeight: 86)
+                statCapsule(title: "Main protection", value: mainProtectionName(progress: progress), caption: mainProtectionCaption(progress: progress), minHeight: 86)
                 statCapsule(title: "Emergencies", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining), minHeight: 86)
             }
         }
@@ -2607,7 +2606,7 @@ struct ReportView: View {
                 )
             )
             editableAIField(
-                placeholder: report.plan[safe: 1] ?? "Repeat the main mode unchanged.",
+                placeholder: report.plan[safe: 1] ?? "Repeat the same distraction list unchanged.",
                 text: Binding(
                     get: { storedPlanSecond.isEmpty ? (report.plan[safe: 1] ?? "") : storedPlanSecond },
                     set: { storedPlanSecond = $0 }
@@ -2744,11 +2743,11 @@ struct ReportView: View {
             subtleDivider()
             metricRow(title: "Emergency used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
 
-            if !progress.modeActivity.isEmpty {
+            if !progress.protectionActivity.isEmpty {
                 subtleDivider()
-                ForEach(progress.modeActivity.prefix(3).indices, id: \.self) { index in
-                    modeRow(progress.modeActivity[index])
-                    if index < min(progress.modeActivity.count, 3) - 1 {
+                ForEach(progress.protectionActivity.prefix(3).indices, id: \.self) { index in
+                    protectionRow(progress.protectionActivity[index])
+                    if index < min(progress.protectionActivity.count, 3) - 1 {
                         subtleDivider()
                     }
                 }
@@ -2818,11 +2817,11 @@ struct ReportView: View {
                 subtleDivider()
                 metricRow(title: "Emergency used", value: "\(usedEmergencyUnlocks(emergencyUnlocksRemaining))/3", caption: emergencyCaption(emergencyUnlocksRemaining))
 
-                if !progress.modeActivity.isEmpty {
+                if !progress.protectionActivity.isEmpty {
                     subtleDivider()
-                    ForEach(progress.modeActivity.indices, id: \.self) { index in
-                        modeRow(progress.modeActivity[index])
-                        if index < progress.modeActivity.count - 1 {
+                    ForEach(progress.protectionActivity.indices, id: \.self) { index in
+                        protectionRow(progress.protectionActivity[index])
+                        if index < progress.protectionActivity.count - 1 {
                             subtleDivider()
                         }
                     }
@@ -2944,27 +2943,7 @@ struct ReportView: View {
         }
     }
 
-    private func modesSection(_ activities: [BlankModeActivity]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Modes this week")
-                .font(.headline)
-
-            VStack(spacing: 0) {
-                ForEach(activities.indices, id: \.self) { index in
-                    let activity = activities[index]
-                    modeRow(activity)
-                    if index < activities.count - 1 {
-                        subtleDivider()
-                    }
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 4)
-            .liquidGlass(cornerRadius: 22)
-        }
-    }
-
-    private func modeRow(_ activity: BlankModeActivity) -> some View {
+    private func protectionRow(_ activity: BlankProtectionActivity) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(activity.name)
@@ -3127,15 +3106,15 @@ struct ReportView: View {
         return "\(dayName) was your most sensitive point. Reinforce that window before the impulse appears."
     }
 
-    private func mostUsedModeName(progress: BlankProgressReport) -> String {
-        progress.modeActivity.first?.name ?? "No data"
+    private func mainProtectionName(progress: BlankProgressReport) -> String {
+        progress.protectionActivity.first?.name ?? "No data"
     }
 
-    private func mostUsedModeCaption(progress: BlankProgressReport) -> String {
-        guard let mode = progress.modeActivity.first else {
+    private func mainProtectionCaption(progress: BlankProgressReport) -> String {
+        guard let protection = progress.protectionActivity.first else {
             return "This week"
         }
-        return "\(formatDuration(mode.totalFocusTime)) · \(mode.sessionCount) sessions"
+        return "\(formatDuration(protection.totalFocusTime)) · \(protection.sessionCount) sessions"
     }
 
     private func statCapsule(title: String, value: String, caption: String, minHeight: CGFloat = 104) -> some View {
@@ -3513,7 +3492,7 @@ struct ReportView: View {
         } else {
             relapseReview.append("After a hold exit, Blanked waits \(sessionStore.manualUnblankCooldownSeconds)s before unlocking and records the signal.")
         }
-        relapseReview.append(recentSessions.count >= 3 ? "Review result: keep the same mode for the next 3 starts." : "Review result: collect 3 starts before changing the plan.")
+        relapseReview.append(recentSessions.count >= 3 ? "Review result: keep the same distraction list for the next 3 starts." : "Review result: collect 3 starts before changing the plan.")
 
         let hasSleepRisk = context.averageSleepMinutes.map { $0 < 6 * 60 + 30 } == true ||
             context.bedtimeDriftMinutes.map { $0 >= 75 } == true ||
@@ -4013,14 +3992,14 @@ struct ReportView: View {
         let startedEvents = todayEvents.filter { $0.kind == .blockStarted }
         let brokenEvents = todayEvents.filter { $0.kind == .blockBroken || $0.endedReason == .emergency }
         let totalFocus = focusTime(sessions: todaySessions, from: dayStart, to: now)
-        let modeName = mostCommonModeName(from: todaySessions, events: startedEvents, progress: progress)
+        let protectionName = mostCommonProtectionName(from: todaySessions, events: startedEvents, progress: progress)
 
         guard !todaySessions.isEmpty || !todayEvents.isEmpty else {
             return DailyAISummary(
                 status: "No activity yet today.",
                 today: "You have not used Blank today yet.",
                 signal: "Not enough daily signal.",
-                nextAction: "Do a 25 min block with your main mode."
+                nextAction: "Do a 25 min block with your distraction list."
             )
         }
 
@@ -4038,8 +4017,8 @@ struct ReportView: View {
             signal = "Today sensitive window was \(hourRangeText(hour))."
         } else if let hour = mostCommonHour(from: startedEvents, sessions: todaySessions) {
             signal = "Today you used Blank most around \(clockTimeText(hour: hour))."
-        } else if let modeName {
-            signal = "Today's active mode was \(modeName)."
+        } else if let protectionName {
+            signal = "Today's protection used \(protectionName)."
         } else {
             signal = "No clear daily pattern yet."
         }
@@ -4050,7 +4029,7 @@ struct ReportView: View {
         } else if totalFocus < 25 * 60 {
             nextAction = "Complete one more short block before the day ends."
         } else if brokenEvents.isEmpty {
-            nextAction = "Repeat the same window and mode tomorrow."
+            nextAction = "Repeat the same protection window tomorrow."
         } else {
             nextAction = "Reduce duration before repeating the block."
         }
@@ -4083,7 +4062,7 @@ struct ReportView: View {
                 summary: "Not enough data this week yet.",
                 patterns: [
                     "Blank needs a few sessions to detect real patterns.",
-                    "The report improves when you use several modes or windows.",
+                    "The report improves as you complete more protection windows.",
                     "Emergency unlocks help detect fragile moments."
                 ],
                 weakSpots: [
@@ -4093,12 +4072,12 @@ struct ReportView: View {
                 ],
                 recommendations: [
                     "Do a session of at least 25 minutes today.",
-                    "Use Study mode before the first strong block.",
+                    "Start protection before the first strong distraction window.",
                     "Avoid Emergency unless it is essential."
                 ],
                 goal: "Complete 3 sessions this week to generate a useful report.",
                 plan: [
-                    "Today: 25 min with your main mode.",
+                    "Today: 25 min with your distraction list.",
                     "Tomorrow: repeat the same window.",
                     "Friday: review whether there were emergencies."
                 ]
@@ -4113,7 +4092,7 @@ struct ReportView: View {
         let weakSessions = weeklySessions.filter { $0.endedReason == .emergency }
         let weakHour = mostCommonValue(brokenEvents.map(\.localHour)) ?? mostCommonValue(weakSessions.compactMap(\.localStartHour))
         let weakWeekday = mostCommonValue(brokenEvents.map(\.weekday)) ?? mostCommonValue(weakSessions.compactMap(\.startWeekday))
-        let modeName = mostCommonModeName(from: weeklySessions, events: startedEvents, progress: progress)
+        let protectionName = mostCommonProtectionName(from: weeklySessions, events: startedEvents, progress: progress)
         let selectionProfile = averageSelectionProfile(from: startedEvents, sessions: weeklySessions)
 
         var patterns: [String] = []
@@ -4127,10 +4106,10 @@ struct ReportView: View {
         } else {
             patterns.append("There is no clear window yet.")
         }
-        if let modeName {
-            patterns.append("The most used mode is \(modeName).")
+        if let protectionName {
+            patterns.append("Your protection used \(protectionName) most often.")
         } else {
-            patterns.append("There is no clear mode yet.")
+            patterns.append("There is not enough protection history yet.")
         }
         if brokenEvents.count > 0 {
             patterns[2] = "You broke \(brokenEvents.count) block\(brokenEvents.count == 1 ? "" : "s") this week."
@@ -4151,7 +4130,7 @@ struct ReportView: View {
         } else {
             weakSpots.append("No concentrated breaks this week.")
         }
-        weakSpots.append(appModeAdjustmentText(profile: selectionProfile, modeName: modeName))
+        weakSpots.append(distractionListAdjustmentText(profile: selectionProfile, protectionName: protectionName))
 
         var recommendations: [String] = []
         if let weakHour {
@@ -4166,10 +4145,10 @@ struct ReportView: View {
         if brokenEvents.count > 0 {
             recommendations.append("Reduce the next block if Emergency appears.")
         } else {
-            recommendations.append("Keep the same mode if you did not need Emergency this week.")
+            recommendations.append("Keep the same distraction list if you did not need Emergency this week.")
         }
         if selectionProfile.totalAverage < 3 {
-            recommendations.append("Add at least 3 apps or categories to the main mode.")
+            recommendations.append("Add at least 3 apps or categories to your distraction list.")
         } else {
             recommendations.append("Do not change too many apps at once.")
         }
@@ -4186,7 +4165,7 @@ struct ReportView: View {
         let plan = weeklyPlan(
             weakHour: weakHour,
             bestHour: bestHour,
-            modeName: modeName,
+            protectionName: protectionName,
             brokenCount: brokenEvents.count,
             healthContext: healthContext
         )
@@ -4204,11 +4183,11 @@ struct ReportView: View {
     private func weeklyPlan(
         weakHour: Int?,
         bestHour: Int?,
-        modeName: String?,
+        protectionName: String?,
         brokenCount: Int,
         healthContext: HealthRecoveryContext
     ) -> [String] {
-        let mode = modeName ?? "main"
+        let protection = protectionName ?? "main"
         let targetHour = weakHour ?? bestHour
         let firstBlock: String
         if let recoveryScore = healthContext.recoveryScore, recoveryScore < 45 {
@@ -4221,7 +4200,7 @@ struct ReportView: View {
             firstBlock = "3 days: 25 min block at the same time."
         }
 
-        let secondBlock = "Mode \(mode): keep the same apps."
+        let secondBlock = "Protection \(protection): keep the same distraction list."
         let thirdBlock = brokenCount > 0
             ? "If Emergency appears, reduce duration before repeating."
             : "Sunday: review whether you can increase one block."
@@ -4259,14 +4238,14 @@ struct ReportView: View {
         mostCommonValue(events.map(\.weekday) + sessions.compactMap(\.startWeekday))
     }
 
-    private func mostCommonModeName(
+    private func mostCommonProtectionName(
         from sessions: [BlankSession],
         events: [BlankUsageEvent],
         progress: BlankProgressReport
     ) -> String? {
         let sessionNames = sessions.compactMap { $0.modeName }
         let eventNames = events.compactMap { $0.modeName }
-        return mostCommonValue(sessionNames + eventNames) ?? progress.modeActivity.first?.name
+        return mostCommonValue(sessionNames + eventNames) ?? progress.protectionActivity.first?.name
     }
 
     private func averageSelectionProfile(from events: [BlankUsageEvent], sessions: [BlankSession]) -> SelectionProfile {
@@ -4287,10 +4266,10 @@ struct ReportView: View {
         )
     }
 
-    private func appModeAdjustmentText(profile: SelectionProfile, modeName: String?) -> String {
-        let mode = modeName ?? "main"
+    private func distractionListAdjustmentText(profile: SelectionProfile, protectionName: String?) -> String {
+        let protection = protectionName ?? "main"
         if profile.totalAverage < 3 {
-            return "Reinforce mode \(mode) with more apps or categories."
+            return "Reinforce \(protection) with more distractions in the same list."
         }
         if profile.applicationAverage == 0 {
             return "Add specific apps if a category is too broad."
@@ -4298,7 +4277,7 @@ struct ReportView: View {
         if profile.categoryAverage == 0 {
         return "Group similar apps in a category if you repeat adjustments."
         }
-        return "Keep apps/modes one more week before changing."
+        return "Keep the same distraction list one more week before changing it."
     }
 
     private func hourRangeText(_ hour: Int) -> String {

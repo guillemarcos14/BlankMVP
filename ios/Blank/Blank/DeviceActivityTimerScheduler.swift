@@ -80,12 +80,12 @@ enum DeviceActivityTimerScheduler {
         #endif
     }
 
-    static func start(modeId: UUID, durationMinutes: Int) -> Bool {
+    static func start(protectionId: UUID, durationMinutes: Int) -> Bool {
         guard durationMinutes > 0 else { return false }
 
         #if canImport(DeviceActivity)
         let center = DeviceActivityCenter()
-        let activityName = DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(modeId.uuidString)")
+        let activityName = DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(protectionId.uuidString)")
         let timerInterval = makeTimerInterval(durationMinutes: durationMinutes)
         guard timerInterval.start != timerInterval.end else {
             return false
@@ -109,10 +109,10 @@ enum DeviceActivityTimerScheduler {
         #endif
     }
 
-    static func stop(modeId: UUID) {
+    static func stop(protectionId: UUID) {
         #if canImport(DeviceActivity)
         let center = DeviceActivityCenter()
-        center.stopMonitoring([DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(modeId.uuidString)")])
+        center.stopMonitoring([DeviceActivityName(rawValue: "\(strategyActivityPrefix):\(protectionId.uuidString)")])
         #endif
     }
 

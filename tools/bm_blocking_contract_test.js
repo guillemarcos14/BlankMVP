@@ -48,39 +48,38 @@ assert.strictEqual(dailyLimit.ready, true);
 assert.strictEqual(dailyLimit.data.action, "daily_limit");
 assert.strictEqual(dailyLimit.data.end.value, 25);
 
-const mode = contract("Start Work mode for 45 minutes.", { available_modes: ["Work"] });
+const mode = contract("Start Work mode for 45 minutes.", { has_selected_apps: true });
 assert.strictEqual(mode.ready, true);
-assert.deepStrictEqual(mode.data.apps, ["mode:Work"]);
+assert.deepStrictEqual(mode.data.apps, ["selected_apps"]);
 assert.strictEqual(mode.data.start.type, "now");
 assert.strictEqual(mode.data.end.value, 45);
 
-const unknownModeWithoutCatalog = contract("Start Gaming mode.", { available_modes: [] });
-assert.strictEqual(unknownModeWithoutCatalog.is_blocking_request, false);
+const legacyModeLanguage = contract("Start Gaming mode for 30 minutes.", { has_selected_apps: true });
+assert.strictEqual(legacyModeLanguage.is_blocking_request, true);
+assert.deepStrictEqual(legacyModeLanguage.data.apps, ["selected_apps"]);
 
-const modeByApps = contract("Block Instagram now for 45 minutes. Only one time.", {
-  available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"], selection_count: 1 }],
-});
+const modeByApps = contract("Block Instagram now for 45 minutes. Only one time.", { has_selected_apps: true });
 assert.strictEqual(modeByApps.ready, true);
-assert.deepStrictEqual(modeByApps.data.apps, ["mode:Instagram solo"]);
-assert.strictEqual(modeByApps.app_source, "mode");
+assert.deepStrictEqual(modeByApps.data.apps, ["selected_apps"]);
+assert.strictEqual(modeByApps.app_source, "device_selection");
 
 const modeBySyncedContext = contract("Block Instagram indefinitely now.", {
   user_context: {
-    available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"] }],
+    has_selected_apps: true,
   },
 });
-assert.deepStrictEqual(modeBySyncedContext.data.apps, ["mode:Instagram solo"]);
+assert.deepStrictEqual(modeBySyncedContext.data.apps, ["selected_apps"]);
 
 const scheduledMode = contract("Block Instagram for 1 hour at 7 pm every day.", {
   user_context: {
-    available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"] }],
+    has_selected_apps: true,
   },
 });
-assert.deepStrictEqual(scheduledMode.data.apps, ["mode:Instagram solo"]);
+assert.deepStrictEqual(scheduledMode.data.apps, ["selected_apps"]);
 
 const pendingModeFollowup = contract("3 mins", {
   user_context: {
-    available_mode_catalog: [{ name: "Instagram solo", app_names: ["Instagram"] }],
+    has_selected_apps: true,
   },
   pending_blocking: {
     apps: ["Instagram"],
@@ -88,7 +87,7 @@ const pendingModeFollowup = contract("3 mins", {
     recurrence: { type: "once", value: [0] },
   },
 });
-assert.deepStrictEqual(pendingModeFollowup.data.apps, ["mode:Instagram solo"]);
+assert.deepStrictEqual(pendingModeFollowup.data.apps, ["selected_apps"]);
 
 const continuation = contract("45 minutes", {
   pending_blocking: {

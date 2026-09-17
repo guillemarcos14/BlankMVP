@@ -142,6 +142,8 @@ class DigitalWellnessRemoteStore(
                     put("mode", "android")
                     put("has_selected_apps", true)
                     put("screen_time_authorized", true)
+                    put("single_distraction_block", true)
+                    put("protection_target", "selected_distractions")
                 })
                 put("plan", JSONObject().apply {
                     put("title", plan?.archetype ?: "digital_wellness")

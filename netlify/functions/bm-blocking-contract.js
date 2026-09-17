@@ -21,7 +21,6 @@ const BLOCKING_ACTION_TYPES = new Set([
   "start_protection",
   "apply_schedule",
   "set_daily_limit",
-  "activate_mode",
 ]);
 
 const MISSING_FIELD_ORDER = ["apps", "action", "start", "end", "recurrence"];
@@ -43,36 +42,6 @@ function canonicalAppName(value) {
   const normalized = lower(value, 80);
   const alias = APP_ALIASES.find(([name]) => normalized === name || normalized.includes(name));
   return alias ? alias[1] : clean(value, 60);
-}
-
-function modeCatalog(context = {}) {
-  const catalog = Array.isArray(context.available_mode_catalog)
-    ? context.available_mode_catalog
-    : Array.isArray(context.available_modes) ? context.available_modes : [];
-  return catalog
-    .map((mode) => {
-      if (typeof mode === "string") return { name: clean(mode, 60), app_names: [] };
-      if (!mode || typeof mode !== "object" || Array.isArray(mode)) return null;
-      const name = clean(mode.name, 60);
-      if (!name) return null;
-      const rawApps = Array.isArray(mode.app_names) ? mode.app_names : Array.isArray(mode.apps) ? mode.apps : [];
-      return {
-        ...mode,
-        name,
-        app_names: Array.from(new Set(rawApps.map(canonicalAppName).filter(Boolean))).sort(),
-      };
-    })
-    .filter(Boolean);
-}
-
-function modeForApps(apps, context = {}) {
-  const requested = Array.from(new Set(apps.map(canonicalAppName).filter(Boolean))).sort();
-  if (!requested.length) return null;
-  return modeCatalog(context).find((mode) => {
-    if (!mode.app_names.length) return false;
-    return mode.app_names.length === requested.length
-      && mode.app_names.every((app, index) => app === requested[index]);
-  }) || null;
 }
 
 function userConversationText(prompt, context = {}) {
@@ -140,9 +109,6 @@ function isBlockingRequest(prompt, context = {}) {
     "schedule", "programa", "programar", "activate", "activa", "inicia", "start ",
   ]);
   const modeRequest = /\b(?:mode|modo|profile|perfil)\b/i.test(text) && hasAny(text, ["now", "ahora", "start", "activate", "inicia", "activa", "use", "usa", "i'm in", "im in", "estoy en"]);
-  const knownModes = modeCatalog(context);
-  if (modeRequest && knownModes.length === 0) return false;
-  if (modeRequest && knownModes.length > 0 && !knownModes.some((mode) => text.includes(mode.name.toLowerCase()))) return false;
   if (!imperative && !modeRequest) return false;
   const adviceOnly = /\b(?:how can i|what should i|can you explain|como puedo|qué debería|que deberia|puedes explicar)\b/i.test(text)
     && !/\b(?:i want|quiero|block|bloquea|bloquear|start|inicia|activa|programa)\b/i.test(text);
@@ -160,26 +126,21 @@ function isStandaloneNonBlockingTurn(text) {
 
 function parseApps(text, context = {}) {
   const value = lower(text);
+  if (context.has_selected_apps === true) {
+    return { value:["selected_apps"], source:"device_selection", resolved:true };
+  }
   const apps = Array.from(new Set(
     APP_ALIASES
       .filter(([alias]) => value.includes(alias))
       .map(([, app]) => app),
   ));
   if (apps.length) {
-    const matchingMode = modeForApps(apps, context);
-    if (matchingMode) {
-      return { value: [`mode:${matchingMode.name}`], source: "mode", resolved: true, mode_name: matchingMode.name };
-    }
     return { value: apps, source: "conversation", resolved: true };
   }
 
   const pending = pendingState(context);
   if (Array.isArray(pending.apps) && pending.apps.length) {
     const pendingApps = pending.apps.map((app) => clean(app, 60)).filter(Boolean);
-    const matchingMode = modeForApps(pendingApps, context);
-    if (matchingMode) {
-      return { value: [`mode:${matchingMode.name}`], source: "mode", resolved: true, mode_name: matchingMode.name };
-    }
     return { value: pendingApps, source: "pending", resolved: true };
   }
 
@@ -190,14 +151,6 @@ function parseApps(text, context = {}) {
 
   if (hasAny(value, ["selected apps", "current apps", "my selected apps", "apps already selected", "apps elegidas", "aplicaciones seleccionadas"])) {
     return { value: ["selected_apps"], source: "device_selection", resolved: context.has_selected_apps === true };
-  }
-
-  const modeName = modeCatalog(context)
-    .map((mode) => mode.name)
-    .map((mode) => clean(mode, 60))
-    .find((mode) => mode && value.includes(mode.toLowerCase()));
-  if (modeName && hasAny(value, [" mode", "modo", "profile", "perfil", "activate", "activa", "start", "inicia", "use ", "usa "])) {
-    return { value: [`mode:${modeName}`], source: "mode", resolved: true, mode_name: modeName };
   }
 
   if (context.has_selected_apps === true) {
@@ -517,10 +470,9 @@ function incompleteBlockingPlan(contract, language = "en", prompt = "", context 
   const data = contract.data || {};
   const apps = Array.isArray(data.apps) ? data.apps.filter((app) => app && app !== "selected_apps") : [];
   const combinedText = userConversationText(prompt, context);
-  const requestedMode = combinedText.match(/\b(?:start|activate|use|inicia|activa|usa)\s+([a-z][a-z0-9 _-]{0,30})\s+(?:mode|modo)\b/i)?.[1]?.trim() || "";
   const target = apps.length
-    ? apps.map((app) => String(app).replace(/^mode:/, "")).join(" and ")
-    : requestedMode ? `${requestedMode} mode` : "the selected apps";
+    ? apps.join(" and ")
+    : "the selected distractions";
   const windowMatch = String(prompt || "").match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|to|until|a)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
   const knownWindow = windowMatch ? ` from ${windowMatch[1]}${windowMatch[3] ? ` ${windowMatch[3].toUpperCase()}` : ""} to ${windowMatch[4]}${windowMatch[6] ? ` ${windowMatch[6].toUpperCase()}` : ""}` : "";
   const webChannel = context && (context.web_preview === true || context.channel === "web" || context.assistant_channel === "web");
@@ -551,8 +503,8 @@ function incompleteBlockingPlan(contract, language = "en", prompt = "", context 
     title: language === "es" ? "Detalles del bloqueo" : "Blocking details",
     response_text: question,
     bullets: language === "es"
-      ? ["Aún faltan datos para ejecutar este bloqueo.", "No voy a inventar ninguna aplicación, hora o duración.", "Cuando estén completos, buscaré un modo o abriré la selección de apps."]
-      : ["A few details are still needed before this block can run.", "I will not invent an app, time or duration.", "Once they are complete, I will look for a saved mode or open app selection."],
+      ? ["Aún faltan datos para ejecutar este bloqueo.", "No voy a inventar ninguna aplicación, hora o duración.", "Cuando estén completos, usaré tu única lista de distracciones o abriré su selección."]
+      : ["A few details are still needed before this block can run.", "I will not invent an app, time or duration.", "Once they are complete, I will use your one distraction list or open its selection."],
     primary_label: language === "es" ? "Decir detalles" : "Tell me the details",
     secondary_label: language === "es" ? "Ahora no" : "Not now",
     actions: [],

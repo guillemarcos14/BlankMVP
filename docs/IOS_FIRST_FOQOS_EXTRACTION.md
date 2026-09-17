@@ -41,7 +41,7 @@ Implemented:
 - ManagedSettings shields while Blank is active.
 - Local setup state in UserDefaults.
 - Session history and weekly report.
-- Multiple focus modes with separate Screen Time selections.
+- One reusable Screen Time selection for all protections, schedules, limits, and BM actions.
 - Daily schedule persistence and activation window.
 - Timer end persistence.
 - Emergency unlock phrase.
@@ -71,19 +71,13 @@ Goal: a polished Blank iPhone app with one default profile, physical NFC control
 - Done: paired NFC tag is the normal unlock path.
 - Done: Family Controls entitlement and TestFlight checklist documented.
 
-### Phase 2: Foqos-style profiles
+### Phase 2: adaptive protection
 
-Goal: make Blank useful for different contexts.
+Goal: make the single distraction selection adapt to different moments without adding profiles.
 
-- Add `BlankProfile` persistence.
-- Profile list: Work, Study, Night, Custom.
-- Each profile stores:
-  - name
-  - Screen Time selection
-  - strategy
-  - physical unlock items
-  - estimated minutes saved per block
-- Active session belongs to a profile.
+- Keep one editable distraction selection.
+- Let schedules, limits and BM recommendations reuse it.
+- Keep session analytics attached to the canonical protection identity.
 
 ### Phase 3: strategies
 
@@ -100,9 +94,9 @@ Strategy model is seeded as `BlankStrategyKind`.
 
 ### Phase 4: physical unlock items
 
-Goal: go beyond one NFC tag.
+Goal: support more physical entry points without multiplying distraction lists.
 
-- Multiple NFC tags per profile.
+- Multiple NFC tags for the same protection.
 - Rename/revoke unlock items.
 
 Model is seeded as `PhysicalUnlockItem`.

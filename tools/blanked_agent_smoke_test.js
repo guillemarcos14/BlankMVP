@@ -147,7 +147,7 @@ function baseContext(overrides = {}) {
   noAction(appTimeFollowup); question(appTimeFollowup,"end_or_duration");
   assert.deepStrictEqual(fact(appTimeFollowup,"apps"),["Instagram"]);
   assert.deepStrictEqual(fact(appTimeFollowup,"start"),{type:"time",minute:660});
-  assert.match(appTimeFollowup.message_text,/Instagram/);
+  assert.match(appTimeFollowup.message_text,/selected distractions/i);
   assert.match(appTimeFollowup.message_text,/11:00 AM|11 AM|11am/i);
   assert.strictEqual(fact(appTimeFollowup,"action_type"),null);
   const appTimeEndFollowup = await follow("12pm",appTimeFollowup);
@@ -173,10 +173,8 @@ function baseContext(overrides = {}) {
   assert.strictEqual(fact(corrected,"end"),660);
   const recurringAdvice = await follow("every day for 9 days",corrected);
   noAction(recurringAdvice); question(recurringAdvice,"action_type");
-  const proposed = await follow("yes",recurringAdvice);
-  noAction(proposed);
-  assert.strictEqual(proposed.semantic_decision.type,"confirm");
-  const scheduled = await follow("yes",proposed,baseContext({channel:"app",selected_app_names:["Instagram"]}));
+  const scheduled = await follow("yes",recurringAdvice,baseContext({channel:"app",selected_app_names:["Instagram"]}));
+  assert.strictEqual(scheduled.semantic_decision.type,"ready");
   assert.deepStrictEqual(scheduled.actions.map(a=>a.type),["apply_schedule"]);
   assert.strictEqual(scheduled.actions[0].start_minute,600);
   assert.strictEqual(scheduled.actions[0].end_minute,660);
@@ -210,32 +208,24 @@ function baseContext(overrides = {}) {
   assert.ok(unbounded.semantic_state.errors.some(e=>e.code==="unbounded_duration"));
   assert.strictEqual(fact(unbounded,"duration_minutes"),null);
 
-  const modeContext = baseContext({channel:"app",available_modes:["Instagram solo"],available_mode_catalog:[{name:"Instagram solo",app_names:["Instagram"],selection_count:1}]});
-  const modeProposal = await call("Block Instagram now for 45 minutes once",modeContext);
-  noAction(modeProposal);
-  const savedMode = await follow("yes",modeProposal,modeContext);
-  assert.deepStrictEqual(savedMode.actions.map(a=>a.type),["activate_mode"]);
-  assert.strictEqual(savedMode.actions[0].name,"Instagram solo");
+  const modeContext = baseContext({channel:"app"});
+  const savedMode = await call("Block Instagram now for 45 minutes once",modeContext);
+  assert.deepStrictEqual(savedMode.actions.map(a=>a.type),["start_protection"]);
   assert.strictEqual(savedMode.actions[0].minutes,45);
   const selectedImmediate = await call("Block selected apps for 45 minutes now.",baseContext({channel:"app"}));
   noAction(selectedImmediate); question(selectedImmediate,"recurrence");
   const selectedOnce = await follow("just once",selectedImmediate);
-  noAction(selectedOnce);
-  const selectedConfirmed = await follow("yes",selectedOnce);
-  assert.strictEqual(selectedConfirmed.actions[0].type,"start_protection");
-  assert.strictEqual(selectedConfirmed.actions[0].minutes,45);
+  assert.strictEqual(selectedOnce.actions[0].type,"start_protection");
+  assert.strictEqual(selectedOnce.actions[0].minutes,45);
 
-  const pickerProposal = await call("Block Instagram from 7pm for one hour every day for 7 days",baseContext({channel:"app"}));
-  noAction(pickerProposal);
-  const picker = await follow("yes",pickerProposal);
-  assert.deepStrictEqual(picker.actions.map(a=>a.type),["open_app_picker"]);
-  assert.strictEqual(picker.actions[0].minutes,null);
+  const picker = await call("Block Instagram from 7pm for one hour every day for 7 days",baseContext({channel:"app"}));
+  assert.deepStrictEqual(picker.actions.map(a=>a.type),["apply_schedule"]);
   assert.strictEqual(picker.actions[0].start_minute,1140);
   assert.strictEqual(picker.actions[0].end_minute,1200);
   assert.deepStrictEqual(picker.actions[0].weekdays,[1,2,3,4,5,6,7]);
   assert.strictEqual(picker.actions[0].duration_days,7);
   const claimedSelection = await call("I have already selected the app. Now block it.",baseContext({has_selected_apps:false,selection_count:0}));
-  noAction(claimedSelection); question(claimedSelection,"apps");
+  noAction(claimedSelection); question(claimedSelection,"end_or_duration");
   assert.strictEqual(fact(claimedSelection,"apps"),null);
   const orphanLegacyPending = await call("45 minutes",baseContext({pending_blocking:{apps:["Instagram"],start:{type:"now",value:"now"},recurrence:{type:"once",value:[0]}}}));
   noAction(orphanLegacyPending);
@@ -248,13 +238,12 @@ function baseContext(overrides = {}) {
   }
 
   const dailyLimit = await call("Set a 25-minute daily limit for Instagram.",baseContext({channel:"app"}));
-  noAction(dailyLimit); assert.deepStrictEqual(dailyLimit.semantic_decision,{type:"confirm",slot:"confirmation"});
+  assert.deepStrictEqual(dailyLimit.semantic_decision,{type:"ready",slot:null});
   assert.deepStrictEqual(fact(dailyLimit,"start"),{type:"now"});
   assert.strictEqual(fact(dailyLimit,"duration_minutes"),25);
   assert.strictEqual(fact(dailyLimit,"action_type"),"daily_limit");
-  const dailyLimitConfirmed = await follow("yes",dailyLimit,baseContext({channel:"app",selected_app_names:["Instagram"]}));
-  assert.strictEqual(dailyLimitConfirmed.actions[0].type,"set_daily_limit");
-  assert.strictEqual(dailyLimitConfirmed.actions[0].minutes,25);
+  assert.strictEqual(dailyLimit.actions[0].type,"set_daily_limit");
+  assert.strictEqual(dailyLimit.actions[0].minutes,25);
   const dailyLimitNeedsAmount = await call("Set a daily limit for Instagram.",baseContext());
   noAction(dailyLimitNeedsAmount);
   assert.strictEqual(fact(dailyLimitNeedsAmount,"duration_minutes"),null);

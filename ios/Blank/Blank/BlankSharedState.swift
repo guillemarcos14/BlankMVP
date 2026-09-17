@@ -3,7 +3,8 @@ import Foundation
 
 enum BlankSharedState {
     static let appGroupIdentifier = "group.com.blanknfc.app.ios"
-    static let defaultModeId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
+    static let canonicalProtectionId = UUID(uuidString: "A1E43B14-22E6-4B55-8E89-5E2A3C100001")!
+    static let canonicalProtectionName = "Distractions"
 
     static var defaults: UserDefaults {
         UserDefaults(suiteName: appGroupIdentifier) ?? .standard
@@ -112,16 +113,14 @@ enum BlankSharedState {
         entryMode: BlankEntryMode,
         plannedDurationMinutes: Int? = nil
     ) {
-        let modeId = defaults.string(forKey: Keys.currentModeId).flatMap(UUID.init(uuidString:)) ?? defaultModeId
-        let modeName = currentModeName(defaults: defaults, modeId: modeId)
         let snapshot = selectionSnapshot(in: defaults)
         let session = BlankSession(
-            profileId: modeId,
+            profileId: canonicalProtectionId,
             strategy: .manual,
             startedAt: now,
             entryMode: entryMode,
             selectionSnapshot: snapshot,
-            modeName: modeName,
+            modeName: canonicalProtectionName,
             plannedDurationMinutes: plannedDurationMinutes
         )
         var sessions = loadSessions(defaults: defaults)
@@ -145,7 +144,7 @@ enum BlankSharedState {
             entryMode: entryMode,
             now: now,
             selectionSnapshot: snapshot,
-            modeName: modeName
+            modeName: canonicalProtectionName
         )
     }
 
@@ -219,14 +218,6 @@ enum BlankSharedState {
         defaults.set(data, forKey: Keys.usageEvents)
     }
 
-    private static func currentModeName(defaults: UserDefaults, modeId: UUID) -> String? {
-        guard let data = defaults.data(forKey: Keys.focusModes),
-              let modes = try? JSONDecoder().decode([BlankFocusMode].self, from: data) else {
-            return nil
-        }
-        return modes.first { $0.id == modeId }?.name
-    }
-
     private static func date(forKey key: String, defaults: UserDefaults) -> Date? {
         guard let timestamp = defaults.object(forKey: key) as? TimeInterval, timestamp > 0 else {
             return nil
@@ -253,8 +244,6 @@ enum BlankSharedState {
         static let selection = "familyActivitySelection"
         static let sessions = "blankSessions"
         static let usageEvents = "blankUsageEvents"
-        static let currentModeId = "blankCurrentModeId"
-        static let focusModes = "blankFocusModes"
         static let pendingWidgetTimerMinutes = "blankPendingWidgetTimerMinutes"
     }
 }

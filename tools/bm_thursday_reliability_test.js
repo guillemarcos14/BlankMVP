@@ -48,16 +48,14 @@ const schedule = normalizePendingAction(action({
   id: "schedule-1",
   type: "apply_schedule",
   name: "Instagram evenings",
-  source_mode_name: "Routine",
-  copy_mode: true,
   minutes: null,
   start_minute: 1230,
   end_minute: 1320,
   weekdays: [1, 3, 5],
   duration_days: 11,
 }));
-assert.equal(schedule.copy_mode, true);
-assert.equal(schedule.source_mode_name, "Routine");
+assert.equal(schedule.copy_mode, undefined);
+assert.equal(schedule.source_mode_name, undefined);
 assert.equal(schedule.start_minute, 1230);
 assert.equal(schedule.end_minute, 1320);
 assert.deepEqual(schedule.weekdays, [1, 3, 5]);

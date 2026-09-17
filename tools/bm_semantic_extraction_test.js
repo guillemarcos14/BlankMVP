@@ -20,7 +20,7 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
     assert.ok(!request.text.format.schema.properties.actions, "extractor cannot return executable actions");
     const accepted = advanceSemanticState({ prompt: "Just once", previousState: first.state, extraction: extracted.extraction });
     assert.equal(accepted.state.slots.recurrence.value.type, "once");
-    assert.deepEqual(accepted.actions, [], "model facts never confirm the proposal");
+    assert.deepEqual(accepted.actions, [{ type:"start_protection", minutes:30, hard_mode:false }], "the user's final fact authorizes the explicit activation request");
 
     const hostile = await extractWithModel({ prompt: "45 minutes", previousState: first.state, fetchImpl: async () => ({ ok: true, json: async () => bodyFor([field("duration_minutes", 5, "45 minutes"), field("apps", ["TikTok"], "45 minutes")]) }) });
     const safe = advanceSemanticState({ prompt: "45 minutes", previousState: first.state, extraction: hostile.extraction });

@@ -55,7 +55,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -81,7 +80,6 @@ import com.blanknfc.app.data.DigitalWellnessEngine
 import com.blanknfc.app.data.DigitalWellnessPlan
 import com.blanknfc.app.data.DigitalWellnessRemoteStore
 import com.blanknfc.app.data.FocusActivityDay
-import com.blanknfc.app.data.BlankMode
 import com.blanknfc.app.data.FocusSchedule
 import com.blanknfc.app.data.FocusStats
 import com.blanknfc.app.data.HealthConnectStore
@@ -105,7 +103,7 @@ import org.json.JSONObject
 private enum class HomePanel {
     HOME,
     SETTINGS,
-    MODES,
+    DISTRACTIONS,
     STATS,
     SCHEDULE,
     RELINK,
@@ -170,8 +168,7 @@ fun HomeScreen(
     val backendClient = appContainer.backendClient
     val lifecycleOwner = LocalLifecycleOwner.current
     val isBlankActive by sessionManager.isBlankActive.collectAsState()
-    val modes by sessionManager.modes.collectAsState()
-    val currentModeId by sessionManager.currentModeId.collectAsState()
+    val blockedPackages by sessionManager.blockedPackages.collectAsState()
     val stats by sessionManager.stats.collectAsState()
     val emergencyUnlocksRemaining by sessionManager.emergencyUnlocksRemaining.collectAsState()
     val schedule by sessionManager.schedule.collectAsState()
@@ -180,10 +177,9 @@ fun HomeScreen(
     val remoteAiPlan by digitalWellnessStore.plan.collectAsState()
     val referralState by referralStore.state.collectAsState()
     val hasPremiumAccess = purchaseState.hasPremiumAccess || referralStore.hasReferralProAccess || referralState.rewardUnlocked
-    val currentMode = modes.firstOrNull { it.id == currentModeId } ?: modes.first()
     val localAiPlan = DigitalWellnessEngine.build(
         stats = stats,
-        selectedAppCount = currentMode.packages.size,
+        selectedAppCount = blockedPackages.size,
         emergencyUnlocksRemaining = emergencyUnlocksRemaining,
         schedule = schedule,
         healthSummary = healthSummary
@@ -192,8 +188,7 @@ fun HomeScreen(
     val buttonLight = !isBlankActive
     val apps = remember { PackageHelper.getInstalledApps(context) }
     var panel by remember { mutableStateOf(HomePanel.HOME) }
-    var modeBeingEdited by remember { mutableStateOf<BlankMode?>(null) }
-    var showCreateMode by remember { mutableStateOf(false) }
+    var showDistractionPicker by remember { mutableStateOf(false) }
     var accessibilityEnabled by remember { mutableStateOf(AccessibilityHelper.isServiceEnabled(context)) }
     var batteryOptimizedIgnored by remember { mutableStateOf(BatteryHelper.isIgnoringBatteryOptimizations(context)) }
 
@@ -214,11 +209,11 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(stats, currentMode.packages.size, emergencyUnlocksRemaining, schedule, healthSummary) {
+    LaunchedEffect(stats, blockedPackages.size, emergencyUnlocksRemaining, schedule, healthSummary) {
         digitalWellnessStore.refresh(
             localPlan = localAiPlan,
             stats = stats,
-            selectedAppCount = currentMode.packages.size,
+            selectedAppCount = blockedPackages.size,
             emergencyUnlocksRemaining = emergencyUnlocksRemaining,
             schedule = schedule,
             healthSummary = healthSummary
@@ -295,11 +290,11 @@ fun HomeScreen(
                 hasPremiumAccess = hasPremiumAccess,
                 onSettings = { panel = HomePanel.SETTINGS },
                 onStats = { panel = HomePanel.STATS },
-                onMode = { panel = HomePanel.MODES },
+                onDistractions = { panel = HomePanel.DISTRACTIONS },
                 onTimer = { panel = HomePanel.SCHEDULE },
                 onStartAIPlan = {
-                    if (currentMode.packages.isEmpty()) {
-                        modeBeingEdited = currentMode
+                    if (blockedPackages.isEmpty()) {
+                        showDistractionPicker = true
                     } else if (!AccessibilityHelper.isServiceEnabled(context)) {
                         AccessibilityHelper.openAccessibilitySettings(context)
                     } else {
@@ -313,8 +308,8 @@ fun HomeScreen(
                     }
                 },
                 onMainAction = {
-                    if (currentMode.packages.isEmpty()) {
-                        modeBeingEdited = currentMode
+                    if (blockedPackages.isEmpty()) {
+                        showDistractionPicker = true
                     } else if (!AccessibilityHelper.isServiceEnabled(context)) {
                         AccessibilityHelper.openAccessibilitySettings(context)
                     } else {
@@ -332,7 +327,7 @@ fun HomeScreen(
             HomePanel.SETTINGS -> SettingsPanel(
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
-                onModes = { panel = HomePanel.MODES },
+                onDistractions = { panel = HomePanel.DISTRACTIONS },
                 onSchedule = {
                     panel = HomePanel.SCHEDULE
                 },
@@ -344,16 +339,11 @@ fun HomeScreen(
                 }
             )
 
-            HomePanel.MODES -> ModesPanel(
-                modes = modes,
-                currentModeId = currentModeId,
+            HomePanel.DISTRACTIONS -> DistractionsPanel(
+                selectedCount = blockedPackages.size,
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.HOME },
-                onSelect = sessionManager::selectMode,
-                onCreate = { showCreateMode = true },
-                onRename = sessionManager::renameMode,
-                onEditApps = { modeBeingEdited = it },
-                onDelete = sessionManager::deleteMode
+                onEdit = { showDistractionPicker = true }
             )
 
             HomePanel.RELINK -> CenterActionPanel(
@@ -430,27 +420,15 @@ fun HomeScreen(
         }
     }
 
-    modeBeingEdited?.let { mode ->
-        ModeAppsDialog(
-            mode = mode,
+    if (showDistractionPicker) {
+        DistractionPickerDialog(
+            selectedPackages = blockedPackages,
             apps = apps,
             buttonLight = buttonLight,
-            onDismiss = { modeBeingEdited = null },
+            onDismiss = { showDistractionPicker = false },
             onSave = { packages ->
-                sessionManager.updateModePackages(mode.id, packages)
-                modeBeingEdited = null
-            }
-        )
-    }
-
-    if (showCreateMode) {
-        CreateModeDialog(
-            apps = apps,
-            buttonLight = buttonLight,
-            onDismiss = { showCreateMode = false },
-            onCreate = { name, packages ->
-                sessionManager.createMode(name, packages)
-                showCreateMode = false
+                sessionManager.setBlockedPackages(packages)
+                showDistractionPicker = false
             }
         )
     }
@@ -500,7 +478,7 @@ private fun HomePanelContent(
     hasPremiumAccess: Boolean,
     onSettings: () -> Unit,
     onStats: () -> Unit,
-    onMode: () -> Unit,
+    onDistractions: () -> Unit,
     onTimer: () -> Unit,
     onStartAIPlan: () -> Unit,
     onMainAction: () -> Unit
@@ -509,7 +487,7 @@ private fun HomePanelContent(
         HomeTopNav(
             onSettings = onSettings,
             onStats = onStats,
-            onMode = onMode,
+            onDistractions = onDistractions,
             onTimer = onTimer,
             modifier = Modifier.align(Alignment.TopCenter)
         )
@@ -614,7 +592,7 @@ private fun AiPlanHomeCard(
 private fun HomeTopNav(
     onSettings: () -> Unit,
     onStats: () -> Unit,
-    onMode: () -> Unit,
+    onDistractions: () -> Unit,
     onTimer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -674,7 +652,7 @@ private fun HomeTopNav(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HomeTopNavButton("Stats", onStats)
-                HomeTopNavButton("Plan", onMode)
+                HomeTopNavButton("Distractions", onDistractions)
                 HomeTopNavButton("Timer", onTimer)
             }
         }
@@ -753,23 +731,6 @@ private fun TopBar(
 }
 
 @Composable
-private fun ModeChipAligned(name: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .height(44.dp)
-            .clickable(onClick = onClick),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = name,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-            color = BlankOnSurface
-        )
-        MinimalChevron(color = BlankOnSurface, modifier = Modifier.padding(start = 5.dp))
-    }
-}
-
-@Composable
 private fun IconDotsAligned(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
@@ -778,21 +739,6 @@ private fun IconDotsAligned(onClick: () -> Unit, modifier: Modifier = Modifier) 
         contentAlignment = Alignment.Center
     ) {
         VerticalDotsIcon(color = BlankOnSurface)
-    }
-}
-
-@Composable
-private fun MinimalChevron(color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(width = 8.dp, height = 6.dp)) {
-        drawArc(
-            color = color.copy(alpha = 0.74f),
-            startAngle = 20f,
-            sweepAngle = 140f,
-            useCenter = false,
-            topLeft = Offset(0f, -size.height * 0.45f),
-            size = Size(size.width, size.height * 1.6f),
-            style = Stroke(width = 1.15.dp.toPx(), cap = StrokeCap.Round)
-        )
     }
 }
 
@@ -809,24 +755,6 @@ private fun VerticalDotsIcon(color: Color) {
 }
 
 @Composable
-private fun ModeChip(name: String, onClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 2.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-                color = BlankOnSurface
-            )
-            Text(text = "⌄", color = BlankOnSurface, fontSize = 15.sp, modifier = Modifier.padding(start = 4.dp))
-        }
-    }
-}
-
-@Composable
 private fun IconDots(onClick: () -> Unit) {
     TextButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
         Text(text = "⋮", color = BlankOnSurface, fontSize = 24.sp, fontWeight = FontWeight.Medium)
@@ -837,7 +765,7 @@ private fun IconDots(onClick: () -> Unit) {
 private fun SettingsPanel(
     buttonLight: Boolean,
     onBack: () -> Unit,
-    onModes: () -> Unit,
+    onDistractions: () -> Unit,
     onSchedule: () -> Unit,
     onStats: () -> Unit,
     onEmergency: () -> Unit
@@ -848,7 +776,7 @@ private fun SettingsPanel(
         Text(text = "Settings", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(28.dp))
         val items = buildList {
-            add(MenuItem("Plan", "Apps", onModes))
+            add(MenuItem("Distractions", "Edit", onDistractions))
             add(MenuItem("Timer", "Daily", onSchedule))
             add(MenuItem("Stats", "Time", onStats))
             add(MenuItem("Emergency", "Exit", onEmergency, destructive = true))
@@ -1879,239 +1807,91 @@ private fun TimeDropdown(
 }
 
 @Composable
-private fun ModesPanel(
-    modes: List<BlankMode>,
-    currentModeId: String,
+private fun DistractionsPanel(
+    selectedCount: Int,
     buttonLight: Boolean,
     onBack: () -> Unit,
-    onSelect: (String) -> Unit,
-    onCreate: () -> Unit,
-    onRename: (String, String) -> Unit,
-    onEditApps: (BlankMode) -> Unit,
-    onDelete: (String) -> Unit
+    onEdit: () -> Unit
 ) {
+    val surfaceColor = if (buttonLight) Color.White else Color.Black
+    val textColor = if (buttonLight) Color.Black else Color.White
     Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = "Plan", onBack = onBack)
+        ScreenHeader(title = "Distractions", onBack = onBack)
         Spacer(modifier = Modifier.height(46.dp))
-        Text(text = "Choose a mode", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
-        Spacer(modifier = Modifier.height(24.dp))
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Text(
+            text = "One list. Every protection.",
+            style = MaterialTheme.typography.headlineLarge,
+            color = BlankOnSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Choose every app that pulls your attention. Blanked reuses this list whenever it protects your time.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = BlankGray
+        )
+        Spacer(modifier = Modifier.height(28.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = surfaceColor,
+            shape = RoundedCornerShape(22.dp)
         ) {
-            items(modes, key = { it.id }) { mode ->
-                ModeRow(
-                    mode = mode,
-                    selected = mode.id == currentModeId,
-                    canDelete = modes.size > 1,
-                    buttonLight = buttonLight,
-                    onSelect = { onSelect(mode.id) },
-                    onRename = { name -> onRename(mode.id, name) },
-                    onEditApps = { onEditApps(mode) },
-                    onDelete = { onDelete(mode.id) }
+            Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+                Text(
+                    text = if (selectedCount == 1) "1 distraction selected" else "$selectedCount distractions selected",
+                    color = textColor,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = if (selectedCount == 0) "Add apps before starting protection." else "You can update this list at any time.",
+                    color = textColor.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
-        MainActionButton(text = "Create mode", light = buttonLight, onClick = onCreate)
+        Spacer(modifier = Modifier.weight(1f))
+        MainActionButton(
+            text = if (selectedCount == 0) "Choose distractions" else "Edit distractions",
+            light = buttonLight,
+            onClick = onEdit
+        )
     }
 }
 
 @Composable
-private fun ModeRow(
-    mode: BlankMode,
-    selected: Boolean,
-    canDelete: Boolean,
-    buttonLight: Boolean,
-    onSelect: () -> Unit,
-    onRename: (String) -> Unit,
-    onEditApps: () -> Unit,
-    onDelete: () -> Unit
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf(false) }
-    var name by remember(mode.id, mode.name) { mutableStateOf(mode.name) }
-    val rowColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
-    val metaColor = textColor.copy(alpha = 0.72f)
-    val border = if (selected) BorderStroke(1.5.dp, textColor) else null
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = rowColor,
-        shape = RoundedCornerShape(22.dp),
-        border = border,
-        onClick = {
-            if (!editing) onSelect()
-        }
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (editing) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedTextColor = textColor,
-                            unfocusedTextColor = textColor,
-                            focusedBorderColor = metaColor,
-                            unfocusedBorderColor = metaColor
-                        )
-                    )
-                } else {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = mode.name, color = textColor, style = MaterialTheme.typography.bodyLarge)
-                        Text(text = "${mode.packages.size} apps", color = metaColor, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-                Box {
-                    TextButton(onClick = { menuOpen = true }) {
-                        Text(text = "⋮", color = textColor, fontSize = 22.sp, fontWeight = FontWeight.Medium)
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Edit name") },
-                            onClick = {
-                                menuOpen = false
-                                editing = true
-                                onSelect()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Edit apps") },
-                            onClick = {
-                                menuOpen = false
-                                onSelect()
-                                onEditApps()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete") },
-                            enabled = canDelete,
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
-                            }
-                        )
-                    }
-                }
-            }
-            if (editing) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 12.dp)) {
-                    TextButton(
-                        onClick = {
-                            onRename(name)
-                            editing = false
-                        }
-                    ) {
-                        Text("Save", color = textColor)
-                    }
-                    TextButton(
-                        onClick = {
-                            name = mode.name
-                            editing = false
-                        }
-                    ) {
-                        Text("Cancel", color = metaColor)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModeAppsDialog(
-    mode: BlankMode,
+private fun DistractionPickerDialog(
+    selectedPackages: Set<String>,
     apps: List<AppInfo>,
     buttonLight: Boolean,
     onDismiss: () -> Unit,
     onSave: (Set<String>) -> Unit
 ) {
-    var selected by remember(mode.id) { mutableStateOf(mode.packages) }
-    ModeSetupDialog(
-        title = "Edit apps",
-        name = mode.name,
-        apps = apps,
-        selected = selected,
-        onSelectedChange = { selected = it },
-        buttonLight = buttonLight,
-        onDismiss = onDismiss,
-        onPrimary = { onSave(selected) },
-        primaryText = "Save apps"
-    )
-}
-
-@Composable
-private fun CreateModeDialog(
-    apps: List<AppInfo>,
-    buttonLight: Boolean,
-    onDismiss: () -> Unit,
-    onCreate: (String, Set<String>) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf(emptySet<String>()) }
-    ModeSetupDialog(
-        title = "Set up mode",
-        name = name,
-        nameEditable = true,
-        apps = apps,
-        selected = selected,
-        onNameChange = { name = it },
-        onSelectedChange = { selected = it },
-        buttonLight = buttonLight,
-        onDismiss = onDismiss,
-        onPrimary = { onCreate(name, selected) },
-        primaryText = "Save mode"
-    )
-}
-
-@Composable
-private fun ModeSetupDialog(
-    title: String,
-    name: String,
-    apps: List<AppInfo>,
-    selected: Set<String>,
-    onSelectedChange: (Set<String>) -> Unit,
-    buttonLight: Boolean,
-    onDismiss: () -> Unit,
-    onPrimary: () -> Unit,
-    primaryText: String,
-    nameEditable: Boolean = false,
-    onNameChange: (String) -> Unit = {}
-) {
+    var selected by remember(selectedPackages) { mutableStateOf(selectedPackages) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(color = BlankSurface, shape = RoundedCornerShape(28.dp)) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    Text(text = "Your distractions", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     TextButton(onClick = onDismiss) { Text("×", fontSize = 22.sp, color = BlankOnSurface) }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
-                if (nameEditable) {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = onNameChange,
-                        label = { Text("Name") },
-                        placeholder = { Text("Deep work") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    Text(text = name, style = MaterialTheme.typography.bodyLarge, color = BlankGray)
-                }
+                Text(
+                    text = "Choose every app that pulls your attention. This one list is reused for every protection.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = BlankGray
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 AppPickerContent(
                     apps = apps,
                     selected = selected,
-                    onSelectedChange = onSelectedChange,
+                    onSelectedChange = { selected = it },
                     listMaxHeight = 360.dp
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                MainActionButton(text = primaryText, light = buttonLight, onClick = onPrimary)
+                MainActionButton(
+                    text = "Save distractions",
+                    light = buttonLight,
+                    onClick = { onSave(selected) }
+                )
             }
         }
     }

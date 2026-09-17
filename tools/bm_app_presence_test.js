@@ -80,14 +80,11 @@ async function run() {
   assert.ok(serverSeenAt && Date.now() - Date.parse(serverSeenAt) < 5000);
   assert.strictEqual(syncedRow.payload.properties.context.app_presence.source, "assistant_context_sync");
 
-  async function confirmedProposal(context) {
-    const proposal = await request("Block Instagram from 22:00 to 23:00 every day for 7 days", context);
-    assert.deepStrictEqual(proposal.actions, [], "A complete contract still needs confirmation");
-    assert.strictEqual(proposal.semantic_state.status, "awaiting_confirmation");
-    return request("Yes", { ...context, semantic_state: proposal.semantic_state });
+  async function authorizedActivation(context) {
+    return request("Block Instagram from 22:00 to 23:00 every day for 7 days", context);
   }
 
-  const installGuidance = await confirmedProposal({ channel: "whatsapp" });
+  const installGuidance = await authorizedActivation({ channel: "whatsapp" });
   assert.deepStrictEqual(installGuidance.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(installGuidance.semantic_state.status, "needs_setup");
   assert.strictEqual(installGuidance.semantic_state.next_question, "app_presence");
@@ -101,7 +98,7 @@ async function run() {
   assert.strictEqual(incompleteRequest.semantic_state.next_question, "start");
   assert.doesNotMatch(incompleteRequest.message_text, /apps\.apple\.com|download|descarga/i);
 
-  const staleGuidance = await confirmedProposal({
+  const staleGuidance = await authorizedActivation({
     channel: "sms",
     app_presence: { app_present: true, app_ready: true, last_seen_at: new Date(now - 48 * 60 * 60 * 1000).toISOString() },
   });
@@ -113,7 +110,7 @@ async function run() {
     channel: "whatsapp", has_selected_apps: true, selected_app_names: ["Instagram"], screen_time_authorized: true,
     app_presence: { app_present: true, app_ready: true, last_seen_at: new Date(now - 60 * 60 * 1000).toISOString() },
   };
-  const recentPlan = await confirmedProposal(recentContext);
+  const recentPlan = await authorizedActivation(recentContext);
   assert.deepStrictEqual(recentPlan.actions.map((item) => item.type), ["apply_schedule"]);
   assert.strictEqual(recentPlan.actions[0].start_minute, 1320);
   assert.strictEqual(recentPlan.actions[0].end_minute, 1380);
@@ -133,7 +130,7 @@ async function run() {
   assert.deepStrictEqual(repeatedInstallClaim.actions.map((item) => item.type), ["apply_schedule"]);
   assert.match(repeatedInstallClaim.message_text, /Open Blankmind to review and apply|Nothing has been applied/i);
 
-  const permissionGuidance = await confirmedProposal({ ...recentContext, screen_time_authorized: false });
+  const permissionGuidance = await authorizedActivation({ ...recentContext, screen_time_authorized: false });
   assert.deepStrictEqual(permissionGuidance.actions.map((item) => item.type), ["request_screen_time_permission"]);
   assert.strictEqual(permissionGuidance.semantic_state.next_question, "permissions");
 

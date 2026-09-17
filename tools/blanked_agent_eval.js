@@ -129,7 +129,7 @@ function assertBlockingContract(testCase, plan) {
       assert.ok(data[field] !== null && data[field] !== undefined, `${testCase.id}.complete_blocking_data.${field}`);
     }
     assert.ok(actualActions.length > 0, `${testCase.id}.complete_block_has_action`);
-    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit", "activate_mode", "open_app_picker"].includes(type)), `${testCase.id}.complete_block_action_type`);
+    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit", "open_app_picker"].includes(type)), `${testCase.id}.complete_block_action_type`);
     assert.deepStrictEqual(plan.blocking_missing_fields, [], `${testCase.id}.complete_block_has_no_missing_fields`);
   }
 

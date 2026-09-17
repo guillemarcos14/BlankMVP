@@ -188,7 +188,7 @@ No user data is collected by this MVP because Blank does not transmit user data 
 Data stored locally:
 
 ```text
-Blank stores the paired NFC tag identifier, setup completion state, active Blank mode state, session history, selected Screen Time tokens, focus modes, theme choice, and schedule settings locally on the device.
+Blank stores the paired NFC tag identifier, setup completion state, active protection state, session history, one selected set of distracting apps/categories/domains, theme choice, and schedule settings locally on the device.
 ```
 
 Tracking:
@@ -224,7 +224,7 @@ Blank is a digital wellbeing app that lets users voluntarily block their own dis
 
 Blank uses FamilyControls so users can select the apps, app categories, and web domains they want to shield. It uses ManagedSettings to apply those shields only while the user has activated Blank mode.
 
-Blank does not monitor children, sell parental-control services, collect app usage content, read messages, read screen contents, or transmit selected apps to a server in this MVP. Selected tokens, paired tag state, focus modes, session history, and Blank mode state are stored locally on the device.
+Blank does not monitor children, sell parental-control services, collect app usage content, read messages, read screen contents, or transmit selected apps to a server in this MVP. Selected tokens, paired tag state, session history, and active protection state are stored locally on the device.
 
 The user can deactivate Blank mode with the paired NFC tag and can clear shields with an emergency unlock phrase if needed.
 ```

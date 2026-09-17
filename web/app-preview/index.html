@@ -120,9 +120,9 @@
             </section>
 
             <section class="menu-list">
-              <button type="button" data-preview-target="modes">
-                <span>Modo</span>
-                <strong data-current-mode-name>Rutina diaria</strong>
+              <button type="button" data-preview-target="distractions">
+                <span>Distracciones</span>
+                <strong><span data-app-count>3</span> apps</strong>
               </button>
               <button type="button" data-preview-target="schedule">
                 <span>Programar mi Blank</span>
@@ -143,69 +143,38 @@
             </section>
           </article>
 
-          <article class="screen modes-screen" id="screen-modes" data-preview-panel="modes">
+          <article class="screen distractions-screen" id="screen-distractions" data-preview-panel="distractions">
             <header class="report-top">
               <button class="back-button" type="button" data-preview-target="home">Volver</button>
-              <span>Modos</span>
+              <span>Distracciones</span>
             </header>
 
             <section class="apps-hero">
-              <h2>Elige un modo</h2>
-              <p>Cada modo puede tener sus propias apps protegidas.</p>
+              <h2>Una lista. Toda la protecci&oacute;n.</h2>
+              <p>Elige todo lo que te distrae. Blank reutiliza esta misma lista cada vez que protege tu tiempo.</p>
             </section>
 
-            <section class="mode-list" data-mode-list></section>
-
-            <section class="new-mode-form">
-              <button class="main-action" type="button" data-open-create-mode>Crear modo</button>
+            <section class="menu-list">
+              <button type="button" data-preview-target="apps" data-return-screen="distractions">
+                <span>Distracciones seleccionadas</span>
+                <strong><span data-app-count>3</span> apps</strong>
+              </button>
             </section>
 
-            <section class="mode-setup-window" data-create-mode-window hidden>
-              <div class="mode-setup-panel">
-                <div class="mode-setup-header">
-                  <span>Configurar modo</span>
-                  <button type="button" aria-label="Cerrar" data-cancel-create-mode>&times;</button>
-                </div>
-                <label class="mode-setup-name">
-                  <span>Nombre</span>
-                  <input type="text" data-new-mode-input placeholder="Trabajo profundo" />
-                </label>
-                <div class="mode-setup-apps" aria-label="Apps del nuevo modo">
-                  <label>
-                    <span>Instagram</span>
-                    <input type="checkbox" data-new-mode-app checked />
-                  </label>
-                  <label>
-                    <span>TikTok</span>
-                    <input type="checkbox" data-new-mode-app checked />
-                  </label>
-                  <label>
-                    <span>YouTube</span>
-                    <input type="checkbox" data-new-mode-app />
-                  </label>
-                  <label>
-                    <span>Reddit</span>
-                    <input type="checkbox" data-new-mode-app />
-                  </label>
-                  <label>
-                    <span>X</span>
-                    <input type="checkbox" data-new-mode-app />
-                  </label>
-                </div>
-                <button class="main-action" type="button" data-create-mode>Guardar modo</button>
-              </div>
+            <section class="bottom-action">
+              <button class="main-action" type="button" data-preview-target="apps" data-return-screen="distractions">Editar distracciones</button>
             </section>
           </article>
 
           <article class="screen apps-screen" id="screen-apps" data-preview-panel="apps">
             <header class="report-top">
-              <button class="back-button" type="button" data-preview-target="profile">Volver</button>
-              <span>Apps</span>
+              <button class="back-button" type="button" data-preview-target="distractions">Volver</button>
+              <span>Distracciones</span>
             </header>
 
             <section class="apps-hero">
-              <h2>Apps protegidas</h2>
-              <p>Elige las apps que Blank bloquear&aacute; cuando est&eacute; activo.</p>
+              <h2>Elige tus distracciones</h2>
+              <p>Incluye redes sociales, juegos, streaming o cualquier app que te saque de lo que importa.</p>
             </section>
 
             <section class="app-picker-list">
@@ -232,7 +201,7 @@
             </section>
 
             <section class="bottom-action">
-              <button class="main-action" type="button" data-save-apps>Guardar apps</button>
+              <button class="main-action" type="button" data-save-apps>Guardar distracciones</button>
             </section>
           </article>
 
@@ -253,7 +222,7 @@
               </div>
               <div>
                 <h2>Almacenamiento</h2>
-                <p>La etiqueta NFC, apps protegidas, modos y sesiones se guardan localmente en este dispositivo.</p>
+                <p>La etiqueta NFC, la selecci&oacute;n de distracciones y las sesiones se guardan localmente en este dispositivo.</p>
               </div>
             </section>
           </article>

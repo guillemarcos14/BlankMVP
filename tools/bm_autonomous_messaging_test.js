@@ -18,7 +18,7 @@ assert.equal(device.token, "aa".repeat(32));
 assert.equal(device.environment, "sandbox");
 assert.equal(normalizeDevicePush({ token: "invalid" }), null);
 
-const executable = pushPayload({ id: "action-1", type: "activate_mode" });
+const executable = pushPayload({ id: "action-1", type: "start_protection" });
 assert.equal(executable.aps["content-available"], 1);
 assert.equal(executable.aps.alert, undefined, "saved selections must execute without asking the user to open the app");
 assert.equal(executable.bm_action_id, "action-1");
@@ -53,9 +53,10 @@ assert.doesNotMatch(smsAgent, /Open Blankmind to review and apply it/);
 assert.doesNotMatch(whatsappAgent, /Open Blankmind to review and apply it/);
 assert.match(blankApp, /didReceiveRemoteNotification/);
 assert.match(blankApp, /AssistantBackgroundActionRunner/);
-assert.match(blankApp, /duplicateMode\(named:/);
+assert.match(blankApp, /canonical_protection_active/);
+assert.doesNotMatch(blankApp, /duplicateMode\(named:/);
 assert.match(home, /confirmPendingAssistantAction\(\)/);
 assert.match(home, /native_state_applied_after_selection/);
 assert.match(info, /<string>remote-notification<\/string>/);
 
-console.log("BM autonomous messaging contract passed: push, duplicate, picker and verified acknowledgement");
+console.log("BM autonomous messaging contract passed: push, canonical selection, picker and verified acknowledgement");

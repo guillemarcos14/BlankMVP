@@ -228,10 +228,7 @@ async function linkIncludesRequestedApps() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /Do you confirm/i);
-    assert.doesNotMatch(outboundText, /review-action/);
-    const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.plan.confirm", text: { body: "Yes" } }] } }] }] }) });
-    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
+    assert.doesNotMatch(outboundText, /Do you confirm|review-action/i);
     assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
     assert.match(outboundText, /applying it now/i);
     assert.doesNotMatch(outboundText, /Open Blankmind/i);
@@ -240,7 +237,7 @@ async function linkIncludesRequestedApps() {
       .filter(Boolean);
     assert.strictEqual(pendingRows.length, 1);
     assert.strictEqual(pendingRows[0].type, "apply_schedule");
-    assert.deepStrictEqual(pendingRows[0].app_names, ["Instagram", "TikTok"]);
+    assert.deepStrictEqual(pendingRows[0].app_names, []);
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
@@ -250,7 +247,7 @@ async function linkIncludesRequestedApps() {
     assert.strictEqual(polled.statusCode, 200, polled.body);
     assert.strictEqual(polledBody.linked, true);
     assert.strictEqual(polledBody.pending_action.id, pendingRows[0].id);
-    assert.deepStrictEqual(polledBody.pending_action.app_names, ["Instagram", "TikTok"]);
+    assert.deepStrictEqual(polledBody.pending_action.app_names, []);
 
     const acknowledged = await assistantChannelHandler({
       httpMethod: "POST",
@@ -352,12 +349,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.strictEqual(requests.length, 1);
-    assert.match(requests[0].Body, /Do you confirm/i);
-    assert.doesNotMatch(requests[0].Body, /review-action/);
-    requests.length = 0;
-    const confirmed = await handler({ httpMethod: "POST", headers: {}, body: JSON.stringify({ entry: [{ changes: [{ value: { messages: [{ from: "34600000000", id: "wamid.button.confirm", text: { body: "Yes" } }] } }] }] }) });
-    assert.strictEqual(confirmed.statusCode, 200, confirmed.body);
-    assert.strictEqual(requests.length, 1);
+    assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
     assert.match(requests[0].Body, /applying it now/i);
     assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
@@ -373,7 +365,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
   }
 }
 
-async function modePhraseRejectsUnknownModeWithoutCatalog() {
+async function legacyModePhraseUsesCanonicalProtection() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
   let outboundText = "";
@@ -412,7 +404,8 @@ async function modePhraseRejectsUnknownModeWithoutCatalog() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /review-action/);
-    assert.match(outboundText, /not.*saved|not.*created|create it|create.*blankmind/i);
+    assert.doesNotMatch(outboundText, /not.*saved|not.*created|create.*mode/i);
+    assert.match(outboundText, /protection|selected distractions|choose|confirm/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
@@ -420,7 +413,7 @@ async function modePhraseRejectsUnknownModeWithoutCatalog() {
   }
 }
 
-async function categoryRequestOpensActivateModeLink() {
+async function categoryRequestUsesSingleSelectionFlow() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
   let outboundText = "";
@@ -459,7 +452,7 @@ async function categoryRequestOpensActivateModeLink() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /review-action/);
-    assert.match(outboundText, /Which apps|Should it start now|How long/i);
+    assert.match(outboundText, /When should it start|Should it start now|How long/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;
@@ -593,8 +586,8 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   await connectGreeting();
   await linkIncludesRequestedApps();
   await twilioButtonTemplateHidesRawUrlFromMainReply();
-  await modePhraseRejectsUnknownModeWithoutCatalog();
-  await categoryRequestOpensActivateModeLink();
+  await legacyModePhraseUsesCanonicalProtection();
+  await categoryRequestUsesSingleSelectionFlow();
   await whatsappAudioInputGetsTranscribedTextReply();
   await duplicateInboundIsIgnoredAcrossRetries();
   console.log("whatsapp-agent smoke tests passed");

@@ -101,14 +101,14 @@ check("context_preserves_autonomy_and_native_control_fields", () => {
     authorized_action_types: ["apply_schedule"],
     autonomy_grant: { active: true, action_types: ["apply_schedule"] },
     device_execution_ready: true,
-    available_modes: ["Deep Focus"],
-    mode_name: "Routine",
+    selection_count: 3,
   });
 
   assert.ok(Array.isArray(context.authorized_action_types));
   assert.ok(context.autonomy_grant && context.autonomy_grant.active === true);
-  assert.deepStrictEqual(context.available_modes, ["Deep Focus"]);
-  assert.strictEqual(context.mode_name, "Routine");
+  assert.strictEqual(context.selection_count, 3);
+  assert.strictEqual(context.single_distraction_block, true);
+  assert.strictEqual(context.protection_target, "selected_distractions");
   assert.strictEqual(
     policyForPlan({ actions: [{ type: "apply_schedule" }] }, context).decision,
     "autonomous_execution",
@@ -163,7 +163,8 @@ check("messaging_actions_execute_without_native_confirmation", () => {
   assert.match(assistantChannel, /last_assistant_action_outcome/);
   assert.match(home, /status:\s*"verified"/);
   assert.match(home, /blankPendingAssistantActionId/);
-  assert.match(sessionStore, /requestedAppsName = knownAppNames\.joined\(separator: " \+ "\)/);
+  assert.match(sessionStore, /func restoreSavedSelectionForAssistant\(appNames: \[String\] = \[\]\)/);
+  assert.match(sessionStore, /_ = appNames[\s\S]{0,80}return hasSelectedApps/);
   assert.match(smsAgent, /TWILIO_WHATSAPP_ACTION_CONTENT_SID/);
   assert.match(smsAgent, /whatsappSetupButton/);
   assert.doesNotMatch(whatsapp, /reviewActionLink\(action, apps\)/);
@@ -175,17 +176,17 @@ check("assistant_context_sync_reaches_messaging_identity", () => {
   assert.match(assistantChannelShared, /assistant_user_context_synced/);
   assert.match(assistantChannelShared, /attachAssistantUserContext/);
   assert.match(assistantChannel, /const connection = await findAssistantConnection\(connectCode, preferredChannel\)/);
-  assert.match(bmContext, /available_mode_catalog/);
+  assert.match(bmContext, /single_distraction_block/);
   assert.match(bmContext, /deriveAppPresence/);
   assert.match(bmContext, /app_presence_state/);
   assert.match(assistantChannelShared, /last_seen_at: now/);
   assert.match(ios, /AssistantContextSyncClient/);
   assert.match(ios, /BlankmindAppPresence\.payload/);
   assert.match(home, /BlankmindAppPresence\.payload/);
-  assert.match(ios, /availableModeCatalog/);
+  assert.match(ios, /single_distraction_block/);
   assert.match(home, /assistantContextPayload/);
   assert.match(home, /syncAssistantContext/);
-  assert.match(sessionStore, /func assistantModeCatalog/);
+  assert.match(sessionStore, /func restoreSavedSelectionForAssistant/);
 });
 
 check("daily_limit_applies_screen_time_state", () => {
@@ -211,7 +212,7 @@ check("why_now_layout_preserves_conversational_design", () => {
   assert.match(home, /sessionStore\.recordRelapseReview\(reason\)[\s\S]{0,160}sessionStore\.applyAIPlan\(\)/);
 });
 
-check("assistant_actions_reuse_saved_modes_and_ignore_stale_timer", () => {
+check("assistant_actions_reuse_canonical_selection_and_ignore_stale_timer", () => {
   assert.match(sessionStore, /func restoreSavedSelectionForAssistant\(appNames: \[String\] = \[\]\)/);
   assert.match(sessionStore, /usePendingWidgetTimer: Bool = true/);
   assert.match(home, /restoreSavedSelectionForAssistant\(appNames: appNames\)/);

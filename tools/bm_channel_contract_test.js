@@ -5,7 +5,6 @@ const { actionDeepLink } = require("../netlify/functions/sms-agent");
 
 for (const action of [
   { type: "start_protection", minutes: 17, hard_mode: false },
-  { type: "activate_mode", name: "Social", minutes: null },
   { type: "apply_schedule", start_minute: 0, end_minute: 57, weekdays: [2, 4], duration_days: 1 },
   { type: "set_daily_limit", minutes: 43 },
   { type: "open_app_picker" },

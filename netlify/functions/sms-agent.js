@@ -265,7 +265,6 @@ function actionIntro(actions) {
   if (first.type === "set_daily_limit") return "Open Blanked to review the daily limit.";
   if (first.type === "apply_schedule") return "Open Blanked to review the protection window.";
   if (first.type === "start_protection") return "Open Blanked to start the block.";
-  if (first.type === "activate_mode") return "Open Blanked to start that mode.";
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
   return "Open Blanked to review the next step.";
 }
@@ -296,9 +295,6 @@ function actionSentence(actions, appNames = []) {
     return Number.isFinite(first.minutes)
       ? `This opens Blankmind with a ${first.minutes}-minute app block ready to review.`
       : "This opens Blankmind with an app block ready to review.";
-  }
-  if (first.type === "activate_mode") {
-    return `This opens Blanked with ${cleanText(first.name, 40) || "that"} mode ready to start.`;
   }
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
     return "This opens Blanked so you can choose the apps to block.";
@@ -361,7 +357,7 @@ function smsCommand(text) {
 function commandForAction(actions) {
   const first = primaryAction(actions);
   if (!first) return "OPEN";
-  if (["start_protection", "activate_mode", "apply_schedule", "open_app_picker", "request_screen_time_permission", "enable_allow_only"].includes(first.type)) {
+  if (["start_protection", "apply_schedule", "open_app_picker", "request_screen_time_permission", "enable_allow_only"].includes(first.type)) {
     return "BLOCK";
   }
   if (first.type === "set_daily_limit") return "START";
@@ -469,7 +465,7 @@ function naturalReplyText(text) {
 }
 
 const PENDING_ASSISTANT_ACTION_TYPES = new Set([
-  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "start_protection", "apply_schedule", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
   "open_app_picker", "request_screen_time_permission",
 ]);
@@ -486,8 +482,6 @@ function pendingAssistantActionFromPlan(plan, appNames = []) {
   const payload = {
     type: action.type,
     name: action.name || null,
-    source_mode_name: action.source_mode_name || null,
-    copy_mode: action.copy_mode === true,
     minutes: Number.isInteger(action.minutes) ? action.minutes : null,
     hard_mode: action.hard_mode === true,
     start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
@@ -495,7 +489,8 @@ function pendingAssistantActionFromPlan(plan, appNames = []) {
     weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
     duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
     hours: Number.isInteger(action.hours) ? action.hours : null,
-    app_names: (Array.isArray(appNames) ? appNames : []).filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps").slice(0, 12),
+    // App mentions remain useful context, but never select the activation target.
+    app_names: [],
   };
   const createdAt = new Date().toISOString();
   return {

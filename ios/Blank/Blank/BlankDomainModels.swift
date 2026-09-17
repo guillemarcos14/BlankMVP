@@ -334,7 +334,7 @@ struct BlankProfile: Codable, Identifiable, Equatable {
     }
 }
 
-struct BlankFocusMode: Codable, Identifiable, Equatable {
+struct LegacyFocusMode: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
     var selectionData: Data?
@@ -765,9 +765,9 @@ struct BlankActivityDay: Identifiable, Equatable {
     var sessionCount: Int
 }
 
-struct BlankModeActivity: Identifiable, Equatable {
-    var id: UUID { modeId }
-    var modeId: UUID
+struct BlankProtectionActivity: Identifiable, Equatable {
+    var id: UUID { protectionId }
+    var protectionId: UUID
     var name: String
     var totalFocusTime: TimeInterval
     var sessionCount: Int
@@ -776,7 +776,7 @@ struct BlankModeActivity: Identifiable, Equatable {
 struct BlankProgressReport: Equatable {
     var weeklyReport: BlankWeeklyReport
     var recentActivity: [BlankActivityDay]
-    var modeActivity: [BlankModeActivity]
+    var protectionActivity: [BlankProtectionActivity]
     var currentStreakDays: Int
     var longestStreakDays: Int
 }
@@ -2506,7 +2506,6 @@ enum DigitalWellnessAI {
 enum BlankProgressAggregator {
     static func aggregate(
         sessions: [BlankSession],
-        modes: [BlankFocusMode],
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> BlankProgressReport {
@@ -2521,7 +2520,7 @@ enum BlankProgressAggregator {
         return BlankProgressReport(
             weeklyReport: weeklyReport,
             recentActivity: activityDays(sessions: sessions, days: 28, endingOn: now, calendar: calendar),
-            modeActivity: modeActivity(sessions: sessions, modes: modes, weekStart: weekStart, now: now, calendar: calendar),
+            protectionActivity: protectionActivity(sessions: sessions, weekStart: weekStart, now: now, calendar: calendar),
             currentStreakDays: currentStreakDays(sessions: sessions, now: now, calendar: calendar),
             longestStreakDays: longestStreakDays(sessions: sessions, days: 365, endingOn: now, calendar: calendar)
         )
@@ -2560,19 +2559,18 @@ enum BlankProgressAggregator {
         }
     }
 
-    private static func modeActivity(
+    private static func protectionActivity(
         sessions: [BlankSession],
-        modes: [BlankFocusMode],
         weekStart: Date,
         now: Date,
         calendar: Calendar
-    ) -> [BlankModeActivity] {
+    ) -> [BlankProtectionActivity] {
         guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
             return []
         }
 
-        let namesById = Dictionary(uniqueKeysWithValues: modes.map { ($0.id, $0.name) })
-        var totals: [UUID: (duration: TimeInterval, count: Int)] = [:]
+        var totalDuration: TimeInterval = 0
+        var sessionCount = 0
 
         for session in sessions {
             let sessionEnd = session.endedAt ?? now
@@ -2586,29 +2584,17 @@ enum BlankProgressAggregator {
             let overlapEnd = min(sessionEnd, weekEnd)
             guard overlapStart < overlapEnd else { continue }
 
-            let current = totals[session.profileId] ?? (0, 0)
-            totals[session.profileId] = (
-                current.duration + overlapEnd.timeIntervalSince(overlapStart),
-                current.count + 1
-            )
+            totalDuration += overlapEnd.timeIntervalSince(overlapStart)
+            sessionCount += 1
         }
 
-        return totals.map { entry in
-            let modeId = entry.key
-            let value = entry.value
-            return BlankModeActivity(
-                modeId: modeId,
-                name: namesById[modeId] ?? "Mode",
-                totalFocusTime: value.duration,
-                sessionCount: value.count
-            )
-        }
-        .sorted { lhs, rhs in
-            if lhs.totalFocusTime == rhs.totalFocusTime {
-                return lhs.sessionCount > rhs.sessionCount
-            }
-            return lhs.totalFocusTime > rhs.totalFocusTime
-        }
+        guard sessionCount > 0 else { return [] }
+        return [BlankProtectionActivity(
+            protectionId: BlankSharedState.canonicalProtectionId,
+            name: BlankSharedState.canonicalProtectionName,
+            totalFocusTime: totalDuration,
+            sessionCount: sessionCount
+        )]
     }
 
     private static func currentStreakDays(

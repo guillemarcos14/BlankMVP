@@ -131,14 +131,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        if (action != "mode") return
-        val name = uri.getQueryParameter("name").orEmpty()
+        if (action != "protection" && action != "mode") return
         val activate = uri.getQueryParameter("activate").equals("true", ignoreCase = true)
         lifecycleScope.launch {
             sessionManager.stateLoaded.filter { it }.first()
-            val selected = sessionManager.selectBestModeMatching(name)
-            if (!selected) {
-                Toast.makeText(this@MainActivity, "Create $name mode first", Toast.LENGTH_SHORT).show()
+            if (sessionManager.blockedPackages.value.isEmpty()) {
+                Toast.makeText(this@MainActivity, "Choose your distractions first", Toast.LENGTH_SHORT).show()
                 return@launch
             }
             if (activate) {

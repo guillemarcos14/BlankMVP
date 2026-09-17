@@ -104,5 +104,133 @@
     "rationale": "BM preserved the confirmed 10:00 AM to 12:00 PM daily Instagram schedule for seven days, emitted the expected autonomous schedule action, and reserved success for positive device verification.",
     "verdict": "equivalent",
     "language": "en"
+  },
+  {
+    "response_sha256": "65d7841a284ca4a4327eaa638315af42a79a5cc60fb91871b181e75e057cb1ae",
+    "expectation_sha256": "eb5b5df3a76ecd785dddc40693c8ad0e8718b016dbda488a4cd64a90f1321905",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The response preserves the immediate 30-minute request and asks only for recurrence. Under the single-selection MVP, selected distractions is the correct executable target and no action or success is claimed.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "f1715179f3d09e71c88773844080cf9f188cfce4218904f93fde9c9dc763eb81",
+    "expectation_sha256": "23a7b34612791f12dacee2b3e32e52aa6185c2aa729f59e807442ea9f24ec287",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The response correctly restates an immediate 30-minute one-time protection and asks for confirmation. The canonical selected-distractions target matches the MVP and no execution is claimed.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "905e93ddae0a55e7f7429d538016b9c1a7cead8b361b827a3b359d9bf1352501",
+    "expectation_sha256": "a0b2cf52fc35a58ac28f0af6022879b6a303b67bbab1debab80be19e63fb2b01",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The corrected 45-minute duration replaces 30 while immediate start and one-time recurrence remain intact. The response asks for confirmation and targets the single distraction selection.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "b536b800f76595cb59823e99cab4fde1974fe581a6e7e1e5b388215845e7fa90",
+    "expectation_sha256": "57a8c9dfc907e33920d95288aec4816709b55aeb7ef22308145bfc6604ce1a4a",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The confirmed immediate 45-minute one-time protection is preserved, the canonical distraction selection is targeted, and success is explicitly deferred until device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "1838e21f262a4b3924fa6b619cdd1a71feff1067d28d594b096ea32fc81d5f6b",
+    "expectation_sha256": "d20226ae34f9a34529c32b5f9633fd2d0d737001bf4dd99d6e74e56fd6666fb9",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The response preserves the 10:00 AM start and daily request, asks only for the missing duration or end, and correctly refers to the canonical distraction selection without inventing execution.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "11afdd465d2836c4674f33322c9b84d64db1559b720850f20d19234fb092c444",
+    "expectation_sha256": "25ab69a5e811e3077bd5cb2ece98ecf673007940f57b633d26985fc46b78b982",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The response accurately states the 10:00 to 11:00 daily window for seven days, targets the canonical distraction selection, and asks for confirmation without claiming execution.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "812970c2a0ae4e3546a0d96a7728b291c25ef47c53d6c5cb301b6a56a7d5c0b8",
+    "expectation_sha256": "0dd9e5b2185388b565290bcc30eeb83840df8df8782144d469485af8ee46d27b",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The corrected 10:00 to 12:00 daily window for seven days is preserved everywhere, the previous end is absent, and the response asks for confirmation for the single selection.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "4f379cdb6b8bc5b1eab4b9a69942ed3f0bd3fbb9cc8be7a01147522294ca7f24",
+    "expectation_sha256": "c26390b243c64098d95c9c1b8efcb9192bcf2628b06c7d244fcbc2f3502bb19e",
+    "reviewer": "Codex cross-layer single-selection audit",
+    "rationale": "The confirmed 10:00 to 12:00 daily schedule for seven days is preserved, the canonical selection is targeted, and success remains conditional on device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "65d7841a284ca4a4327eaa638315af42a79a5cc60fb91871b181e75e057cb1ae",
+    "expectation_sha256": "aa48e58ae680f2fa12ec78178c621122fb962cdfa96c15bcf5635fa883e62162",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The response preserves the immediate 30-minute request and asks only for the missing recurrence. The app mention remains contextual while the canonical selected-distractions target is used; no execution is claimed.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "8f10faf84461258e8b563c49cea7f1f555999513e1eda19ef3a7f43a84a6f96c",
+    "expectation_sha256": "47bc6f9040d95b4627b684b92ee103e096c00e204ac1b51d7726eb836c8ea835",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The final missing detail completes an immediate one-time 30-minute block. The response sends the canonical selection to the linked device and correctly reserves success for device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "9c936284475353b86f68c2f92f31383fc7ac67d4e2a4354f8cba4f2124f373bf",
+    "expectation_sha256": "2c5eea869b398326a63217c233a59c090deb5a241b3166e804fa4cfb640c1d4b",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The corrected 45-minute duration replaces the prior value and is immediately authorized as an explicit activation correction. The response targets the canonical selection and makes no unverified success claim.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "9c936284475353b86f68c2f92f31383fc7ac67d4e2a4354f8cba4f2124f373bf",
+    "expectation_sha256": "d6056096814e3cd2acc89fc6548f35f32fb45a18c462ffd59ce00d4d14913269",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The follow-up acknowledgment does not emit a duplicate action. The visible response remains consistent with the already authorized 45-minute request and still defers success to device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "1838e21f262a4b3924fa6b619cdd1a71feff1067d28d594b096ea32fc81d5f6b",
+    "expectation_sha256": "33941d81df972c9c573dc7d01130fe6269b7f3ada35760d30c9ce2ae41db8c15",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The response preserves the 10:00 AM daily request and seven-day horizon, asks only for the missing duration or end, and retains the canonical selected-distractions target without claiming execution.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "5c14b30293e10651da434d841876e65c3e40784cb69f569fb9cde987dfe9a264",
+    "expectation_sha256": "e63761503433ecc47fe38ba4dbfe7ac8294214363f89edaef3e6ae88ea338be4",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The supplied duration completes a 10:00-11:00 daily schedule for seven days. The response sends the canonical selection and explicitly waits for device verification before reporting success.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "2665c8bcc0dd9c5bb42a3cf0621ac50bba5c9cbd0250b033fc7585fe1edcf75b",
+    "expectation_sha256": "31b00d34486729f47864aa9709d4ba7208ab3d1b74549e59ee0199a13315e3f9",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The correction replaces the prior end with noon, preserves the daily seven-day schedule, authorizes the corrected canonical-selection action, and does not claim success before verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "2665c8bcc0dd9c5bb42a3cf0621ac50bba5c9cbd0250b033fc7585fe1edcf75b",
+    "expectation_sha256": "7a79705f1cf6a897cddbced194418de583b2ae47c7f5c58b3c2259961b490565",
+    "reviewer": "Codex single-block activation audit",
+    "rationale": "The acknowledgment emits no duplicate schedule action. The visible response accurately retains the authorized 10:00-12:00 daily schedule for seven days and defers success to device verification.",
+    "verdict": "equivalent",
+    "language": "en"
   }
 ]

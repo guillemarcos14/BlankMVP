@@ -56,19 +56,23 @@ function nextStep(loop) {
   return "none";
 }
 
-function initialStatus(plan, context, policy, validation) {
+function initialStatus(plan, context, policy, validation, actionAuthorization) {
   if (!validation.valid || policy.blocked) return { status: "failed", phase: "stop" };
   if (!plan.actions.length || plan.actions.every((action) => action.type === "none")) return { status: "awaiting_input", phase: "understand" };
   if (plan.actions.some((action) => actionNeedsSetup(action, context))) return { status: "awaiting_setup", phase: "setup" };
+  if (actionAuthorization?.confirmed === true) return { status: "awaiting_execution", phase: "execute" };
   if (policy.autonomous_allowed) return { status: "awaiting_execution", phase: "execute" };
   return { status: "awaiting_confirmation", phase: "propose" };
 }
 
-function createLoop({ prompt, context = {}, plan, runId, promptHash, contextFingerprint } = {}) {
+function createLoop({ prompt, context = {}, plan, runId, promptHash, contextFingerprint, actionAuthorization } = {}) {
   const validation = validatePlan(plan);
   const normalizedPlan = validation.plan || normalizePlan(plan);
   const policy = policyForPlan(normalizedPlan, context);
-  const initial = initialStatus(normalizedPlan, context, policy, validation);
+  const explicitActionAuthorization = actionAuthorization?.confirmed === true
+    ? { confirmed:true, source:clean(actionAuthorization.source,64) || "explicit_activation_request" }
+    : null;
+  const initial = initialStatus(normalizedPlan, context, policy, validation, explicitActionAuthorization);
   const created = now();
   const maxDurationHours = Number(contract.limits?.max_duration_hours || 168);
   const expires = new Date(created.getTime() + maxDurationHours * 60 * 60 * 1000);
@@ -125,9 +129,9 @@ function createLoop({ prompt, context = {}, plan, runId, promptHash, contextFing
     max_iterations: Number(contract.limits?.max_iterations || 3),
     next_step: null,
     consent: {
-      required: policy.requires_confirmation,
-      status: policy.autonomous_allowed ? "pre_authorized" : policy.requires_confirmation ? "pending" : "not_required",
-      source: context.autonomy_consent === true || context.autonomy_grant?.active === true ? "explicit_autonomy_grant" : "per_action_confirmation",
+      required: explicitActionAuthorization ? false : policy.requires_confirmation,
+      status: explicitActionAuthorization ? "confirmed" : policy.autonomous_allowed ? "pre_authorized" : policy.requires_confirmation ? "pending" : "not_required",
+      source: explicitActionAuthorization?.source || (context.autonomy_consent === true || context.autonomy_grant?.active === true ? "explicit_autonomy_grant" : "per_action_confirmation"),
     },
     policy,
     verification: { status: "not_started", attempts: 0, evidence: null, source: null, reason: null },
@@ -316,9 +320,10 @@ function advanceLoop(loop, event = {}) {
     next.consent.status = "confirmed";
     transition = "ready_for_execution";
   } else if (type === "setup_completed") {
-    next.status = "awaiting_confirmation";
-    next.phase = "propose";
-    transition = "setup_completed";
+    const alreadyAuthorized = ["confirmed", "pre_authorized"].includes(next.consent.status);
+    next.status = alreadyAuthorized ? "awaiting_execution" : "awaiting_confirmation";
+    next.phase = alreadyAuthorized ? "execute" : "propose";
+    transition = alreadyAuthorized ? "ready_for_execution" : "setup_completed";
   } else if (type === "execution_started") {
     next.status = "awaiting_execution";
     next.phase = "execute";

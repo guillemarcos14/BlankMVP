@@ -169,19 +169,16 @@ struct BlankApp: App {
         }
 
         if action == "mode" {
-            let name = components?.stringQueryItem("name") ?? ""
             let shouldActivate = components?.boolQueryItem("activate") ?? false
             let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
             let hardMode = components?.boolQueryItem("hard") ?? false
-            if !name.isEmpty, sessionStore.selectBestMode(matching: name) {
+            if sessionStore.hasSelectedApps {
                 if shouldActivate {
                     _ = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode, entryMode: .app)
                 }
             } else {
                 openBlockConfiguration(
                     from: components,
-                    startsFreshSelection: true,
-                    modeName: name.isEmpty ? nil : name,
                     shouldActivate: shouldActivate,
                     durationMinutes: minutes,
                     hardMode: hardMode
@@ -193,8 +190,6 @@ struct BlankApp: App {
 
     private func openBlockConfiguration(
         from components: URLComponents?,
-        startsFreshSelection: Bool = false,
-        modeName: String? = nil,
         shouldActivate: Bool = false,
         durationMinutes: Int? = nil,
         hardMode: Bool = false
@@ -202,8 +197,6 @@ struct BlankApp: App {
         let appNames = components?.listQueryItem("apps") ?? []
         sessionStore.requestBlockConfiguration(
             appNames: appNames,
-            startsFreshSelection: startsFreshSelection,
-            modeName: modeName,
             shouldActivate: shouldActivate,
             durationMinutes: durationMinutes,
             hardMode: hardMode
@@ -212,10 +205,8 @@ struct BlankApp: App {
 
     private func setupPlan(from components: URLComponents?) {
         applyPlan(from: components, shouldOpenPickerIfIncomplete: false)
-        let appNames = components?.listQueryItem("apps") ?? []
-        let shouldStartFresh = !sessionStore.hasSelectedApps || !appNames.isEmpty
-        if !sessionStore.hasSelectedApps || !appNames.isEmpty {
-            openBlockConfiguration(from: components, startsFreshSelection: shouldStartFresh)
+        if !sessionStore.hasSelectedApps {
+            openBlockConfiguration(from: components)
         }
     }
 
@@ -223,17 +214,15 @@ struct BlankApp: App {
         let startMinute = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute")
         let endMinute = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute")
         let durationDays = components?.intQueryItem("days") ?? 7
-        let name = components?.stringQueryItem("name") ?? "AI Plan"
         let weekdays = components?.listQueryItem("weekdays").compactMap(Int.init) ?? Array(1...7)
 
         if let startMinute, let endMinute {
-            _ = sessionStore.selectBestMode(matching: name)
             sessionStore.applyAdaptivePlan(
                 startMinute: min(max(startMinute, 0), 1439),
                 endMinute: min(max(endMinute, 0), 1439),
                 durationDays: min(max(durationDays, 1), 14),
                 activateCurrentWindow: false,
-                name: name,
+                name: "Protection",
                 weekdays: weekdays
             )
             applyScreenTimeState()
@@ -248,13 +237,10 @@ struct BlankApp: App {
         let minutes = components?.intQueryItem("minutes").map { min(max($0, 5), 240) }
         let hardMode = components?.boolQueryItem("hard") ?? false
         switch type {
-        case "start_protection":
+        case "start_protection", "activate_mode":
             sessionStore.requestAssistantActionConfirmation(.startProtection(minutes: minutes, hardMode: hardMode, appNames: appNames))
-        case "activate_mode":
-            let name = components?.stringQueryItem("name") ?? "Routine"
-            sessionStore.requestAssistantActionConfirmation(.activateMode(name: name, minutes: minutes, hardMode: hardMode, appNames: appNames))
         case "switch_mode":
-            sessionStore.requestAssistantActionConfirmation(.switchMode(name: components?.stringQueryItem("name") ?? "Routine"))
+            sessionStore.requestAssistantActionConfirmation(.openAppPicker(appNames: appNames))
         case "apply_schedule":
             guard let start = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute"),
                   let end = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute") else { return }
@@ -535,41 +521,17 @@ private struct AssistantBackgroundActionRunner {
     ) -> (verified: Bool, detail: String) {
         switch action {
         case .startProtection(let minutes, let hardMode, let appNames):
-            guard store.restoreSavedSelectionForAssistant(appNames: appNames),
-                  store.duplicateMode(named: store.currentMode.name) != nil else {
-                return (false, "exact_saved_selection_required")
-            }
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
             _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
             apply(store: store, blocker: blocker)
-            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "protection_not_active")
-        case .activateMode(let name, let minutes, let hardMode, _):
-            guard store.duplicateMode(named: name) != nil else { return (false, "source_mode_not_found") }
-            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
-            apply(store: store, blocker: blocker)
-            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "mode_copy_not_active")
-        case .duplicateAndActivateMode(let sourceName, let minutes, let hardMode, _):
-            guard store.duplicateMode(named: sourceName) != nil else { return (false, "source_mode_not_found") }
-            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
-            apply(store: store, blocker: blocker)
-            return (store.isBlankActive, store.isBlankActive ? "mode_copy_active" : "mode_copy_not_active")
+            return (store.isBlankActive, store.isBlankActive ? "canonical_protection_active" : "protection_not_active")
         case .applySchedule(_, let start, let end, let weekdays, let days, let appNames):
-            guard store.restoreSavedSelectionForAssistant(appNames: appNames),
-                  let copy = store.duplicateMode(named: store.currentMode.name) else {
-                return (false, "exact_saved_selection_required")
-            }
-            store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: copy.name, weekdays: weekdays)
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
+            store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: "Protection", weekdays: weekdays)
             apply(store: store, blocker: blocker)
-            return (true, "mode_copy_schedule_persisted")
-        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, let weekdays, let days, _):
-            guard let copy = store.duplicateMode(named: sourceName) else { return (false, "source_mode_not_found") }
-            store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: copy.name, weekdays: weekdays)
-            apply(store: store, blocker: blocker)
-            return (true, "mode_copy_schedule_persisted")
+            return (true, "canonical_schedule_persisted")
         case .setDailyLimit(let minutes, let appNames):
-            guard let minutes, store.restoreSavedSelectionForAssistant(appNames: appNames),
-                  store.duplicateMode(named: store.currentMode.name) != nil else {
-                return (false, "exact_saved_selection_required")
-            }
+            guard let minutes, store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
             store.dailyLimitMinutes = minutes
             store.dailyLimitEnabled = true
             store.refreshDailyLimitMonitoring()
@@ -595,8 +557,6 @@ private struct AssistantBackgroundActionRunner {
             store.applyAIPlan()
             apply(store: store, blocker: blocker)
             return (true, "ai_plan_persisted")
-        case .switchMode(let name):
-            return (store.selectBestMode(matching: name), "mode_selected")
         case .openAppPicker, .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker, .requestScreenTimePermission:
             return (false, "foreground_setup_required")
         }

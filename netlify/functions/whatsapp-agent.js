@@ -209,7 +209,7 @@ function messageLanguage(text, savedLanguage = "") {
 }
 
 const PENDING_ACTION_TYPES = new Set([
-  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "start_protection", "apply_schedule", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
   "open_app_picker", "request_screen_time_permission",
 ]);
@@ -218,10 +218,6 @@ function pendingActionFromPlan(plan, prompt = "") {
   const action = (Array.isArray(plan.actions) ? plan.actions : [])
     .find((item) => item && PENDING_ACTION_TYPES.has(item.type));
   if (!action) return null;
-  const contractApps = plan.blocking_data && Array.isArray(plan.blocking_data.apps)
-    ? plan.blocking_data.apps.filter((app) => app && !String(app).startsWith("mode:") && app !== "selected_apps")
-    : [];
-  const appNames = (contractApps.length ? contractApps : requestedAppNames(prompt)).slice(0, 12);
   if (action.type === "apply_schedule" && (
     !Number.isInteger(action.start_minute)
     || !Number.isInteger(action.end_minute)
@@ -232,8 +228,6 @@ function pendingActionFromPlan(plan, prompt = "") {
   const payload = {
     type: action.type,
     name: action.name || null,
-    source_mode_name: action.source_mode_name || null,
-    copy_mode: action.copy_mode === true,
     minutes: Number.isInteger(action.minutes) ? action.minutes : null,
     hard_mode: action.hard_mode === true,
     start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
@@ -241,7 +235,9 @@ function pendingActionFromPlan(plan, prompt = "") {
     weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
     duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
     hours: Number.isInteger(action.hours) ? action.hours : null,
-    app_names: appNames,
+    // App mentions remain conversational context only. Native execution always
+    // targets the one canonical distraction selection.
+    app_names: [],
   };
   const fingerprint = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
   return {

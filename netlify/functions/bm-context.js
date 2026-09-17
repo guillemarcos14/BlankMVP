@@ -27,6 +27,8 @@ const SCALAR_KEYS = [
   "trigger",
   "mode",
   "web_preview",
+  "single_distraction_block",
+  "protection_target",
   "has_selected_apps",
   "screen_time_authorized",
   "is_blank_active",
@@ -39,7 +41,6 @@ const SCALAR_KEYS = [
   "recommendation_id",
   "autonomy_consent",
   "device_execution_ready",
-  "mode_name",
   "selection_count",
   "allow_only_mode_enabled",
   "adult_content_blocking_enabled",
@@ -74,8 +75,8 @@ const SCALAR_KEYS = [
   "app_ready",
 ];
 
-const ARRAY_KEYS = ["authorized_action_types", "available_modes", "selected_app_names"];
-const OBJECT_ARRAY_KEYS = ["available_mode_catalog"];
+const ARRAY_KEYS = ["authorized_action_types", "selected_app_names"];
+const OBJECT_ARRAY_KEYS = [];
 const OBJECT_KEYS = ["schedule", "app_presence"];
 
 const APP_PRESENCE_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -86,47 +87,6 @@ function normalizeStringArray(value, maxItems = 8, maxLength = 80) {
   return value
     .map((item) => typeof item === "string" ? item : item && typeof item === "object" ? item.name : "")
     .map((item) => clean(item, maxLength))
-    .filter(Boolean)
-    .slice(0, maxItems);
-}
-
-function inferAppNamesFromModeName(value) {
-  const normalized = ` ${clean(value, 80).toLowerCase().replace(/[-_]+/g, " ")} `;
-  const aliases = [
-    ["instagram", "Instagram"], ["insta", "Instagram"], ["tik tok", "TikTok"],
-    ["tiktok", "TikTok"], ["youtube", "YouTube"], ["reddit", "Reddit"],
-    ["twitter", "Twitter"], ["facebook", "Facebook"], ["snapchat", "Snapchat"],
-    ["whatsapp", "WhatsApp"],
-  ];
-  const apps = [];
-  const seen = new Set();
-  for (const [alias, app] of aliases) {
-    if (!normalized.includes(` ${alias} `) || seen.has(app)) continue;
-    seen.add(app);
-    apps.push(app);
-  }
-  return apps;
-}
-
-function normalizeModeCatalog(value, maxItems = 12) {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((mode) => {
-      if (typeof mode === "string") {
-        const name = clean(mode, 60);
-        return name ? { name, app_names: [] } : null;
-      }
-      if (!mode || typeof mode !== "object" || Array.isArray(mode)) return null;
-      const name = clean(mode.name, 60);
-      if (!name) return null;
-      const suppliedApps = normalizeStringArray(mode.app_names || mode.apps, 8, 60);
-      const normalized = { name, app_names: suppliedApps.length ? suppliedApps : inferAppNamesFromModeName(name) };
-      const id = clean(mode.id, 80);
-      if (id) normalized.id = id;
-      if (Number.isFinite(mode.selection_count)) normalized.selection_count = Math.max(0, Math.round(mode.selection_count));
-      if (typeof mode.has_selection === "boolean") normalized.has_selection = mode.has_selection;
-      return normalized;
-    })
     .filter(Boolean)
     .slice(0, maxItems);
 }
@@ -246,9 +206,7 @@ function normalizeUserContext(value) {
       }
     }
   }
-  if (Array.isArray(value.available_modes)) result.available_modes = normalizeStringArray(value.available_modes, 12, 60);
   if (Array.isArray(value.selected_app_names)) result.selected_app_names = normalizeStringArray(value.selected_app_names, 8, 60);
-  if (Array.isArray(value.available_mode_catalog)) result.available_mode_catalog = normalizeModeCatalog(value.available_mode_catalog);
   if (value.schedule) result.schedule = normalizeSchedule(value.schedule);
   if (value.app_presence) result.app_presence = normalizeAppPresence(value.app_presence);
   if (Array.isArray(value.recent_messages)) result.recent_messages = normalizeConversation(value.recent_messages);
@@ -337,7 +295,7 @@ function buildAgentContext(input = {}) {
     if (merged[key] !== undefined) result[key] = normalizeStringArray(merged[key]);
   }
   for (const key of OBJECT_ARRAY_KEYS) {
-    if (merged[key] !== undefined) result[key] = normalizeModeCatalog(merged[key]);
+    if (merged[key] !== undefined) result[key] = merged[key];
   }
   for (const key of OBJECT_KEYS) {
     if (merged[key] !== undefined) {
@@ -367,6 +325,8 @@ function buildAgentContext(input = {}) {
   result.app_presence_state = presence.state;
   result.app_presence_recent = presence.recent;
   result.app_ready = presence.ready;
+  result.single_distraction_block = true;
+  result.protection_target = "selected_distractions";
   if (Object.keys(shared).length) result.user_context = shared;
   result.context_fingerprint = fingerprint({
     ...result,
@@ -378,7 +338,6 @@ function buildAgentContext(input = {}) {
 module.exports = {
   MEMORY_KEYS,
   buildAgentContext,
-  normalizeModeCatalog,
   normalizeAppPresence,
   deriveAppPresence,
   normalizeConversation,

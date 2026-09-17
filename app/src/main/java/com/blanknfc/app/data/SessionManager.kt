@@ -17,12 +17,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-data class BlankMode(
-    val id: String,
-    val name: String,
-    val packages: Set<String>
-)
-
 data class FocusStats(
     val sessionsThisWeek: Int = 0,
     val protectedMsThisWeek: Long = 0L,
@@ -62,12 +56,6 @@ class SessionManager(
     private val _blockedPackages = MutableStateFlow<Set<String>>(emptySet())
     val blockedPackages: StateFlow<Set<String>> = _blockedPackages.asStateFlow()
 
-    private val _modes = MutableStateFlow<List<BlankMode>>(defaultModes())
-    val modes: StateFlow<List<BlankMode>> = _modes.asStateFlow()
-
-    private val _currentModeId = MutableStateFlow(DEFAULT_MODE_ID)
-    val currentModeId: StateFlow<String> = _currentModeId.asStateFlow()
-
     private val _nfcTagUid = MutableStateFlow<String?>(null)
     val nfcTagUid: StateFlow<String?> = _nfcTagUid.asStateFlow()
 
@@ -102,14 +90,21 @@ class SessionManager(
             dataStore.data.collect { prefs ->
                 _isBlankActive.value = prefs[PrefsKeys.IS_BLANK_ACTIVE] ?: false
                 _blankActiveSince.value = prefs[PrefsKeys.BLANK_ACTIVE_SINCE] ?: 0L
-                val legacyPackages = prefs[PrefsKeys.BLOCKED_PACKAGES] ?: emptySet()
-                val parsedModes = ensurePresetModes(parseModes(prefs[PrefsKeys.FOCUS_MODES], legacyPackages))
-                val currentId = prefs[PrefsKeys.CURRENT_MODE_ID]
-                    ?.takeIf { id -> parsedModes.any { it.id == id } }
-                    ?: parsedModes.first().id
-                _modes.value = parsedModes
-                _currentModeId.value = currentId
-                _blockedPackages.value = parsedModes.first { it.id == currentId }.packages
+                val savedPackages = prefs[PrefsKeys.BLOCKED_PACKAGES] ?: emptySet()
+                val migratedPackages = if (savedPackages.isNotEmpty()) savedPackages else legacySelectedPackages(
+                    serialized = prefs[PrefsKeys.LEGACY_FOCUS_MODES],
+                    currentId = prefs[PrefsKeys.LEGACY_CURRENT_MODE_ID]
+                )
+                _blockedPackages.value = migratedPackages
+                if (prefs[PrefsKeys.LEGACY_FOCUS_MODES] != null || prefs[PrefsKeys.LEGACY_CURRENT_MODE_ID] != null) {
+                    scope.launch {
+                        dataStore.edit { stored ->
+                            stored[PrefsKeys.BLOCKED_PACKAGES] = migratedPackages
+                            stored.remove(PrefsKeys.LEGACY_FOCUS_MODES)
+                            stored.remove(PrefsKeys.LEGACY_CURRENT_MODE_ID)
+                        }
+                    }
+                }
                 _nfcTagUid.value = prefs[PrefsKeys.NFC_TAG_UID]
                 _setupComplete.value = prefs[PrefsKeys.SETUP_COMPLETE] ?: false
                 val currentWeekKey = currentWeekKey()
@@ -236,9 +231,6 @@ class SessionManager(
 
     fun setBlockedPackages(packages: Set<String>) {
         _blockedPackages.value = packages
-        _modes.value = _modes.value.map { mode ->
-            if (mode.id == _currentModeId.value) mode.copy(packages = packages) else mode
-        }
         analyticsTracker?.track(
             BlankEvent(
                 BlankEvents.BLOCKED_APPS_UPDATED,
@@ -248,112 +240,8 @@ class SessionManager(
         scope.launch {
             dataStore.edit { prefs ->
                 prefs[PrefsKeys.BLOCKED_PACKAGES] = packages
-                prefs[PrefsKeys.FOCUS_MODES] = serializeModes(_modes.value)
             }
         }
-    }
-
-    fun selectMode(modeId: String) {
-        val mode = _modes.value.firstOrNull { it.id == modeId } ?: return
-        _currentModeId.value = mode.id
-        _blockedPackages.value = mode.packages
-        scope.launch {
-            dataStore.edit { prefs ->
-                prefs[PrefsKeys.CURRENT_MODE_ID] = mode.id
-                prefs[PrefsKeys.BLOCKED_PACKAGES] = mode.packages
-            }
-        }
-    }
-
-    fun selectBestModeMatching(rawName: String): Boolean {
-        val target = normalizeModeName(rawName)
-        if (target.isBlank()) return false
-        val exact = _modes.value.firstOrNull { normalizeModeName(it.name) == target }
-        if (exact != null) {
-            selectMode(exact.id)
-            return true
-        }
-        val fuzzy = _modes.value.firstOrNull { mode ->
-            val normalized = normalizeModeName(mode.name)
-            normalized.contains(target) || target.contains(normalized)
-        }
-        if (fuzzy != null) {
-            selectMode(fuzzy.id)
-            return true
-        }
-        val aliases = listOf(
-            listOf("social", "redes", "instagram", "tiktok", "reels", "shorts") to listOf("social", "social media", "redes sociales"),
-            listOf("deep focus", "focus", "foco", "work", "trabajo") to listOf("deep focus", "focus", "work"),
-            listOf("study", "estudio", "exam", "examen") to listOf("study", "study mode"),
-            listOf("sleep", "night", "bedtime", "dormir", "noche") to listOf("sleep", "night", "bedtime")
-        )
-        aliases.forEach { (keys, names) ->
-            if (keys.any { target.contains(it) }) {
-                val match = _modes.value.firstOrNull { mode ->
-                    val normalized = normalizeModeName(mode.name)
-                    names.any { normalized.contains(it) || it.contains(normalized) }
-                }
-                if (match != null) {
-                    selectMode(match.id)
-                    return true
-                }
-            }
-        }
-        return false
-    }
-
-    fun createMode(name: String, packages: Set<String>) {
-        val cleanName = name.trim().ifBlank { "Mode" }
-        val mode = BlankMode(
-            id = "mode_${System.currentTimeMillis()}",
-            name = cleanName,
-            packages = packages
-        )
-        _modes.value = _modes.value + mode
-        selectMode(mode.id)
-        persistModes()
-    }
-
-    fun renameMode(modeId: String, name: String) {
-        val cleanName = name.trim()
-        if (cleanName.isBlank()) return
-        _modes.value = _modes.value.map { mode ->
-            if (mode.id == modeId) mode.copy(name = cleanName) else mode
-        }
-        persistModes()
-    }
-
-    fun updateModePackages(modeId: String, packages: Set<String>) {
-        _modes.value = _modes.value.map { mode ->
-            if (mode.id == modeId) mode.copy(packages = packages) else mode
-        }
-        if (_currentModeId.value == modeId) {
-            _blockedPackages.value = packages
-        }
-        analyticsTracker?.track(
-            BlankEvent(
-                BlankEvents.BLOCKED_APPS_UPDATED,
-                mapOf("blocked_app_count" to packages.size.toString())
-            )
-        )
-        scope.launch {
-            dataStore.edit { prefs ->
-                prefs[PrefsKeys.FOCUS_MODES] = serializeModes(_modes.value)
-                if (_currentModeId.value == modeId) {
-                    prefs[PrefsKeys.BLOCKED_PACKAGES] = packages
-                }
-            }
-        }
-    }
-
-    fun deleteMode(modeId: String) {
-        if (_modes.value.size <= 1) return
-        val updated = _modes.value.filterNot { it.id == modeId }
-        _modes.value = updated
-        if (_currentModeId.value == modeId) {
-            selectMode(updated.first().id)
-        }
-        persistModes()
     }
 
     fun setNfcTag(uid: String) {
@@ -505,16 +393,6 @@ class SessionManager(
         NOT_ACTIVE
     }
 
-    private fun persistModes() {
-        scope.launch {
-            dataStore.edit { prefs ->
-                prefs[PrefsKeys.FOCUS_MODES] = serializeModes(_modes.value)
-                prefs[PrefsKeys.CURRENT_MODE_ID] = _currentModeId.value
-                prefs[PrefsKeys.BLOCKED_PACKAGES] = _blockedPackages.value
-            }
-        }
-    }
-
     fun expireSchedule() {
         val schedule = _schedule.value
         if (!schedule.enabled && schedule.expiresAtMillis == null) return
@@ -529,40 +407,15 @@ class SessionManager(
         updateSchedule(schedule.copy(enabled = false, expiresAtMillis = null))
     }
 
-    private fun normalizeModeName(value: String): String {
-        return value
-            .trim()
-            .lowercase()
-            .replace("-", " ")
-            .replace("_", " ")
-            .replace(" mode", "")
-            .replace(" profile", "")
-            .split(Regex("\\s+"))
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
-    }
-
-    private fun parseModes(serialized: String?, legacyPackages: Set<String>): List<BlankMode> {
-        if (serialized.isNullOrBlank()) {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Routine", legacyPackages)) + presetModes()
+    private fun legacySelectedPackages(serialized: String?, currentId: String?): Set<String> {
+        if (serialized.isNullOrBlank()) return emptySet()
+        val selections = serialized.split(MODE_SEPARATOR).mapNotNull { raw ->
+            val parts = raw.split(FIELD_SEPARATOR)
+            if (parts.size < 3) null else parts[0] to parts[2].split(PACKAGE_SEPARATOR).filter { it.isNotBlank() }.toSet()
         }
-
-        val modes = serialized.split(MODE_SEPARATOR).mapNotNull { rawMode ->
-            val parts = rawMode.split(FIELD_SEPARATOR)
-            if (parts.size < 3) return@mapNotNull null
-            BlankMode(
-                id = parts[0],
-                name = decode(parts[1]).ifBlank { "Mode" },
-                packages = parts[2].split(PACKAGE_SEPARATOR).filter { it.isNotBlank() }.toSet()
-            )
-        }
-
-        return modes.ifEmpty { listOf(BlankMode(DEFAULT_MODE_ID, "Routine", legacyPackages)) }
-    }
-
-    private fun ensurePresetModes(modes: List<BlankMode>): List<BlankMode> {
-        val existingIds = modes.map { it.id }.toSet()
-        return modes + presetModes().filterNot { it.id in existingIds }
+        return selections.firstOrNull { it.first == currentId }?.second
+            ?: selections.firstOrNull { it.second.isNotEmpty() }?.second
+            ?: emptySet()
     }
 
     private fun recordSessionCompleted(savedStart: Long) {
@@ -652,51 +505,12 @@ class SessionManager(
         _emergencyUnlocksRemaining.value = MAX_EMERGENCY_UNLOCKS_PER_WEEK
     }
 
-    private fun serializeModes(modes: List<BlankMode>): String {
-        return modes.joinToString(MODE_SEPARATOR) { mode ->
-            listOf(
-                mode.id,
-                encode(mode.name),
-                mode.packages.joinToString(PACKAGE_SEPARATOR)
-            ).joinToString(FIELD_SEPARATOR)
-        }
-    }
-
-    private fun encode(value: String): String {
-        return value
-            .replace("%", "%25")
-            .replace("|", "%7C")
-            .replace(";", "%3B")
-            .replace(",", "%2C")
-    }
-
-    private fun decode(value: String): String {
-        return value
-            .replace("%2C", ",")
-            .replace("%3B", ";")
-            .replace("%7C", "|")
-            .replace("%25", "%")
-    }
-
     companion object {
-        private const val DEFAULT_MODE_ID = "daily"
-        private const val STUDY_MODE_ID = "study"
         private const val MINUTES_PER_DAY = 24 * 60
         private const val MAX_EMERGENCY_UNLOCKS_PER_WEEK = 3
         private const val MODE_SEPARATOR = ";"
         private const val FIELD_SEPARATOR = "|"
         private const val PACKAGE_SEPARATOR = ","
-
-        private fun defaultModes(): List<BlankMode> {
-            return listOf(BlankMode(DEFAULT_MODE_ID, "Routine", emptySet())) + presetModes()
-        }
-
-        private fun presetModes(): List<BlankMode> {
-            return listOf(
-                BlankMode(STUDY_MODE_ID, "Study", emptySet()),
-                BlankMode("sleep", "Sleep", emptySet())
-            )
-        }
 
         private fun currentWeekKey(): String {
             val calendar = Calendar.getInstance().apply {

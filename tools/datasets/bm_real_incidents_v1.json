@@ -20,7 +20,7 @@
       "assertions": [
         { "path": "turns.3.decision.slot", "op": "eq", "value": "recurrence" },
         { "path": "turns.3.actions", "op": "length", "value": 0 },
-        { "path": "turns.3.state.slots.confirmation", "op": "absent" }
+        { "path": "turns.3.state.slots.confirmation.value.status", "op": "eq", "value": "confirmed" }
       ]
     },
     {
@@ -37,9 +37,9 @@
         "app_presence_state": "recently_seen"
       },
       "assertions": [
-        { "path": "turns.1.decision.type", "op": "eq", "value": "ready" },
-        { "path": "turns.1.actions.0.type", "op": "eq", "value": "start_protection" },
-        { "path": "turns.1.actions.0.minutes", "op": "eq", "value": 5 }
+        { "path": "turns.0.decision.type", "op": "eq", "value": "ready" },
+        { "path": "turns.0.actions.0.type", "op": "eq", "value": "start_protection" },
+        { "path": "turns.0.actions.0.minutes", "op": "eq", "value": 5 }
       ]
     },
     {
@@ -56,16 +56,16 @@
         "app_presence_state": "recently_seen"
       },
       "assertions": [
-        { "path": "turns.2.decision.slot", "op": "eq", "value": "app_selection" },
-        { "path": "turns.2.actions.0.type", "op": "eq", "value": "open_app_picker" },
-        { "path": "turns.2.actions.0.minutes", "op": "eq", "value": 5 },
-        { "path": "turns.2.actions.0.hard_mode", "op": "eq", "value": false }
+        { "path": "turns.1.decision.slot", "op": "eq", "value": "app_selection" },
+        { "path": "turns.1.actions.0.type", "op": "eq", "value": "open_app_picker" },
+        { "path": "turns.1.actions.0.minutes", "op": "eq", "value": 5 },
+        { "path": "turns.1.actions.0.hard_mode", "op": "eq", "value": false }
       ]
     },
     {
-      "id": "physical-exact-saved-plan-must-create-copy",
+      "id": "physical-saved-selection-must-stay-canonical",
       "source": "physical_whatsapp",
-      "failure_class": "destructive_mode_reuse",
+      "failure_class": "canonical_selection_drift",
       "runner": "semantic",
       "prompts": ["Block Instagram now for 5 minutes", "Once", "Yes"],
       "context": {
@@ -73,44 +73,39 @@
         "screen_time_authorized": true,
         "has_selected_apps": true,
         "selected_app_names": [],
-        "available_mode_catalog": [
-          { "id": "mode-instagram", "name": "Instagram only", "app_names": [], "selection_count": 1, "has_selection": true }
-        ],
         "app_presence_state": "recently_seen"
       },
       "assertions": [
-        { "path": "turns.2.actions.0.type", "op": "eq", "value": "activate_mode" },
-        { "path": "turns.2.actions.0.source_mode_name", "op": "eq", "value": "Instagram only" },
-        { "path": "turns.2.actions.0.copy_mode", "op": "eq", "value": true },
-        { "path": "turns.2.actions.0.minutes", "op": "eq", "value": 5 },
-        { "path": "turns.2.actions.0.type", "op": "not_eq", "value": "open_app_picker" }
+        { "path": "turns.1.actions.0.type", "op": "eq", "value": "start_protection" },
+        { "path": "turns.1.actions.0.source_mode_name", "op": "absent" },
+        { "path": "turns.1.actions.0.copy_mode", "op": "absent" },
+        { "path": "turns.1.actions.0.minutes", "op": "eq", "value": 5 },
+        { "path": "turns.1.actions.0.type", "op": "not_eq", "value": "open_app_picker" }
       ]
     },
     {
-      "id": "physical-copy-fields-must-survive-channel-envelope",
+      "id": "physical-canonical-action-must-survive-channel-envelope",
       "source": "physical_whatsapp",
-      "failure_class": "cross_layer_contract_drift",
+      "failure_class": "canonical_action_contract_drift",
       "runner": "transport",
       "plan": {
         "message_text": "Open Blankmind to review and apply it.",
         "actions": [
           {
-            "type": "activate_mode",
-            "name": "Instagram only",
-            "source_mode_name": "Instagram only",
-            "copy_mode": true,
+            "type": "start_protection",
+            "name": null,
             "minutes": 5,
             "hard_mode": false
           }
         ]
       },
-      "app_names": ["Instagram"],
+      "app_names": [],
       "assertions": [
-        { "path": "delivered.type", "op": "eq", "value": "activate_mode" },
-        { "path": "delivered.source_mode_name", "op": "eq", "value": "Instagram only" },
-        { "path": "delivered.copy_mode", "op": "eq", "value": true },
+        { "path": "delivered.type", "op": "eq", "value": "start_protection" },
+        { "path": "delivered.source_mode_name", "op": "absent" },
+        { "path": "delivered.copy_mode", "op": "absent" },
         { "path": "delivered.minutes", "op": "eq", "value": 5 },
-        { "path": "delivered.app_names", "op": "eq", "value": ["Instagram"] }
+        { "path": "delivered.app_names", "op": "eq", "value": [] }
       ]
     },
     {

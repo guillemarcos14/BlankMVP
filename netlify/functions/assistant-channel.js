@@ -136,9 +136,7 @@ async function syncContext(body) {
   return json(200, {
     ok: true,
     synced: Boolean(normalizedContext),
-    available_mode_count: Array.isArray(normalizedContext?.available_mode_catalog)
-      ? normalizedContext.available_mode_catalog.length
-      : 0,
+    selection_count: Number(normalizedContext?.selection_count) || 0,
     attached_channel: connection?.channel || "",
   });
 }
@@ -164,7 +162,7 @@ async function registerDevicePush(body) {
 }
 
 const PENDING_ACTION_TYPES = new Set([
-  "start_protection", "activate_mode", "switch_mode", "apply_schedule", "set_daily_limit",
+  "start_protection", "apply_schedule", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
   "open_app_picker", "request_screen_time_permission",
 ]);
@@ -215,15 +213,14 @@ function pendingActionTransition(currentValue, requestedValue) {
 function normalizePendingAction(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const id = cleanText(value.id, 80);
-  const type = cleanText(value.type, 60);
+  const legacyType = cleanText(value.type, 60);
+  const type = legacyType === "activate_mode" ? "start_protection" : legacyType === "switch_mode" ? "open_app_picker" : legacyType;
   const expiresAt = Date.parse(value.expires_at || "");
   if (!id || !PENDING_ACTION_TYPES.has(type) || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
   const action = {
     id,
     type,
     name: cleanText(value.name, 80) || null,
-    source_mode_name: cleanText(value.source_mode_name, 80) || null,
-    copy_mode: value.copy_mode === true,
     minutes: Number.isInteger(value.minutes) ? Math.min(Math.max(value.minutes, 5), 240) : null,
     hard_mode: value.hard_mode === true,
     start_minute: Number.isInteger(value.start_minute) ? Math.min(Math.max(value.start_minute, 0), 1439) : null,
@@ -386,8 +383,8 @@ async function acknowledgePendingAction(body) {
     const spanish = String(memory.language || "").toLowerCase().startsWith("es");
     let message;
     if (status === "verified") {
-      const target = pending.app_names.length ? pending.app_names.join(", ") : (pending.source_mode_name || pending.name || "the requested apps");
-      if (["start_protection", "activate_mode"].includes(pending.type)) {
+      const target = pending.app_names.length ? pending.app_names.join(", ") : "the selected distractions";
+      if (pending.type === "start_protection") {
         message = spanish
           ? `${target} ${pending.minutes ? `está bloqueado durante ${pending.minutes} minutos` : "está bloqueado"}.`
           : `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;

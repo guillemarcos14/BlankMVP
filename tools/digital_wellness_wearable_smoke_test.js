@@ -38,6 +38,7 @@ async function resolvesWearableSourcesBeforePlanGeneration() {
     }
     if (target.includes("/rest/v1/bai_global_plan_patterns")) return response(200, []);
     if (target.includes("/rest/v1/bai_user_plan_preferences")) return response(200, []);
+    if (target.includes("/rest/v1/bai_user_plan_outcomes") && options.method === "GET") return response(200, []);
     if (target.includes("/rest/v1/bai_user_plan_outcomes") && options.method === "POST") {
       generatedOutcome = JSON.parse(options.body);
       return response(201, null);
@@ -84,6 +85,8 @@ async function resolvesWearableSourcesBeforePlanGeneration() {
   assert.ok(body.insight.experiment);
   assert.strictEqual(generatedOutcome.outcome, "generated");
   assert.strictEqual(generatedOutcome.recommendation_id, body.insight.recommendation_id);
+  assert.strictEqual(generatedOutcome.metadata.protection_target, "selected_distractions");
+  assert.strictEqual(body.insight.plan_intelligence.protection_target, "selected_distractions");
   assert.match(body.insight.plan_update.evidence, /Recovery context is low/i);
   assert.strictEqual(storedPayload.payload.resolved_wearable.source_map.recovery, "oura");
   assert.ok(storedPayload.payload.wearable_decision_context.flags.includes("low_recovery"));

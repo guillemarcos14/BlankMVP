@@ -27,6 +27,12 @@ They must share the same brain, tone, memory, context rules, and recommendation 
 
 The evaluation must penalize any behavior that makes web feel like a weaker or different assistant.
 
+## Single-Block Intelligence
+
+The existing intelligence architecture remains the source of truth: `bai_global_plan_patterns` provides cross-user evidence and `bai_user_plan_outcomes` provides personal evidence. All existing profile, timing, weekday, behavior, outcome, check-in and wearable/Health inputs remain unchanged.
+
+The single-block model changes only the recommendation target. Intelligence may optimize when and for how long protection runs, but every recommendation applies to `selected_distractions`; it never selects individual apps, creates modes or switches targets.
+
 ## Scope Rule
 
 Blanked only talks about digital wellness.

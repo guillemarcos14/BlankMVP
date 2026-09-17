@@ -18,6 +18,7 @@ keystore.properties
 
 # Generated deploy artifacts
 /web/*.zip
+/.next/
 
 # Local screenshot/debug dumps and generated test artifacts
 /blank-*.png

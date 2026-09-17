@@ -13,6 +13,7 @@ extension EnvironmentValues {
 
 enum BlankColors {
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
+    static let statusGreen = Color(red: 0.145, green: 0.580, blue: 0.285)
     static let redDark = Color(red: 0.125, green: 0.129, blue: 0.141)
     static let green = Color(red: 0.125, green: 0.129, blue: 0.141)
     static let background = Color(red: 0.914, green: 0.914, blue: 0.906)

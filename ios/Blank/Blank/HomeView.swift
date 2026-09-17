@@ -510,7 +510,6 @@ struct HomeView: View {
                 screenHeight: viewportHeight,
                 intervention: relapseIntervention,
                 onEmergencyUnlock: performEmergencyUnlock,
-                onTimedBlank: startTimedBlank,
                 onOpenSection: openSection,
                 onOpenAssistant: { showingAssistantConnect = true },
                 onRequestScreenTimePermission: {
@@ -2624,7 +2623,6 @@ struct HomeSectionScreen: View {
     var horizontalOffset: CGFloat = 0
     let intervention: RelapseIntervention
     let onEmergencyUnlock: () -> Bool
-    let onTimedBlank: (Int, Bool) -> Void
     let onOpenSection: (HomeSection) -> Void
     let onOpenAssistant: () -> Void
     let onRequestScreenTimePermission: () -> Void
@@ -2655,25 +2653,27 @@ struct HomeSectionScreen: View {
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
                 .offset(x: horizontalOffset, y: contentTop)
 
-            Button {
-                onClose()
-            } label: {
-                Group {
-                    if minimalAppearance {
-                        Text("back")
-                            .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
-                            .tracking(-0.3)
-                    } else {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 22, weight: .regular))
+            if section != .report {
+                Button {
+                    onClose()
+                } label: {
+                    Group {
+                        if minimalAppearance {
+                            Text("back")
+                                .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                                .tracking(-0.3)
+                        } else {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 22, weight: .regular))
+                        }
                     }
+                    .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
+                    .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
-                .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
-                .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .position(x: 64, y: 84)
             }
-            .buttonStyle(.plain)
-            .position(x: 64, y: 84)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -2691,7 +2691,7 @@ struct HomeSectionScreen: View {
                 onClose()
             }
         case .report:
-            ReportView(usesMainBackground: true)
+            ReportView(usesMainBackground: true, onClose: onClose)
         case .emergency:
             EmergencyScreen(
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
@@ -2699,7 +2699,7 @@ struct HomeSectionScreen: View {
                 onUnlock: onEmergencyUnlock
             )
         case .sessions:
-            SessionsScreen(onStartTimer: onTimedBlank)
+            SessionsScreen()
         case .settings:
             SettingsScreen(
                 onOpenEmergency: { onOpenSection(.emergency) },
@@ -3640,9 +3640,7 @@ private struct TechnicalSheetActions<Content: View>: View {
 private struct SessionsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
-    @State private var showingManualTimer = false
-
-    let onStartTimer: (Int, Bool) -> Void
+    @State private var showingManualMode = false
 
     private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
     private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
@@ -3677,12 +3675,20 @@ private struct SessionsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                TopSheetHeader(
-                    title: "Sessions",
-                    subtitle: activePlansSubtitle,
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("sessions")
+                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
+                        .tracking(-0.6)
+                        .foregroundStyle(textColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.86)
+
+                    Text(activePlansSubtitle)
+                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(secondaryColor)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 28)
 
                 if activePlans.isEmpty {
@@ -3695,7 +3701,7 @@ private struct SessionsScreen: View {
                     }
                 }
 
-                manualTimerButton
+                newModeButton
                     .padding(.top, activePlans.isEmpty ? 22 : 16)
 
                 Spacer(minLength: 24)
@@ -3706,13 +3712,10 @@ private struct SessionsScreen: View {
         }
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .sheet(isPresented: $showingManualTimer) {
-            TimerScreen { minutes, hardMode in
-                showingManualTimer = false
-                onStartTimer(minutes, hardMode)
-            }
-            .environment(\.blankMinimalAppearance, true)
-            .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showingManualMode) {
+            ManualModeEditorScreen()
+                .environment(\.blankMinimalAppearance, true)
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
     }
@@ -3744,10 +3747,15 @@ private struct SessionsScreen: View {
 
                 Spacer(minLength: 8)
 
-                Circle()
-                    .fill(textColor.opacity(0.78))
-                    .frame(width: 7, height: 7)
-                    .accessibilityHidden(true)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(BlankColors.statusGreen)
+                        .frame(width: 7, height: 7)
+
+                    Text("active")
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(BlankColors.statusGreen)
+                }
             }
 
             Text(blockedTargetsText)
@@ -3762,10 +3770,6 @@ private struct SessionsScreen: View {
                     .monospacedDigit()
 
                 Spacer(minLength: 8)
-
-                Text(plan.runsEveryDay ? "daily" : "scheduled")
-                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
             }
             .padding(.top, 20)
 
@@ -3776,11 +3780,11 @@ private struct SessionsScreen: View {
 
                     Text(weekdayLabels[index])
                         .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(isSelected ? textColor : secondaryColor.opacity(0.55))
+                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? Color.black : Color.white) : secondaryColor.opacity(0.55))
                         .frame(width: 27, height: 27)
                         .background {
                             Circle()
-                                .fill(isSelected ? textColor.opacity(0.12) : textColor.opacity(0.035))
+                                .fill(isSelected ? (sessionStore.isBlankActive ? Color.white : Color.black) : textColor.opacity(0.035))
                         }
                 }
             }
@@ -3794,22 +3798,22 @@ private struct SessionsScreen: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(planTitle(for: plan)), \(blockedTargetsText), \(formatMinute(plan.startMinute)) to \(formatMinute(plan.endMinute))"
+            "\(planTitle(for: plan)), active, \(blockedTargetsText), \(formatMinute(plan.startMinute)) to \(formatMinute(plan.endMinute))"
         )
     }
 
-    private var manualTimerButton: some View {
+    private var newModeButton: some View {
         Button {
-            showingManualTimer = true
+            showingManualMode = true
         } label: {
             HStack(spacing: 12) {
-                Text("manual timer")
+                Text("new mode")
                     .font(.blankInter(size: 19, weight: .bold, relativeTo: .headline))
                     .tracking(-0.25)
 
                 Spacer(minLength: 8)
 
-                Text("one-off block")
+                Text("custom schedule")
                     .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                     .foregroundStyle(secondaryColor)
 
@@ -3824,7 +3828,7 @@ private struct SessionsScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Create a manual timer")
+        .accessibilityLabel("Create a new mode with a custom schedule")
     }
 
     private func planTitle(for plan: BlankHabitWindow) -> String {
@@ -3833,6 +3837,187 @@ private struct SessionsScreen: View {
             return sessionStore.currentMode.name.lowercased()
         }
         return normalizedName.lowercased()
+    }
+}
+
+private struct ManualModeEditorScreen: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var modeName = ""
+    @State private var selection = FamilyActivitySelection()
+    @State private var showingPicker = false
+    @State private var startMinute = 13 * 60
+    @State private var endMinute = 14 * 60
+    @State private var selectedWeekdays = Set(1...7)
+    @State private var repeatsWeekly = true
+
+    private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
+    private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
+
+    private var textColor: Color {
+        sessionStore.isBlankActive ? Color.white : BlankColors.minimalInk
+    }
+
+    private var secondaryColor: Color {
+        sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.minimalSecondary
+    }
+
+    private var canSave: Bool {
+        !modeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && selection.blankedSelectionCount > 0
+            && startMinute != endMinute
+            && (!repeatsWeekly || !selectedWeekdays.isEmpty)
+    }
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                TopSheetHeader(
+                    title: "New mode",
+                    subtitle: "Choose apps, timing and repetition.",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 28)
+
+                TextField("mode name", text: $modeName)
+                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    .foregroundStyle(textColor)
+                    .padding(.horizontal, 18)
+                    .frame(height: 54)
+                    .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
+
+                configurationRow(title: "apps", value: appsSummary) {
+                    showingPicker = true
+                }
+                .padding(.top, 12)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("schedule")
+                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(secondaryColor)
+                        .textCase(.uppercase)
+
+                    HStack(spacing: 10) {
+                        TimeMenuRow(title: "starts", minute: $startMinute, textColor: textColor)
+                        TimeMenuRow(title: "ends", minute: $endMinute, textColor: textColor)
+                    }
+
+                    Text("days")
+                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                        .foregroundStyle(textColor)
+                        .padding(.top, 6)
+
+                    HStack(spacing: 6) {
+                        ForEach(0..<weekdayOrder.count, id: \.self) { index in
+                            let weekday = weekdayOrder[index]
+                            dayButton(weekday: weekday, label: weekdayLabels[index])
+                        }
+                    }
+                }
+                .padding(.top, 24)
+
+                Toggle("repeat weekly", isOn: $repeatsWeekly)
+                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                    .foregroundStyle(textColor)
+                    .tint(BlankColors.statusGreen)
+                    .padding(.horizontal, 18)
+                    .frame(height: 54)
+                    .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
+                    .padding(.top, 14)
+
+                if !repeatsWeekly {
+                    Text("The mode will be saved without a recurring schedule.")
+                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(secondaryColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                }
+
+                Button {
+                    saveMode()
+                } label: {
+                    TopSheetPrimaryButtonLabel(title: "Create mode")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+                .opacity(canSave ? 1 : 0.45)
+                .padding(.top, 24)
+                .padding(.bottom, 32)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+        }
+        .background(Color.clear)
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .familyActivityPicker(isPresented: $showingPicker, selection: $selection)
+    }
+
+    private var appsSummary: String {
+        let count = selection.blankedSelectionCount
+        return count == 0 ? "choose apps" : "\(count) selected"
+    }
+
+    private func configurationRow(title: String, value: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
+                    .foregroundStyle(textColor)
+                Spacer()
+                Text(value)
+                    .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                    .foregroundStyle(secondaryColor)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(secondaryColor)
+            }
+            .padding(.horizontal, 18)
+            .frame(height: 54)
+            .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func dayButton(weekday: Int, label: String) -> some View {
+        let isSelected = selectedWeekdays.contains(weekday)
+        let selectedFill = sessionStore.isBlankActive ? Color.white : Color.black
+        let selectedText = sessionStore.isBlankActive ? Color.black : Color.white
+
+        return Button {
+            guard repeatsWeekly else { return }
+            if isSelected {
+                guard selectedWeekdays.count > 1 else { return }
+                selectedWeekdays.remove(weekday)
+            } else {
+                selectedWeekdays.insert(weekday)
+            }
+        } label: {
+            Text(label)
+                .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(isSelected && repeatsWeekly ? selectedText : secondaryColor)
+                .frame(width: 30, height: 30)
+                .background {
+                    Circle()
+                        .fill(isSelected && repeatsWeekly ? selectedFill : textColor.opacity(0.06))
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(!repeatsWeekly)
+        .opacity(repeatsWeekly ? 1 : 0.45)
+    }
+
+    private func saveMode() {
+        sessionStore.saveManualMode(
+            named: modeName,
+            selection: selection,
+            startMinute: startMinute,
+            endMinute: endMinute,
+            weekdays: Array(selectedWeekdays).sorted(),
+            repeatsWeekly: repeatsWeekly
+        )
+        dismiss()
     }
 }
 

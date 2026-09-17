@@ -799,6 +799,51 @@ final class SessionStore: ObservableObject {
         self.selection = selection
     }
 
+    func saveManualMode(
+        named name: String,
+        selection: FamilyActivitySelection,
+        startMinute: Int,
+        endMinute: Int,
+        weekdays: [Int],
+        repeatsWeekly: Bool
+    ) {
+        createOrUpdateMode(named: name, selection: selection)
+
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedName = cleanName.isEmpty ? currentMode.name : cleanName
+        var windows = schedule.windows.filter {
+            $0.name.caseInsensitiveCompare(savedName) != .orderedSame
+        }
+
+        if repeatsWeekly {
+            windows.append(
+                BlankHabitWindow(
+                    name: savedName,
+                    enabled: true,
+                    startMinute: startMinute,
+                    endMinute: endMinute,
+                    weekdays: weekdays
+                )
+            )
+        }
+
+        let first = windows.first ?? BlankHabitWindow(
+            name: savedName,
+            enabled: false,
+            startMinute: startMinute,
+            endMinute: endMinute,
+            weekdays: weekdays
+        )
+        schedule = BlankFocusSchedule(
+            enabled: windows.contains(where: \.enabled),
+            startMinute: first.startMinute,
+            endMinute: first.endMinute,
+            windows: windows
+        )
+        adaptiveScheduleExpiresAt = nil
+        schedulePausedUntil = nil
+    }
+
     func applyOnboardingPlan(modeName: String, startHour: Int) {
         let cleanName = modeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let planModeName = cleanName.isEmpty ? "My Plan" : cleanName

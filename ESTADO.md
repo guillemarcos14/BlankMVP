@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-16
+Ultima actualizacion: 2026-09-17
 
 ## Resumen actual
+- 2026-09-17: Implementada la revisión aprobada de `Sessions` en `codex/conversational-agentic-blanked`: cabecera alineada a la izquierda, estado `active` verde, días activos en negro/blanco, eliminación de `daily` y creación manual de modos con apps, horario, días y repetición semanal. Harness `31/31` y `git diff --check` en verde; falta build/revisión visual iOS.
 - 2026-09-16: Implementado el transporte BM WhatsApp→app sin enlaces largos. WhatsApp guarda propuestas confirmadas en una bandeja pendiente; iOS las consulta y conserva la confirmación nativa antes de aplicar. Commit `eca89c4`, Netlify `getblank` deploy `6aaa4e0958b7deec27e448b5`. Product harness `25/25`, release gate automatizado `16/16`; falta compilar/distribuir la build iOS para la prueba física.
 - 2026-09-16: Corrección BM integrada y publicada en Netlify `getblank` desde `29cf543`, deploy `6aaa44e8a1ae618cfcda5c6d`. Producción verificada con corrección 3→7 días, `Yea` y `It’s already opened`: enlace `apply_schedule` conservado como revisión (`review_only_actions: true`), sin ejecución automática y sin prompt repetido. Product harness `25/25`, core `84/84`, release gate automatizado `16/16`; Supabase sin cambios.
 - 2026-09-16: La confirmación conversacional acepta también `Yeah`, `Yea` y `Yep`, cubriendo la variante observada en WhatsApp. Validado en el core y en product harness `25/25` antes del despliegue.
@@ -15,6 +16,7 @@ Ultima actualizacion: 2026-09-16
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-17: `Sessions` actualizado en `HomeView.swift`, `SessionStore.swift` y `BlankColors.swift`. Se retiró el flujo de `manual timer` de esta pantalla y se añadió `ManualModeEditorScreen` con selector nativo de apps, horario, días, repetición semanal y persistencia del modo/plan. Validado con product harness `31/31` y `git diff --check`. La compilación iOS queda pendiente porque este entorno Windows no tiene `xcodebuild` y no hay una sesión MacinCloud abierta.
 - 2026-09-16: `assistant` retirado de la Home y conservado dentro de `settings`, con el callback existente para abrir WhatsApp/SMS/código. Commit `fc78def`; product harness `31/31`, detector Impeccable `[]`, `git diff --check` y build MacinCloud `** BUILD SUCCEEDED **`.
 - 2026-09-16: Corregida la verificación remota de Progress: el primer build usaba `ce50633`, anterior al cambio local. El commit `61e5944` se subió a `codex/conversational-agentic-blanked`, MacinCloud lo actualizó y `xcodebuild` terminó con `** BUILD SUCCEEDED **`; la app se instaló y abrió en Simulator iPhone 17 Pro Max, iOS `26.3`. La home visible confirma `blank / sessions / progress / settings`; el estado dark mantiene `menu` y `unblank`.
 - 2026-09-16: En MacinCloud FF368, el checkout `codex/conversational-agentic-blanked` quedó actualizado (`git pull --ff-only`, ya estaba al día) y `xcodebuild -project Blank.xcodeproj -sdk iphonesimulator -configuration debug build` terminó con `** BUILD SUCCEEDED **`. Quedó abierto Simulator en `iPhone 17`, iOS `26.3`.
@@ -385,6 +387,7 @@ Ultima actualizacion: 2026-09-16
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- La revisión de `Sessions` está implementada localmente en `codex/conversational-agentic-blanked`; falta compilarla y revisar la captura en Simulator/MacinCloud.
 - La ultima modificacion iOS esta en `SetupView.swift`: copy del paso 3 sin `NFC` visible y paso 1 confirmado con el estilo compartido actualizado.
 - MacinCloud compila correctamente por Terminal el commit `90623ac`, que incluye el ajuste de copy de onboarding; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
 - `Stats` y `Habits` abren correctamente desde la top bar en sheet medio tras quitar el `ZStack` exterior y dejar la `List` como raiz directa, igual que `Mode`.
@@ -509,6 +512,7 @@ Ultima actualizacion: 2026-09-16
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- En MacinCloud, actualizar `codex/conversational-agentic-blanked`, compilar `Blank` y revisar visualmente `Sessions` y el flujo `new mode`/selector de apps.
 - Configurar env vars OAuth por proveedor antes de probar conexiones directas: Oura, WHOOP, Fitbit/Google Health y Withings.
 - Configurar env vars OAuth wearable en Netlify antes de probar conexiones directas.
 - Compilar iOS en MacinCloud y probar en iPhone real con Apple Health/Apple Watch.

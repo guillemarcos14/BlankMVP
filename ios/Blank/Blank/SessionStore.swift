@@ -844,6 +844,28 @@ final class SessionStore: ObservableObject {
         schedulePausedUntil = nil
     }
 
+    func deleteScheduleWindow(_ windowId: UUID) {
+        let wasActiveSchedule = isBlankActive && activeSessionStartedBySchedule
+        let remainingWindows = schedule.windows.filter { $0.id != windowId }
+        let first = remainingWindows.first
+
+        schedule = BlankFocusSchedule(
+            enabled: remainingWindows.contains(where: \.enabled),
+            startMinute: first?.startMinute ?? schedule.startMinute,
+            endMinute: first?.endMinute ?? schedule.endMinute,
+            windows: remainingWindows
+        )
+
+        if remainingWindows.isEmpty {
+            schedulePausedUntil = nil
+            adaptiveScheduleExpiresAt = nil
+        }
+
+        if wasActiveSchedule {
+            applyScheduleWindow()
+        }
+    }
+
     func applyOnboardingPlan(modeName: String, startHour: Int) {
         let cleanName = modeName.trimmingCharacters(in: .whitespacesAndNewlines)
         let planModeName = cleanName.isEmpty ? "My Plan" : cleanName

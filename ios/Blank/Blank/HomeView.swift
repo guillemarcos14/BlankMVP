@@ -2173,6 +2173,7 @@ struct AppBackground: View {
 private struct ModesList: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
     @State private var newModeName = ""
@@ -2252,7 +2253,7 @@ private struct ModesList: View {
             VStack(alignment: .leading, spacing: 0) {
                 TopSheetHeader(
                     title: "Plan",
-                    subtitle: "",
+                    subtitle: "Protection, routines and safeguards.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -2286,7 +2287,7 @@ private struct ModesList: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, sectionHorizontalPadding)
     }
 
     private var newLookRule: some View {
@@ -2792,7 +2793,8 @@ struct HomeSectionScreen: View {
     var body: some View {
         let contentTop: CGFloat = 94
         let contentHeight = max(0, screenHeight - contentTop)
-        let contentWidth = min(max(0, screenWidth - 32), 360)
+        let sectionHorizontalPadding = min(max(screenWidth * 0.075, 28), 36)
+        let contentWidth = screenWidth
         let minimalAppearance = true
 
         ZStack(alignment: .topLeading) {
@@ -2806,6 +2808,7 @@ struct HomeSectionScreen: View {
 
             routeContent
                 .environment(\.blankMinimalAppearance, minimalAppearance)
+                .environment(\.blankSectionHorizontalPadding, sectionHorizontalPadding)
                 .frame(width: contentWidth, height: contentHeight, alignment: .top)
                 .frame(width: screenWidth, height: contentHeight, alignment: .top)
                 .offset(x: horizontalOffset, y: contentTop)
@@ -2872,6 +2875,7 @@ struct HomeSectionScreen: View {
 
 private struct SettingsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
 
     let onOpenEmergency: () -> Void
     let onOpenAssistant: () -> Void
@@ -2886,11 +2890,13 @@ private struct SettingsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                Text("settings")
-                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                    .tracking(-0.6)
-                    .foregroundStyle(textColor)
-                    .padding(.bottom, 18)
+                TopSheetHeader(
+                    title: "settings",
+                    subtitle: "access, support and preferences.",
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 28)
 
                 settingsRow(
                     title: "emergency",
@@ -2918,7 +2924,7 @@ private struct SettingsScreen: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, sectionHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -2952,6 +2958,7 @@ private struct SettingsScreen: View {
 private struct ScheduleEditorContent: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     let onSave: () -> Void
     @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
@@ -3021,7 +3028,7 @@ private struct ScheduleEditorContent: View {
                 .padding(.top, 6)
             }
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, sectionHorizontalPadding)
             .padding(.top, 24)
             .padding(.bottom, 34)
             .listRowInsets(EdgeInsets())
@@ -3576,6 +3583,7 @@ private struct RelapseReasonButtonStyle: ButtonStyle {
 private struct EmergencyScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     let emergencyUnlocksRemaining: Int
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
@@ -3645,7 +3653,7 @@ private struct EmergencyScreen: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, sectionHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3797,6 +3805,7 @@ private struct TechnicalSheetActions<Content: View>: View {
 private struct SessionsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     @State private var showingManualMode = false
 
     private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
@@ -3832,20 +3841,12 @@ private struct SessionsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("sessions")
-                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                        .tracking(-0.6)
-                        .foregroundStyle(textColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.86)
-
-                    Text(activePlansSubtitle)
-                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(secondaryColor)
-                        .multilineTextAlignment(.leading)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                TopSheetHeader(
+                    title: "sessions",
+                    subtitle: activePlansSubtitle,
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
                 .padding(.bottom, 28)
 
                 if activePlans.isEmpty {
@@ -3863,17 +3864,15 @@ private struct SessionsScreen: View {
 
                 Spacer(minLength: 24)
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, sectionHorizontalPadding)
             .padding(.top, 12)
             .padding(.bottom, 24)
         }
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .sheet(isPresented: $showingManualMode) {
+        .fullScreenCover(isPresented: $showingManualMode) {
             ManualModeEditorScreen()
                 .environment(\.blankMinimalAppearance, true)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -3913,6 +3912,21 @@ private struct SessionsScreen: View {
                         .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                         .foregroundStyle(BlankColors.statusGreen)
                 }
+
+                Menu {
+                    Button(role: .destructive) {
+                        sessionStore.deleteScheduleWindow(plan.id)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(secondaryColor)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .accessibilityLabel("More options")
             }
 
             Text(blockedTargetsText)
@@ -3953,10 +3967,7 @@ private struct SessionsScreen: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(cardSurface)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(planTitle(for: plan)), active, \(blockedTargetsText), \(formatMinute(plan.startMinute)) to \(formatMinute(plan.endMinute))"
-        )
+        .accessibilityElement(children: .contain)
     }
 
     private var newModeButton: some View {
@@ -4000,6 +4011,7 @@ private struct SessionsScreen: View {
 private struct ManualModeEditorScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     @State private var modeName = ""
     @State private var selection = FamilyActivitySelection()
     @State private var showingPicker = false
@@ -4026,89 +4038,185 @@ private struct ManualModeEditorScreen: View {
             && (!repeatsWeekly || !selectedWeekdays.isEmpty)
     }
 
+    private var surfaceColor: Color {
+        sessionStore.isBlankActive ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface
+    }
+
+    private var fieldFill: Color {
+        sessionStore.isBlankActive ? Color.white.opacity(0.08) : BlankColors.minimalBackground
+    }
+
+    private var fieldBorder: Color {
+        sessionStore.isBlankActive ? Color.white.opacity(0.16) : BlankColors.minimalInk.opacity(0.10)
+    }
+
+    private var primaryButtonFill: Color {
+        sessionStore.isBlankActive ? Color.white : Color.black
+    }
+
+    private var primaryButtonText: Color {
+        sessionStore.isBlankActive ? Color.black : Color.white
+    }
+
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                TopSheetHeader(
-                    title: "New mode",
-                    subtitle: "Choose apps, timing and repetition.",
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
-                .padding(.bottom, 28)
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("back")
+                            .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                            .tracking(-0.3)
+                            .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : BlankColors.premiumBlue)
+                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
 
-                TextField("mode name", text: $modeName)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                    Spacer()
+                }
+                .padding(.bottom, 22)
+
+                Text("new mode")
+                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
+                    .tracking(-0.6)
                     .foregroundStyle(textColor)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
 
-                configurationRow(title: "apps", value: appsSummary) {
-                    showingPicker = true
+                Text("Choose apps, timing and repetition.")
+                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(secondaryColor)
+                    .padding(.top, 5)
+                    .padding(.bottom, 24)
+
+                sectionCard(title: "mode details") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("name")
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                            .foregroundStyle(secondaryColor)
+
+                        TextField("e.g. deep focus", text: $modeName)
+                            .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                            .foregroundStyle(textColor)
+                            .textInputAutocapitalization(.sentences)
+                            .padding(.horizontal, 14)
+                            .frame(height: 50)
+                            .background {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(fieldFill)
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(fieldBorder, lineWidth: 1)
+                                    }
+                            }
+                    }
+                }
+
+                sectionCard(title: "protected apps") {
+                    configurationRow(title: "apps", value: appsSummary) {
+                        showingPicker = true
+                    }
                 }
                 .padding(.top, 12)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("schedule")
-                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(secondaryColor)
-                        .textCase(.uppercase)
+                sectionCard(title: "schedule") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("time")
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                            .foregroundStyle(secondaryColor)
 
-                    HStack(spacing: 10) {
-                        TimeMenuRow(title: "starts", minute: $startMinute, textColor: textColor)
-                        TimeMenuRow(title: "ends", minute: $endMinute, textColor: textColor)
-                    }
+                        HStack(spacing: 10) {
+                            TimeMenuRow(title: "starts", minute: $startMinute, textColor: textColor)
+                            TimeMenuRow(title: "ends", minute: $endMinute, textColor: textColor)
+                        }
 
-                    Text("days")
-                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(textColor)
-                        .padding(.top, 6)
+                        Text("days")
+                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                            .foregroundStyle(secondaryColor)
+                            .padding(.top, 4)
 
-                    HStack(spacing: 6) {
-                        ForEach(0..<weekdayOrder.count, id: \.self) { index in
-                            let weekday = weekdayOrder[index]
-                            dayButton(weekday: weekday, label: weekdayLabels[index])
+                        HStack(spacing: 6) {
+                            ForEach(0..<weekdayOrder.count, id: \.self) { index in
+                                let weekday = weekdayOrder[index]
+                                dayButton(weekday: weekday, label: weekdayLabels[index])
+                            }
+                        }
+
+                        Toggle("repeat weekly", isOn: $repeatsWeekly)
+                            .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
+                            .foregroundStyle(textColor)
+                            .tint(BlankColors.statusGreen)
+                            .padding(.horizontal, 14)
+                            .frame(height: 50)
+                            .background {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(fieldFill)
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(fieldBorder, lineWidth: 1)
+                                    }
+                            }
+
+                        if !repeatsWeekly {
+                            Text("The mode will be saved without a recurring schedule.")
+                                .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                                .foregroundStyle(secondaryColor)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
                 }
-                .padding(.top, 24)
-
-                Toggle("repeat weekly", isOn: $repeatsWeekly)
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(textColor)
-                    .tint(BlankColors.statusGreen)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
-                    .padding(.top, 14)
-
-                if !repeatsWeekly {
-                    Text("The mode will be saved without a recurring schedule.")
-                        .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(secondaryColor)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 8)
-                }
+                .padding(.top, 12)
 
                 Button {
                     saveMode()
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Create mode")
+                    Text("Create mode")
+                        .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
+                        .foregroundStyle(canSave ? primaryButtonText : secondaryColor)
                         .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(canSave ? primaryButtonFill : textColor.opacity(0.08))
+                        }
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSave)
-                .opacity(canSave ? 1 : 0.45)
-                .padding(.top, 24)
+                .padding(.top, 18)
                 .padding(.bottom, 32)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
+            .padding(.horizontal, sectionHorizontalPadding)
+            .padding(.top, 16)
         }
-        .background(Color.clear)
+        .background {
+            (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+                .ignoresSafeArea()
+        }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
         .familyActivityPicker(isPresented: $showingPicker, selection: $selection)
+    }
+
+    private func sectionCard<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
+                .foregroundStyle(secondaryColor)
+                .textCase(.uppercase)
+
+            content()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(surfaceColor)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(fieldBorder, lineWidth: 1)
+                }
+        }
     }
 
     private var appsSummary: String {
@@ -4131,8 +4239,15 @@ private struct ManualModeEditorScreen: View {
                     .foregroundStyle(secondaryColor)
             }
             .padding(.horizontal, 18)
-            .frame(height: 54)
-            .blankControlSurface(cornerRadius: 18, tintOpacity: 0.08)
+            .frame(height: 50)
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(fieldFill)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(fieldBorder, lineWidth: 1)
+                    }
+            }
         }
         .buttonStyle(.plain)
     }
@@ -4181,6 +4296,7 @@ private struct ManualModeEditorScreen: View {
 private struct TimerScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     @State private var hardMode = false
     @State private var selectedMinutes = 30
     let onStart: (Int, Bool) -> Void
@@ -4288,7 +4404,7 @@ private struct TimerScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             TopSheetHeader(
                 title: "Timer",
-                subtitle: "",
+                subtitle: "Choose a focused block.",
                 titleColor: textColor,
                 subtitleColor: secondaryColor
             )
@@ -4359,7 +4475,7 @@ private struct TimerScreen: View {
             .disabled(sessionStore.isBlankActive)
             .opacity(sessionStore.isBlankActive ? 0.52 : 1)
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, sectionHorizontalPadding)
         .padding(.top, 12)
         .padding(.bottom, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

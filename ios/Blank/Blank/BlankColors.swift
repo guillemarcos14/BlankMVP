@@ -4,10 +4,19 @@ private struct BlankMinimalAppearanceKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+private struct BlankSectionHorizontalPaddingKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 24
+}
+
 extension EnvironmentValues {
     var blankMinimalAppearance: Bool {
         get { self[BlankMinimalAppearanceKey.self] }
         set { self[BlankMinimalAppearanceKey.self] = newValue }
+    }
+
+    var blankSectionHorizontalPadding: CGFloat {
+        get { self[BlankSectionHorizontalPaddingKey.self] }
+        set { self[BlankSectionHorizontalPaddingKey.self] = newValue }
     }
 }
 

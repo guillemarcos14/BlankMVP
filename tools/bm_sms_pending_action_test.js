@@ -24,6 +24,11 @@ assert.deepStrictEqual(directConnection, {
   channelUser: "whatsapp:+34000000000",
   connectCode: "ABC123",
 }, "An existing channel connection must remain usable even when phone identity lookup has no row");
+assert.match(
+  channel.assistantConnectionPath("ABC123"),
+  /payload->properties->>channel_user=not\.is\.null/,
+  "Connection lookup must exclude context-only events before applying its row limit"
+);
 
 function reset() {
   memory = {

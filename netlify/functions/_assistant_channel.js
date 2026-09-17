@@ -146,7 +146,7 @@ async function findAssistantConnection(connectCode, preferredChannel = "") {
   const normalizedCode = normalizeConnectCode(connectCode);
   if (!normalizedCode) return null;
   const rows = await supabaseFetch(
-    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantUserId(normalizedCode))}&select=*&order=submitted_at.desc&limit=20`,
+    assistantConnectionPath(normalizedCode),
     { method: "GET" }
   );
   const preferred = cleanChannel(preferredChannel);
@@ -162,6 +162,13 @@ async function findAssistantConnection(connectCode, preferredChannel = "") {
   const channel = cleanChannel(match.channel) || cleanChannel(match.preferred_channel) || preferred;
   const channelUser = cleanText(match.channel_user, 120);
   return channel && channelUser ? { channel, channelUser, connectCode: normalizedCode } : null;
+}
+
+function assistantConnectionPath(connectCode) {
+  const normalizedCode = normalizeConnectCode(connectCode);
+  return `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantUserId(normalizedCode))}`
+    + "&payload->properties->>channel_user=not.is.null"
+    + "&select=*&order=submitted_at.desc&limit=20";
 }
 
 function connectionForChannelUser(rows, channel, channelUser) {
@@ -621,6 +628,7 @@ module.exports = {
   claimAssistantInboundMessage,
   completeAssistantInboundMessage,
   releaseAssistantInboundMessage,
+  assistantConnectionPath,
   findAssistantConnection,
   findAssistantConnectionForChannelUser,
   connectionForChannelUser,

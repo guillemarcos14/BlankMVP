@@ -109,6 +109,7 @@ async function persistGeneratedOutcome(
     metadata: {
       generated_key: id,
       source: "digital_wellness_features_edge",
+      protection_target: "selected_distractions",
       risk_score: insight.behavior_forecast?.risk_score || null,
       forecast_window: insight.behavior_forecast?.window || null,
       experiment: insight.experiment?.name || null,
@@ -185,7 +186,7 @@ function buildInsight(payload: Record<string, any>) {
 
   const weakWindow = weekly.worst_focus_window || hourWindow(weekly.weakest_hour);
   if (weakWindow) {
-    recommendations.push(`Protect ${weakWindow} before opening high-friction apps.`);
+    recommendations.push(`Start the selected-distractions block before the ${weakWindow} risk window.`);
   }
 
   if ((weekly.plan_adherence_percent || 0) < 60) {
@@ -198,8 +199,8 @@ function buildInsight(payload: Record<string, any>) {
     recommendations.push("Use a lighter block after short sleep instead of relying on willpower.");
   }
 
-  if ((weekly.selection_count || 0) < 3) {
-    recommendations.push("Add at least three distracting apps or categories to improve protection.");
+  if ((weekly.selection_count || 0) < 1) {
+    recommendations.push("Choose your distractions once so BM can optimize when that single block should run.");
   }
 
   const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
@@ -272,7 +273,7 @@ function buildExperiment(payload: Record<string, any>) {
   return {
     name: "Stable Repeat",
     hypothesis: "Repeating the same window creates a cleaner baseline before increasing difficulty.",
-    variant: "same_window_same_apps",
+    variant: "same_window_selected_distractions",
     success_metric: "Three completed sessions with no relapse.",
   };
 }
@@ -485,7 +486,7 @@ async function buildModelInsight(payload: Record<string, any>, fallback: Record<
         {
           role: "system",
           content:
-            "You generate concise digital wellness insights for Blanked. Use only the aggregated features provided, including pickup pressure, app-category chains, check-ins, outcomes, Health/wearable signals, and baseline timing. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely digital risk window. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive daily blocking window. Return practical, specific, non-alarming English.",
+            "You generate concise digital wellness insights for Blanked. The user has one fixed block called selected_distractions. Never choose individual apps, create or name modes, switch targets, or propose allow-lists. Use only the aggregated features provided, including pickup pressure, behavior chains, weekday and time patterns, outcomes, check-ins, Health/wearable signals, and baseline timing. You may optimize only when the selected-distractions block starts, ends, repeats, or how long the experiment runs. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely digital risk window. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive window for selected_distractions. Return practical, specific, non-alarming English.",
         },
         {
           role: "user",
@@ -554,6 +555,7 @@ serve(async (request) => {
     const insightWithoutId = {
       ...modelResult.insight,
       source: modelResult.source,
+      protection_target: "selected_distractions",
     };
     const generatedRecommendationId = await recommendationId(anonymousUserId, payload, insightWithoutId);
     const insight = { ...insightWithoutId, recommendation_id: generatedRecommendationId };

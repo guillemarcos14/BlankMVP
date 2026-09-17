@@ -1,4 +1,6 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 
 process.env.SUPABASE_URL = "https://blank-test.supabase.co";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -90,6 +92,10 @@ async function resolvesWearableSourcesBeforePlanGeneration() {
   assert.match(body.insight.plan_update.evidence, /Recovery context is low/i);
   assert.strictEqual(storedPayload.payload.resolved_wearable.source_map.recovery, "oura");
   assert.ok(storedPayload.payload.wearable_decision_context.flags.includes("low_recovery"));
+
+  const edgeSource = fs.readFileSync(path.join(__dirname, "../supabase/functions/digital-wellness-features/index.ts"), "utf8");
+  assert.match(edgeSource, /protection_target:\s*"selected_distractions"/);
+  assert.match(edgeSource, /Never choose individual apps, create or name modes/);
 }
 
 (async () => {

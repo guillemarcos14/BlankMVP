@@ -19,7 +19,8 @@
     "web/landing/**",
     "Blank Brain/**",
     ".github/**",
-    "supabase/migrations/**"
+    "supabase/migrations/**",
+    "supabase/functions/**"
   ],
   "acceptance": [
     "El cambio tiene contexto mínimo de Blank Brain y del proceso de desarrollo.",

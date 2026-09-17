@@ -7,6 +7,7 @@ struct ReportView: View {
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     var usesMainBackground = false
+    var onClose: (() -> Void)? = nil
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var selectedHeroPage = 0
     @State private var isSubmittingWellnessFeatures = false
@@ -243,13 +244,13 @@ struct ReportView: View {
 
                 HStack(alignment: .top, spacing: 12) {
                     newLookMetricCard(
-                        label: "THIS WEEK",
+                        label: "this week",
                         value: formatDuration(weekly.totalFocusTime),
                         detail: weekly.completedSessionCount == 1 ? "1 session" : "\(weekly.completedSessionCount) sessions"
                     )
 
                     newLookMetricCard(
-                        label: "SESSIONS",
+                        label: "sessions",
                         value: "\(weekly.completedSessionCount)",
                         detail: "\(formatDuration(weekly.averageSessionDuration)) average"
                     )
@@ -283,14 +284,30 @@ struct ReportView: View {
                     Button {
                         startBlank()
                     } label: {
-                        Text("start blank")
-                            .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
-                            .tracking(-0.6)
-                            .foregroundStyle(reportPrimary)
-                            .frame(minWidth: 44, minHeight: 52, alignment: .leading)
+                        HStack(spacing: 12) {
+                            Text("start blank")
+                                .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
+                                .tracking(-0.6)
+                                .foregroundStyle(accentBlue)
+
+                            Spacer(minLength: 12)
+
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(accentBlue)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .background(accentBlue.opacity(0.10), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(accentBlue.opacity(0.24), lineWidth: 1)
+                        }
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 4)
+                    .accessibilityLabel("start blank")
+                    .accessibilityHint("starts a blank session")
                 }
 
                 Text("for digital wellness only.")
@@ -306,12 +323,27 @@ struct ReportView: View {
     }
 
     private func newLookProgressHeader() -> some View {
-        TopSheetHeader(
-            title: "Progress",
-            subtitle: "Your time, rhythm and patterns.",
-            titleColor: reportPrimary,
-            subtitleColor: reportSecondary
-        )
+        VStack(alignment: .leading, spacing: 14) {
+            if let onClose {
+                Button(action: onClose) {
+                    Text("back")
+                        .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                        .tracking(-0.3)
+                        .foregroundStyle(sessionStore.isBlankActive ? Color.white.opacity(0.72) : accentBlue)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("back")
+            }
+
+            TopSheetHeader(
+                title: "progress",
+                subtitle: "your time, rhythm and patterns.",
+                titleColor: reportPrimary,
+                subtitleColor: reportSecondary
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func newLookRiskCard(forecast: ControlForecast) -> some View {
@@ -319,7 +351,7 @@ struct ReportView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("RISK TODAY")
+                Text("risk signal")
                     .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
                     .tracking(0.8)
                     .foregroundStyle(reportSecondary)
@@ -338,7 +370,7 @@ struct ReportView: View {
                     .tracking(-0.35)
                     .foregroundStyle(reportPrimary)
 
-                Text("· \(forecast.windowText)")
+                Text("· \(forecast.windowText.lowercased())")
                     .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
                     .foregroundStyle(reportSecondary)
                     .lineLimit(1)
@@ -346,7 +378,7 @@ struct ReportView: View {
             }
 
             HStack(alignment: .center, spacing: 12) {
-                Text("weak window")
+                Text("risk window")
                     .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
                     .foregroundStyle(reportSecondary)
 
@@ -369,27 +401,31 @@ struct ReportView: View {
                     .buttonStyle(.plain)
                 }
             }
+
+            Text("based on recent patterns")
+                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
+                .foregroundStyle(reportSecondary)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .liquidGlass(cornerRadius: 22)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Risk today, \(forecast.riskPercent) percent, \(forecast.riskLabel), \(forecast.windowText)."
+            "risk signal, \(forecast.riskPercent) percent, \(forecast.riskLabel.lowercased()), \(forecast.windowText.lowercased())."
         )
     }
 
     private func newLookRecoveredCard(savedTime: TimeInterval, totalFocusTime: TimeInterval) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("RECOVERED")
+                Text("recovered time")
                     .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
                     .tracking(0.8)
                     .foregroundStyle(reportSecondary)
 
                 Spacer(minLength: 8)
 
-                Text("ALL TIME")
+                Text("all time")
                     .font(.blankInter(size: 11, weight: .bold, relativeTo: .caption))
                     .tracking(0.7)
                     .foregroundStyle(reportSecondary)
@@ -402,7 +438,7 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.60)
 
-            Text("\(formatDuration(totalFocusTime)) blanked")
+            Text("estimated from \(formatDuration(totalFocusTime)) blanked")
                 .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
                 .foregroundStyle(reportSecondary)
         }
@@ -410,12 +446,12 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .liquidGlass(cornerRadius: 22)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Recovered \(formatDuration(savedTime)) all time, from \(formatDuration(totalFocusTime)) blanked.")
+        .accessibilityLabel("recovered \(formatDuration(savedTime)) all time, estimated from \(formatDuration(totalFocusTime)) blanked.")
     }
 
     private func newLookMetricCard(label: String, value: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(label)
+            Text(label.lowercased())
                 .font(.blankInter(size: 11, weight: .bold, relativeTo: .caption))
                 .tracking(0.7)
                 .foregroundStyle(reportSecondary)
@@ -430,7 +466,7 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
 
-            Text(detail)
+                Text(detail.lowercased())
                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(reportSecondary)
                 .lineLimit(1)
@@ -449,7 +485,7 @@ struct ReportView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("RHYTHM")
+                Text("rhythm")
                     .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
                     .tracking(0.8)
                     .foregroundStyle(reportSecondary)
@@ -469,13 +505,15 @@ struct ReportView: View {
                                 .fill(reportPrimary.opacity(0.08))
                                 .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72)
 
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(index == bestIndex && durations[index] > 0 ? recoveryGreen : reportPrimary.opacity(0.72))
-                                .frame(
-                                    maxWidth: .infinity,
-                                    minHeight: max(8, 72 * CGFloat(durations[index] / maxDuration)),
-                                    maxHeight: max(8, 72 * CGFloat(durations[index] / maxDuration))
-                                )
+                            if durations[index] > 0 {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(index == bestIndex ? recoveryGreen : reportPrimary.opacity(0.72))
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: max(8, 72 * CGFloat(durations[index] / maxDuration)),
+                                        maxHeight: max(8, 72 * CGFloat(durations[index] / maxDuration))
+                                    )
+                            }
                         }
 
                         Text(dayLabels[index])
@@ -485,12 +523,17 @@ struct ReportView: View {
                     .frame(maxWidth: .infinity)
                 }
             }
+
+            Text("green marks your best day · height shows protected time")
+                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
+                .foregroundStyle(reportSecondary)
+                .lineLimit(2)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .liquidGlass(cornerRadius: 22)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Rhythm for the last seven days.")
+        .accessibilityLabel("rhythm for the last seven days. height shows protected time.")
     }
 
     private func newLookPatternsCard(
@@ -501,19 +544,19 @@ struct ReportView: View {
         let bestDay = bestDayText(report: weekly).lowercased()
 
         return VStack(alignment: .leading, spacing: 14) {
-            Text("PATTERNS")
+            Text("patterns")
                 .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
                 .tracking(0.8)
                 .foregroundStyle(reportSecondary)
 
             HStack(alignment: .top, spacing: 16) {
-                newLookPatternMetric(label: "STREAK", value: "\(progress.currentStreakDays) days")
+                newLookPatternMetric(label: "current streak", value: "\(progress.currentStreakDays) days")
 
                 Rectangle()
                     .fill(reportPrimary.opacity(0.10))
                     .frame(width: 1, height: 48)
 
-                newLookPatternMetric(label: "BEST DAY", value: bestDay)
+                newLookPatternMetric(label: "best day this week", value: bestDay)
             }
 
             Rectangle()
@@ -521,8 +564,8 @@ struct ReportView: View {
                 .frame(height: 1)
 
             HStack(spacing: 16) {
-                newLookSecondaryPatternMetric(label: "LONGEST", value: "\(progress.longestStreakDays) days")
-                newLookSecondaryPatternMetric(label: "RESCUES LEFT", value: "\(emergencyUnlocksRemaining)")
+                newLookSecondaryPatternMetric(label: "longest streak", value: "\(progress.longestStreakDays) days")
+                newLookSecondaryPatternMetric(label: "unlocks left", value: "\(emergencyUnlocksRemaining)")
             }
         }
         .padding(18)
@@ -532,7 +575,7 @@ struct ReportView: View {
 
     private func newLookPatternMetric(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label)
+            Text(label.lowercased())
                 .font(.blankInter(size: 11, weight: .bold, relativeTo: .caption))
                 .tracking(0.7)
                 .foregroundStyle(reportSecondary)
@@ -549,7 +592,7 @@ struct ReportView: View {
 
     private func newLookSecondaryPatternMetric(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(label)
+            Text(label.lowercased())
                 .font(.blankInter(size: 10, weight: .bold, relativeTo: .caption))
                 .tracking(0.65)
                 .foregroundStyle(reportSecondary)
@@ -569,7 +612,7 @@ struct ReportView: View {
         totalSessionCount: Int
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("TIME")
+            Text("time")
                 .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
                 .tracking(0.8)
                 .foregroundStyle(reportSecondary)
@@ -585,7 +628,7 @@ struct ReportView: View {
 
     private func newLookDetailRow(title: String, value: String, detail: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
+            Text(title.lowercased())
                 .font(.blankInter(size: 17, weight: .bold, relativeTo: .headline))
                 .foregroundStyle(reportPrimary)
 
@@ -599,7 +642,7 @@ struct ReportView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
 
-                Text(detail)
+                Text(detail.lowercased())
                     .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                     .foregroundStyle(reportSecondary)
                     .lineLimit(1)
@@ -613,11 +656,17 @@ struct ReportView: View {
         let visibleActivities = Array(progress.modeActivity.prefix(3))
 
         return VStack(alignment: .leading, spacing: 0) {
-            Text("BY MODE")
-                .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                .tracking(0.8)
-                .foregroundStyle(reportSecondary)
-                .padding(.bottom, 4)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("modes")
+                    .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
+                    .tracking(0.2)
+                    .foregroundStyle(reportSecondary)
+
+                Text("protected time by mode")
+                    .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
+                    .foregroundStyle(reportSecondary)
+            }
+            .padding(.bottom, 4)
 
             ForEach(visibleActivities) { activity in
                 HStack(alignment: .firstTextBaseline, spacing: 12) {

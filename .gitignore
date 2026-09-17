@@ -11,6 +11,9 @@ keystore.properties
 # Local Netlify folder
 .netlify
 
+# Local Supabase CLI state
+/supabase/.temp/
+
 # Local membership secrets
 .env
 .env.*

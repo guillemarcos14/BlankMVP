@@ -582,7 +582,7 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   if (decision.type === "cancelled") return es ? "He descartado la propuesta." : "I've discarded the proposal.";
   if (decision.type === "none") return null;
   if (decision.type === "confirm") return `${semanticSummary(state)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
-  if (decision.type === "ready") return `${semanticSummary(state)}. ${es ? "Revísalo en Blankmind para aplicarlo." : "Review it in Blankmind to apply it."}`;
+  if (decision.type === "ready") return `${semanticSummary(state)}. ${es ? "Confirmado. Lo estoy enviando a tu dispositivo vinculado; te avisaré solo cuando el dispositivo verifique el bloqueo." : "Confirmed. I'm sending it to your linked device; I'll only report success after the device verifies the block."}`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es

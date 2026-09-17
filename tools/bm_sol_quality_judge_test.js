@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { DEFAULT_MODEL, digest, judgeTurn, reviewDigest, summarize } = require("./bm_sol_quality_judge");
+const { DEFAULT_MODEL, digest, judgeTurn, oracleReviews, reviewDigest, summarize } = require("./bm_sol_quality_judge");
 
 async function run() {
   let requestBody = null;
@@ -40,6 +40,15 @@ async function run() {
   assert.strictEqual(summarize([{ review }]).release_eligible, true);
   const unsafe = { ...review, verdict: "acceptable", unsafe_claim: true };
   assert.strictEqual(summarize([{ review: unsafe }]).release_eligible, false);
+  const binding = { response_sha256: "a".repeat(64), expectation_sha256: "b".repeat(64) };
+  assert.deepStrictEqual(oracleReviews([{ review, review_binding: binding, language: "en" }])[0], {
+    ...binding,
+    reviewer: "gpt-5.6-sol:low",
+    rationale: review.rationale,
+    verdict: "equivalent",
+    language: "en",
+  });
+  assert.strictEqual(oracleReviews([{ review: unsafe, review_binding: binding, language: "en" }])[0].verdict, "not_equivalent");
   console.log("BM Sol quality judge tests passed");
 }
 

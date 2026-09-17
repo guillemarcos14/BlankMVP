@@ -3632,8 +3632,8 @@ function semanticPlan(result, language, prompt) {
     title: result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
       : result.state.intent === "cancelled" ? (language === "es" ? "Propuesta descartada" : "Proposal discarded")
       : language === "es"
-      ? result.decision.type === "confirm" ? "Confirmar bloqueo" : result.decision.type === "ready" ? "Revisar bloqueo" : "Detalles del bloqueo"
-      : result.decision.type === "confirm" ? "Confirm protection" : result.decision.type === "ready" ? "Review protection" : "Protection details",
+      ? result.decision.type === "confirm" ? "Confirmar bloqueo" : result.decision.type === "ready" ? "Enviando bloqueo" : "Detalles del bloqueo"
+      : result.decision.type === "confirm" ? "Confirm protection" : result.decision.type === "ready" ? "Sending protection" : "Protection details",
     response_text: result.responseText,
     message_text: result.responseText,
     speech_text: result.responseText,

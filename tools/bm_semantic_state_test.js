@@ -24,6 +24,9 @@ test("data then exact proposal confirmation", () => {
   assert.equal(b.state.status,"awaiting_confirmation"); none(b);
   assert.deepEqual(c.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
   assert.equal(c.state.slots.confirmation.source.text,"Yes");
+  assert.match(c.responseText,/sending it to your linked device/i);
+  assert.match(c.responseText,/only report success after the device verifies/i);
+  assert.doesNotMatch(c.responseText,/review it in Blankmind|applied|started successfully/i);
 });
 test("common affirmative variants confirm the proposal", () => {
   for (const reply of ["Yeah", "Yea", "Yep"]) {

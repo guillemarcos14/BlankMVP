@@ -88,5 +88,21 @@
     "verdict": "equivalent",
     "language": "en",
     "review_scope": "All message, response, speech, title, primary and secondary label and bullet surfaces inspected against exact state, decision and proposed action. Independent agent review, not human certification."
+  },
+  {
+    "response_sha256": "f4845c1a09407cda907e807dcc141fb1f708ffae154c88590d723aa9f5ca633e",
+    "expectation_sha256": "57a8c9dfc907e33920d95288aec4816709b55aeb7ef22308145bfc6604ce1a4a",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM preserved Instagram, the revised 45-minute duration, immediate start and one-time recurrence, emitted the expected autonomous action, and reserved success for positive device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "b874705284e5f85219f63f9e8617e5da2ff4f222f845e6e22d2a8c351efe13df",
+    "expectation_sha256": "c26390b243c64098d95c9c1b8efcb9192bcf2628b06c7d244fcbc2f3502bb19e",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM preserved the confirmed 10:00 AM to 12:00 PM daily Instagram schedule for seven days, emitted the expected autonomous schedule action, and reserved success for positive device verification.",
+    "verdict": "equivalent",
+    "language": "en"
   }
 ]

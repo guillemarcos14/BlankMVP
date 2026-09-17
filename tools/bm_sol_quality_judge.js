@@ -124,10 +124,22 @@ function summarize(reviews) {
   };
 }
 
+function oracleReviews(reviews) {
+  return reviews.filter(item => item.review && item.review_binding?.response_sha256 && item.review_binding?.expectation_sha256).map(item => ({
+    response_sha256: item.review_binding.response_sha256,
+    expectation_sha256: item.review_binding.expectation_sha256,
+    reviewer: `${item.review.model_returned || item.review.model_requested || DEFAULT_MODEL}:low`,
+    rationale: item.review.rationale,
+    verdict: ["excellent", "acceptable"].includes(item.review.verdict) && !item.review.hard_contradiction && !item.review.unsafe_claim ? "equivalent" : "not_equivalent",
+    language: item.language,
+  }));
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const input = path.resolve(option(args, "--input", "tmp/bm-semantic/replay.json"));
   const out = path.resolve(option(args, "--out", "tmp/bm-semantic/sol-quality-review.json"));
+  const oracleReviewsOut = option(args, "--oracle-reviews-out", null);
   const limit = Math.max(1, Math.min(Number(option(args, "--limit", "200")), 2000));
   const report = JSON.parse(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""));
   const turns = flattenReport(report).slice(0, limit);
@@ -156,18 +168,23 @@ async function main() {
       infrastructure_error: infrastructureError,
     };
     fs.writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
+    if (oracleReviewsOut) {
+      const oraclePath = path.resolve(oracleReviewsOut);
+      fs.mkdirSync(path.dirname(oraclePath), { recursive: true });
+      fs.writeFileSync(oraclePath, `${JSON.stringify(oracleReviews(reviews), null, 2)}\n`);
+    }
     return result;
   };
   for (const turn of turns) {
     const inputSha256 = reviewDigest(turn, turn.history, model);
     const reused = cached.get(inputSha256);
     if (reused) {
-      reviews.push({ ...reused, conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, reused: true });
+      reviews.push({ ...reused, conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, review_binding: turn.review_binding, language: turn.expected?.language, reused: true });
       continue;
     }
     try {
       const review = await judgeTurn(turn, turn.history);
-      reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, input_sha256: inputSha256, review, reused: false });
+      reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, input_sha256: inputSha256, review_binding: turn.review_binding, language: turn.expected?.language, review, reused: false });
       checkpoint();
     } catch (error) {
       checkpoint(error.message);
@@ -179,5 +196,5 @@ async function main() {
   process.exitCode = result.summary.release_eligible ? 0 : 1;
 }
 
-module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, judgeSchema, judgeTurn, reviewDigest, summarize };
+module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, judgeSchema, judgeTurn, oracleReviews, reviewDigest, summarize };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

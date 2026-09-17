@@ -48,9 +48,10 @@ function run(label, commandArgs, options = {}) {
   });
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   const item = { name: label, args: commandArgs, passed: result.status === 0 && !result.error, exit_code: result.status, output, error: result.error?.message || null };
-  (options.diagnostic ? report.legacy_diagnostics : report.checks).push(item);
-  console.log(`${options.diagnostic ? "DIAGNOSTIC" : item.passed ? "PASS" : "FAIL"} ${label} (exit ${result.status})`);
-  if (!item.passed && !options.diagnostic) console.error(output.slice(-2000));
+  const nonBlocking = options.diagnostic || options.nonBlocking;
+  (nonBlocking ? report.legacy_diagnostics : report.checks).push(item);
+  console.log(`${nonBlocking ? "DIAGNOSTIC" : item.passed ? "PASS" : "FAIL"} ${label} (exit ${result.status})`);
+  if (!item.passed && !nonBlocking) console.error(output.slice(-2000));
   return item;
 }
 
@@ -103,22 +104,40 @@ for (const [label, file] of [
 
 run("Evaluator integrity against physical regressions", ["tools/bm_evaluator_integrity_gate.js"]);
 
-const replayArgs = [
+const replayArgsBase = [
   "tools/bm_semantic_replay.js",
   "--dataset", argValue("--dataset", "tools/datasets/bm_semantic_development_v2.json"),
-  "--reviews", argValue("--reviews", "tools/datasets/bm_semantic_development_reviews.json"),
   "--repeats", argValue("--repeats", "2"),
   "--concurrency", argValue("--concurrency", "4"),
 ];
-run("Reviewed multi-turn semantic replay", [...replayArgs, "--out", "tmp/bm-semantic/development-gate.json"]);
-if (forceModel || qualityJudge || (hasApiKey && !quick)) run("Active model repeated semantic replay", [...replayArgs, "--model", "--out", "tmp/bm-semantic/active-model-gate.json"]);
+const replayArgs = [
+  ...replayArgsBase,
+  "--reviews", argValue("--reviews", "tools/datasets/bm_semantic_development_reviews.json"),
+];
+if (!qualityJudge) run("Reviewed multi-turn semantic replay", [...replayArgs, "--out", "tmp/bm-semantic/development-gate.json"]);
+if (forceModel || (hasApiKey && !quick && !qualityJudge)) run("Active model repeated semantic replay", [...replayArgs, "--model", "--out", "tmp/bm-semantic/active-model-gate.json"]);
 if (qualityJudge) {
+  run("Active model semantic replay pending independent review", [
+    ...replayArgsBase,
+    "--model", "--out", "tmp/bm-semantic/active-model-gate.json",
+  ], { nonBlocking: true });
   run("Independent GPT-5.6 Sol Low quality review", [
     "tools/bm_sol_quality_judge.js",
     "--input", "tmp/bm-semantic/active-model-gate.json",
     "--limit", argValue("--quality-limit", "2000"),
     "--out", "tmp/bm-semantic/sol-quality-release-gate.json",
+    "--oracle-reviews-out", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
   ], { timeoutMs: 600000 });
+  run("Reviewed multi-turn semantic replay", [
+    ...replayArgsBase,
+    "--reviews", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
+    "--out", "tmp/bm-semantic/development-gate.json",
+  ]);
+  run("Active model repeated semantic replay", [
+    ...replayArgsBase,
+    "--reviews", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
+    "--model", "--out", "tmp/bm-semantic/active-model-gate.json",
+  ]);
 }
 
 run("BM web/app smoke", ["tools/blanked_agent_smoke_test.js"]);

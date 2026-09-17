@@ -819,7 +819,7 @@ struct HomeView: View {
                     .foregroundStyle(Color.white)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
-                    .lineSpacing(-18)
+                    .lineSpacing(1.1)
                     .opacity(1 - unblankHoldProgress)
                     .transition(.opacity)
             } else if let cooldownText {

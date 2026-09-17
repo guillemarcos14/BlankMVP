@@ -138,7 +138,6 @@ private struct ConversationalHomeView: View {
             sessionStore.refreshDailyLimitMonitoring()
             syncAssistantContext()
         }
-        .onChange(of: sessionStore.focusModes) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.allowOnlyModeEnabled) { _ in
             restoreRuntimeState()
@@ -436,14 +435,14 @@ private struct ConversationalHomeView: View {
             .accessibilityLabel("Advanced controls")
 
             HStack(spacing: 0) {
-                topNavButton("Stats") {
+                topNavButton("Progress") {
                     openSection(.report)
                 }
-                topNavButton("Mode") {
-                    openSection(.modes)
+                topNavButton("Distractions") {
+                    openSection(.distractions)
                 }
-                topNavButton("Habits") {
-                    openSection(.schedule)
+                topNavButton("Settings") {
+                    openSection(.settings)
                 }
             }
             .padding(.horizontal, 22)
@@ -738,8 +737,6 @@ private struct ConversationalHomeView: View {
                 system: system,
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
                 vacationModeActive: sessionStore.isVacationModeActive,
-                modeName: sessionStore.currentMode.name,
-                availableModes: sessionStore.focusModes.map(\.name),
                 recentMessages: recentConversationPayload()
             )
         )
@@ -810,9 +807,6 @@ private struct ConversationalHomeView: View {
             system: system,
             emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
             vacationModeActive: sessionStore.isVacationModeActive,
-            modeName: sessionStore.currentMode.name,
-            availableModes: sessionStore.focusModes.map(\.name),
-            availableModeCatalog: sessionStore.assistantModeCatalog(),
             scheduleContext: sessionStore.assistantScheduleContext(),
             recentMessages: recentConversationPayload()
         )
@@ -873,13 +867,13 @@ private struct ConversationalHomeView: View {
                 let result = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
                 screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
                 appliedLabels.append(agentResultText(result))
-            case .applySchedule(let name, let startMinute, let endMinute, let weekdays, let durationDays):
+            case .applySchedule(_, let startMinute, let endMinute, let weekdays, let durationDays):
                 sessionStore.applyAdaptivePlan(
                     startMinute: startMinute,
                     endMinute: endMinute,
                     durationDays: durationDays,
                     activateCurrentWindow: false,
-                    name: name,
+                    name: "Protection",
                     weekdays: weekdays
                 )
                 appliedLabels.append("Plan scheduled")
@@ -900,30 +894,6 @@ private struct ConversationalHomeView: View {
             case .disablePause:
                 sessionStore.disableVacationMode()
                 appliedLabels.append("Rules resumed")
-            case .switchMode(let name):
-                if sessionStore.selectBestMode(matching: name) {
-                    appliedLabels.append("\(name) mode selected")
-                } else {
-                    sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
-                    showingPicker = true
-                    appliedLabels.append("Choose apps for \(name)")
-                }
-            case .activateMode(let name, let minutes, let hardMode):
-                if sessionStore.selectBestMode(matching: name) {
-                    let result = sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
-                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    appliedLabels.append("\(name) mode: \(agentResultText(result))")
-                } else {
-                    sessionStore.requestBlockConfiguration(
-                        startsFreshSelection: true,
-                        modeName: name,
-                        shouldActivate: true,
-                        durationMinutes: minutes,
-                        hardMode: hardMode
-                    )
-                    showingPicker = true
-                    appliedLabels.append("Choose apps for \(name)")
-                }
             case .openAppPicker:
                 showingPicker = true
                 appliedLabels.append("App picker opened")
@@ -1034,23 +1004,6 @@ private struct ConversationalHomeView: View {
                     expected: "vacation_mode=false",
                     actual: "vacation_mode=\(sessionStore.isVacationModeActive)",
                     passed: !sessionStore.isVacationModeActive
-                )
-            case .switchMode(let name):
-                let passed = sessionStore.currentMode.name.caseInsensitiveCompare(name) == .orderedSame
-                return AgentExecutionCheck(
-                    name: "mode_selected",
-                    expected: name,
-                    actual: sessionStore.currentMode.name,
-                    passed: passed
-                )
-            case .activateMode(let name, _, _):
-                let passed = sessionStore.isBlankActive
-                    && sessionStore.currentMode.name.caseInsensitiveCompare(name) == .orderedSame
-                return AgentExecutionCheck(
-                    name: "mode_active",
-                    expected: "active mode \(name)",
-                    actual: "active=\(sessionStore.isBlankActive) mode=\(sessionStore.currentMode.name)",
-                    passed: passed
                 )
             case .openAppPicker:
                 return AgentExecutionCheck(
@@ -1355,9 +1308,6 @@ private struct AgentContext {
     var system: DigitalWellnessV3System
     var emergencyUnlocksRemaining: Int
     var vacationModeActive: Bool
-    var modeName: String = "Routine"
-    var availableModes: [String] = []
-    var availableModeCatalog: [[String: Any]] = []
     var scheduleContext: [String: Any] = [:]
     var recentMessages: [[String: String]] = []
     var memory: [String: Any] {
@@ -1370,6 +1320,8 @@ private extension AgentContext {
         var payload: [String: Any] = [
             "channel": "ios",
             "assistant_channel": "app",
+            "single_distraction_block": true,
+            "protection_target": "selected_distractions",
             "is_blank_active": isBlankActive,
             "has_selected_apps": hasSelectedApps,
             "selection_count": selectionCount,
@@ -1382,9 +1334,6 @@ private extension AgentContext {
             "risk_window": system.forecast.riskWindow,
             "recommended_duration_minutes": system.plan.recommendedDurationMinutes,
             "weekly_goal": system.plan.weeklyGoal,
-            "mode_name": modeName,
-            "available_modes": availableModes,
-            "available_mode_catalog": availableModeCatalog,
             "app_presence": BlankmindAppPresence.payload(appReady: hasSelectedApps && screenTimeAuthorized),
             "recent_messages": recentMessages,
             "weak_hours": BlankedAgentMemory.rememberedWeakHours(system: system),
@@ -1424,8 +1373,6 @@ private enum AgentAction: Equatable {
     case setDailyLimit(minutes: Int)
     case pauseRules(hours: Int)
     case disablePause
-    case switchMode(name: String)
-    case activateMode(name: String, minutes: Int?, hardMode: Bool)
     case openAppPicker
     case requestScreenTimePermission
     case applyAIPlan
@@ -2076,7 +2023,7 @@ private enum BlankedAgentPlanner {
             title: isActive ? "Resume Rules" : "Vacation Mode",
             responseText: isActive ? "Your rules are paused. I can resume them now." : "I can pause scheduled protection while you are away.",
             bullets: isActive
-                ? ["Resume schedules.", "Keep selected apps and modes unchanged."]
+                ? ["Resume schedules.", "Keep your distraction list unchanged."]
                 : ["Pause schedules for 7 days.", "Keep manual protection available.", "Resume anytime from chat."],
             primaryLabel: isActive ? "Resume rules" : "Pause 7 days",
             secondaryLabel: "Advanced",
@@ -2501,9 +2448,8 @@ private struct BMLoopClient {
             "prompt_hash": loop.idempotencyKey,
             "context": [
                 "loop_id": loop.loopId,
-                "mode_name": context.modeName,
-                "available_modes": context.availableModes,
-                "available_mode_catalog": context.availableModeCatalog,
+                "single_distraction_block": true,
+                "protection_target": "selected_distractions",
                 "schedule": context.scheduleContext,
                 "has_selected_apps": context.hasSelectedApps,
                 "screen_time_authorized": context.screenTimeAuthorized,
@@ -2604,8 +2550,6 @@ private struct BMLoopClient {
         case .setDailyLimit: return "set_daily_limit"
         case .pauseRules: return "pause_rules"
         case .disablePause: return "disable_pause"
-        case .switchMode: return "switch_mode"
-        case .activateMode: return "activate_mode"
         case .openAppPicker: return "open_app_picker"
         case .requestScreenTimePermission: return "request_screen_time_permission"
         case .applyAIPlan: return "apply_ai_plan"
@@ -2631,12 +2575,6 @@ private struct BMLoopClient {
             return ["type": "pause_rules", "hours": hours]
         case .disablePause:
             return ["type": "disable_pause"]
-        case .switchMode(let name):
-            return ["type": "switch_mode", "name": name]
-        case .activateMode(let name, let minutes, let hardMode):
-            var payload: [String: Any] = ["type": "activate_mode", "name": name, "hard_mode": hardMode]
-            if let minutes { payload["minutes"] = minutes }
-            return payload
         case .openAppPicker:
             return ["type": "open_app_picker"]
         case .requestScreenTimePermission:
@@ -2709,7 +2647,7 @@ private struct RemoteAgentAction: Decodable {
         switch type {
         case "none":
             return AgentAction.none
-        case "start_protection":
+        case "start_protection", "activate_mode":
             return .startProtection(minutes: minutes.map { clamp($0, 5, 240) }, hardMode: hard_mode ?? false)
         case "apply_schedule":
             return .applySchedule(
@@ -2730,13 +2668,7 @@ private struct RemoteAgentAction: Decodable {
         case "disable_pause":
             return .disablePause
         case "switch_mode":
-            return .switchMode(name: String((name ?? "Routine").prefix(40)))
-        case "activate_mode":
-            return .activateMode(
-                name: String((name ?? "Routine").prefix(40)),
-                minutes: minutes.map { clamp($0, 5, 240) },
-                hardMode: hard_mode ?? false
-            )
+            return .openAppPicker
         case "open_app_picker":
             return .openAppPicker
         case "request_screen_time_permission":

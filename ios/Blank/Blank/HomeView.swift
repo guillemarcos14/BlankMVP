@@ -4,11 +4,10 @@ import SwiftUI
 import UIKit
 
 enum HomeSection: Hashable {
-    case modes
+    case distractions
     case schedule
     case report
     case emergency
-    case sessions
     case settings
 }
 
@@ -36,8 +35,6 @@ struct AssistantInboxAction: Decodable {
     let durationDays: Int?
     let hours: Int?
     let appNames: [String]?
-    let copyMode: Bool?
-    let sourceModeName: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -51,42 +48,19 @@ struct AssistantInboxAction: Decodable {
         case durationDays = "duration_days"
         case hours
         case appNames = "app_names"
-        case copyMode = "copy_mode"
-        case sourceModeName = "source_mode_name"
     }
 
     func toPendingAction() -> AssistantPendingAction? {
         let apps = (appNames ?? []).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         switch type {
-        case "start_protection":
+        case "start_protection", "activate_mode":
             return .startProtection(minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
-        case "activate_mode":
-            if copyMode == true {
-                return .duplicateAndActivateMode(
-                    sourceName: sourceModeName ?? name ?? "Routine",
-                    minutes: minutes,
-                    hardMode: hardMode ?? false,
-                    appNames: apps
-                )
-            }
-            return .activateMode(name: name ?? "Routine", minutes: minutes, hardMode: hardMode ?? false, appNames: apps)
         case "switch_mode":
-            return .switchMode(name: name ?? "Routine")
+            return .openAppPicker(appNames: apps)
         case "apply_schedule":
             guard let startMinute, let endMinute else { return nil }
-            if copyMode == true {
-                return .duplicateModeAndApplySchedule(
-                    sourceName: sourceModeName ?? name ?? "Routine",
-                    name: name ?? "AI Plan",
-                    startMinute: min(max(startMinute, 0), 1439),
-                    endMinute: min(max(endMinute, 0), 1439),
-                    weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
-                    durationDays: min(max(durationDays ?? 7, 1), 14),
-                    appNames: apps
-                )
-            }
             return .applySchedule(
-                name: name ?? "AI Plan",
+                name: "Protection",
                 startMinute: min(max(startMinute, 0), 1439),
                 endMinute: min(max(endMinute, 0), 1439),
                 weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) },
@@ -455,7 +429,6 @@ struct HomeView: View {
             sessionStore.refreshDailyLimitMonitoring()
             syncAssistantContext()
         }
-        .onChange(of: sessionStore.focusModes) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
         .onChange(of: sessionStore.isBlankActive) { isActive in
             if !isActive {
@@ -492,17 +465,9 @@ struct HomeView: View {
         .onChange(of: showingContextualAppPicker) { isPresented in
             if !isPresented {
                 var assistantActionApplied = false
-                if !sessionStore.pendingPlanStartsFreshSelection || contextualPlanSelection.blankedSelectionCount > 0 {
+                if contextualPlanSelection.blankedSelectionCount > 0 {
                     if contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
-                    }
-                    if let modeName = sessionStore.pendingPlanModeName,
-                       contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.createOrUpdateMode(
-                            named: modeName,
-                            selection: contextualPlanSelection,
-                            appNames: sessionStore.pendingPlanAppNames
-                        )
                     }
                     if sessionStore.pendingPlanShouldActivate,
                        contextualPlanSelection.blankedSelectionCount > 0 {
@@ -538,12 +503,7 @@ struct HomeView: View {
                             weekdays: schedule.weekdays
                         )
                         applyScreenTimeControls()
-                        message = "Added \(schedule.name) without replacing your existing protection windows."
-                        messageAction = nil
-                        assistantActionApplied = true
-                    } else if let modeName = sessionStore.pendingPlanModeName,
-                              contextualPlanSelection.blankedSelectionCount > 0 {
-                        message = "\(modeName) mode saved."
+                        message = "Protection schedule added for your distractions."
                         messageAction = nil
                         assistantActionApplied = true
                     } else {
@@ -663,14 +623,14 @@ struct HomeView: View {
             .accessibilityLabel("Emergency")
 
             HStack(spacing: 0) {
-                topNavButton("Stats") {
+                topNavButton("Progress") {
                     openSection(.report)
                 }
-                topNavButton("Plan") {
-                    openSection(.modes)
+                topNavButton("Distractions") {
+                    openSection(.distractions)
                 }
-                topNavButton("Sessions") {
-                    openSection(.sessions)
+                topNavButton("Settings") {
+                    openSection(.settings)
                 }
             }
             .padding(.horizontal, 22)
@@ -706,7 +666,7 @@ struct HomeView: View {
     }
 
     private func openSection(_ section: HomeSection) {
-        if section == .modes, sessionStore.pinProtectionEnabled {
+        if section == .distractions, sessionStore.pinProtectionEnabled {
             unlockAdvancedSettings {
                 withAnimation(.easeInOut(duration: 0.35)) {
                     activeSection = section
@@ -769,12 +729,12 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
-                minimalHomeRow("sessions", color: BlankColors.paleSteelBlue) {
-                    openSection(.sessions)
-                }
-
                 minimalHomeRow("progress", color: BlankColors.paleSteelBlue) {
                     openSection(.report)
+                }
+
+                minimalHomeRow("distractions", color: BlankColors.paleSteelBlue) {
+                    openSection(.distractions)
                 }
 
                 minimalHomeRow("settings", color: BlankColors.paleSteelBlue) {
@@ -934,11 +894,11 @@ struct HomeView: View {
 
     private var activeExpandedNavigation: some View {
         VStack(alignment: .leading, spacing: -8) {
-            minimalHomeRow("sessions", color: BlankColors.homeDarkSecondary) {
-                openSection(.sessions)
-            }
             minimalHomeRow("progress", color: BlankColors.homeDarkSecondary) {
                 openSection(.report)
+            }
+            minimalHomeRow("distractions", color: BlankColors.homeDarkSecondary) {
+                openSection(.distractions)
             }
             minimalHomeRow("settings", color: BlankColors.homeDarkSecondary) {
                 openSection(.settings)
@@ -1405,12 +1365,8 @@ struct HomeView: View {
 
     private func processPendingBlockConfigurationIfNeeded() {
         guard sessionStore.shouldOpenBlockConfiguration else { return }
-        if sessionStore.pendingPlanAppNames.isEmpty && sessionStore.pendingPlanModeName == nil {
-            openSection(.modes)
-        } else {
-            contextualPlanSelection = sessionStore.pendingPlanStartsFreshSelection ? FamilyActivitySelection() : sessionStore.selection
-            showingContextualAppPicker = true
-        }
+        contextualPlanSelection = sessionStore.selection
+        showingContextualAppPicker = true
         sessionStore.shouldOpenBlockConfiguration = false
     }
 
@@ -1419,19 +1375,10 @@ struct HomeView: View {
             return "No action is waiting for confirmation."
         }
         switch action {
-        case .startProtection(let minutes, _, let appNames):
-            let target = appNames.isEmpty ? "the current app selection" : appNames.joined(separator: ", ")
-            return minutes.map { "Start protection now for \($0) minutes using \(target)?" } ?? "Start protection now using \(target), with no duration added?"
-        case .activateMode(let name, let minutes, _, _):
-            return minutes.map { "Start \(name) mode for \($0) minutes?" } ?? "Start \(name) mode now, without adding a duration?"
-        case .duplicateAndActivateMode(let sourceName, let minutes, _, _):
-            return minutes.map { "Copy \(sourceName) and start the copy for \($0) minutes?" } ?? "Copy \(sourceName) and start the copy now?"
-        case .switchMode(let name):
-            return "Switch to \(name) mode?"
-        case .applySchedule(let name, let start, let end, _, let days, _):
-            return "Add \(name) as a new protection window from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
-        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, _, let days, _):
-            return "Copy \(sourceName) and schedule the copy from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .startProtection(let minutes, _, _):
+            return minutes.map { "Protect all your selected distractions for \($0) minutes?" } ?? "Protect all your selected distractions now, with no duration added?"
+        case .applySchedule(_, let start, let end, _, let days, _):
+            return "Protect your distractions from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
         case .setDailyLimit(let minutes, _):
             return minutes.map { "Set a daily limit of \($0) minutes?" } ?? "Set a daily limit after you choose its duration?"
         case .allowOnly:
@@ -1446,15 +1393,13 @@ struct HomeView: View {
             return "Apply the recommended adaptive plan?"
         case .openAppPicker:
             return "Open the app picker to choose what Blanked can protect?"
-        case .configureAndOpenAppPicker(let appNames, let durationMinutes, _, let schedule):
+        case .configureAndOpenAppPicker(_, let durationMinutes, _, let schedule):
             if let schedule {
-                return "Choose the apps for \(schedule.name) from \(formatMinute(schedule.startMinute)) to \(formatMinute(schedule.endMinute))?"
+                return "Choose your distractions once, then protect them from \(formatMinute(schedule.startMinute)) to \(formatMinute(schedule.endMinute))?"
             }
-            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
-            return durationMinutes.map { "Choose \(target) and start protection for \($0) minutes?" } ?? "Choose \(target) and start protection now?"
-        case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
-            let target = appNames.isEmpty ? "the requested apps" : appNames.joined(separator: ", ")
-            return "Choose \(target) and set a daily limit of \(minutes) minutes?"
+            return durationMinutes.map { "Choose your distractions once, then protect them for \($0) minutes?" } ?? "Choose your distractions once, then start protection?"
+        case .configureAndOpenDailyLimitPicker(_, let minutes):
+            return "Choose your distractions once, then set a daily limit of \(minutes) minutes?"
         case .requestScreenTimePermission:
             return "Request Screen Time permission?"
         }
@@ -1488,7 +1433,6 @@ struct HomeView: View {
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
                 sessionStore.requestBlockConfiguration(
                     appNames: appNames,
-                    startsFreshSelection: !appNames.isEmpty,
                     shouldActivate: true,
                     durationMinutes: minutes,
                     hardMode: hardMode
@@ -1506,70 +1450,12 @@ struct HomeView: View {
                 status: sessionStore.isBlankActive ? "verified" : "failed",
                 detail: sessionStore.isBlankActive ? "protection_active" : "protection_not_active"
             )
-        case .activateMode(let name, let minutes, let hardMode, let appNames):
-            if !sessionStore.selectBestMode(matching: name) {
-                guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
-                    sessionStore.requestBlockConfiguration(
-                        appNames: appNames,
-                        startsFreshSelection: !appNames.isEmpty,
-                        modeName: name,
-                        shouldActivate: true,
-                        durationMinutes: minutes,
-                        hardMode: hardMode
-                    )
-                    return
-                }
-                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection, appNames: appNames)
-            }
-            let result = sessionStore.activateBlank(
-                durationMinutes: minutes,
-                hardMode: hardMode,
-                usePendingWidgetTimer: false
-            )
-            applyScreenTimeControls()
-            setMessage(for: result)
-            finishPendingAssistantAction(
-                status: sessionStore.isBlankActive ? "verified" : "failed",
-                detail: sessionStore.isBlankActive ? "mode_active" : "mode_not_active"
-            )
-        case .duplicateAndActivateMode(let sourceName, let minutes, let hardMode, _):
-            guard sessionStore.duplicateMode(named: sourceName) != nil else {
-                message = "I couldn't find the saved \(sourceName) plan to copy."
-                messageAction = nil
-                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
-                return
-            }
-            let result = sessionStore.activateBlank(
-                durationMinutes: minutes,
-                hardMode: hardMode,
-                usePendingWidgetTimer: false
-            )
-            applyScreenTimeControls()
-            setMessage(for: result)
-            finishPendingAssistantAction(
-                status: sessionStore.isBlankActive ? "verified" : "failed",
-                detail: sessionStore.isBlankActive ? "mode_copy_active" : "mode_copy_not_active"
-            )
-        case .switchMode(let name):
-            if sessionStore.selectBestMode(matching: name) {
-                message = "\(name) mode selected."
-                messageAction = nil
-            } else if sessionStore.hasSelectedApps {
-                sessionStore.createOrUpdateMode(named: name, selection: sessionStore.selection)
-                message = "\(name) mode saved."
-                messageAction = nil
-            } else {
-                sessionStore.requestBlockConfiguration(startsFreshSelection: true, modeName: name)
-                return
-            }
-            finishPendingAssistantAction(status: "verified", detail: "mode_selected")
-        case .applySchedule(let name, let start, let end, let weekdays, let days, let appNames):
+        case .applySchedule(_, let start, let end, let weekdays, let days, let appNames):
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
                 sessionStore.requestBlockConfiguration(
                     appNames: appNames,
-                    startsFreshSelection: !appNames.isEmpty,
                     schedule: PendingPlanSchedule(
-                        name: name,
+                        name: "Protection",
                         startMinute: start,
                         endMinute: end,
                         weekdays: weekdays,
@@ -1583,32 +1469,13 @@ struct HomeView: View {
                 endMinute: end,
                 durationDays: days,
                 activateCurrentWindow: false,
-                name: name,
+                name: "Protection",
                 weekdays: weekdays
             )
             applyScreenTimeControls()
-            message = "Added \(name) without replacing your existing protection windows."
+            message = "Protection schedule added for your distractions."
             messageAction = nil
             finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
-        case .duplicateModeAndApplySchedule(let sourceName, _, let start, let end, let weekdays, let days, _):
-            guard let copy = sessionStore.duplicateMode(named: sourceName) else {
-                message = "I couldn't find the saved \(sourceName) plan to copy."
-                messageAction = nil
-                finishPendingAssistantAction(status: "failed", detail: "source_mode_not_found")
-                return
-            }
-            sessionStore.applyAdaptivePlan(
-                startMinute: start,
-                endMinute: end,
-                durationDays: days,
-                activateCurrentWindow: false,
-                name: copy.name,
-                weekdays: weekdays
-            )
-            applyScreenTimeControls()
-            message = "Copied \(sourceName) as \(copy.name) and added the requested protection window."
-            messageAction = nil
-            finishPendingAssistantAction(status: "verified", detail: "mode_copy_schedule_persisted")
         case .setDailyLimit(let minutes, let appNames):
             guard let minutes else {
                 message = "Tell BM how many minutes per day you want to allow before activating this limit."
@@ -1617,7 +1484,7 @@ struct HomeView: View {
                 return
             }
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
-                sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: !appNames.isEmpty)
+                sessionStore.requestBlockConfiguration(appNames: appNames)
                 return
             }
             sessionStore.dailyLimitMinutes = minutes
@@ -1651,12 +1518,10 @@ struct HomeView: View {
             applyScreenTimeControls()
             finishPendingAssistantAction(status: "verified", detail: "ai_plan_persisted")
         case .openAppPicker(let appNames):
-            sessionStore.requestBlockConfiguration(appNames: appNames, startsFreshSelection: true)
+            sessionStore.requestBlockConfiguration(appNames: appNames)
         case .configureAndOpenAppPicker(let appNames, let durationMinutes, let hardMode, let schedule):
             sessionStore.requestBlockConfiguration(
                 appNames: appNames,
-                startsFreshSelection: true,
-                modeName: appNames.isEmpty ? (schedule?.name ?? "BM Plan") : appNames.joined(separator: " + "),
                 shouldActivate: schedule == nil,
                 durationMinutes: durationMinutes,
                 hardMode: hardMode,
@@ -1665,8 +1530,6 @@ struct HomeView: View {
         case .configureAndOpenDailyLimitPicker(let appNames, let minutes):
             sessionStore.requestBlockConfiguration(
                 appNames: appNames,
-                startsFreshSelection: true,
-                modeName: appNames.isEmpty ? "BM Daily Limit" : appNames.joined(separator: " + "),
                 dailyLimitMinutes: minutes
             )
         case .requestScreenTimePermission:
@@ -1729,35 +1592,20 @@ struct HomeView: View {
     }
 
     private var contextualPickerHeaderText: String {
-        if let modeName = sessionStore.pendingPlanModeName {
-            return "Select apps for \(modeName)"
-        }
-        return "Select \(formattedPendingPlanAppNames)"
+        "Choose your distractions"
     }
 
     private var contextualPickerFooterText: String {
-        guard let modeName = sessionStore.pendingPlanModeName else {
-            return "Tap Done to use this selection for the plan."
-        }
         if sessionStore.pendingPlanShouldActivate {
-            return "Tap Done to save \(modeName) and start the block now."
+            return "Tap Done to save this list and start protection now."
         }
         if sessionStore.pendingPlanSchedule != nil {
-            return "Tap Done to save \(modeName) and add its schedule."
+            return "Tap Done to save this list and add its schedule."
         }
         if sessionStore.pendingPlanDailyLimitMinutes != nil {
-            return "Tap Done to save \(modeName) and apply its daily limit."
+            return "Tap Done to save this list and apply its daily limit."
         }
-        return "Tap Done to save \(modeName)."
-    }
-
-    private var formattedPendingPlanAppNames: String {
-        let cleaned = sessionStore.pendingPlanAppNames
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        guard !cleaned.isEmpty else { return "the recommended apps" }
-        guard cleaned.count > 1 else { return cleaned[0] }
-        return "\(cleaned.dropLast().joined(separator: ", ")) and \(cleaned.last ?? "")"
+        return "Choose every app, category or website that distracts you. You can edit this one list later."
     }
 
     private var riskWindowText: String {
@@ -1791,9 +1639,8 @@ struct HomeView: View {
             "risk_window": system.forecast.riskWindow,
             "recommended_duration_minutes": system.plan.recommendedDurationMinutes,
             "weekly_goal": system.plan.weeklyGoal,
-            "mode_name": sessionStore.currentMode.name,
-            "available_modes": sessionStore.focusModes.map(\.name),
-            "available_mode_catalog": sessionStore.assistantModeCatalog(),
+            "single_distraction_block": true,
+            "protection_target": "selected_distractions",
             "app_presence": BlankmindAppPresence.payload(
                 appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
             ),
@@ -2167,14 +2014,12 @@ struct AppBackground: View {
     }
 }
 
-private struct ModesList: View {
+private struct DistractionsList: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     @Binding var showingPicker: Bool
     let onFinish: () -> Void
-    @State private var newModeName = ""
-    @State private var showsManualPlanCreator = false
     @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
@@ -2249,15 +2094,15 @@ private struct ModesList: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 SectionHeader(
-                    title: "Plan",
-                    subtitle: "Protection, routines and safeguards.",
+                    title: "plan",
+                    subtitle: "one distraction list for every protection.",
                     action: onFinish,
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
                 .padding(.bottom, 24)
 
-                Text(sessionStore.currentMode.name.lowercased())
+                Text("your distractions")
                     .font(.blankInter(size: 32, weight: .bold, relativeTo: .title2))
                     .tracking(-0.8)
                     .foregroundStyle(textColor)
@@ -2269,7 +2114,7 @@ private struct ModesList: View {
 
                 newLookRule
 
-                newLookPlanRow(title: "protected apps", detail: blockedAppsText) {
+                newLookPlanRow(title: "edit distractions", detail: blockedAppsText) {
                     showingPicker = true
                     onFinish()
                 }
@@ -2316,41 +2161,13 @@ private struct ModesList: View {
         .buttonStyle(.plain)
     }
 
-    private func modeButton(_ mode: BlankFocusMode) -> some View {
-        let isSelected = mode.id == sessionStore.currentModeId
-
-        return Button {
-            sessionStore.selectMode(mode.id)
-            onFinish()
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(mode.name.lowercased())
-                        .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
-
-                    Text(isSelected ? blockedAppsText : "tap to activate this plan")
-                        .font(.caption)
-                        .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-            }
-            .foregroundStyle(isSelected ? textColor.opacity(0.84) : textColor)
-            .padding(.horizontal, 18)
-            .frame(height: 68)
-            .blankGlassCard(cornerRadius: 20, tintOpacity: isSelected ? 0.18 : 0.28)
-        }
-        .buttonStyle(.plain)
-    }
-
     private var baiPlanSummary: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("current protection")
                         .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
-                    Text(sessionStore.currentMode.name)
+                    Text("One reusable list")
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(secondaryColor)
                 }
@@ -2533,26 +2350,6 @@ private struct ModesList: View {
     private var planAdvancedControls: some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("manual plans")
-                        .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(secondaryColor)
-
-                    ForEach(sessionStore.focusModes) { mode in
-                        modeButton(mode)
-                            .swipeActions {
-                                Button(role: .destructive) {
-                                    sessionStore.deleteMode(mode.id)
-                                } label: {
-                                    Label("delete", systemImage: "trash")
-                                }
-                                .disabled(sessionStore.focusModes.count <= 1)
-                            }
-                    }
-                }
-
-                manualPlanCreator
-
                 AdvancedModeControls(
                     showingPicker: $showingPicker,
                     onFinish: onFinish,
@@ -2626,51 +2423,9 @@ private struct ModesList: View {
         windows.removeAll { $0.id == id }
     }
 
-    private var manualPlanCreator: some View {
-        VStack(spacing: 10) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showsManualPlanCreator.toggle()
-                }
-            } label: {
-                HStack {
-                    Text("add manual plan")
-                        .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                    Spacer()
-                    Image(systemName: showsManualPlanCreator ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(secondaryColor)
-                .padding(.horizontal, 18)
-                .frame(height: 50)
-                .blankGlassCard(cornerRadius: 18, tintOpacity: 0.16)
-            }
-            .buttonStyle(.plain)
-
-            if showsManualPlanCreator {
-                TextField("plan name", text: $newModeName)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(textColor)
-                    .padding(.horizontal, 18)
-                    .frame(height: 54)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
-
-                Button {
-                    sessionStore.createMode(named: newModeName)
-                    newModeName = ""
-                    showsManualPlanCreator = false
-                } label: {
-                    TopSheetPrimaryButtonLabel(title: "save manual plan")
-                }
-                .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
-            }
-        }
-    }
-
     private var blockedAppsText: String {
         let count = sessionStore.selectionCount
-        return "\(count) \(count == 1 ? "app" : "apps") blocked"
+        return count == 0 ? "choose distractions" : "\(count) selected"
     }
 }
 
@@ -2816,8 +2571,8 @@ struct HomeSectionScreen: View {
     @ViewBuilder
     private var routeContent: some View {
         switch section {
-        case .modes:
-            ModesList(showingPicker: $showingPicker) {
+        case .distractions:
+            DistractionsScreen(showingPicker: $showingPicker) {
                 onClose()
             }
         case .schedule:
@@ -2831,8 +2586,6 @@ struct HomeSectionScreen: View {
                 onUnlock: onEmergencyUnlock,
                 onClose: onClose
             )
-        case .sessions:
-            SessionsScreen(onClose: onClose)
         case .settings:
             SettingsScreen(
                 onClose: onClose,
@@ -3519,7 +3272,7 @@ private struct ForgetBlankConfirmSheet: View {
         TechnicalSettingsSheetLayout {
             TechnicalSheetTitle("I forgot my Blank")
             TechnicalSheetDescription("This turns Blank off, removes the linked item, and returns to onboarding so you can register a new one.")
-            TechnicalSheetDescription("Your modes and selected apps stay saved.", emphasized: true)
+            TechnicalSheetDescription("Your distraction list and protection settings stay saved.", emphasized: true)
             TechnicalSheetActions {
                 Button("I forgot my Blank") {
                     onConfirm()
@@ -3751,7 +3504,7 @@ private struct RelinkSheet: View {
     var body: some View {
         TechnicalSettingsSheetLayout {
             TechnicalSheetTitle("New Blank")
-            TechnicalSheetDescription("Scan the new Blank to replace the one you linked. Your modes and protected apps stay saved.")
+            TechnicalSheetDescription("Scan the new Blank to replace the one you linked. Your distraction list and protection settings stay saved.")
             TechnicalSheetActions {
                 Button("Scan new Blank") {
                     nfcReader.scan { result in
@@ -3847,221 +3600,142 @@ private struct TechnicalSheetActions<Content: View>: View {
     }
 }
 
-private struct SessionsScreen: View {
+private struct DistractionsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
+    @Binding var showingPicker: Bool
     let onClose: () -> Void
-    @State private var showingManualMode = false
-
-    private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
-    private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
 
     private var textColor: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.minimalInk
+        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.homeLightInk
     }
 
     private var secondaryColor: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.minimalSecondary
+        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.homeLightSecondary
     }
 
-    private var cardSurface: Color {
-        sessionStore.isBlankActive ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface
-    }
-
-    private var activePlans: [BlankHabitWindow] {
+    private var activeWindows: [BlankHabitWindow] {
         sessionStore.schedule.activeWindows
     }
 
-    private var activePlansSubtitle: String {
-        guard !activePlans.isEmpty else { return "no active plans" }
-        return "\(activePlans.count) active \(activePlans.count == 1 ? "plan" : "plans")"
-    }
-
-    private var blockedTargetsText: String {
-        let count = sessionStore.selectionCount
-        guard count > 0 else { return "choose apps" }
-        return "\(count) \(count == 1 ? "app" : "apps") blocked"
+    private var applicationTokens: [ApplicationToken] {
+        Array(sessionStore.selection.applicationTokens)
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(
-                    title: "sessions",
-                    subtitle: activePlansSubtitle,
-                    action: onClose,
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
-                .padding(.bottom, 24)
+        GeometryReader { proxy in
+            ZStack(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionBackHeader(action: onClose)
 
-                if activePlans.isEmpty {
-                    emptyPlans
-                } else {
-                    VStack(spacing: 14) {
-                        ForEach(activePlans) { plan in
-                            planCard(plan)
-                        }
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("distractions")
+                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
+                            .tracking(-0.6)
+                            .foregroundStyle(textColor)
+                            .lineLimit(1)
+
+                        scheduleRanges
+                            .padding(.top, 18)
                     }
+
+                    Spacer(minLength: 20)
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: -8) {
+                            if sessionStore.selection.blankedSelectionCount == 0 {
+                                Text("no distractions yet")
+                                    .font(.blankInter(size: 18, weight: .medium, relativeTo: .headline))
+                                    .foregroundStyle(secondaryColor)
+                                    .frame(minHeight: 44, alignment: .leading)
+                            } else {
+                                ForEach(applicationTokens, id: \.self) { token in
+                                    Label(token)
+                                        .labelStyle(.titleOnly)
+                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                                        .foregroundStyle(textColor)
+                                        .tracking(-0.6)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                }
+                                ForEach(Array(sessionStore.selection.categoryTokens), id: \.self) { token in
+                                    Label(token)
+                                        .labelStyle(.titleOnly)
+                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                                        .foregroundStyle(textColor)
+                                        .tracking(-0.6)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                }
+                                ForEach(Array(sessionStore.selection.webDomainTokens), id: \.self) { token in
+                                    Label(token)
+                                        .labelStyle(.titleOnly)
+                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                                        .foregroundStyle(textColor)
+                                        .tracking(-0.6)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.72)
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(
+                            maxWidth: .infinity,
+                            minHeight: max(0, proxy.size.height - 310),
+                            alignment: .bottomLeading
+                        )
+                        .padding(.bottom, 78)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                 }
+                .padding(.horizontal, sectionHorizontalPadding)
+                .padding(.bottom, 20)
 
-                newModeButton
-                    .padding(.top, activePlans.isEmpty ? 22 : 16)
-
-                Spacer(minLength: 24)
+                editButton
+                    .padding(.leading, sectionHorizontalPadding)
+                    .padding(.bottom, 24)
             }
-            .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.bottom, 24)
         }
-        .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .fullScreenCover(isPresented: $showingManualMode) {
-            ManualModeEditorScreen()
-                .environment(\.blankMinimalAppearance, true)
-                .environment(\.blankSectionHorizontalPadding, sectionHorizontalPadding)
-        }
     }
 
-    private var emptyPlans: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("no active plans")
-                .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
-                .tracking(-0.35)
-                .foregroundStyle(textColor)
-
-            Text("create a plan from whatsapp or plan to see it here.")
-                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                .foregroundStyle(secondaryColor)
-                .fixedSize(horizontal: false, vertical: true)
+    private var scheduleRanges: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if activeWindows.isEmpty {
+                Text("no scheduled blocks")
+            } else {
+                ForEach(activeWindows) { window in
+                    Text("\(distractionTimeLabel(window.startMinute)) to \(distractionTimeLabel(window.endMinute))")
+                }
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+        .foregroundStyle(secondaryColor)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func planCard(_ plan: BlankHabitWindow) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(planTitle(for: plan))
-                    .font(.blankInter(size: 23, weight: .bold, relativeTo: .title3))
-                    .tracking(-0.45)
-                    .foregroundStyle(textColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-
-                Spacer(minLength: 8)
-
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(BlankColors.statusGreen)
-                        .frame(width: 7, height: 7)
-
-                    Text("active")
-                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                        .foregroundStyle(BlankColors.statusGreen)
-                }
-
-                Menu {
-                    Button(role: .destructive) {
-                        sessionStore.deleteScheduleWindow(plan.id)
-                    } label: {
-                    Label("delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(secondaryColor)
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel("More options")
-            }
-
-            Text(blockedTargetsText)
-                .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                .foregroundStyle(secondaryColor)
-                .padding(.top, 5)
-
-            HStack(spacing: 8) {
-                Text("\(formatMinute(plan.startMinute)) – \(formatMinute(plan.endMinute))")
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(textColor)
-                    .monospacedDigit()
-
-                Spacer(minLength: 8)
-            }
-            .padding(.top, 20)
-
-            HStack(spacing: 6) {
-                ForEach(0..<weekdayOrder.count, id: \.self) { index in
-                    let weekday = weekdayOrder[index]
-                    let isSelected = plan.weekdays.contains(weekday)
-
-                    Text(weekdayLabels[index])
-                        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite) : secondaryColor.opacity(0.55))
-                        .frame(width: 27, height: 27)
-                        .background {
-                            Circle()
-                                .fill(isSelected ? (sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal) : textColor.opacity(0.035))
-                        }
-                }
-            }
-            .padding(.top, 12)
-        }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(cardSurface)
-        }
-        .accessibilityElement(children: .contain)
-    }
-
-    private var newModeButton: some View {
+    private var editButton: some View {
         Button {
-            showingManualMode = true
+            showingPicker = true
         } label: {
-            HStack(spacing: 12) {
-                Text("new mode")
-                    .font(.blankInter(size: 19, weight: .bold, relativeTo: .headline))
-                    .tracking(-0.25)
-
-                Spacer(minLength: 8)
-
-                Text("custom schedule")
-                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
-
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(textColor)
-                    .frame(width: 27, height: 27)
-                    .background(Circle().fill(textColor.opacity(0.10)))
-            }
-            .foregroundStyle(textColor)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .contentShape(Rectangle())
+            Image(systemName: "plus")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(BlankColors.pureWhite)
+                .frame(width: 56, height: 56)
+                .background(Circle().fill(Color.black))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Create a new mode with a custom schedule")
-    }
-
-    private func planTitle(for plan: BlankHabitWindow) -> String {
-        let normalizedName = plan.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if normalizedName.isEmpty || normalizedName.lowercased().hasPrefix("habit") {
-            return sessionStore.currentMode.name.lowercased()
-        }
-        return normalizedName.lowercased()
+        .accessibilityLabel("Edit distractions")
+        .accessibilityHint("Choose apps to add or remove from your distractions")
     }
 }
 
-private struct ManualModeEditorScreen: View {
+private struct ScheduleEditorScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
-    @State private var modeName = ""
-    @State private var selection = FamilyActivitySelection()
-    @State private var showingPicker = false
     @State private var startMinute = 13 * 60
     @State private var endMinute = 14 * 60
     @State private var selectedWeekdays = Set(1...7)
@@ -4079,8 +3753,7 @@ private struct ManualModeEditorScreen: View {
     }
 
     private var canSave: Bool {
-        !modeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && selection.blankedSelectionCount > 0
+        sessionStore.hasSelectedApps
             && startMinute != endMinute
             && (!repeatsWeekly || !selectedWeekdays.isEmpty)
     }
@@ -4109,43 +3782,25 @@ private struct ManualModeEditorScreen: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 SectionHeader(
-                    title: "new mode",
-                    subtitle: "choose apps, timing and repetition.",
+                    title: "new schedule",
+                    subtitle: "protect the same distraction list automatically.",
                     action: { dismiss() },
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
                 .padding(.bottom, 24)
 
-                sectionCard(title: "mode details") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("name")
-                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                            .foregroundStyle(secondaryColor)
-
-                        TextField("e.g. deep focus", text: $modeName)
-                            .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
+                sectionCard(title: "protected") {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text("your distractions")
+                            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
                             .foregroundStyle(textColor)
-                            .textInputAutocapitalization(.sentences)
-                            .padding(.horizontal, 14)
-                            .frame(height: 50)
-                            .background {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(fieldFill)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(fieldBorder, lineWidth: 1)
-                                    }
-                            }
+                        Spacer(minLength: 8)
+                        Text("\(sessionStore.selectionCount) selected")
+                            .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+                            .foregroundStyle(secondaryColor)
                     }
                 }
-
-                sectionCard(title: "protected apps") {
-                    configurationRow(title: "apps", value: appsSummary) {
-                        showingPicker = true
-                    }
-                }
-                .padding(.top, 12)
 
                 sectionCard(title: "schedule") {
                     VStack(alignment: .leading, spacing: 12) {
@@ -4186,7 +3841,7 @@ private struct ManualModeEditorScreen: View {
                             }
 
                         if !repeatsWeekly {
-                                Text("the mode will be saved without a recurring schedule.")
+                                Text("without repetition, protection stays available on demand.")
                                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -4196,9 +3851,9 @@ private struct ManualModeEditorScreen: View {
                 .padding(.top, 12)
 
                 Button {
-                    saveMode()
+                    saveSchedule()
                 } label: {
-                    Text("create mode")
+                    Text("create schedule")
                         .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                         .foregroundStyle(canSave ? primaryButtonText : secondaryColor)
                         .frame(maxWidth: .infinity)
@@ -4220,7 +3875,6 @@ private struct ManualModeEditorScreen: View {
                 .ignoresSafeArea()
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .familyActivityPicker(isPresented: $showingPicker, selection: $selection)
     }
 
     private func sectionCard<Content: View>(
@@ -4244,39 +3898,6 @@ private struct ManualModeEditorScreen: View {
                         .stroke(fieldBorder, lineWidth: 1)
                 }
         }
-    }
-
-    private var appsSummary: String {
-        let count = selection.blankedSelectionCount
-        return count == 0 ? "choose apps" : "\(count) selected"
-    }
-
-    private func configurationRow(title: String, value: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-                    .foregroundStyle(textColor)
-                Spacer()
-                Text(value)
-                    .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                    .foregroundStyle(secondaryColor)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(secondaryColor)
-            }
-            .padding(.horizontal, 18)
-            .frame(height: 50)
-            .background {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(fieldFill)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(fieldBorder, lineWidth: 1)
-                    }
-            }
-        }
-        .buttonStyle(.plain)
     }
 
     private func dayButton(weekday: Int, label: String) -> some View {
@@ -4307,10 +3928,8 @@ private struct ManualModeEditorScreen: View {
         .opacity(repeatsWeekly ? 1 : 0.45)
     }
 
-    private func saveMode() {
-        sessionStore.saveManualMode(
-            named: modeName,
-            selection: selection,
+    private func saveSchedule() {
+        sessionStore.saveManualSchedule(
             startMinute: startMinute,
             endMinute: endMinute,
             weekdays: Array(selectedWeekdays).sorted(),
@@ -5107,6 +4726,15 @@ private func formatMinute(_ minuteOfDay: Int) -> String {
     let displayHour = hour % 12 == 0 ? 12 : hour % 12
     let meridiem = hour < 12 ? "AM" : "PM"
     return "\(displayHour):\(String(format: "%02d", minute)) \(meridiem)"
+}
+
+private func distractionTimeLabel(_ minuteOfDay: Int) -> String {
+    let hour = max(0, min(23, minuteOfDay / 60))
+    let minute = max(0, min(59, minuteOfDay % 60))
+    let displayHour = hour % 12 == 0 ? 12 : hour % 12
+    let meridiem = hour < 12 ? "a.m." : "p.m."
+    let minuteText = minute == 0 ? "" : ":\(String(format: "%02d", minute))"
+    return "\(displayHour)\(minuteText) \(meridiem)"
 }
 
 private func parseMinute(_ value: String) -> Int? {

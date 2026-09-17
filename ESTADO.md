@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-17
 
 ## Resumen actual
+- 2026-09-17: Cerrado por código el gate de fiabilidad del jueves para acciones BM: ciclo estricto `queued → delivered → confirmed → execution_started → verified|failed|dismissed`, reintentos idempotentes, recuperación tras cierre/reapertura, continuidad tras permisos/selector y fallos/expiración explícitos. Product harness `32/32` y suites dirigidas en verde; quedan build iOS y prueba física, esta última bloqueada hasta la aprobación de Meta.
 - 2026-09-17: Implementada la revisión aprobada de `Sessions` en `codex/conversational-agentic-blanked`: cabecera alineada a la izquierda, estado `active` verde, días activos en negro/blanco, eliminación de `daily` y creación manual de modos con apps, horario, días y repetición semanal. Harness `31/31` y `git diff --check` en verde; falta build/revisión visual iOS.
 - 2026-09-16: Implementado el transporte BM WhatsApp→app sin enlaces largos. WhatsApp guarda propuestas confirmadas en una bandeja pendiente; iOS las consulta y conserva la confirmación nativa antes de aplicar. Commit `eca89c4`, Netlify `getblank` deploy `6aaa4e0958b7deec27e448b5`. Product harness `25/25`, release gate automatizado `16/16`; falta compilar/distribuir la build iOS para la prueba física.
 - 2026-09-16: Corrección BM integrada y publicada en Netlify `getblank` desde `29cf543`, deploy `6aaa44e8a1ae618cfcda5c6d`. Producción verificada con corrección 3→7 días, `Yea` y `It’s already opened`: enlace `apply_schedule` conservado como revisión (`review_only_actions: true`), sin ejecución automática y sin prompt repetido. Product harness `25/25`, core `84/84`, release gate automatizado `16/16`; Supabase sin cambios.
@@ -16,6 +17,7 @@ Ultima actualizacion: 2026-09-17
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-17: Implementada la persistencia local de recibos terminales antes del acuse remoto, evitando reejecutar una acción si la app se cierra o se pierde la respuesta de red. Añadida cobertura de bloqueo inmediato, horario, recurrencia, límite diario, payload exacto, duplicados, reintentos, expiración, permisos denegados y cancelación del selector.
 - 2026-09-17: Verificado por API el CTA `blankmind_choose_apps_v1`: SID `HX38d9d1202945e8f65863686f59108cf3`, categoría `MARKETING`, estado `pending`. Producción conserva el SID anterior, aún `unsubmitted`, para no activar una plantilla no aprobada. Creado seguimiento horario `Activar botón Choose Apps`, que cambiará la variable de Netlify, aplicará el cambio al runtime y hará un único envío interno solo cuando Meta marque la plantilla como `approved`; ante rechazo, no modificará producción.
 - 2026-09-17: `Sessions` actualizado en `HomeView.swift`, `SessionStore.swift` y `BlankColors.swift`. Se retiró el flujo de `manual timer` de esta pantalla y se añadió `ManualModeEditorScreen` con selector nativo de apps, horario, días, repetición semanal y persistencia del modo/plan. Validado con product harness `31/31` y `git diff --check`. La compilación iOS queda pendiente porque este entorno Windows no tiene `xcodebuild` y no hay una sesión MacinCloud abierta.
 - 2026-09-16: `assistant` retirado de la Home y conservado dentro de `settings`, con el callback existente para abrir WhatsApp/SMS/código. Commit `fc78def`; product harness `31/31`, detector Impeccable `[]`, `git diff --check` y build MacinCloud `** BUILD SUCCEEDED **`.
@@ -388,6 +390,7 @@ Ultima actualizacion: 2026-09-17
 - 2026-07-12: Tras captura del iPhone donde la Home con fondo Grey no mostraba modo/ajustes, dejaba la barra de estado blanca y el CTA parecia una barra cuadrada, se quito el esquema oscuro global y se fijo contraste, anchura y padding de `HomeView`.
 
 ## Estado actual
+- El gate automatizado de fiabilidad del jueves está completo (`32/32`); falta compilar el commit exacto y validar el E2E físico cuando el CTA de Meta esté aprobado.
 - La revisión de `Sessions` está implementada localmente en `codex/conversational-agentic-blanked`; falta compilarla y revisar la captura en Simulator/MacinCloud.
 - La ultima modificacion iOS esta en `SetupView.swift`: copy del paso 3 sin `NFC` visible y paso 1 confirmado con el estilo compartido actualizado.
 - MacinCloud compila correctamente por Terminal el commit `90623ac`, que incluye el ajuste de copy de onboarding; resultado confirmado: `** BUILD SUCCEEDED **`. Falta Run/revision visual en Xcode y, si procede, archive/subida.
@@ -513,6 +516,7 @@ Ultima actualizacion: 2026-09-17
 - El Run visual de Xcode en iPhone 17 no ha validado aun la Home porque Xcode quedo pausado por `SIGTERM`; hay que relanzar y, si se reproduce, capturar la consola/debug output.
 
 ## Proximos pasos concretos
+- Compilar en MacinCloud la rama operativa y, cuando Meta apruebe `blankmind_choose_apps_v1`, ejecutar el E2E físico y la matriz de reapertura/reintentos.
 - En MacinCloud, actualizar `codex/conversational-agentic-blanked`, compilar `Blank` y revisar visualmente `Sessions` y el flujo `new mode`/selector de apps.
 - Configurar env vars OAuth por proveedor antes de probar conexiones directas: Oura, WHOOP, Fitbit/Google Health y Withings.
 - Configurar env vars OAuth wearable en Netlify antes de probar conexiones directas.

@@ -268,6 +268,13 @@ async function linkIncludesRequestedApps() {
     assert.strictEqual(stillPendingBody.pending_action.id, pendingRows[0].id);
     assert.strictEqual(stillPendingBody.pending_action.status, "confirmed");
 
+    const started = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "ack_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp", action_id: pendingRows[0].id, status: "execution_started" }),
+    });
+    assert.strictEqual(started.statusCode, 200, started.body);
+    assert.strictEqual(JSON.parse(started.body).status, "execution_started");
+
     const verified = await assistantChannelHandler({
       httpMethod: "POST",
       body: JSON.stringify({ action: "ack_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp", action_id: pendingRows[0].id, status: "verified", detail: "schedule_persisted" }),
@@ -280,6 +287,14 @@ async function linkIncludesRequestedApps() {
       body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp" }),
     });
     assert.strictEqual(JSON.parse(terminalPoll.body).pending_action, null);
+
+    const verifiedRetry = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "ack_pending_action", app_install_id: "install-1", preferred_channel: "whatsapp", action_id: pendingRows[0].id, status: "verified", detail: "schedule_persisted" }),
+    });
+    const verifiedRetryBody = JSON.parse(verifiedRetry.body);
+    assert.strictEqual(verifiedRetryBody.acknowledged, true);
+    assert.strictEqual(verifiedRetryBody.idempotent, true);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;

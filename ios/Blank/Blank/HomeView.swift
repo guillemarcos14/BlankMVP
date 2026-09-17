@@ -20,6 +20,10 @@ struct AssistantInboxResponse: Decodable {
     }
 }
 
+private struct AssistantAcknowledgementResponse: Decodable {
+    let acknowledged: Bool
+}
+
 struct AssistantInboxAction: Decodable {
     let id: String
     let type: String
@@ -135,6 +139,52 @@ struct AssistantInboxAction: Decodable {
     }
 }
 
+struct AssistantActionReceipt: Equatable {
+    let actionId: String
+    let status: String
+    let detail: String
+    let executionStarted: Bool
+}
+
+enum AssistantActionReceiptStore {
+    private static let actionIdKey = "blankAssistantReceiptActionId"
+    private static let statusKey = "blankAssistantReceiptStatus"
+    private static let detailKey = "blankAssistantReceiptDetail"
+    private static let executionStartedKey = "blankAssistantReceiptExecutionStarted"
+
+    static func load(defaults: UserDefaults = BlankSharedState.defaults) -> AssistantActionReceipt? {
+        guard let actionId = defaults.string(forKey: actionIdKey), !actionId.isEmpty,
+              let status = defaults.string(forKey: statusKey), !status.isEmpty else { return nil }
+        return AssistantActionReceipt(
+            actionId: actionId,
+            status: status,
+            detail: defaults.string(forKey: detailKey) ?? "",
+            executionStarted: defaults.bool(forKey: executionStartedKey)
+        )
+    }
+
+    static func save(
+        actionId: String,
+        status: String,
+        detail: String,
+        executionStarted: Bool,
+        defaults: UserDefaults = BlankSharedState.defaults
+    ) {
+        defaults.set(actionId, forKey: actionIdKey)
+        defaults.set(status, forKey: statusKey)
+        defaults.set(detail, forKey: detailKey)
+        defaults.set(executionStarted, forKey: executionStartedKey)
+    }
+
+    static func clear(actionId: String, defaults: UserDefaults = BlankSharedState.defaults) {
+        guard defaults.string(forKey: actionIdKey) == actionId else { return }
+        defaults.removeObject(forKey: actionIdKey)
+        defaults.removeObject(forKey: statusKey)
+        defaults.removeObject(forKey: detailKey)
+        defaults.removeObject(forKey: executionStartedKey)
+    }
+}
+
 struct AssistantActionInboxClient {
     func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
         guard let data = try? await request(
@@ -148,8 +198,8 @@ struct AssistantActionInboxClient {
         return response.pendingAction
     }
 
-    func acknowledge(actionId: String, status: String, connectCode: String, channel: String, phoneNumber: String, detail: String = "") async {
-        _ = try? await request(
+    func acknowledge(actionId: String, status: String, connectCode: String, channel: String, phoneNumber: String, detail: String = "") async -> Bool {
+        guard let data = try? await request(
             action: "ack_pending_action",
             connectCode: connectCode,
             channel: channel,
@@ -157,6 +207,41 @@ struct AssistantActionInboxClient {
             actionId: actionId,
             status: status,
             detail: detail
+        ), let response = try? JSONDecoder().decode(AssistantAcknowledgementResponse.self, from: data) else {
+            return false
+        }
+        return response.acknowledged
+    }
+
+    func acknowledgeLifecycle(
+        receipt: AssistantActionReceipt,
+        connectCode: String,
+        channel: String,
+        phoneNumber: String
+    ) async -> Bool {
+        if receipt.executionStarted {
+            guard await acknowledge(
+                actionId: receipt.actionId,
+                status: "confirmed",
+                connectCode: connectCode,
+                channel: channel,
+                phoneNumber: phoneNumber
+            ) else { return false }
+            guard await acknowledge(
+                actionId: receipt.actionId,
+                status: "execution_started",
+                connectCode: connectCode,
+                channel: channel,
+                phoneNumber: phoneNumber
+            ) else { return false }
+        }
+        return await acknowledge(
+            actionId: receipt.actionId,
+            status: receipt.status,
+            connectCode: connectCode,
+            channel: channel,
+            phoneNumber: phoneNumber,
+            detail: receipt.detail
         )
     }
 
@@ -469,8 +554,8 @@ struct HomeView: View {
                 contextualPlanSelection = FamilyActivitySelection()
                 if !pendingAssistantActionId.isEmpty {
                     finishPendingAssistantAction(
-                        status: assistantActionApplied ? "verified" : "failed",
-                        detail: assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_not_completed"
+                        status: assistantActionApplied ? "verified" : "dismissed",
+                        detail: assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_cancelled"
                     )
                 }
             }
@@ -1380,6 +1465,25 @@ struct HomeView: View {
 
     private func confirmPendingAssistantAction() {
         guard let pendingAction = sessionStore.pendingAssistantAction else { return }
+        if assistantActionRequiresScreenTime(pendingAction), screenTimeBlocker.authorizationStatus != .approved {
+            assistantActionExecutionInFlight = true
+            Task {
+                _ = await screenTimeBlocker.requestAuthorization()
+                await MainActor.run {
+                    if screenTimeBlocker.authorizationStatus == .approved {
+                        confirmPendingAssistantAction()
+                    } else {
+                        sessionStore.clearAssistantActionConfirmation()
+                        finishPendingAssistantAction(
+                            status: "failed",
+                            detail: "screen_time_permission_denied",
+                            executionStarted: false
+                        )
+                    }
+                }
+            }
+            return
+        }
         assistantActionExecutionInFlight = true
         sessionStore.clearAssistantActionConfirmation()
         switch pendingAction {
@@ -1580,37 +1684,50 @@ struct HomeView: View {
         }
     }
 
-    private func finishPendingAssistantAction(status: String, detail: String) {
+    private func assistantActionRequiresScreenTime(_ action: AssistantPendingAction) -> Bool {
+        switch action {
+        case .pauseRules, .disablePause, .requestScreenTimePermission:
+            return false
+        default:
+            return true
+        }
+    }
+
+    private func finishPendingAssistantAction(status: String, detail: String, executionStarted: Bool = true) {
         let actionId = pendingAssistantActionId
         let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
         let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
-        assistantActionExecutionInFlight = false
-        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
-        pendingAssistantActionId = ""
+        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else {
+            assistantActionExecutionInFlight = false
+            return
+        }
         let phoneNumber = assistantPhoneNumber
+        let receipt = AssistantActionReceipt(
+            actionId: actionId,
+            status: status,
+            detail: detail,
+            executionStarted: executionStarted && status != "dismissed"
+        )
+        AssistantActionReceiptStore.save(
+            actionId: receipt.actionId,
+            status: receipt.status,
+            detail: receipt.detail,
+            executionStarted: receipt.executionStarted
+        )
         Task {
-            await AssistantActionInboxClient().acknowledge(
-                actionId: actionId,
-                status: "confirmed",
+            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                receipt: receipt,
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phoneNumber
             )
-            await AssistantActionInboxClient().acknowledge(
-                actionId: actionId,
-                status: "execution_started",
-                connectCode: code,
-                channel: channel,
-                phoneNumber: phoneNumber
-            )
-            await AssistantActionInboxClient().acknowledge(
-                actionId: actionId,
-                status: status,
-                connectCode: code,
-                channel: channel,
-                phoneNumber: phoneNumber,
-                detail: detail
-            )
+            await MainActor.run {
+                assistantActionExecutionInFlight = false
+                if acknowledged {
+                    AssistantActionReceiptStore.clear(actionId: actionId)
+                    pendingAssistantActionId = ""
+                }
+            }
         }
     }
 
@@ -1724,6 +1841,27 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
+        if let receipt = AssistantActionReceiptStore.load() {
+            Task {
+                let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                    receipt: receipt,
+                    connectCode: code,
+                    channel: channel,
+                    phoneNumber: phoneNumber
+                )
+                await MainActor.run {
+                    assistantActionPollInFlight = false
+                    if acknowledged {
+                        AssistantActionReceiptStore.clear(actionId: receipt.actionId)
+                        if pendingAssistantActionId == receipt.actionId {
+                            pendingAssistantActionId = ""
+                        }
+                        pollPendingAssistantActionIfNeeded(force: true)
+                    }
+                }
+            }
+            return
+        }
         Task {
             let remoteAction = await AssistantActionInboxClient().poll(
                 connectCode: code,
@@ -1747,20 +1885,39 @@ struct HomeView: View {
         let actionId = pendingAssistantActionId
         let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
         let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
-        pendingAssistantActionId = ""
-        assistantActionExecutionInFlight = false
         sessionStore.clearAssistantActionConfirmation()
-        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
+        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else {
+            assistantActionExecutionInFlight = false
+            return
+        }
         lastAssistantActionPollAt = Date()
         let phoneNumber = assistantPhoneNumber
+        let receipt = AssistantActionReceipt(
+            actionId: actionId,
+            status: status,
+            detail: "user_cancelled",
+            executionStarted: false
+        )
+        AssistantActionReceiptStore.save(
+            actionId: receipt.actionId,
+            status: receipt.status,
+            detail: receipt.detail,
+            executionStarted: receipt.executionStarted
+        )
         Task {
-            await AssistantActionInboxClient().acknowledge(
-                actionId: actionId,
-                status: status,
+            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                receipt: receipt,
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phoneNumber
             )
+            await MainActor.run {
+                assistantActionExecutionInFlight = false
+                if acknowledged {
+                    AssistantActionReceiptStore.clear(actionId: actionId)
+                    pendingAssistantActionId = ""
+                }
+            }
         }
     }
 

@@ -169,6 +169,49 @@ const PENDING_ACTION_TYPES = new Set([
   "open_app_picker", "request_screen_time_permission",
 ]);
 
+const TERMINAL_ACTION_STATUSES = new Set(["verified", "failed", "dismissed"]);
+const ACTION_STATUS_TRANSITIONS = {
+  queued: new Set(["delivered"]),
+  delivered: new Set(["confirmed", "failed", "dismissed"]),
+  confirmed: new Set(["execution_started", "failed", "dismissed"]),
+  execution_started: new Set(["verified", "failed"]),
+  verified: new Set(),
+  failed: new Set(),
+  dismissed: new Set(),
+};
+const ACTION_STATUS_RANK = {
+  queued: 0,
+  delivered: 1,
+  confirmed: 2,
+  execution_started: 3,
+  verified: 4,
+  failed: 4,
+  dismissed: 4,
+};
+
+function normalizeActionStatus(value) {
+  const status = cleanText(value, 24).toLowerCase();
+  return status === "received" ? "delivered" : status;
+}
+
+function pendingActionTransition(currentValue, requestedValue) {
+  const current = normalizeActionStatus(currentValue) || "queued";
+  const requested = normalizeActionStatus(requestedValue);
+  if (!ACTION_STATUS_TRANSITIONS[current] || !ACTION_STATUS_TRANSITIONS[requested]) {
+    return { allowed: false, idempotent: false, current, requested, reason: "invalid_status" };
+  }
+  if (current === requested) {
+    return { allowed: true, idempotent: true, current, requested, next: current };
+  }
+  if (ACTION_STATUS_RANK[requested] < ACTION_STATUS_RANK[current]) {
+    return { allowed: true, idempotent: true, current, requested, next: current };
+  }
+  if (!ACTION_STATUS_TRANSITIONS[current].has(requested)) {
+    return { allowed: false, idempotent: false, current, requested, reason: "invalid_transition" };
+  }
+  return { allowed: true, idempotent: false, current, requested, next: requested };
+}
+
 function normalizePendingAction(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const id = cleanText(value.id, 80);
@@ -196,7 +239,7 @@ function normalizePendingAction(value) {
     summary: cleanText(value.summary, 320),
     created_at: cleanText(value.created_at, 40),
     expires_at: new Date(expiresAt).toISOString(),
-    status: cleanText(value.status, 24) || "queued",
+    status: normalizeActionStatus(value.status) || "queued",
     delivered_at: cleanText(value.delivered_at, 40),
     confirmed_at: cleanText(value.confirmed_at, 40),
     execution_started_at: cleanText(value.execution_started_at, 40),
@@ -231,15 +274,37 @@ async function pollPendingAction(body) {
   const memory = await getAssistantMemory(result.connection.channel, result.connection.channelUser);
   const pending = normalizePendingAction(memory.pending_assistant_action);
   if (!pending && memory.pending_assistant_action) {
+    const expired = memory.pending_assistant_action;
+    const expiredAt = Date.parse(expired.expires_at || "");
+    const expiredOutcome = Number.isFinite(expiredAt) && expiredAt <= Date.now()
+      ? {
+          id: cleanText(expired.id, 80),
+          type: cleanText(expired.type, 60),
+          status: "failed",
+          resolved_at: new Date().toISOString(),
+          detail: "action_expired_before_execution",
+        }
+      : null;
     await recordAssistantMemory({
       channel: result.connection.channel,
       channelUser: result.connection.channelUser,
-      memory: { pending_assistant_action: null },
+      memory: {
+        pending_assistant_action: null,
+        ...(expiredOutcome ? { last_assistant_action_outcome: expiredOutcome } : {}),
+      },
       source: "assistant_action_expired",
     });
+    if (expiredOutcome) {
+      const spanish = String(memory.language || "").toLowerCase().startsWith("es");
+      const message = spanish
+        ? "La acción caducó antes de llegar al iPhone. No se aplicó ningún cambio. Puedes pedírmela otra vez."
+        : "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
+      try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The explicit outcome remains recorded. */ }
+    }
   }
   if (pending && pending.status === "queued") {
-    const delivered = { ...memory.pending_assistant_action, status: "delivered", delivered_at: new Date().toISOString() };
+    const transition = pendingActionTransition(pending.status, "delivered");
+    const delivered = { ...memory.pending_assistant_action, status: transition.next, delivered_at: new Date().toISOString() };
     await recordAssistantMemory({
       channel: result.connection.channel,
       channelUser: result.connection.channelUser,
@@ -258,22 +323,47 @@ async function pollPendingAction(body) {
 async function acknowledgePendingAction(body) {
   const result = await connectedChannel(body);
   const actionId = cleanText(body.action_id, 80);
-  const status = ["received", "confirmed", "execution_started", "verified", "failed", "dismissed"].includes(cleanText(body.status, 24).toLowerCase())
-    ? cleanText(body.status, 20).toLowerCase()
-    : "failed";
+  const status = normalizeActionStatus(body.status);
   if (result.error || !actionId) return json(400, { error: result.error || "missing_action_id" });
+  if (!ACTION_STATUS_TRANSITIONS[status]) return json(400, { error: "invalid_action_status" });
   if (!result.connection) return json(200, { ok: true, acknowledged: false, reason: "not_linked" });
 
   const memory = await getAssistantMemory(result.connection.channel, result.connection.channelUser);
-  const pending = normalizePendingAction(memory.pending_assistant_action);
+  const rawPending = memory.pending_assistant_action;
+  const pending = normalizePendingAction(rawPending)
+    || (cleanText(rawPending?.id, 80) === actionId
+      ? normalizePendingAction({ ...rawPending, expires_at: new Date(Date.now() + 60_000).toISOString() })
+      : null);
   if (!pending || pending.id !== actionId) {
+    const outcome = memory.last_assistant_action_outcome;
+    if (outcome?.id === actionId && TERMINAL_ACTION_STATUSES.has(normalizeActionStatus(outcome.status))) {
+      return json(200, {
+        ok: true,
+        acknowledged: true,
+        idempotent: true,
+        status: normalizeActionStatus(outcome.status),
+      });
+    }
     return json(200, { ok: true, acknowledged: false, reason: pending ? "action_mismatch" : "no_pending_action" });
   }
+  const transition = pendingActionTransition(pending.status, status);
+  if (!transition.allowed) {
+    return json(200, {
+      ok: true,
+      acknowledged: false,
+      reason: transition.reason,
+      current_status: transition.current,
+      requested_status: transition.requested,
+    });
+  }
+  if (transition.idempotent) {
+    return json(200, { ok: true, acknowledged: true, idempotent: true, status: transition.next });
+  }
   const now = new Date().toISOString();
-  const terminal = ["verified", "failed", "dismissed"].includes(status);
+  const terminal = TERMINAL_ACTION_STATUSES.has(status);
   const timestampKey = status === "confirmed" ? "confirmed_at"
     : status === "execution_started" ? "execution_started_at"
-      : status === "received" ? "delivered_at" : "resolved_at";
+      : status === "delivered" ? "delivered_at" : "resolved_at";
   const updated = { ...memory.pending_assistant_action, status, [timestampKey]: now };
   await recordAssistantMemory({
     channel: result.connection.channel,
@@ -306,6 +396,10 @@ async function acknowledgePendingAction(body) {
       } else {
         message = spanish ? "Hecho. El cambio está aplicado y verificado." : "Done. The change is applied and verified.";
       }
+    } else if (status === "dismissed") {
+      message = spanish
+        ? "Cancelado. No se ha cambiado nada en el iPhone."
+        : "Cancelled. Nothing was changed on the iPhone.";
     } else {
       message = spanish
         ? "No he podido aplicar el bloqueo en el iPhone. No se ha marcado como completado."
@@ -336,3 +430,4 @@ exports.handler = async (event) => {
 };
 
 exports.normalizePendingAction = normalizePendingAction;
+exports.pendingActionTransition = pendingActionTransition;

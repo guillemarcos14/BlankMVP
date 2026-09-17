@@ -1,0 +1,92 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { normalizePendingAction, pendingActionTransition } = require("../netlify/functions/assistant-channel");
+
+const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+function action(overrides = {}) {
+  return {
+    id: "action-1",
+    type: "start_protection",
+    name: "Instagram",
+    minutes: 18,
+    hard_mode: true,
+    app_names: ["Instagram"],
+    status: "queued",
+    created_at: new Date().toISOString(),
+    expires_at: future,
+    ...overrides,
+  };
+}
+
+function assertTransition(current, requested, expected) {
+  const result = pendingActionTransition(current, requested);
+  assert.equal(result.allowed, expected, `${current} -> ${requested}`);
+  return result;
+}
+
+assertTransition("queued", "delivered", true);
+assertTransition("delivered", "confirmed", true);
+assertTransition("confirmed", "execution_started", true);
+assertTransition("execution_started", "verified", true);
+assertTransition("execution_started", "failed", true);
+assertTransition("delivered", "dismissed", true);
+assertTransition("delivered", "verified", false);
+assertTransition("verified", "failed", false);
+assert.equal(assertTransition("execution_started", "confirmed", true).idempotent, true, "retrying an earlier stage must be safe");
+assert.equal(assertTransition("verified", "verified", true).idempotent, true, "terminal retries must be safe");
+
+const immediate = normalizePendingAction(action());
+assert.equal(immediate.minutes, 18);
+assert.equal(immediate.hard_mode, true);
+assert.deepEqual(immediate.app_names, ["Instagram"]);
+
+const schedule = normalizePendingAction(action({
+  id: "schedule-1",
+  type: "apply_schedule",
+  name: "Instagram evenings",
+  source_mode_name: "Routine",
+  copy_mode: true,
+  minutes: null,
+  start_minute: 1230,
+  end_minute: 1320,
+  weekdays: [1, 3, 5],
+  duration_days: 11,
+}));
+assert.equal(schedule.copy_mode, true);
+assert.equal(schedule.source_mode_name, "Routine");
+assert.equal(schedule.start_minute, 1230);
+assert.equal(schedule.end_minute, 1320);
+assert.deepEqual(schedule.weekdays, [1, 3, 5]);
+assert.equal(schedule.duration_days, 11);
+
+const dailyLimit = normalizePendingAction(action({
+  id: "daily-1",
+  type: "set_daily_limit",
+  name: "Daily Limit",
+  minutes: 25,
+}));
+assert.equal(dailyLimit.minutes, 25);
+assert.deepEqual(dailyLimit.app_names, ["Instagram"]);
+
+assert.equal(normalizePendingAction(action({ expires_at: new Date(Date.now() - 1).toISOString() })), null);
+
+const root = path.resolve(__dirname, "..");
+const home = fs.readFileSync(path.join(root, "ios", "Blank", "Blank", "HomeView.swift"), "utf8");
+const app = fs.readFileSync(path.join(root, "ios", "Blank", "Blank", "BlankApp.swift"), "utf8");
+const channel = fs.readFileSync(path.join(root, "netlify", "functions", "assistant-channel.js"), "utf8");
+
+assert.match(home, /AssistantActionReceiptStore\.save/, "foreground outcomes must survive relaunch until acknowledged");
+assert.match(home, /AssistantActionReceiptStore\.load/, "foreground must retry an unacknowledged outcome before polling again");
+assert.match(home, /acknowledgeLifecycle/, "foreground lifecycle delivery must be retryable");
+assert.match(home, /screen_time_permission_denied/, "permission denial must end explicitly");
+assert.match(home, /status: assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
+assert.match(app, /AssistantActionReceiptStore\.load/, "background execution must recover an unacknowledged outcome");
+assert.match(app, /guard await client\.acknowledge\([\s\S]*?status: "confirmed"/, "background execution must not start before confirmation is recorded");
+assert.match(channel, /action_expired_before_execution/, "expired actions must have an explicit terminal outcome");
+assert.match(channel, /Cancelled\. Nothing was changed on the iPhone\./, "dismissal must be reported accurately");
+
+console.log("bm_thursday_reliability_test passed: lifecycle, retries, expiry, permission, selection and action variants");

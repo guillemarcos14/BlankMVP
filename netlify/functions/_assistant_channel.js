@@ -268,7 +268,7 @@ async function getAssistantMemory(channel, channelUser) {
   const normalizedUser = cleanText(channelUser, 160);
   if (!normalizedChannel || !normalizedUser) return {};
   const rows = await supabaseFetch(
-    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantChannelUserId(normalizedChannel, normalizedUser))}&select=payload,submitted_at&order=submitted_at.desc&limit=20`,
+    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantChannelUserId(normalizedChannel, normalizedUser))}&select=payload,submitted_at&order=submitted_at.desc&limit=100`,
     { method: "GET" }
   );
   const memory = rows.reverse().reduce((memory, row) => {

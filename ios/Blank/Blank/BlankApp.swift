@@ -439,8 +439,22 @@ private struct AssistantBackgroundActionRunner {
         let rawChannel = defaults.string(forKey: "blankAssistantPreferredChannel") ?? ""
         let channel = rawChannel == "whatsApp" ? "whatsapp" : rawChannel.lowercased()
         let phone = defaults.string(forKey: "blankAssistantPhoneNumber") ?? ""
-        guard ["whatsapp", "sms"].contains(channel),
-              let remote = await AssistantActionInboxClient().poll(connectCode: code, channel: channel, phoneNumber: phone),
+        guard ["whatsapp", "sms"].contains(channel) else { return .noData }
+        let client = AssistantActionInboxClient()
+        if let receipt = AssistantActionReceiptStore.load(defaults: defaults) {
+            let acknowledged = await client.acknowledgeLifecycle(
+                receipt: receipt,
+                connectCode: code,
+                channel: channel,
+                phoneNumber: phone
+            )
+            if acknowledged {
+                AssistantActionReceiptStore.clear(actionId: receipt.actionId, defaults: defaults)
+                return .newData
+            }
+            return .failed
+        }
+        guard let remote = await client.poll(connectCode: code, channel: channel, phoneNumber: phone),
               let action = remote.toPendingAction() else { return .noData }
 
         if case .openAppPicker = action { return .noData }
@@ -448,28 +462,69 @@ private struct AssistantBackgroundActionRunner {
         if case .configureAndOpenDailyLimitPicker = action { return .noData }
         if case .requestScreenTimePermission = action { return .noData }
 
-        let client = AssistantActionInboxClient()
-        await client.acknowledge(actionId: remote.id, status: "confirmed", connectCode: code, channel: channel, phoneNumber: phone)
-        await client.acknowledge(actionId: remote.id, status: "execution_started", connectCode: code, channel: channel, phoneNumber: phone)
+        guard await client.acknowledge(
+            actionId: remote.id,
+            status: "confirmed",
+            connectCode: code,
+            channel: channel,
+            phoneNumber: phone
+        ) else { return .failed }
+        guard await client.acknowledge(
+            actionId: remote.id,
+            status: "execution_started",
+            connectCode: code,
+            channel: channel,
+            phoneNumber: phone
+        ) else { return .failed }
 
         let store = SessionStore(defaults: defaults)
         let blocker = ScreenTimeBlocker()
         await blocker.restore(selection: store.selection)
         blocker.refreshAuthorizationStatus()
         guard blocker.authorizationStatus == .approved else {
-            await client.acknowledge(actionId: remote.id, status: "failed", connectCode: code, channel: channel, phoneNumber: phone, detail: "screen_time_permission_required")
+            let receipt = AssistantActionReceipt(
+                actionId: remote.id,
+                status: "failed",
+                detail: "screen_time_permission_required",
+                executionStarted: true
+            )
+            AssistantActionReceiptStore.save(
+                actionId: receipt.actionId,
+                status: receipt.status,
+                detail: receipt.detail,
+                executionStarted: receipt.executionStarted,
+                defaults: defaults
+            )
+            if await client.acknowledge(actionId: remote.id, status: receipt.status, connectCode: code, channel: channel, phoneNumber: phone, detail: receipt.detail) {
+                AssistantActionReceiptStore.clear(actionId: receipt.actionId, defaults: defaults)
+            }
             return .failed
         }
 
         let outcome = execute(action, store: store, blocker: blocker)
-        await client.acknowledge(
+        let receipt = AssistantActionReceipt(
             actionId: remote.id,
             status: outcome.verified ? "verified" : "failed",
+            detail: outcome.detail,
+            executionStarted: true
+        )
+        AssistantActionReceiptStore.save(
+            actionId: receipt.actionId,
+            status: receipt.status,
+            detail: receipt.detail,
+            executionStarted: receipt.executionStarted,
+            defaults: defaults
+        )
+        if await client.acknowledge(
+            actionId: remote.id,
+            status: receipt.status,
             connectCode: code,
             channel: channel,
             phoneNumber: phone,
-            detail: outcome.detail
-        )
+            detail: receipt.detail
+        ) {
+            AssistantActionReceiptStore.clear(actionId: receipt.actionId, defaults: defaults)
+        }
         return outcome.verified ? .newData : .failed
     }
 

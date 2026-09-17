@@ -57,7 +57,7 @@ enum BlankColors {
     static let darkCardSurface = paleSteelBlue.opacity(0.16)
     static let newLookDarkBackground = charcoal
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
-    static let homeLightBackground = powderGray
+    static let homeLightBackground = pureWhite
     static let homeLightInk = charcoal
     static let homeLightOption = secondaryText
     static let homeLightSecondary = charcoal.opacity(0.68)

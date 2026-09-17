@@ -320,23 +320,15 @@ struct ReportView: View {
                     .padding(.bottom, 30)
             }
             .padding(.horizontal, 0)
-            .padding(.top, 12)
+            .padding(.top, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func newLookProgressHeader() -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 0) {
             if let onClose {
-                Button(action: onClose) {
-                    Text("back")
-                        .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
-                        .tracking(-0.3)
-                        .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : accentBlue)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("back")
+                SectionBackHeader(action: onClose)
             }
 
             TopSheetHeader(
@@ -345,6 +337,7 @@ struct ReportView: View {
                 titleColor: reportPrimary,
                 subtitleColor: reportSecondary
             )
+            .padding(.bottom, 24)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

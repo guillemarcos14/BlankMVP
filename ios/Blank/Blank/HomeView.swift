@@ -769,15 +769,15 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
-                minimalHomeRow("sessions", color: BlankColors.homeLightSecondary) {
+                minimalHomeRow("sessions", color: BlankColors.paleSteelBlue) {
                     openSection(.sessions)
                 }
 
-                minimalHomeRow("progress", color: BlankColors.homeLightSecondary) {
+                minimalHomeRow("progress", color: BlankColors.paleSteelBlue) {
                     openSection(.report)
                 }
 
-                minimalHomeRow("settings", color: BlankColors.homeLightSecondary) {
+                minimalHomeRow("settings", color: BlankColors.paleSteelBlue) {
                     openSection(.settings)
                 }
 
@@ -904,7 +904,7 @@ struct HomeView: View {
                     .foregroundStyle(BlankColors.pureWhite)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
-                    .lineSpacing(1.1)
+                    .lineSpacing(0.8)
                     .opacity(1 - unblankHoldProgress)
                     .transition(.opacity)
             } else if let cooldownText {
@@ -934,9 +934,6 @@ struct HomeView: View {
 
     private var activeExpandedNavigation: some View {
         VStack(alignment: .leading, spacing: -8) {
-            minimalHomeRow("unblank", color: BlankColors.homeDarkSecondary) {
-                beginFullScreenUnblankHold()
-            }
             minimalHomeRow("sessions", color: BlankColors.homeDarkSecondary) {
                 openSection(.sessions)
             }
@@ -2251,13 +2248,15 @@ private struct ModesList: View {
     private var newLookPlan: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                SectionBackHeader(action: onFinish)
+
                 TopSheetHeader(
                     title: "Plan",
                     subtitle: "Protection, routines and safeguards.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
-                .padding(.bottom, 34)
+                .padding(.bottom, 24)
 
                 Text(sessionStore.currentMode.name.lowercased())
                     .font(.blankInter(size: 32, weight: .bold, relativeTo: .title2))
@@ -2286,6 +2285,7 @@ private struct ModesList: View {
                     .padding(.bottom, 34)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 16)
         }
         .padding(.horizontal, sectionHorizontalPadding)
     }
@@ -2790,8 +2790,6 @@ struct HomeSectionScreen: View {
     private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
 
     var body: some View {
-        let contentTop: CGFloat = 94
-        let contentHeight = max(0, screenHeight - contentTop)
         let sectionHorizontalPadding = min(max(screenWidth * 0.075, 28), 36)
         let contentWidth = screenWidth
         let minimalAppearance = true
@@ -2808,31 +2806,9 @@ struct HomeSectionScreen: View {
             routeContent
                 .environment(\.blankMinimalAppearance, minimalAppearance)
                 .environment(\.blankSectionHorizontalPadding, sectionHorizontalPadding)
-                .frame(width: contentWidth, height: contentHeight, alignment: .top)
-                .frame(width: screenWidth, height: contentHeight, alignment: .top)
-                .offset(x: horizontalOffset, y: contentTop)
-
-            if section != .report {
-                Button {
-                    onClose()
-                } label: {
-                    Group {
-                        if minimalAppearance {
-                            Text("back")
-                                .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
-                                .tracking(-0.3)
-                        } else {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 22, weight: .regular))
-                        }
-                    }
-                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
-                    .frame(minWidth: 44, minHeight: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .position(x: 64, y: 84)
-            }
+                .frame(width: contentWidth, height: screenHeight, alignment: .top)
+                .frame(width: screenWidth, height: screenHeight, alignment: .top)
+                .offset(x: horizontalOffset)
         }
         .frame(width: screenWidth, height: screenHeight, alignment: .topLeading)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -2846,21 +2822,21 @@ struct HomeSectionScreen: View {
                 onClose()
             }
         case .schedule:
-            ScheduleEditorContent {
-                onClose()
-            }
+            ScheduleEditorContent(onSave: onClose, onClose: onClose)
         case .report:
             ReportView(usesMainBackground: true, onClose: onClose)
         case .emergency:
             EmergencyScreen(
                 emergencyUnlocksRemaining: sessionStore.emergencyUnlocksRemaining,
                 intervention: intervention,
-                onUnlock: onEmergencyUnlock
+                onUnlock: onEmergencyUnlock,
+                onClose: onClose
             )
         case .sessions:
-            SessionsScreen()
+            SessionsScreen(onClose: onClose)
         case .settings:
             SettingsScreen(
+                onClose: onClose,
                 onOpenEmergency: { onOpenSection(.emergency) },
                 onOpenAssistant: onOpenAssistant,
                 onRequestScreenTimePermission: onRequestScreenTimePermission,
@@ -2872,10 +2848,33 @@ struct HomeSectionScreen: View {
     }
 }
 
+struct SectionBackHeader: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: action) {
+                Text("back")
+                    .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                    .tracking(-0.3)
+                    .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("back")
+
+            Spacer()
+        }
+        .padding(.bottom, 22)
+    }
+}
+
 private struct SettingsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
 
+    let onClose: () -> Void
     let onOpenEmergency: () -> Void
     let onOpenAssistant: () -> Void
     let onRequestScreenTimePermission: () -> Void
@@ -2889,13 +2888,15 @@ private struct SettingsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                SectionBackHeader(action: onClose)
+
                 TopSheetHeader(
                     title: "settings",
                     subtitle: "access, support and preferences.",
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
-                .padding(.bottom, 28)
+                .padding(.bottom, 24)
 
                 settingsRow(
                     title: "emergency",
@@ -2922,6 +2923,7 @@ private struct SettingsScreen: View {
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 16)
         }
         .padding(.horizontal, sectionHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -2959,6 +2961,7 @@ private struct ScheduleEditorContent: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     let onSave: () -> Void
+    let onClose: () -> Void
     @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
     private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
@@ -2966,12 +2969,17 @@ private struct ScheduleEditorContent: View {
     var body: some View {
         List {
             VStack(alignment: .center, spacing: 16) {
-                TopSheetHeader(
-                    title: "Routines",
-                    subtitle: "BM schedules routines.\nYou review and override them here.",
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
+                VStack(alignment: .leading, spacing: 0) {
+                    SectionBackHeader(action: onClose)
+
+                    TopSheetHeader(
+                        title: "Routines",
+                        subtitle: "BM schedules routines.\nYou review and override them here.",
+                        titleColor: textColor,
+                        subtitleColor: secondaryColor
+                    )
+                }
+                .padding(.bottom, 8)
 
                 baiHabitsSummary
 
@@ -3027,7 +3035,7 @@ private struct ScheduleEditorContent: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.top, 24)
+            .padding(.top, 16)
             .padding(.bottom, 34)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
@@ -3507,14 +3515,14 @@ private struct RelapseReviewSheet: View {
             let bottomInset = max(proxy.safeAreaInsets.bottom + 18, 34) + 51
 
             ZStack {
-                BlankColors.homeLightBackground
+                BlankColors.homeDarkBackground
                     .ignoresSafeArea()
 
                 ZStack(alignment: .bottomLeading) {
                     Text("why now?")
                         .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
                         .tracking(-1.1)
-                        .foregroundStyle(BlankColors.homeLightInk)
+                        .foregroundStyle(BlankColors.pureWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -3535,7 +3543,7 @@ private struct RelapseReviewSheet: View {
                             Text("skip")
                                 .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                                 .tracking(-0.6)
-                                .foregroundStyle(BlankColors.homeLightSecondary)
+                                .foregroundStyle(BlankColors.homeDarkSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -3549,7 +3557,7 @@ private struct RelapseReviewSheet: View {
                 .padding(.horizontal, horizontalPadding)
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -3561,7 +3569,7 @@ private struct RelapseReasonTile: View {
             Text(reason.title.lowercased())
                 .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
                 .tracking(-0.6)
-                .foregroundStyle(BlankColors.homeLightOption)
+                .foregroundStyle(BlankColors.homeDarkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }
@@ -3585,15 +3593,18 @@ private struct EmergencyScreen: View {
     let emergencyUnlocksRemaining: Int
     let intervention: RelapseIntervention
     let onUnlock: () -> Bool
+    let onClose: () -> Void
     @State private var isConfirming = false
     private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
     private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     var body: some View {
-        VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 18 : 22) {
-            Spacer(minLength: 0)
+        VStack(alignment: minimalAppearance ? .leading : .center, spacing: 0) {
+            if minimalAppearance {
+                SectionBackHeader(action: onClose)
+            }
 
-            VStack(alignment: minimalAppearance ? .leading : .center, spacing: 10) {
+            VStack(alignment: minimalAppearance ? .leading : .center, spacing: minimalAppearance ? 0 : 10) {
                 if !minimalAppearance {
                     Image(systemName: isConfirming ? "lock.open.fill" : "shield.lefthalf.filled")
                         .font(.system(size: 22, weight: .semibold))
@@ -3620,10 +3631,13 @@ private struct EmergencyScreen: View {
                     .multilineTextAlignment(minimalAppearance ? .leading : .center)
                     .lineSpacing(minimalAppearance ? 0 : 3)
                     .frame(maxWidth: 300)
+                    .padding(.top, minimalAppearance ? 5 : 0)
+                    .padding(.bottom, minimalAppearance ? 24 : 0)
             }
             .frame(maxWidth: .infinity, alignment: minimalAppearance ? .leading : .center)
 
             emergencyAllowance
+                .padding(.bottom, minimalAppearance ? 24 : 0)
 
             VStack(spacing: 12) {
                 if isConfirming {
@@ -3652,6 +3666,7 @@ private struct EmergencyScreen: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, sectionHorizontalPadding)
+        .padding(.top, minimalAppearance ? 16 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3804,6 +3819,7 @@ private struct SessionsScreen: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
+    let onClose: () -> Void
     @State private var showingManualMode = false
 
     private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
@@ -3839,13 +3855,15 @@ private struct SessionsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
+                SectionBackHeader(action: onClose)
+
                 TopSheetHeader(
                     title: "sessions",
                     subtitle: activePlansSubtitle,
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
-                .padding(.bottom, 28)
+                .padding(.bottom, 24)
 
                 if activePlans.isEmpty {
                     emptyPlans
@@ -3863,7 +3881,7 @@ private struct SessionsScreen: View {
                 Spacer(minLength: 24)
             }
             .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.top, 12)
+            .padding(.top, 16)
             .padding(.bottom, 24)
         }
         .background(Color.clear)

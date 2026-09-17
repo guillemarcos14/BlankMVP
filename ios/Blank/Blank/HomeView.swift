@@ -3618,10 +3618,6 @@ private struct DistractionsScreen: View {
         sessionStore.schedule.activeWindows
     }
 
-    private var applicationTokens {
-        Array(sessionStore.selection.applicationTokens)
-    }
-
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
@@ -3649,7 +3645,7 @@ private struct DistractionsScreen: View {
                                     .foregroundStyle(secondaryColor)
                                     .frame(minHeight: 44, alignment: .leading)
                             } else {
-                                ForEach(applicationTokens, id: \.self) { token in
+                                ForEach(Array(sessionStore.selection.applicationTokens), id: \.self) { token in
                                     Label(token)
                                         .labelStyle(.titleOnly)
                                         .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))

@@ -164,10 +164,39 @@ async function findAssistantConnection(connectCode, preferredChannel = "") {
   return channel && channelUser ? { channel, channelUser, connectCode: normalizedCode } : null;
 }
 
+function connectionForChannelUser(rows, channel, channelUser) {
+  const normalizedChannel = cleanChannel(channel);
+  const normalizedUser = cleanText(channelUser, 160);
+  const match = (Array.isArray(rows) ? rows : [])
+    .map((row) => row?.payload?.properties || {})
+    .find((props) => cleanChannel(props.channel || props.preferred_channel) === normalizedChannel
+      && cleanText(props.channel_user, 160) === normalizedUser
+      && normalizeConnectCode(props.connect_code));
+  if (!match) return null;
+  return {
+    channel: normalizedChannel,
+    channelUser: normalizedUser,
+    connectCode: normalizeConnectCode(match.connect_code),
+  };
+}
+
+async function findAssistantConnectionForChannelUser(channel, channelUser) {
+  const normalizedChannel = cleanChannel(channel);
+  const normalizedUser = cleanText(channelUser, 160);
+  if (!normalizedChannel || !normalizedUser) return null;
+  const rows = await supabaseFetch(
+    `${EVENT_TABLE}?payload->properties->>channel_user=eq.${encodeURIComponent(normalizedUser)}&select=payload,submitted_at&order=submitted_at.desc&limit=50`,
+    { method: "GET" }
+  );
+  return connectionForChannelUser(rows, normalizedChannel, normalizedUser);
+}
+
 async function ensureAssistantConnectionForPhone({ channel, channelUser }) {
   const normalizedChannel = cleanChannel(channel);
   const normalizedPhone = cleanText(channelUser, 160);
   if (!normalizedChannel || !normalizedPhone) return null;
+  const existing = await findAssistantConnectionForChannelUser(normalizedChannel, normalizedPhone);
+  if (existing) return existing;
   const identity = await identityForPhone(normalizedPhone);
   if (!identity?.assistant_connect_code) return null;
   const connectCode = normalizeConnectCode(identity.assistant_connect_code);
@@ -593,6 +622,8 @@ module.exports = {
   completeAssistantInboundMessage,
   releaseAssistantInboundMessage,
   findAssistantConnection,
+  findAssistantConnectionForChannelUser,
+  connectionForChannelUser,
   ensureAssistantConnectionForPhone,
   getAssistantUserContext,
   getAssistantMemory,

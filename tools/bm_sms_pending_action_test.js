@@ -8,6 +8,23 @@ process.env.BLANKED_PUBLIC_APP_LINK_BASE = "https://getblank.netlify.app";
 const channel = require("../netlify/functions/_assistant_channel");
 let memory;
 
+const directConnection = channel.connectionForChannelUser([
+  {
+    payload: {
+      properties: {
+        channel: "whatsapp",
+        channel_user: "whatsapp:+34000000000",
+        connect_code: "ABC123",
+      },
+    },
+  },
+], "whatsapp", "whatsapp:+34000000000");
+assert.deepStrictEqual(directConnection, {
+  channel: "whatsapp",
+  channelUser: "whatsapp:+34000000000",
+  connectCode: "ABC123",
+}, "An existing channel connection must remain usable even when phone identity lookup has no row");
+
 function reset() {
   memory = {
     user_context: {

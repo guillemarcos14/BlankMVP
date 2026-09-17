@@ -6,6 +6,7 @@ struct ReportView: View {
     @EnvironmentObject private var screenTimeBlocker: ScreenTimeBlocker
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
     var usesMainBackground = false
     var onClose: (() -> Void)? = nil
     @StateObject private var healthKitStore = HealthKitStore()
@@ -38,9 +39,9 @@ struct ReportView: View {
     private var reportPrimary: Color { sessionStore.isBlankActive ? Color.white : BlankColors.ink }
     private var reportSecondary: Color { sessionStore.isBlankActive ? Color.white.opacity(0.70) : BlankColors.mutedInk }
     private var accentBlue: Color { BlankColors.premiumBlue }
-    private var recoveryGreen: Color { Color(red: 0.18, green: 0.62, blue: 0.34) }
-    private var sleepBlue: Color { Color(red: 0.24, green: 0.42, blue: 0.78) }
-    private var activityOrange: Color { Color(red: 0.72, green: 0.42, blue: 0.18) }
+    private var recoveryGreen: Color { BlankColors.seafoam }
+    private var sleepBlue: Color { BlankColors.paleSteelBlue }
+    private var activityOrange: Color { BlankColors.charcoal }
 
     private var report: BlankProgressReport {
         BlankProgressAggregator.aggregate(
@@ -183,7 +184,7 @@ struct ReportView: View {
             if usesMainBackground {
                 GeometryReader { proxy in
                     let viewportWidth = proxy.size.width
-                    let contentWidth = max(0, min(viewportWidth - 32, 360))
+                    let contentWidth = max(0, viewportWidth - (sectionHorizontalPadding * 2))
 
                     ScrollView(.vertical, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 0) {
@@ -234,7 +235,7 @@ struct ReportView: View {
         emergencyUnlocksRemaining: Int
     ) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 newLookProgressHeader()
 
                 // Risk is deliberately the first card: it turns the report into a daily decision.
@@ -246,13 +247,15 @@ struct ReportView: View {
                     newLookMetricCard(
                         label: "this week",
                         value: formatDuration(weekly.totalFocusTime),
-                        detail: weekly.completedSessionCount == 1 ? "1 session" : "\(weekly.completedSessionCount) sessions"
+                        detail: weekly.completedSessionCount == 1 ? "1 session" : "\(weekly.completedSessionCount) sessions",
+                        icon: "clock"
                     )
 
                     newLookMetricCard(
                         label: "sessions",
                         value: "\(weekly.completedSessionCount)",
-                        detail: "\(formatDuration(weekly.averageSessionDuration)) average"
+                        detail: "\(formatDuration(weekly.averageSessionDuration)) average",
+                        icon: "square.stack.3d.up"
                     )
                 }
 
@@ -316,7 +319,7 @@ struct ReportView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 30)
             }
-            .padding(.horizontal, usesMainBackground ? 8 : 0)
+            .padding(.horizontal, 0)
             .padding(.top, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -346,69 +349,76 @@ struct ReportView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private func newLookCardHeader(label: String, icon: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label.lowercased())
+                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
+                .foregroundStyle(reportSecondary)
+
+            Spacer(minLength: 8)
+
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(reportSecondary)
+                .frame(width: 18, height: 18)
+        }
+    }
+
     private func newLookRiskCard(forecast: ControlForecast) -> some View {
         let riskColor = newLookRiskColor(forecast.level)
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("risk signal")
-                    .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                    .tracking(0.8)
-                    .foregroundStyle(reportSecondary)
+        return VStack(alignment: .leading, spacing: 0) {
+            newLookCardHeader(label: "risk signal", icon: "waveform.path.ecg")
 
-                Spacer(minLength: 8)
+            Spacer(minLength: 18)
 
+            HStack(alignment: .lastTextBaseline, spacing: 10) {
                 Text("\(forecast.riskPercent)%")
-                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
+                    .font(.blankInter(size: 38, weight: .bold, relativeTo: .largeTitle))
                     .monospacedDigit()
+                    .tracking(-1.1)
                     .foregroundStyle(riskColor)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(forecast.riskLabel.lowercased())
+                        .font(.blankInter(size: 18, weight: .bold, relativeTo: .headline))
+                        .foregroundStyle(reportPrimary)
+
+                    Text(forecast.windowText.lowercased())
+                        .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
+                        .foregroundStyle(reportSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.74)
+                }
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(forecast.riskLabel.lowercased())
-                    .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
-                    .tracking(-0.35)
-                    .foregroundStyle(reportPrimary)
-
-                Text("· \(forecast.windowText.lowercased())")
-                    .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                    .foregroundStyle(reportSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.74)
-            }
-
-            HStack(alignment: .center, spacing: 12) {
-                Text("risk window")
-                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
+            HStack(alignment: .center, spacing: 8) {
+                Text("based on recent patterns")
+                    .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
                     .foregroundStyle(reportSecondary)
 
                 Spacer(minLength: 8)
 
                 if sessionStore.isBlankActive {
                     Text("protected")
-                        .font(.blankInter(size: 14, weight: .bold, relativeTo: .subheadline))
+                        .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                         .foregroundStyle(recoveryGreen)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                 } else {
                     Button {
                         scheduleForecastBlock(forecast, source: "new_look_risk_today")
                     } label: {
                         Text("protect")
-                            .font(.blankInter(size: 14, weight: .bold, relativeTo: .subheadline))
+                            .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                             .foregroundStyle(accentBlue)
-                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                     }
                     .buttonStyle(.plain)
                 }
             }
-
-            Text("based on recent patterns")
-                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
-                .foregroundStyle(reportSecondary)
+            .padding(.top, 10)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 156, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "risk signal, \(forecast.riskPercent) percent, \(forecast.riskLabel.lowercased()), \(forecast.windowText.lowercased())."
@@ -416,47 +426,37 @@ struct ReportView: View {
     }
 
     private func newLookRecoveredCard(savedTime: TimeInterval, totalFocusTime: TimeInterval) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("recovered time")
-                    .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                    .tracking(0.8)
-                    .foregroundStyle(reportSecondary)
+        VStack(alignment: .leading, spacing: 0) {
+            newLookCardHeader(label: "recovered time", icon: "arrow.clockwise")
 
-                Spacer(minLength: 8)
-
-                Text("all time")
-                    .font(.blankInter(size: 11, weight: .bold, relativeTo: .caption))
-                    .tracking(0.7)
-                    .foregroundStyle(reportSecondary)
-            }
+            Spacer(minLength: 18)
 
             Text(formatDuration(savedTime))
-                .font(.blankInter(size: 44, weight: .bold, relativeTo: .largeTitle))
+                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
                 .tracking(-1.5)
                 .foregroundStyle(reportPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.60)
 
-            Text("estimated from \(formatDuration(totalFocusTime)) blanked")
-                .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+            Text("all time · estimated from \(formatDuration(totalFocusTime)) blanked")
+                .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(reportSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .padding(.top, 3)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 142, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("recovered \(formatDuration(savedTime)) all time, estimated from \(formatDuration(totalFocusTime)) blanked.")
     }
 
-    private func newLookMetricCard(label: String, value: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label.lowercased())
-                .font(.blankInter(size: 11, weight: .bold, relativeTo: .caption))
-                .tracking(0.7)
-                .foregroundStyle(reportSecondary)
+    private func newLookMetricCard(label: String, value: String, detail: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            newLookCardHeader(label: label, icon: icon)
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 16)
 
             Text(value)
                 .font(.blankInter(size: 25, weight: .bold, relativeTo: .title3))
@@ -466,15 +466,16 @@ struct ReportView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
 
-                Text(detail.lowercased())
+            Text(detail.lowercased())
                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(reportSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
+                .padding(.top, 3)
         }
         .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 126, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
     }
 
     private func newLookRhythmCard(weekly: BlankWeeklyReport) -> some View {
@@ -483,19 +484,10 @@ struct ReportView: View {
         let bestIndex = durations.indices.max(by: { durations[$0] < durations[$1] })
         let dayLabels = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("rhythm")
-                    .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                    .tracking(0.8)
-                    .foregroundStyle(reportSecondary)
+        return VStack(alignment: .leading, spacing: 0) {
+            newLookCardHeader(label: "rhythm", icon: "chart.bar.fill")
 
-                Spacer(minLength: 8)
-
-                Text("last seven days")
-                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(reportSecondary)
-            }
+            Spacer(minLength: 14)
 
             HStack(alignment: .bottom, spacing: 8) {
                 ForEach(0..<min(7, durations.count), id: \.self) { index in
@@ -503,15 +495,15 @@ struct ReportView: View {
                         ZStack(alignment: .bottom) {
                             RoundedRectangle(cornerRadius: 4, style: .continuous)
                                 .fill(reportPrimary.opacity(0.08))
-                                .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72)
+                                .frame(maxWidth: .infinity, minHeight: 70, maxHeight: 70)
 
                             if durations[index] > 0 {
                                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                                     .fill(index == bestIndex ? recoveryGreen : reportPrimary.opacity(0.72))
                                     .frame(
                                         maxWidth: .infinity,
-                                        minHeight: max(8, 72 * CGFloat(durations[index] / maxDuration)),
-                                        maxHeight: max(8, 72 * CGFloat(durations[index] / maxDuration))
+                                        minHeight: max(8, 70 * CGFloat(durations[index] / maxDuration)),
+                                        maxHeight: max(8, 70 * CGFloat(durations[index] / maxDuration))
                                     )
                             }
                         }
@@ -524,14 +516,15 @@ struct ReportView: View {
                 }
             }
 
-            Text("green marks your best day · height shows protected time")
+            Text("last seven days · height shows protected time")
                 .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
                 .foregroundStyle(reportSecondary)
                 .lineLimit(2)
+                .padding(.top, 10)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 164, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("rhythm for the last seven days. height shows protected time.")
     }
@@ -543,11 +536,10 @@ struct ReportView: View {
     ) -> some View {
         let bestDay = bestDayText(report: weekly).lowercased()
 
-        return VStack(alignment: .leading, spacing: 14) {
-            Text("patterns")
-                .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                .tracking(0.8)
-                .foregroundStyle(reportSecondary)
+        return VStack(alignment: .leading, spacing: 0) {
+            newLookCardHeader(label: "patterns", icon: "chart.bar.xaxis")
+
+            Spacer(minLength: 16)
 
             HStack(alignment: .top, spacing: 16) {
                 newLookPatternMetric(label: "current streak", value: "\(progress.currentStreakDays) days")
@@ -562,15 +554,16 @@ struct ReportView: View {
             Rectangle()
                 .fill(reportPrimary.opacity(0.08))
                 .frame(height: 1)
+                .padding(.vertical, 14)
 
             HStack(spacing: 16) {
                 newLookSecondaryPatternMetric(label: "longest streak", value: "\(progress.longestStreakDays) days")
                 newLookSecondaryPatternMetric(label: "unlocks left", value: "\(emergencyUnlocksRemaining)")
             }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 172, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
     }
 
     private func newLookPatternMetric(label: String, value: String) -> some View {
@@ -612,18 +605,16 @@ struct ReportView: View {
         totalSessionCount: Int
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("time")
-                .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                .tracking(0.8)
-                .foregroundStyle(reportSecondary)
-                .padding(.bottom, 4)
+            newLookCardHeader(label: "time", icon: "clock.arrow.circlepath")
+
+            Spacer(minLength: 8)
 
             newLookDetailRow(title: "today", value: formatDuration(todayFocusTime), detail: "\(formatDuration(todaySavedTime)) recovered")
             newLookDetailRow(title: "all time", value: formatDuration(totalFocusTime), detail: "\(totalSessionCount) sessions")
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 164, alignment: .leading)
+        .reportFlatCard(cornerRadius: 18)
     }
 
     private func newLookDetailRow(title: String, value: String, detail: String) -> some View {
@@ -656,17 +647,13 @@ struct ReportView: View {
         let visibleActivities = Array(progress.modeActivity.prefix(3))
 
         return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("modes")
-                    .font(.blankInter(size: 12, weight: .bold, relativeTo: .caption))
-                    .tracking(0.2)
-                    .foregroundStyle(reportSecondary)
+            newLookCardHeader(label: "modes", icon: "square.grid.2x2")
 
-                Text("protected time by mode")
-                    .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(reportSecondary)
-            }
-            .padding(.bottom, 4)
+            Text("protected time by mode")
+                .font(.blankInter(size: 11, weight: .medium, relativeTo: .caption))
+                .foregroundStyle(reportSecondary)
+                .padding(.top, 3)
+                .padding(.bottom, 4)
 
             ForEach(visibleActivities) { activity in
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
@@ -697,19 +684,19 @@ struct ReportView: View {
                 }
             }
         }
-        .padding(18)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass(cornerRadius: 22)
+        .reportFlatCard(cornerRadius: 18)
     }
 
     private func newLookRiskColor(_ level: ControlForecast.Level) -> Color {
         switch level {
         case .low:
-            return Color(red: 0.20, green: 0.58, blue: 0.42)
+            return BlankColors.seafoam
         case .medium:
-            return Color(red: 0.84, green: 0.39, blue: 0.31)
+            return BlankColors.paleSteelBlue
         case .high:
-            return Color(red: 0.88, green: 0.24, blue: 0.22)
+            return BlankColors.red
         }
     }
 
@@ -2532,7 +2519,7 @@ struct ReportView: View {
         case .medium:
             return activityOrange
         case .high:
-            return Color(red: 0.95, green: 0.22, blue: 0.22)
+            return BlankColors.red
         }
     }
 
@@ -4755,6 +4742,23 @@ private struct ReportLiquidBackground: View {
 private extension View {
     func liquidGlass(cornerRadius: CGFloat) -> some View {
         modifier(LiquidGlassModifier(cornerRadius: cornerRadius))
+    }
+
+    func reportFlatCard(cornerRadius: CGFloat = 18) -> some View {
+        modifier(ReportFlatCardModifier(cornerRadius: cornerRadius))
+    }
+}
+
+private struct ReportFlatCardModifier: ViewModifier {
+    let cornerRadius: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.12) : Color.white)
+            }
     }
 }
 

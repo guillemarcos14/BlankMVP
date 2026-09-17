@@ -21,47 +21,54 @@ extension EnvironmentValues {
 }
 
 enum BlankColors {
+    // Blank brand palette: charcoal gray, pale steel blue, seafoam green, powder gray, pure white.
+    static let charcoal = Color(red: 51 / 255.0, green: 59 / 255.0, blue: 65 / 255.0)
+    static let paleSteelBlue = Color(red: 173 / 255.0, green: 191 / 255.0, blue: 201 / 255.0)
+    static let seafoam = Color(red: 118 / 255.0, green: 201 / 255.0, blue: 171 / 255.0)
+    static let powderGray = Color(red: 228 / 255.0, green: 235 / 255.0, blue: 239 / 255.0)
+    static let pureWhite = Color.white
+
     static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
-    static let statusGreen = Color(red: 0.145, green: 0.580, blue: 0.285)
-    static let redDark = Color(red: 0.125, green: 0.129, blue: 0.141)
-    static let green = Color(red: 0.125, green: 0.129, blue: 0.141)
-    static let background = Color(red: 0.914, green: 0.914, blue: 0.906)
-    static let surface = Color(red: 0.961, green: 0.961, blue: 0.961)
-    static let text = Color.white
-    static let secondaryText = Color(red: 0.400, green: 0.408, blue: 0.400)
-    static let warmBackground = Color(red: 0.914, green: 0.914, blue: 0.906)
-    static let warmSurface = Color.white.opacity(0.72)
-    static let ink = Color(red: 0.125, green: 0.129, blue: 0.141)
-    static let mutedInk = Color(red: 0.400, green: 0.408, blue: 0.400)
-    static let line = Color(red: 0.125, green: 0.129, blue: 0.141).opacity(0.10)
-    static let airBlue = Color(red: 0.573, green: 0.690, blue: 0.800)
-    static let airMist = Color(red: 0.784, green: 0.814, blue: 0.846)
-    static let airStone = Color(red: 0.769, green: 0.765, blue: 0.757)
-    static let glassTint = Color(red: 0.722, green: 0.725, blue: 0.733)
-    static let premiumBlue = Color(red: 0.20, green: 0.47, blue: 0.92)
-    static let controlSurface = Color.white.opacity(0.16)
-    static let activeControlSurface = Color.white.opacity(0.09)
-    static let minimalBackground = Color(red: 0.953, green: 0.953, blue: 0.937)
-    static let minimalInk = Color(red: 0.115, green: 0.118, blue: 0.115)
-    static let minimalSecondary = Color(red: 0.390, green: 0.395, blue: 0.390)
-    static let minimalFaded = Color(red: 0.730, green: 0.732, blue: 0.716)
-    static let minimalCardSurface = Color.white
-    static let darkCardSurface = Color.white.opacity(0.08)
-    static let newLookDarkBackground = Color(red: 0.105, green: 0.105, blue: 0.115)
-    static let newLookDarkSecondary = Color(red: 0.290, green: 0.290, blue: 0.305)
-    static let homeLightBackground = Color(red: 248 / 255.0, green: 249 / 255.0, blue: 244 / 255.0)
-    static let homeLightInk = Color(red: 48 / 255.0, green: 49 / 255.0, blue: 43 / 255.0)
-    static let homeLightOption = Color(red: 141 / 255.0, green: 142 / 255.0, blue: 137 / 255.0)
-    static let homeLightSecondary = Color(red: 199 / 255.0, green: 200 / 255.0, blue: 194 / 255.0)
-    static let homeDarkBackground = Color(red: 27 / 255.0, green: 27 / 255.0, blue: 29 / 255.0)
-    static let homeDarkSecondary = Color(red: 70 / 255.0, green: 70 / 255.0, blue: 66 / 255.0)
-    static let newLookRule = Color(red: 0.115, green: 0.118, blue: 0.115).opacity(0.12)
+    static let statusGreen = seafoam
+    static let redDark = charcoal
+    static let green = seafoam
+    static let background = powderGray
+    static let surface = pureWhite
+    static let text = pureWhite
+    static let secondaryText = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let warmBackground = powderGray
+    static let warmSurface = pureWhite.opacity(0.92)
+    static let ink = charcoal
+    static let mutedInk = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let line = charcoal.opacity(0.14)
+    static let airBlue = paleSteelBlue
+    static let airMist = powderGray
+    static let airStone = powderGray.opacity(0.92)
+    static let glassTint = paleSteelBlue
+    static let premiumBlue = seafoam
+    static let controlSurface = pureWhite.opacity(0.16)
+    static let activeControlSurface = pureWhite.opacity(0.09)
+    static let minimalBackground = powderGray
+    static let minimalInk = charcoal
+    static let minimalSecondary = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let minimalFaded = paleSteelBlue.opacity(0.72)
+    static let minimalCardSurface = pureWhite
+    static let darkCardSurface = paleSteelBlue.opacity(0.16)
+    static let newLookDarkBackground = charcoal
+    static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
+    static let homeLightBackground = powderGray
+    static let homeLightInk = charcoal
+    static let homeLightOption = Color(red: 0.31, green: 0.37, blue: 0.40)
+    static let homeLightSecondary = Color(red: 0.42, green: 0.50, blue: 0.54)
+    static let homeDarkBackground = charcoal
+    static let homeDarkSecondary = paleSteelBlue.opacity(0.46)
+    static let newLookRule = charcoal.opacity(0.16)
     static let glassBorder = LinearGradient(
         colors: [
-            Color.white.opacity(0.48),
-            Color.white.opacity(0.16),
-            Color.white.opacity(0.04),
-            Color.white.opacity(0.00)
+            pureWhite.opacity(0.48),
+            paleSteelBlue.opacity(0.24),
+            paleSteelBlue.opacity(0.06),
+            Color.clear
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
@@ -110,7 +117,7 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: minimalAppearance ? .clear : Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : charcoal.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
@@ -137,7 +144,7 @@ struct BlankSecondaryButtonStyle: ButtonStyle {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: minimalAppearance ? .clear : Color.black.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
+            .shadow(color: minimalAppearance ? .clear : charcoal.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }

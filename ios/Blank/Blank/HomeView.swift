@@ -616,7 +616,7 @@ struct HomeView: View {
     }
 
     private var topBar: some View {
-        let glassTint = Color(red: 149 / 255.0, green: 169 / 255.0, blue: 192 / 255.0).opacity(0.42)
+        let glassTint = BlankColors.paleSteelBlue.opacity(0.42)
         let logoReflection = RadialGradient(
             colors: [
                 Color.white.opacity(0.22),
@@ -656,7 +656,7 @@ struct HomeView: View {
                         }
                         .allowsHitTesting(false)
                     }
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
+                    .shadow(color: BlankColors.charcoal.opacity(0.05), radius: 5, y: 3)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -685,7 +685,7 @@ struct HomeView: View {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(0.05), radius: 5, y: 3)
+            .shadow(color: BlankColors.charcoal.opacity(0.05), radius: 5, y: 3)
         }
         .fixedSize(horizontal: true, vertical: false)
         .frame(width: 291, height: 47)
@@ -2091,7 +2091,7 @@ private struct HomeLayoutMetrics {
 
 private struct HomeBlankButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
-        let glassTint = Color(red: 186 / 255.0, green: 186 / 255.0, blue: 188 / 255.0).opacity(configuration.isPressed ? 0.58 : 0.48)
+        let glassTint = BlankColors.paleSteelBlue.opacity(configuration.isPressed ? 0.58 : 0.48)
         let capsuleBorder = LinearGradient(
             colors: [
                 Color.white.opacity(0.42),
@@ -2119,7 +2119,7 @@ private struct HomeBlankButtonStyle: ButtonStyle {
                 }
                 .allowsHitTesting(false)
             }
-            .shadow(color: Color.black.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
+            .shadow(color: BlankColors.charcoal.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }
@@ -2327,10 +2327,10 @@ private struct ModesList: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(mode.name)
+                    Text(mode.name.lowercased())
                         .font(.blankInter(size: 17, weight: .medium, relativeTo: .body))
 
-                    Text(isSelected ? blockedAppsText : "Tap to activate this plan")
+                    Text(isSelected ? blockedAppsText : "tap to activate this plan")
                         .font(.caption)
                         .foregroundStyle(isSelected ? secondaryColor.opacity(0.82) : secondaryColor)
                         .lineLimit(1)
@@ -2350,7 +2350,7 @@ private struct ModesList: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Current protection")
+                    Text("current protection")
                         .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
                     Text(sessionStore.currentMode.name)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -2362,7 +2362,7 @@ private struct ModesList: View {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.caption.weight(.semibold))
-                    Text("Automatic")
+                    Text("automatic")
                         .font(.caption.weight(.semibold))
                 }
                 .foregroundStyle(textColor)
@@ -2372,9 +2372,9 @@ private struct ModesList: View {
             }
 
             HStack(spacing: 10) {
-                planVisualTile(title: "Apps", value: "\(sessionStore.selectionCount)", symbol: "square.grid.2x2.fill")
-                planVisualTile(title: "Rule", value: sessionStore.allowOnlyModeEnabled ? "Allow" : "Block", symbol: "shield.fill")
-                planVisualTile(title: "Exit", value: sessionStore.hardBlankActive ? "Emergency" : "Hold", symbol: "hand.raised.fill")
+                planVisualTile(title: "apps", value: "\(sessionStore.selectionCount)", symbol: "square.grid.2x2.fill")
+                planVisualTile(title: "rule", value: sessionStore.allowOnlyModeEnabled ? "allow" : "block", symbol: "shield.fill")
+                planVisualTile(title: "exit", value: sessionStore.hardBlankActive ? "emergency" : "hold", symbol: "hand.raised.fill")
             }
         }
         .foregroundStyle(textColor)
@@ -2395,7 +2395,7 @@ private struct ModesList: View {
                         .background(Circle().fill(textColor.opacity(0.10)))
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Protected apps")
+                        Text("protected apps")
                             .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
                         Text(blockedAppsText)
                             .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -2458,7 +2458,7 @@ private struct ModesList: View {
                         .background(Circle().fill(textColor.opacity(0.10)))
 
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Recurring routines")
+                        Text("recurring routines")
                             .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
                         Text(routineSummaryText)
                             .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -2491,7 +2491,7 @@ private struct ModesList: View {
             Button {
                 addWindow()
             } label: {
-                Label("Add manual routine", systemImage: "plus")
+                Label("add manual routine", systemImage: "plus")
                     .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                     .foregroundStyle(textColor)
                     .frame(maxWidth: .infinity)
@@ -2508,7 +2508,7 @@ private struct ModesList: View {
             Button {
                 saveSchedule()
             } label: {
-                TopSheetPrimaryButtonLabel(title: "Save plan")
+                    TopSheetPrimaryButtonLabel(title: "save plan")
             }
             .padding(.top, 2)
         }
@@ -2536,10 +2536,9 @@ private struct ModesList: View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Manual plans")
+                    Text("manual plans")
                         .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                         .foregroundStyle(secondaryColor)
-                        .textCase(.uppercase)
 
                     ForEach(sessionStore.focusModes) { mode in
                         modeButton(mode)
@@ -2547,7 +2546,7 @@ private struct ModesList: View {
                                 Button(role: .destructive) {
                                     sessionStore.deleteMode(mode.id)
                                 } label: {
-                                    Label("Delete", systemImage: "trash")
+                                    Label("delete", systemImage: "trash")
                                 }
                                 .disabled(sessionStore.focusModes.count <= 1)
                             }
@@ -2566,10 +2565,10 @@ private struct ModesList: View {
             .padding(.top, 10)
         } label: {
             HStack {
-                Label("Safeguards", systemImage: "ellipsis.circle")
+                Label("safeguards", systemImage: "ellipsis.circle")
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
                 Spacer()
-                Text("Advanced")
+                Text("advanced")
                     .font(.caption)
                     .foregroundStyle(secondaryColor)
             }
@@ -2586,16 +2585,16 @@ private struct ModesList: View {
     private var routineSummaryText: String {
         let count = enabledWindows.count
         guard count > 0 else {
-            return "No routine approved yet."
+            return "no routine approved yet."
         }
         if count == 1, let first = enabledWindows.first {
             return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
         }
-        return "\(count) active routines. Configure each one below."
+        return "\(count) active routines. configure each one below."
     }
 
     private func shortWeekday(_ index: Int) -> String {
-        ["M", "T", "W", "T", "F", "S", "S"][index]
+        ["m", "t", "w", "t", "f", "s", "s"][index]
     }
 
     private func saveSchedule() {
@@ -2637,7 +2636,7 @@ private struct ModesList: View {
                 }
             } label: {
                 HStack {
-                    Text("Add manual plan")
+                    Text("add manual plan")
                         .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                     Spacer()
                     Image(systemName: showsManualPlanCreator ? "chevron.up" : "chevron.down")
@@ -2651,7 +2650,7 @@ private struct ModesList: View {
             .buttonStyle(.plain)
 
             if showsManualPlanCreator {
-                TextField("Plan name", text: $newModeName)
+                TextField("plan name", text: $newModeName)
                     .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                     .foregroundStyle(textColor)
                     .padding(.horizontal, 18)
@@ -2663,7 +2662,7 @@ private struct ModesList: View {
                     newModeName = ""
                     showsManualPlanCreator = false
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Save manual plan")
+                    TopSheetPrimaryButtonLabel(title: "save manual plan")
                 }
                 .disabled(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .opacity(newModeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
@@ -2685,7 +2684,7 @@ private struct AdvancedModeControls: View {
     let secondaryColor: Color
 
     private static func cooldownSettingText(for seconds: Int) -> String {
-        if seconds == 0 { return "Off" }
+        if seconds == 0 { return "off" }
         let minutes = seconds / 60
         let remainingSeconds = seconds % 60
         if minutes == 0 { return "\(remainingSeconds)s" }
@@ -2694,22 +2693,22 @@ private struct AdvancedModeControls: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Advanced")
+            Text("advanced")
                 .font(.blankInter(size: 15, weight: .semibold, relativeTo: .headline))
                 .foregroundStyle(secondaryColor)
 
-            Toggle("Allow Only", isOn: $sessionStore.allowOnlyModeEnabled)
+            Toggle("allow only", isOn: $sessionStore.allowOnlyModeEnabled)
                 .advancedControlStyle(textColor: textColor)
 
-            Toggle("Adult website filter", isOn: $sessionStore.adultContentBlockingEnabled)
+            Toggle("adult website filter", isOn: $sessionStore.adultContentBlockingEnabled)
                 .advancedControlStyle(textColor: textColor)
 
-            Toggle("PIN protection", isOn: $sessionStore.pinProtectionEnabled)
+            Toggle("pin protection", isOn: $sessionStore.pinProtectionEnabled)
                 .advancedControlStyle(textColor: textColor)
 
             Stepper(value: $sessionStore.manualUnblankCooldownSeconds, in: 0...300, step: 15) {
                 HStack {
-                    Text("Unblank cooldown")
+                    Text("unblank cooldown")
                     Spacer()
                     Text(Self.cooldownSettingText(for: sessionStore.manualUnblankCooldownSeconds))
                         .monospacedDigit()
@@ -2729,7 +2728,7 @@ private struct AdvancedModeControls: View {
                 if sessionStore.dailyLimitEnabled {
                     Stepper(value: $sessionStore.dailyLimitMinutes, in: 5...240, step: 5) {
                         HStack {
-                            Text("Limit")
+                            Text("limit")
                             Spacer()
                             Text("\(sessionStore.dailyLimitMinutes) min")
                                 .monospacedDigit()
@@ -2748,7 +2747,7 @@ private struct AdvancedModeControls: View {
                     showingPicker = true
                     onFinish()
                 } label: {
-                    Text("Choose allowed apps")
+                        Text("choose allowed apps")
                         .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                         .foregroundStyle(textColor)
                         .frame(maxWidth: .infinity)
@@ -2906,13 +2905,13 @@ private struct SettingsScreen: View {
 
                 settingsRow(
                     title: "screen time",
-                    detail: "screen time \(screenTimeStatus)",
+                    detail: "screen time \(screenTimeStatus.lowercased())",
                     action: onRequestScreenTimePermission
                 )
 
                 settingsRow(
                     title: "health",
-                    detail: "apple health \(healthStatus)",
+                    detail: "apple health \(healthStatus.lowercased())",
                     action: onRequestHealthAccess
                 )
 
@@ -2976,10 +2975,9 @@ private struct ScheduleEditorContent: View {
 
                 baiHabitsSummary
 
-                Text("Manual overrides")
+                Text("manual overrides")
                     .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                     .foregroundStyle(secondaryColor)
-                    .textCase(.uppercase)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 2)
 
@@ -2999,7 +2997,7 @@ private struct ScheduleEditorContent: View {
                 Button {
                     addWindow()
                 } label: {
-                    Label("Add manually", systemImage: "plus")
+                    Label("add manually", systemImage: "plus")
                         .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
                         .foregroundStyle(textColor)
                         .frame(maxWidth: .infinity)
@@ -3013,7 +3011,7 @@ private struct ScheduleEditorContent: View {
                     secondaryColor: secondaryColor
                 )
 
-                Text("Manual exits pause only the current habit window.")
+                Text("manual exits pause only the current habit window.")
                     .font(.footnote)
                     .foregroundStyle(secondaryColor)
                     .multilineTextAlignment(.center)
@@ -3023,7 +3021,7 @@ private struct ScheduleEditorContent: View {
                 Button {
                     saveSchedule()
                 } label: {
-                    TopSheetPrimaryButtonLabel(title: "Save habits")
+                    TopSheetPrimaryButtonLabel(title: "save habits")
                 }
                 .padding(.top, 6)
             }
@@ -3088,7 +3086,7 @@ private struct ScheduleEditorContent: View {
                     .background(Circle().fill(textColor.opacity(0.10)))
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Recurring BM routines")
+                    Text("recurring bm routines")
                         .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
                     Text(habitSummaryText)
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
@@ -3103,9 +3101,9 @@ private struct ScheduleEditorContent: View {
                 .overlay(secondaryColor.opacity(0.20))
 
             HStack(spacing: 10) {
-                habitMetric(title: "Active", value: "\(enabledWindows.count)")
-                habitMetric(title: "Total", value: "\(windows.count)")
-                habitMetric(title: "Pause", value: sessionStore.isVacationModeActive ? "On" : "Off")
+                habitMetric(title: "active", value: "\(enabledWindows.count)")
+                habitMetric(title: "total", value: "\(windows.count)")
+                habitMetric(title: "pause", value: sessionStore.isVacationModeActive ? "on" : "off")
             }
         }
         .foregroundStyle(textColor)
@@ -3119,7 +3117,7 @@ private struct ScheduleEditorContent: View {
 
     private var habitSummaryText: String {
         guard let first = enabledWindows.first else {
-            return "No active routine yet. Ask BM to create one, then approve it here."
+            return "no active routine yet. ask bm to create one, then approve it here."
         }
         return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
     }
@@ -3148,7 +3146,7 @@ private struct VacationModeCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Vacation Mode")
+                    Text("vacation mode")
                         .font(.blankInter(size: 16, weight: .semibold, relativeTo: .headline))
                         .foregroundStyle(textColor)
                     Text(statusText)
@@ -3157,7 +3155,7 @@ private struct VacationModeCard: View {
                 }
                 Spacer()
                 if sessionStore.isVacationModeActive {
-                    Button("Off") {
+                    Button("off") {
                         sessionStore.disableVacationMode()
                     }
                     .font(.caption.weight(.semibold))
@@ -3168,9 +3166,9 @@ private struct VacationModeCard: View {
 
             if !sessionStore.isVacationModeActive {
                 HStack(spacing: 10) {
-                    vacationButton("Today", hours: 24)
-                    vacationButton("Weekend", hours: 72)
-                    vacationButton("Week", hours: 168)
+                    vacationButton("today", hours: 24)
+                    vacationButton("weekend", hours: 72)
+                    vacationButton("week", hours: 168)
                 }
             }
         }
@@ -3180,9 +3178,9 @@ private struct VacationModeCard: View {
 
     private var statusText: String {
         guard let until = sessionStore.vacationModeUntil, until > Date() else {
-            return "Pause routines and daily limits temporarily."
+            return "pause routines and daily limits temporarily."
         }
-        return "Paused until \(formatMinute(minuteOfDay(from: until)))."
+        return "paused until \(formatMinute(minuteOfDay(from: until)))."
     }
 
     private func vacationButton(_ title: String, hours: Int) -> some View {
@@ -3217,7 +3215,7 @@ private struct HabitWindowCard: View {
                     .frame(width: 34, height: 34)
                     .background(Circle().fill(textColor.opacity(0.10)))
 
-                TextField("Routine", text: $window.name)
+                TextField("routine", text: $window.name)
                     .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                     .foregroundStyle(textColor)
                     .submitLabel(.done)
@@ -3239,9 +3237,9 @@ private struct HabitWindowCard: View {
             }
 
             HStack(spacing: 8) {
-                routineMetric(title: "Start", value: formatMinute(window.startMinute))
-                routineMetric(title: "End", value: formatMinute(window.endMinute))
-                routineMetric(title: "Days", value: daysSummary)
+                routineMetric(title: "start", value: formatMinute(window.startMinute))
+                routineMetric(title: "end", value: formatMinute(window.endMinute))
+                routineMetric(title: "days", value: daysSummary)
             }
 
             if isExpanded {
@@ -3260,7 +3258,7 @@ private struct HabitWindowCard: View {
 
                     if canDelete {
                         Button(action: onDelete) {
-                            Label("Delete routine", systemImage: "trash")
+                            Label("delete routine", systemImage: "trash")
                                 .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
                                 .foregroundStyle(secondaryColor)
                                 .frame(maxWidth: .infinity)
@@ -3301,7 +3299,7 @@ private struct HabitWindowCard: View {
 
     private var daysSummary: String {
         if window.runsEveryDay {
-            return "Everyday"
+            return "everyday"
         }
         return "\(window.weekdays.count)d"
     }
@@ -3313,19 +3311,19 @@ private struct HabitDaysPicker: View {
     let secondaryColor: Color
 
     private let days: [(id: Int, label: String)] = [
-        (2, "M"),
-        (3, "T"),
-        (4, "W"),
-        (5, "T"),
-        (6, "F"),
-        (7, "S"),
-        (1, "S")
+        (2, "m"),
+        (3, "t"),
+        (4, "w"),
+        (5, "t"),
+        (6, "f"),
+        (7, "s"),
+        (1, "s")
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Days")
+                Text("days")
                     .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
                     .foregroundStyle(secondaryColor)
                 Spacer()
@@ -3354,18 +3352,18 @@ private struct HabitDaysPicker: View {
             }
 
             HStack(spacing: 8) {
-                presetButton("Every day", weekdays: Array(1...7))
-                presetButton("Weekdays", weekdays: [2, 3, 4, 5, 6])
-                presetButton("Weekend", weekdays: [1, 7])
+                presetButton("every day", weekdays: Array(1...7))
+                presetButton("weekdays", weekdays: [2, 3, 4, 5, 6])
+                presetButton("weekend", weekdays: [1, 7])
             }
         }
     }
 
     private var summary: String {
         let set = Set(selectedWeekdays)
-        if set == Set(1...7) { return "Every day" }
-        if set == Set([2, 3, 4, 5, 6]) { return "Weekdays" }
-        if set == Set([1, 7]) { return "Weekend" }
+        if set == Set(1...7) { return "every day" }
+        if set == Set([2, 3, 4, 5, 6]) { return "weekdays" }
+        if set == Set([1, 7]) { return "weekend" }
         return "\(selectedWeekdays.count) days"
     }
 
@@ -3873,6 +3871,7 @@ private struct SessionsScreen: View {
         .fullScreenCover(isPresented: $showingManualMode) {
             ManualModeEditorScreen()
                 .environment(\.blankMinimalAppearance, true)
+                .environment(\.blankSectionHorizontalPadding, sectionHorizontalPadding)
         }
     }
 
@@ -3883,7 +3882,7 @@ private struct SessionsScreen: View {
                 .tracking(-0.35)
                 .foregroundStyle(textColor)
 
-            Text("Create a plan from WhatsApp or Plan to see it here.")
+            Text("create a plan from whatsapp or plan to see it here.")
                 .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
                 .foregroundStyle(secondaryColor)
                 .fixedSize(horizontal: false, vertical: true)
@@ -3917,7 +3916,7 @@ private struct SessionsScreen: View {
                     Button(role: .destructive) {
                         sessionStore.deleteScheduleWindow(plan.id)
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                    Label("delete", systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -3951,11 +3950,11 @@ private struct SessionsScreen: View {
 
                     Text(weekdayLabels[index])
                         .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
-                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? Color.black : Color.white) : secondaryColor.opacity(0.55))
+                        .foregroundStyle(isSelected ? (sessionStore.isBlankActive ? BlankColors.charcoal : Color.white) : secondaryColor.opacity(0.55))
                         .frame(width: 27, height: 27)
                         .background {
                             Circle()
-                                .fill(isSelected ? (sessionStore.isBlankActive ? Color.white : Color.black) : textColor.opacity(0.035))
+                                .fill(isSelected ? (sessionStore.isBlankActive ? Color.white : BlankColors.charcoal) : textColor.opacity(0.035))
                         }
                 }
             }
@@ -4051,11 +4050,11 @@ private struct ManualModeEditorScreen: View {
     }
 
     private var primaryButtonFill: Color {
-        sessionStore.isBlankActive ? Color.white : Color.black
+        sessionStore.isBlankActive ? Color.white : BlankColors.charcoal
     }
 
     private var primaryButtonText: Color {
-        sessionStore.isBlankActive ? Color.black : Color.white
+        sessionStore.isBlankActive ? BlankColors.charcoal : Color.white
     }
 
     var body: some View {
@@ -4082,7 +4081,7 @@ private struct ManualModeEditorScreen: View {
                     .tracking(-0.6)
                     .foregroundStyle(textColor)
 
-                Text("Choose apps, timing and repetition.")
+                Text("choose apps, timing and repetition.")
                     .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
                     .foregroundStyle(secondaryColor)
                     .padding(.top, 5)
@@ -4157,7 +4156,7 @@ private struct ManualModeEditorScreen: View {
                             }
 
                         if !repeatsWeekly {
-                            Text("The mode will be saved without a recurring schedule.")
+                                Text("the mode will be saved without a recurring schedule.")
                                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -4169,7 +4168,7 @@ private struct ManualModeEditorScreen: View {
                 Button {
                     saveMode()
                 } label: {
-                    Text("Create mode")
+                    Text("create mode")
                         .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
                         .foregroundStyle(canSave ? primaryButtonText : secondaryColor)
                         .frame(maxWidth: .infinity)
@@ -4203,7 +4202,6 @@ private struct ManualModeEditorScreen: View {
             Text(title)
                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                 .foregroundStyle(secondaryColor)
-                .textCase(.uppercase)
 
             content()
         }
@@ -4254,8 +4252,8 @@ private struct ManualModeEditorScreen: View {
 
     private func dayButton(weekday: Int, label: String) -> some View {
         let isSelected = selectedWeekdays.contains(weekday)
-        let selectedFill = sessionStore.isBlankActive ? Color.white : Color.black
-        let selectedText = sessionStore.isBlankActive ? Color.black : Color.white
+        let selectedFill = sessionStore.isBlankActive ? Color.white : BlankColors.charcoal
+        let selectedText = sessionStore.isBlankActive ? BlankColors.charcoal : Color.white
 
         return Button {
             guard repeatsWeekly else { return }

@@ -320,26 +320,32 @@ struct ReportView: View {
                     .padding(.bottom, 30)
             }
             .padding(.horizontal, 0)
-            .padding(.top, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private func newLookProgressHeader() -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        Group {
             if let onClose {
-                SectionBackHeader(action: onClose)
+                SectionHeader(
+                    title: "progress",
+                    subtitle: "your time, rhythm and patterns.",
+                    action: onClose,
+                    titleColor: reportPrimary,
+                    subtitleColor: reportSecondary
+                )
+                .padding(.bottom, 24)
+            } else {
+                TopSheetHeader(
+                    title: "progress",
+                    subtitle: "your time, rhythm and patterns.",
+                    titleColor: reportPrimary,
+                    subtitleColor: reportSecondary
+                )
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
-
-            TopSheetHeader(
-                title: "progress",
-                subtitle: "your time, rhythm and patterns.",
-                titleColor: reportPrimary,
-                subtitleColor: reportSecondary
-            )
-            .padding(.bottom, 24)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func newLookCardHeader(label: String, icon: String) -> some View {

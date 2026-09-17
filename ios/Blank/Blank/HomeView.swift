@@ -2248,11 +2248,10 @@ private struct ModesList: View {
     private var newLookPlan: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SectionBackHeader(action: onFinish)
-
-                TopSheetHeader(
+                SectionHeader(
                     title: "Plan",
                     subtitle: "Protection, routines and safeguards.",
+                    action: onFinish,
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -2285,7 +2284,6 @@ private struct ModesList: View {
                     .padding(.bottom, 34)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 16)
         }
         .padding(.horizontal, sectionHorizontalPadding)
     }
@@ -2866,7 +2864,47 @@ struct SectionBackHeader: View {
 
             Spacer()
         }
+        .padding(.top, 16)
         .padding(.bottom, 22)
+    }
+}
+
+struct SectionHeader: View {
+    @EnvironmentObject private var sessionStore: SessionStore
+    let title: String
+    let subtitle: String
+    let action: () -> Void
+    var titleColor: Color? = nil
+    var subtitleColor: Color? = nil
+
+    private var resolvedTitleColor: Color {
+        titleColor ?? (sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink)
+    }
+
+    private var resolvedSubtitleColor: Color {
+        subtitleColor ?? (sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionBackHeader(action: action)
+
+            Text(title.lowercased())
+                .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
+                .tracking(-0.6)
+                .foregroundStyle(resolvedTitleColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.86)
+
+            Text(subtitle.lowercased())
+                .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
+                .foregroundStyle(resolvedSubtitleColor)
+                .lineSpacing(0)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -2888,11 +2926,10 @@ private struct SettingsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SectionBackHeader(action: onClose)
-
-                TopSheetHeader(
+                SectionHeader(
                     title: "settings",
                     subtitle: "access, support and preferences.",
+                    action: onClose,
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -2923,7 +2960,6 @@ private struct SettingsScreen: View {
                 )
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 16)
         }
         .padding(.horizontal, sectionHorizontalPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -2969,16 +3005,13 @@ private struct ScheduleEditorContent: View {
     var body: some View {
         List {
             VStack(alignment: .center, spacing: 16) {
-                VStack(alignment: .leading, spacing: 0) {
-                    SectionBackHeader(action: onClose)
-
-                    TopSheetHeader(
-                        title: "Routines",
-                        subtitle: "BM schedules routines.\nYou review and override them here.",
-                        titleColor: textColor,
-                        subtitleColor: secondaryColor
-                    )
-                }
+                SectionHeader(
+                    title: "Routines",
+                    subtitle: "BM schedules routines.\nYou review and override them here.",
+                    action: onClose,
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
                 .padding(.bottom, 8)
 
                 baiHabitsSummary
@@ -3035,7 +3068,6 @@ private struct ScheduleEditorContent: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.top, 16)
             .padding(.bottom, 34)
             .listRowInsets(EdgeInsets())
             .listRowSeparator(.hidden)
@@ -3666,7 +3698,6 @@ private struct EmergencyScreen: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, sectionHorizontalPadding)
-        .padding(.top, minimalAppearance ? 16 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3855,11 +3886,10 @@ private struct SessionsScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                SectionBackHeader(action: onClose)
-
-                TopSheetHeader(
+                SectionHeader(
                     title: "sessions",
                     subtitle: activePlansSubtitle,
+                    action: onClose,
                     titleColor: textColor,
                     subtitleColor: secondaryColor
                 )
@@ -3881,7 +3911,6 @@ private struct SessionsScreen: View {
                 Spacer(minLength: 24)
             }
             .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.top, 16)
             .padding(.bottom, 24)
         }
         .background(Color.clear)
@@ -4078,32 +4107,14 @@ private struct ManualModeEditorScreen: View {
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text("back")
-                            .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
-                            .tracking(-0.3)
-                            .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
-                            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-
-                    Spacer()
-                }
-                .padding(.bottom, 22)
-
-                Text("new mode")
-                    .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-0.6)
-                    .foregroundStyle(textColor)
-
-                Text("choose apps, timing and repetition.")
-                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
-                    .padding(.top, 5)
-                    .padding(.bottom, 24)
+                SectionHeader(
+                    title: "new mode",
+                    subtitle: "choose apps, timing and repetition.",
+                    action: { dismiss() },
+                    titleColor: textColor,
+                    subtitleColor: secondaryColor
+                )
+                .padding(.bottom, 24)
 
                 sectionCard(title: "mode details") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -4202,7 +4213,6 @@ private struct ManualModeEditorScreen: View {
                 .padding(.bottom, 32)
             }
             .padding(.horizontal, sectionHorizontalPadding)
-            .padding(.top, 16)
         }
         .background {
             (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)

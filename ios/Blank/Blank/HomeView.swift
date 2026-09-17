@@ -3618,7 +3618,7 @@ private struct DistractionsScreen: View {
         sessionStore.schedule.activeWindows
     }
 
-    private var applicationTokens: [ApplicationToken] {
+    private var applicationTokens {
         Array(sessionStore.selection.applicationTokens)
     }
 

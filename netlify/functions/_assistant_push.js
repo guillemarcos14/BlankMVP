@@ -70,17 +70,27 @@ function normalizeDevicePush(value) {
 
 function pushPayload(action) {
   const needsForeground = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
+  const immediateProtection = action?.type === "start_protection";
   return {
     aps: {
       "content-available": 1,
       ...(needsForeground ? { alert: { title: "Blankmind", body: "Tap to finish selecting the apps for this block." } } : {}),
+      ...(immediateProtection ? { alert: { title: "Blankmind", body: "Applying your requested block on this iPhone." } } : {}),
     },
     bm_action_id: String(action?.id || "").slice(0, 80),
     bm_action_type: String(action?.type || "").slice(0, 60),
+    bm_action_created_at: String(action?.created_at || "").slice(0, 40),
+    bm_action_expires_at: String(action?.expires_at || "").slice(0, 40),
   };
 }
 
-async function sendAssistantActionPush(devicePush, action) {
+function pushExpiration(action) {
+  const expiresAt = Date.parse(action?.expires_at || "");
+  const fallback = Date.now() + 2 * 60 * 60 * 1000;
+  return Math.floor((Number.isFinite(expiresAt) ? expiresAt : fallback) / 1000);
+}
+
+async function sendAssistantActionPushOnce(devicePush, action) {
   const device = normalizeDevicePush(devicePush);
   const auth = providerToken();
   const topic = String(process.env.APNS_TOPIC || "com.blanknfc.app.ios").trim();
@@ -89,6 +99,8 @@ async function sendAssistantActionPush(devicePush, action) {
   const host = device.environment === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const body = JSON.stringify(pushPayload(action));
   const needsForeground = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
+  const immediateProtection = action?.type === "start_protection";
+  const apnsId = crypto.randomUUID();
 
   return new Promise((resolve) => {
     const client = http2.connect(host);
@@ -108,9 +120,11 @@ async function sendAssistantActionPush(devicePush, action) {
       ":path": `/3/device/${device.token}`,
       authorization: `bearer ${auth}`,
       "apns-topic": topic,
-      "apns-push-type": needsForeground ? "alert" : "background",
-      "apns-priority": needsForeground ? "10" : "5",
-      "apns-expiration": String(Math.floor(Date.now() / 1000) + 2 * 60 * 60),
+      "apns-push-type": needsForeground || immediateProtection ? "alert" : "background",
+      "apns-priority": needsForeground || immediateProtection ? "10" : "5",
+      "apns-expiration": String(pushExpiration(action)),
+      "apns-collapse-id": String(action?.id || "blankmind-action").slice(0, 64),
+      "apns-id": apnsId,
       "content-type": "application/json",
     });
     let responseBody = "";
@@ -119,11 +133,24 @@ async function sendAssistantActionPush(devicePush, action) {
     request.on("response", (headers) => { status = Number(headers[":status"] || 0); });
     request.on("data", (chunk) => { responseBody += chunk; });
     request.on("end", () => finish(status === 200
-      ? { sent: true, reason: "" }
-      : { sent: false, reason: `apns_${status}:${responseBody.slice(0, 160)}` }));
+      ? { sent: true, reason: "", status, apns_id: apnsId, accepted_at: new Date().toISOString() }
+      : { sent: false, reason: `apns_${status}:${responseBody.slice(0, 160)}`, status, apns_id: apnsId, attempted_at: new Date().toISOString() }));
     request.on("error", (error) => finish({ sent: false, reason: `apns_request:${error.message}` }));
     request.end(body);
   });
 }
 
-module.exports = { apnsCredentials, normalizeDevicePush, pushPayload, sendAssistantActionPush };
+async function sendAssistantActionPush(devicePush, action) {
+  let result = { sent: false, reason: "apns_not_attempted" };
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    result = await sendAssistantActionPushOnce(devicePush, action);
+    result.attempt = attempt;
+    if (result.sent) return result;
+    const retryableStatus = result.status === 429 || result.status >= 500;
+    const retryableTransport = /^apns_(?:timeout|connection|request)/.test(result.reason || "");
+    if (!retryableStatus && !retryableTransport) return result;
+  }
+  return result;
+}
+
+module.exports = { apnsCredentials, normalizeDevicePush, pushPayload, pushExpiration, sendAssistantActionPush };

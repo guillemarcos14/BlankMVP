@@ -25,6 +25,18 @@ struct PendingPlanSchedule: Equatable {
     let durationDays: Int
 }
 
+struct AssistantProtectionExecution: Equatable {
+    let status: String
+    let detail: String
+    let requestedAt: Date
+    let startedAt: Date
+    let requestedDurationMinutes: Int
+    let effectiveUntil: Date?
+    let startDelaySeconds: Int
+    let mergedWithExisting: Bool
+    let result: String
+}
+
 @MainActor
 final class SessionStore: ObservableObject {
     static let canonicalProtectionId = BlankSharedState.canonicalProtectionId
@@ -349,7 +361,22 @@ final class SessionStore: ObservableObject {
         guard hasSelectedApps else {
             return .noAppsSelected
         }
-        guard !isBlankActive else {
+        let now = Date()
+        let pendingDuration = usePendingWidgetTimer ? pendingWidgetTimerMinutes : nil
+        let selectedDuration = (durationMinutes ?? pendingDuration).map { min(max($0, 5), 240) }
+        if isBlankActive {
+            hardBlankActive = hardBlankActive || hardMode
+            if let selectedDuration, blankActiveUntil != nil {
+                let proposedEnd = now.addingTimeInterval(TimeInterval(selectedDuration * 60))
+                let mergedEnd = max(blankActiveUntil ?? proposedEnd, proposedEnd)
+                blankActiveUntil = mergedEnd
+                let remainingMinutes = max(1, Int(ceil(mergedEnd.timeIntervalSince(now) / 60)))
+                deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
+                    protectionId: Self.canonicalProtectionId,
+                    durationMinutes: remainingMinutes
+                )
+            }
+            pendingWidgetTimerMinutes = nil
             return .blanked
         }
         if let lastManualUnblankedAt,
@@ -359,11 +386,9 @@ final class SessionStore: ObservableObject {
 
         isBlankActive = true
         hardBlankActive = hardMode
-        blankActiveSince = Date()
-        let pendingDuration = usePendingWidgetTimer ? pendingWidgetTimerMinutes : nil
-        let selectedDuration = (durationMinutes ?? pendingDuration).map { min(max($0, 5), 240) }
+        blankActiveSince = now
         if let selectedDuration, selectedDuration > 0 {
-            blankActiveUntil = Date().addingTimeInterval(TimeInterval(selectedDuration * 60))
+            blankActiveUntil = now.addingTimeInterval(TimeInterval(selectedDuration * 60))
             deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
                 protectionId: Self.canonicalProtectionId,
                 durationMinutes: selectedDuration
@@ -375,6 +400,75 @@ final class SessionStore: ObservableObject {
         pendingWidgetTimerMinutes = nil
         startSession(tag: nfcTagUid, forceStarted: forceStarted, entryMode: entryMode, plannedDurationMinutes: selectedDuration)
         return .blanked
+    }
+
+    func applyAssistantProtection(
+        actionId: String,
+        requestedAt: Date,
+        durationMinutes: Int,
+        hardMode: Bool,
+        now: Date = Date()
+    ) -> AssistantProtectionExecution {
+        let duration = min(max(durationMinutes, 5), 240)
+        let requestedEnd = requestedAt.addingTimeInterval(TimeInterval(duration * 60))
+        let delay = max(0, Int(now.timeIntervalSince(requestedAt).rounded()))
+        guard now < requestedEnd else {
+            return AssistantProtectionExecution(
+                status: "failed",
+                detail: "immediate_action_expired_before_execution",
+                requestedAt: requestedAt,
+                startedAt: now,
+                requestedDurationMinutes: duration,
+                effectiveUntil: blankActiveUntil,
+                startDelaySeconds: delay,
+                mergedWithExisting: isBlankActive,
+                result: "expired_without_attribution"
+            )
+        }
+
+        let mergedWithExisting = isBlankActive
+        let existingEnd = blankActiveUntil
+        let remainingMinutes = max(1, Int(ceil(requestedEnd.timeIntervalSince(now) / 60)))
+        _ = activateBlank(
+            durationMinutes: remainingMinutes,
+            hardMode: hardMode,
+            entryMode: .app,
+            usePendingWidgetTimer: false
+        )
+        if !mergedWithExisting || existingEnd != nil {
+            let mergedEnd = max(existingEnd ?? requestedEnd, requestedEnd)
+            blankActiveUntil = mergedEnd
+            deviceActivityTimerScheduled = DeviceActivityTimerScheduler.start(
+                protectionId: Self.canonicalProtectionId,
+                durationMinutes: max(1, Int(ceil(mergedEnd.timeIntervalSince(now) / 60)))
+            )
+        }
+        let effectiveEnd = blankActiveUntil ?? requestedEnd
+        let exactActionApplied = isBlankActive
+            && effectiveEnd >= requestedEnd.addingTimeInterval(-1)
+        let delayed = delay > 60
+        let status = exactActionApplied ? (delayed ? "delayed" : "verified") : "failed"
+        let result = exactActionApplied
+            ? (mergedWithExisting ? "merged_without_shortening_existing_protection" : "started_requested_protection")
+            : "requested_interval_not_applied"
+        defaults.set(actionId, forKey: "blankLastAssistantExecutionActionId")
+        defaults.set(requestedAt.timeIntervalSince1970, forKey: "blankLastAssistantExecutionRequestedAt")
+        defaults.set(now.timeIntervalSince1970, forKey: "blankLastAssistantExecutionStartedAt")
+        defaults.set(duration, forKey: "blankLastAssistantExecutionDurationMinutes")
+        defaults.set(effectiveEnd?.timeIntervalSince1970, forKey: "blankLastAssistantExecutionEffectiveUntil")
+        defaults.set("assistant_remote", forKey: "blankLastAssistantExecutionOrigin")
+        defaults.set(result, forKey: "blankLastAssistantExecutionResult")
+        return AssistantProtectionExecution(
+            status: status,
+            detail: delayed ? "late_delivery_applied_remaining_requested_window" : "exact_remote_action_applied",
+            requestedAt: requestedAt,
+            startedAt: now,
+            requestedDurationMinutes: duration,
+            effectiveUntil: effectiveEnd,
+            startDelaySeconds: delay,
+            mergedWithExisting: mergedWithExisting,
+            result: result
+        )
     }
 
     func pauseScheduleWithNfc(minutes: Int = 5) -> NfcResult {

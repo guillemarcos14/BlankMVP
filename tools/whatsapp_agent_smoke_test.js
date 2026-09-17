@@ -230,7 +230,7 @@ async function linkIncludesRequestedApps() {
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /Do you confirm|review-action/i);
     assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
-    assert.match(outboundText, /applying it now/i);
+    assert.match(outboundText, /(applying it now|couldn't wake the iPhone now)/i);
     assert.doesNotMatch(outboundText, /Open Blankmind/i);
     const pendingRows = [...semanticMemoryRows.values()].flat()
       .map((row) => row.payload?.properties?.memory?.pending_assistant_action)

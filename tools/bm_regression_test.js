@@ -216,7 +216,8 @@ check("assistant_actions_reuse_canonical_selection_and_ignore_stale_timer", () =
   assert.match(sessionStore, /func restoreSavedSelectionForAssistant\(appNames: \[String\] = \[\]\)/);
   assert.match(sessionStore, /usePendingWidgetTimer: Bool = true/);
   assert.match(home, /restoreSavedSelectionForAssistant\(appNames: appNames\)/);
-  assert.match(home, /usePendingWidgetTimer: false/);
+  assert.match(home, /applyAssistantProtection/);
+  assert.match(sessionStore, /usePendingWidgetTimer: false/);
 });
 
 check("review_action_survives_landing_redirect", () => {

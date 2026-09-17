@@ -224,7 +224,10 @@ function pendingActionFromPlan(plan, prompt = "") {
     || action.start_minute === action.end_minute
   )) return null;
   const createdAt = new Date().toISOString();
-  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const immediateDurationMs = action.type === "start_protection" && Number.isInteger(action.minutes)
+    ? action.minutes * 60 * 1000
+    : null;
+  const expiresAt = new Date(Date.now() + (immediateDurationMs || 2 * 60 * 60 * 1000)).toISOString();
   const payload = {
     type: action.type,
     name: action.name || null,
@@ -247,8 +250,46 @@ function pendingActionFromPlan(plan, prompt = "") {
     status: "queued",
     summary: cleanText(plan.message_text || plan.response_text, 320),
     created_at: createdAt,
+    requested_at: createdAt,
     expires_at: expiresAt,
   };
+}
+
+async function recordPushAttempt(connection, pending, pushResult) {
+  const attempt = {
+    action_id: pending.id,
+    action_type: pending.type,
+    sent: pushResult?.sent === true,
+    reason: cleanText(pushResult?.reason, 200),
+    status: Number(pushResult?.status || 0),
+    apns_id: cleanText(pushResult?.apns_id, 80),
+    attempted_at: pushResult?.accepted_at || pushResult?.attempted_at || new Date().toISOString(),
+  };
+  await recordAssistantMemory({
+    channel: connection.channel,
+    channelUser: connection.channelUser,
+    memory: { last_assistant_push_attempt: attempt },
+    source: attempt.sent ? "assistant_push_accepted" : "assistant_push_failed",
+  });
+  return attempt;
+}
+
+async function scheduleActionRetry(connection, pending) {
+  const siteURL = String(process.env.URL || "").replace(/\/$/, "");
+  const secret = String(process.env.WHATSAPP_APP_SECRET || "");
+  if (!siteURL || !secret || !connection?.channelUser || !pending?.id) return { scheduled: false };
+  const message = `${connection.channel}:${connection.channelUser}:${pending.id}`;
+  const signature = crypto.createHmac("sha256", secret).update(message).digest("hex");
+  try {
+    const response = await fetch(`${siteURL}/.netlify/functions/assistant-action-retry-background`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ channel: connection.channel, channel_user: connection.channelUser, action_id: pending.id, signature }),
+    });
+    return { scheduled: response.ok, status: response.status };
+  } catch (error) {
+    return { scheduled: false, reason: cleanText(error.message, 160) };
+  }
 }
 
 async function queuePendingAssistantAction(connection, plan, prompt = "") {
@@ -263,8 +304,12 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
   }
   const existing = memory.pending_assistant_action;
   if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
-    try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
-    return existing;
+    let pushResult;
+    try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, existing); }
+    catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
+    const push = await recordPushAttempt(connection, existing, pushResult);
+    await scheduleActionRetry(connection, existing);
+    return { action: existing, push, duplicate: true };
   }
   await recordAssistantMemory({
     channel: connection.channel,
@@ -272,11 +317,15 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
     memory: { pending_assistant_action: pending },
     source: "assistant_action_pending",
   });
-  try { await sendAssistantActionPush(memory.assistant_device_push, pending); } catch (_) { /* Polling remains the fallback. */ }
-  return pending;
+  let pushResult;
+  try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, pending); }
+  catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
+  const push = await recordPushAttempt(connection, pending, pushResult);
+  await scheduleActionRetry(connection, pending);
+  return { action: pending, push, duplicate: false };
 }
 
-function whatsappReplyText(plan) {
+function whatsappReplyText(plan, delivery = null) {
   const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ACTION_TYPES.has(item.type));
   const text = cleanText(plan.message_text || plan.response_text, 480)
     .replace(/(?:https?|blank):\/\/\S+/gi, "")
@@ -290,12 +339,15 @@ function whatsappReplyText(plan) {
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
     return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
   }
+  if (delivery?.push?.sent === false) {
+    return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
+  }
   if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
   return text;
 }
 
-async function sendPlanReply(to, plan) {
-  return sendWhatsAppMessage(to, whatsappReplyText(plan));
+async function sendPlanReply(to, plan, delivery = null) {
+  return sendWhatsAppMessage(to, whatsappReplyText(plan, delivery));
 }
 
 function minuteOfDay(hour, minute, meridiem) {
@@ -538,8 +590,9 @@ async function processMessage(message) {
       // Pending blocking state must never block the user-facing reply.
     }
   }
+  let queued = null;
   try {
-    const queued = await queuePendingAssistantAction(linkedConnection, plan, prompt);
+    queued = await queuePendingAssistantAction(linkedConnection, plan, prompt);
     const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
       || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
     if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
@@ -553,7 +606,7 @@ async function processMessage(message) {
   } catch (error) {
     if (semanticPersistenceRequired()) throw error;
   }
-  return sendPlanReply(message.from, plan);
+  return sendPlanReply(message.from, plan, queued);
 }
 
 exports.handler = async (event) => {

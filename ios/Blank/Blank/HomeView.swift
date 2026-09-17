@@ -35,6 +35,8 @@ struct AssistantInboxAction: Decodable {
     let durationDays: Int?
     let hours: Int?
     let appNames: [String]?
+    let requestedAt: String?
+    let expiresAt: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -48,6 +50,8 @@ struct AssistantInboxAction: Decodable {
         case durationDays = "duration_days"
         case hours
         case appNames = "app_names"
+        case requestedAt = "requested_at"
+        case expiresAt = "expires_at"
     }
 
     func toPendingAction() -> AssistantPendingAction? {
@@ -111,6 +115,10 @@ struct AssistantInboxAction: Decodable {
             return nil
         }
     }
+
+    var requestedDate: Date? {
+        ISO8601DateFormatter().date(from: requestedAt ?? "")
+    }
 }
 
 struct AssistantActionReceipt: Equatable {
@@ -118,6 +126,43 @@ struct AssistantActionReceipt: Equatable {
     let status: String
     let detail: String
     let executionStarted: Bool
+    let requestedAt: String
+    let startedAt: String
+    let requestedDurationMinutes: Int?
+    let effectiveUntil: String
+    let origin: String
+    let result: String
+    let startDelaySeconds: Int?
+    let mergedWithExisting: Bool
+
+    init(
+        actionId: String,
+        status: String,
+        detail: String,
+        executionStarted: Bool,
+        requestedAt: String = "",
+        startedAt: String = "",
+        requestedDurationMinutes: Int? = nil,
+        effectiveUntil: String = "",
+        origin: String = "",
+        result: String = "",
+        startDelaySeconds: Int? = nil,
+        mergedWithExisting: Bool = false
+    ) {
+        self.actionId = actionId
+        self.status = status
+        self.detail = detail
+        self.executionStarted = executionStarted
+        self.requestedAt = requestedAt
+        self.startedAt = startedAt
+        self.requestedDurationMinutes = requestedDurationMinutes
+        self.effectiveUntil = effectiveUntil
+        self.origin = origin
+        self.result = result
+        self.startDelaySeconds = startDelaySeconds
+        self.mergedWithExisting = mergedWithExisting
+    }
+
 }
 
 enum AssistantActionReceiptStore {
@@ -125,15 +170,25 @@ enum AssistantActionReceiptStore {
     private static let statusKey = "blankAssistantReceiptStatus"
     private static let detailKey = "blankAssistantReceiptDetail"
     private static let executionStartedKey = "blankAssistantReceiptExecutionStarted"
+    private static let evidenceKey = "blankAssistantReceiptEvidence"
 
     static func load(defaults: UserDefaults = BlankSharedState.defaults) -> AssistantActionReceipt? {
         guard let actionId = defaults.string(forKey: actionIdKey), !actionId.isEmpty,
               let status = defaults.string(forKey: statusKey), !status.isEmpty else { return nil }
+        let evidence = defaults.dictionary(forKey: evidenceKey) ?? [:]
         return AssistantActionReceipt(
             actionId: actionId,
             status: status,
             detail: defaults.string(forKey: detailKey) ?? "",
-            executionStarted: defaults.bool(forKey: executionStartedKey)
+            executionStarted: defaults.bool(forKey: executionStartedKey),
+            requestedAt: evidence["requested_at"] as? String ?? "",
+            startedAt: evidence["started_at"] as? String ?? "",
+            requestedDurationMinutes: evidence["requested_duration_minutes"] as? Int,
+            effectiveUntil: evidence["effective_until"] as? String ?? "",
+            origin: evidence["origin"] as? String ?? "",
+            result: evidence["result"] as? String ?? "",
+            startDelaySeconds: evidence["start_delay_seconds"] as? Int,
+            mergedWithExisting: evidence["merged_with_existing"] as? Bool ?? false
         )
     }
 
@@ -142,12 +197,31 @@ enum AssistantActionReceiptStore {
         status: String,
         detail: String,
         executionStarted: Bool,
+        requestedAt: String = "",
+        startedAt: String = "",
+        requestedDurationMinutes: Int? = nil,
+        effectiveUntil: String = "",
+        origin: String = "",
+        result: String = "",
+        startDelaySeconds: Int? = nil,
+        mergedWithExisting: Bool = false,
         defaults: UserDefaults = BlankSharedState.defaults
     ) {
         defaults.set(actionId, forKey: actionIdKey)
         defaults.set(status, forKey: statusKey)
         defaults.set(detail, forKey: detailKey)
         defaults.set(executionStarted, forKey: executionStartedKey)
+        var evidence: [String: Any] = [
+            "requested_at": requestedAt,
+            "started_at": startedAt,
+            "effective_until": effectiveUntil,
+            "origin": origin,
+            "result": result,
+            "merged_with_existing": mergedWithExisting,
+        ]
+        if let requestedDurationMinutes { evidence["requested_duration_minutes"] = requestedDurationMinutes }
+        if let startDelaySeconds { evidence["start_delay_seconds"] = startDelaySeconds }
+        defaults.set(evidence, forKey: evidenceKey)
     }
 
     static func clear(actionId: String, defaults: UserDefaults = BlankSharedState.defaults) {
@@ -156,6 +230,7 @@ enum AssistantActionReceiptStore {
         defaults.removeObject(forKey: statusKey)
         defaults.removeObject(forKey: detailKey)
         defaults.removeObject(forKey: executionStartedKey)
+        defaults.removeObject(forKey: evidenceKey)
     }
 }
 
@@ -172,7 +247,15 @@ struct AssistantActionInboxClient {
         return response.pendingAction
     }
 
-    func acknowledge(actionId: String, status: String, connectCode: String, channel: String, phoneNumber: String, detail: String = "") async -> Bool {
+    func acknowledge(
+        actionId: String,
+        status: String,
+        connectCode: String,
+        channel: String,
+        phoneNumber: String,
+        detail: String = "",
+        evidence: AssistantActionReceipt? = nil
+    ) async -> Bool {
         guard let data = try? await request(
             action: "ack_pending_action",
             connectCode: connectCode,
@@ -180,7 +263,8 @@ struct AssistantActionInboxClient {
             phoneNumber: phoneNumber,
             actionId: actionId,
             status: status,
-            detail: detail
+            detail: detail,
+            evidence: evidence
         ), let response = try? JSONDecoder().decode(AssistantAcknowledgementResponse.self, from: data) else {
             return false
         }
@@ -215,7 +299,8 @@ struct AssistantActionInboxClient {
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber,
-            detail: receipt.detail
+            detail: receipt.detail,
+            evidence: receipt
         )
     }
 
@@ -239,6 +324,7 @@ struct AssistantActionInboxClient {
         actionId: String? = nil,
         status: String? = nil,
         detail: String? = nil,
+        evidence: AssistantActionReceipt? = nil,
         deviceToken: String? = nil,
         environment: String? = nil
     ) async throws -> Data {
@@ -263,6 +349,16 @@ struct AssistantActionInboxClient {
         if let actionId { body["action_id"] = actionId }
         if let status { body["status"] = status }
         if let detail, !detail.isEmpty { body["detail"] = detail }
+        if let evidence {
+            body["requested_at"] = evidence.requestedAt
+            body["started_at"] = evidence.startedAt
+            body["requested_duration_minutes"] = evidence.requestedDurationMinutes
+            body["effective_until"] = evidence.effectiveUntil
+            body["origin"] = evidence.origin
+            body["result"] = evidence.result
+            body["start_delay_seconds"] = evidence.startDelaySeconds
+            body["merged_with_existing"] = evidence.mergedWithExisting
+        }
         if let deviceToken, !deviceToken.isEmpty { body["device_token"] = deviceToken }
         if let environment, !environment.isEmpty { body["environment"] = environment }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -307,6 +403,7 @@ struct HomeView: View {
     @State private var assistantActionPollInFlight = false
     @State private var assistantActionExecutionInFlight = false
     @State private var lastAssistantActionPollAt = Date.distantPast
+    @State private var pendingAssistantInboxAction: AssistantInboxAction?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -465,22 +562,34 @@ struct HomeView: View {
         .onChange(of: showingContextualAppPicker) { isPresented in
             if !isPresented {
                 var assistantActionApplied = false
+                var assistantProtectionExecution: AssistantProtectionExecution?
                 if contextualPlanSelection.blankedSelectionCount > 0 {
                     if contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
                     }
                     if sessionStore.pendingPlanShouldActivate,
                        contextualPlanSelection.blankedSelectionCount > 0 {
-                        let result = withAnimation(.easeInOut(duration: 0.65)) {
-                            sessionStore.activateBlank(
-                                durationMinutes: sessionStore.pendingPlanDurationMinutes,
+                        if let remote = pendingAssistantInboxAction,
+                           let requestedAt = remote.requestedDate,
+                           let duration = remote.minutes {
+                            assistantProtectionExecution = sessionStore.applyAssistantProtection(
+                                actionId: remote.id,
+                                requestedAt: requestedAt,
+                                durationMinutes: duration,
                                 hardMode: sessionStore.pendingPlanHardMode
                             )
+                        } else {
+                            _ = withAnimation(.easeInOut(duration: 0.65)) {
+                                sessionStore.activateBlank(
+                                    durationMinutes: sessionStore.pendingPlanDurationMinutes,
+                                    hardMode: sessionStore.pendingPlanHardMode
+                                )
+                            }
                         }
                         applyScreenTimeControls()
-                        setMessage(for: result)
                         activeSection = nil
-                        assistantActionApplied = sessionStore.isBlankActive
+                        assistantActionApplied = assistantProtectionExecution.map { ["verified", "delayed"].contains($0.status) }
+                            ?? sessionStore.isBlankActive
                     } else if let dailyLimitMinutes = sessionStore.pendingPlanDailyLimitMinutes,
                               contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
@@ -514,8 +623,9 @@ struct HomeView: View {
                 contextualPlanSelection = FamilyActivitySelection()
                 if !pendingAssistantActionId.isEmpty {
                     finishPendingAssistantAction(
-                        status: assistantActionApplied ? "verified" : "dismissed",
-                        detail: assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_cancelled"
+                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : "dismissed"),
+                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_cancelled"),
+                        execution: assistantProtectionExecution
                     )
                 }
             }
@@ -1430,6 +1540,13 @@ struct HomeView: View {
         sessionStore.clearAssistantActionConfirmation()
         switch pendingAction {
         case .startProtection(let minutes, let hardMode, let appNames):
+            guard let minutes,
+                  let remote = pendingAssistantInboxAction,
+                  remote.id == pendingAssistantActionId,
+                  let requestedAt = remote.requestedDate else {
+                finishPendingAssistantAction(status: "failed", detail: "missing_exact_action_metadata")
+                return
+            }
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
                 sessionStore.requestBlockConfiguration(
                     appNames: appNames,
@@ -1439,16 +1556,17 @@ struct HomeView: View {
                 )
                 return
             }
-            let result = sessionStore.activateBlank(
+            let execution = sessionStore.applyAssistantProtection(
+                actionId: remote.id,
+                requestedAt: requestedAt,
                 durationMinutes: minutes,
-                hardMode: hardMode,
-                usePendingWidgetTimer: false
+                hardMode: hardMode
             )
             applyScreenTimeControls()
-            setMessage(for: result)
             finishPendingAssistantAction(
-                status: sessionStore.isBlankActive ? "verified" : "failed",
-                detail: sessionStore.isBlankActive ? "protection_active" : "protection_not_active"
+                status: execution.status,
+                detail: execution.detail,
+                execution: execution
             )
         case .applySchedule(_, let start, let end, let weekdays, let days, let appNames):
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
@@ -1553,7 +1671,12 @@ struct HomeView: View {
         }
     }
 
-    private func finishPendingAssistantAction(status: String, detail: String, executionStarted: Bool = true) {
+    private func finishPendingAssistantAction(
+        status: String,
+        detail: String,
+        executionStarted: Bool = true,
+        execution: AssistantProtectionExecution? = nil
+    ) {
         let actionId = pendingAssistantActionId
         let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
         let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
@@ -1566,13 +1689,29 @@ struct HomeView: View {
             actionId: actionId,
             status: status,
             detail: detail,
-            executionStarted: executionStarted && status != "dismissed"
+            executionStarted: executionStarted && status != "dismissed",
+            requestedAt: execution.map { ISO8601DateFormatter().string(from: $0.requestedAt) } ?? "",
+            startedAt: execution.map { ISO8601DateFormatter().string(from: $0.startedAt) } ?? "",
+            requestedDurationMinutes: execution?.requestedDurationMinutes,
+            effectiveUntil: execution?.effectiveUntil.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            origin: execution == nil ? "" : "assistant_remote",
+            result: execution?.result ?? "",
+            startDelaySeconds: execution?.startDelaySeconds,
+            mergedWithExisting: execution?.mergedWithExisting ?? false
         )
         AssistantActionReceiptStore.save(
             actionId: receipt.actionId,
             status: receipt.status,
             detail: receipt.detail,
-            executionStarted: receipt.executionStarted
+            executionStarted: receipt.executionStarted,
+            requestedAt: receipt.requestedAt,
+            startedAt: receipt.startedAt,
+            requestedDurationMinutes: receipt.requestedDurationMinutes,
+            effectiveUntil: receipt.effectiveUntil,
+            origin: receipt.origin,
+            result: receipt.result,
+            startDelaySeconds: receipt.startDelaySeconds,
+            mergedWithExisting: receipt.mergedWithExisting
         )
         Task {
             let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
@@ -1719,6 +1858,7 @@ struct HomeView: View {
                       sessionStore.pendingAssistantAction == nil else { return }
                 BlankSharedState.defaults.removeObject(forKey: "blankAssistantPollAfterOpen")
                 pendingAssistantActionId = remoteAction.id
+                pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)
                 confirmPendingAssistantAction()
             }

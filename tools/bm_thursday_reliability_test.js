@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { normalizePendingAction, pendingActionTransition } = require("../netlify/functions/assistant-channel");
+const { normalizePendingAction, pendingActionTransition, normalizeExecutionEvidence } = require("../netlify/functions/assistant-channel");
 
 const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
@@ -32,6 +32,7 @@ assertTransition("queued", "delivered", true);
 assertTransition("delivered", "confirmed", true);
 assertTransition("confirmed", "execution_started", true);
 assertTransition("execution_started", "verified", true);
+assertTransition("execution_started", "delayed", true);
 assertTransition("execution_started", "failed", true);
 assertTransition("delivered", "dismissed", true);
 assertTransition("delivered", "verified", false);
@@ -43,6 +44,22 @@ const immediate = normalizePendingAction(action());
 assert.equal(immediate.minutes, 18);
 assert.equal(immediate.hard_mode, true);
 assert.deepEqual(immediate.app_names, ["Instagram"]);
+assert.equal(immediate.requested_at, immediate.created_at);
+
+const evidence = normalizeExecutionEvidence({
+  action_id: immediate.id,
+  origin: "assistant_remote",
+  requested_at: immediate.requested_at,
+  started_at: new Date().toISOString(),
+  requested_duration_minutes: immediate.minutes,
+  effective_until: future,
+  result: "merged_without_shortening_existing_protection",
+  start_delay_seconds: 74,
+  merged_with_existing: true,
+}, immediate);
+assert.equal(evidence.valid, true, "exact action identity, request time and duration must verify");
+assert.equal(evidence.merged_with_existing, true);
+assert.equal(normalizeExecutionEvidence({ ...evidence, action_id: "another-action" }, immediate).valid, false, "another active block must not verify this action");
 
 const schedule = normalizePendingAction(action({
   id: "schedule-1",
@@ -81,10 +98,11 @@ assert.match(home, /AssistantActionReceiptStore\.save/, "foreground outcomes mus
 assert.match(home, /AssistantActionReceiptStore\.load/, "foreground must retry an unacknowledged outcome before polling again");
 assert.match(home, /acknowledgeLifecycle/, "foreground lifecycle delivery must be retryable");
 assert.match(home, /screen_time_permission_denied/, "permission denial must end explicitly");
-assert.match(home, /status: assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
+assert.match(home, /assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
 assert.match(app, /AssistantActionReceiptStore\.load/, "background execution must recover an unacknowledged outcome");
 assert.match(app, /guard await client\.acknowledge\([\s\S]*?status: "confirmed"/, "background execution must not start before confirmation is recorded");
 assert.match(channel, /action_expired_before_execution/, "expired actions must have an explicit terminal outcome");
+assert.match(channel, /invalid_execution_evidence/, "generic active state must not verify an exact immediate action");
 assert.match(channel, /Cancelled\. Nothing was changed on the iPhone\./, "dismissal must be reported accurately");
 
 console.log("bm_thursday_reliability_test passed: lifecycle, retries, expiry, permission, selection and action variants");

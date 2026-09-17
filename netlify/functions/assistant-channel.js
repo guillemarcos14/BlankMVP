@@ -167,13 +167,14 @@ const PENDING_ACTION_TYPES = new Set([
   "open_app_picker", "request_screen_time_permission",
 ]);
 
-const TERMINAL_ACTION_STATUSES = new Set(["verified", "failed", "dismissed"]);
+const TERMINAL_ACTION_STATUSES = new Set(["verified", "delayed", "failed", "dismissed"]);
 const ACTION_STATUS_TRANSITIONS = {
   queued: new Set(["delivered"]),
   delivered: new Set(["confirmed", "failed", "dismissed"]),
   confirmed: new Set(["execution_started", "failed", "dismissed"]),
-  execution_started: new Set(["verified", "failed"]),
+  execution_started: new Set(["verified", "delayed", "failed"]),
   verified: new Set(),
+  delayed: new Set(),
   failed: new Set(),
   dismissed: new Set(),
 };
@@ -183,6 +184,7 @@ const ACTION_STATUS_RANK = {
   confirmed: 2,
   execution_started: 3,
   verified: 4,
+  delayed: 4,
   failed: 4,
   dismissed: 4,
 };
@@ -235,6 +237,7 @@ function normalizePendingAction(value) {
       : [],
     summary: cleanText(value.summary, 320),
     created_at: cleanText(value.created_at, 40),
+    requested_at: cleanText(value.requested_at || value.created_at, 40),
     expires_at: new Date(expiresAt).toISOString(),
     status: normalizeActionStatus(value.status) || "queued",
     delivered_at: cleanText(value.delivered_at, 40),
@@ -247,6 +250,41 @@ function normalizePendingAction(value) {
     || action.start_minute === action.end_minute
   )) return null;
   return action;
+}
+
+function normalizeExecutionEvidence(body, pending) {
+  const startedAt = cleanText(body.started_at, 40);
+  const effectiveUntil = cleanText(body.effective_until, 40);
+  const requestedAt = cleanText(body.requested_at, 40);
+  const duration = Number.isInteger(body.requested_duration_minutes) ? body.requested_duration_minutes : null;
+  const requestedMs = Date.parse(requestedAt);
+  const effectiveMs = Date.parse(effectiveUntil);
+  const expectedEndMs = Number.isFinite(requestedMs) && Number.isInteger(duration)
+    ? requestedMs + duration * 60 * 1000
+    : NaN;
+  return {
+    action_id: cleanText(body.action_id, 80),
+    origin: cleanText(body.origin, 40),
+    requested_at: requestedAt,
+    started_at: startedAt,
+    requested_duration_minutes: duration,
+    effective_until: effectiveUntil,
+    result: cleanText(body.result, 120),
+    start_delay_seconds: Number.isFinite(body.start_delay_seconds) ? Math.max(0, Math.round(body.start_delay_seconds)) : null,
+    merged_with_existing: body.merged_with_existing === true,
+    valid: pending.type !== "start_protection" || (
+      cleanText(body.action_id, 80) === pending.id
+      && cleanText(body.origin, 40) === "assistant_remote"
+      && Number.isFinite(Date.parse(requestedAt))
+      && Number.isFinite(Date.parse(startedAt))
+      && (
+        duration === pending.minutes
+        && requestedAt === pending.requested_at
+        && Number.isFinite(effectiveMs)
+        && effectiveMs >= expectedEndMs - 1000
+      )
+    ),
+  };
 }
 
 async function connectedChannel(body) {
@@ -358,6 +396,16 @@ async function acknowledgePendingAction(body) {
   }
   const now = new Date().toISOString();
   const terminal = TERMINAL_ACTION_STATUSES.has(status);
+  const execution = terminal ? normalizeExecutionEvidence(body, pending) : null;
+  if ((status === "verified" || status === "delayed") && !execution.valid) {
+    return json(200, { ok: true, acknowledged: false, reason: "invalid_execution_evidence" });
+  }
+  if (status === "verified" && execution.start_delay_seconds > 60) {
+    return json(200, { ok: true, acknowledged: false, reason: "late_execution_cannot_be_verified_as_immediate" });
+  }
+  if (status === "delayed" && !(execution.start_delay_seconds > 60)) {
+    return json(200, { ok: true, acknowledged: false, reason: "delayed_status_without_measured_delay" });
+  }
   const timestampKey = status === "confirmed" ? "confirmed_at"
     : status === "execution_started" ? "execution_started_at"
       : status === "delivered" ? "delivered_at" : "resolved_at";
@@ -374,6 +422,7 @@ async function acknowledgePendingAction(body) {
             status,
             resolved_at: now,
             detail: cleanText(body.detail, 240),
+            execution,
           },
         }
       : { pending_assistant_action: updated },
@@ -393,6 +442,11 @@ async function acknowledgePendingAction(body) {
       } else {
         message = spanish ? "Hecho. El cambio está aplicado y verificado." : "Done. The change is applied and verified.";
       }
+    } else if (status === "delayed") {
+      const delay = execution?.start_delay_seconds || 0;
+      message = spanish
+        ? `El iPhone aplicó la orden con ${delay} segundos de retraso. La protección efectiva termina a las ${execution?.effective_until || "hora registrada por el dispositivo"}; no la cuento como ejecución inmediata.`
+        : `The iPhone applied the request ${delay} seconds late. Effective protection ends at ${execution?.effective_until || "the device-recorded time"}; I am not counting it as immediate execution.`;
     } else if (status === "dismissed") {
       message = spanish
         ? "Cancelado. No se ha cambiado nada en el iPhone."
@@ -428,3 +482,4 @@ exports.handler = async (event) => {
 
 exports.normalizePendingAction = normalizePendingAction;
 exports.pendingActionTransition = pendingActionTransition;
+exports.normalizeExecutionEvidence = normalizeExecutionEvidence;

@@ -487,18 +487,34 @@ private struct AssistantBackgroundActionRunner {
             return .failed
         }
 
-        let outcome = execute(action, store: store, blocker: blocker)
+        let outcome = execute(remote: remote, action: action, store: store, blocker: blocker)
         let receipt = AssistantActionReceipt(
             actionId: remote.id,
-            status: outcome.verified ? "verified" : "failed",
+            status: outcome.status,
             detail: outcome.detail,
-            executionStarted: true
+            executionStarted: true,
+            requestedAt: outcome.execution.map { ISO8601DateFormatter().string(from: $0.requestedAt) } ?? "",
+            startedAt: outcome.execution.map { ISO8601DateFormatter().string(from: $0.startedAt) } ?? "",
+            requestedDurationMinutes: outcome.execution?.requestedDurationMinutes,
+            effectiveUntil: outcome.execution?.effectiveUntil.map { ISO8601DateFormatter().string(from: $0) } ?? "",
+            origin: outcome.execution == nil ? "" : "assistant_remote",
+            result: outcome.execution?.result ?? "",
+            startDelaySeconds: outcome.execution?.startDelaySeconds,
+            mergedWithExisting: outcome.execution?.mergedWithExisting ?? false
         )
         AssistantActionReceiptStore.save(
             actionId: receipt.actionId,
             status: receipt.status,
             detail: receipt.detail,
             executionStarted: receipt.executionStarted,
+            requestedAt: receipt.requestedAt,
+            startedAt: receipt.startedAt,
+            requestedDurationMinutes: receipt.requestedDurationMinutes,
+            effectiveUntil: receipt.effectiveUntil,
+            origin: receipt.origin,
+            result: receipt.result,
+            startDelaySeconds: receipt.startDelaySeconds,
+            mergedWithExisting: receipt.mergedWithExisting,
             defaults: defaults
         )
         if await client.acknowledge(
@@ -507,58 +523,66 @@ private struct AssistantBackgroundActionRunner {
             connectCode: code,
             channel: channel,
             phoneNumber: phone,
-            detail: receipt.detail
+            detail: receipt.detail,
+            evidence: receipt
         ) {
             AssistantActionReceiptStore.clear(actionId: receipt.actionId, defaults: defaults)
         }
-        return outcome.verified ? .newData : .failed
+        return outcome.status == "verified" || outcome.status == "delayed" ? .newData : .failed
     }
 
     private func execute(
-        _ action: AssistantPendingAction,
+        remote: AssistantInboxAction,
+        action: AssistantPendingAction,
         store: SessionStore,
         blocker: ScreenTimeBlocker
-    ) -> (verified: Bool, detail: String) {
+    ) -> (status: String, detail: String, execution: AssistantProtectionExecution?) {
         switch action {
         case .startProtection(let minutes, let hardMode, let appNames):
-            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
-            _ = store.activateBlank(durationMinutes: minutes, hardMode: hardMode, usePendingWidgetTimer: false)
+            guard let minutes, let requestedAt = remote.requestedDate else { return ("failed", "missing_exact_action_metadata", nil) }
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return ("failed", "distraction_selection_required", nil) }
+            let execution = store.applyAssistantProtection(
+                actionId: remote.id,
+                requestedAt: requestedAt,
+                durationMinutes: minutes,
+                hardMode: hardMode
+            )
             apply(store: store, blocker: blocker)
-            return (store.isBlankActive, store.isBlankActive ? "canonical_protection_active" : "protection_not_active")
+            return (execution.status, execution.detail, execution)
         case .applySchedule(_, let start, let end, let weekdays, let days, let appNames):
-            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
+            guard store.restoreSavedSelectionForAssistant(appNames: appNames) else { return ("failed", "distraction_selection_required", nil) }
             store.applyAdaptivePlan(startMinute: start, endMinute: end, durationDays: days, activateCurrentWindow: true, name: "Protection", weekdays: weekdays)
             apply(store: store, blocker: blocker)
-            return (true, "canonical_schedule_persisted")
+            return ("verified", "canonical_schedule_persisted", nil)
         case .setDailyLimit(let minutes, let appNames):
-            guard let minutes, store.restoreSavedSelectionForAssistant(appNames: appNames) else { return (false, "distraction_selection_required") }
+            guard let minutes, store.restoreSavedSelectionForAssistant(appNames: appNames) else { return ("failed", "distraction_selection_required", nil) }
             store.dailyLimitMinutes = minutes
             store.dailyLimitEnabled = true
             store.refreshDailyLimitMonitoring()
             apply(store: store, blocker: blocker)
-            return (store.dailyLimitEnabled && store.dailyLimitMinutes == minutes, "daily_limit_state_checked")
+            return (store.dailyLimitEnabled && store.dailyLimitMinutes == minutes ? "verified" : "failed", "daily_limit_state_checked", nil)
         case .allowOnly:
             store.allowOnlyModeEnabled = true
             apply(store: store, blocker: blocker)
-            return (store.allowOnlyModeEnabled, "allow_only_state_checked")
+            return (store.allowOnlyModeEnabled ? "verified" : "failed", "allow_only_state_checked", nil)
         case .adultFilter:
             store.adultContentBlockingEnabled = true
             apply(store: store, blocker: blocker)
-            return (store.adultContentBlockingEnabled, "adult_filter_state_checked")
+            return (store.adultContentBlockingEnabled ? "verified" : "failed", "adult_filter_state_checked", nil)
         case .pauseRules(let hours):
             store.enableVacationMode(hours: hours)
             apply(store: store, blocker: blocker)
-            return (store.isVacationModeActive, "pause_state_checked")
+            return (store.isVacationModeActive ? "verified" : "failed", "pause_state_checked", nil)
         case .disablePause:
             store.disableVacationMode()
             apply(store: store, blocker: blocker)
-            return (!store.isVacationModeActive, "resume_state_checked")
+            return (!store.isVacationModeActive ? "verified" : "failed", "resume_state_checked", nil)
         case .applyAIPlan:
             store.applyAIPlan()
             apply(store: store, blocker: blocker)
-            return (true, "ai_plan_persisted")
+            return ("verified", "ai_plan_persisted", nil)
         case .openAppPicker, .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker, .requestScreenTimePermission:
-            return (false, "foreground_setup_required")
+            return ("failed", "foreground_setup_required", nil)
         }
     }
 

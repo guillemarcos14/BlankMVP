@@ -715,7 +715,7 @@ struct HomeView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, layout.horizontalPadding)
-        .padding(.bottom, layout.bottomPadding)
+        .padding(.bottom, layout.bottomPadding * 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
 
@@ -751,7 +751,7 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
             .padding(.horizontal, layout.horizontalPadding)
-            .padding(.bottom, layout.bottomPadding)
+            .padding(.bottom, layout.bottomPadding * 2)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .overlay {

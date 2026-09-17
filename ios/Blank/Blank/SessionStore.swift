@@ -455,7 +455,7 @@ final class SessionStore: ObservableObject {
         defaults.set(requestedAt.timeIntervalSince1970, forKey: "blankLastAssistantExecutionRequestedAt")
         defaults.set(now.timeIntervalSince1970, forKey: "blankLastAssistantExecutionStartedAt")
         defaults.set(duration, forKey: "blankLastAssistantExecutionDurationMinutes")
-        defaults.set(effectiveEnd?.timeIntervalSince1970, forKey: "blankLastAssistantExecutionEffectiveUntil")
+        defaults.set(effectiveEnd.timeIntervalSince1970, forKey: "blankLastAssistantExecutionEffectiveUntil")
         defaults.set("assistant_remote", forKey: "blankLastAssistantExecutionOrigin")
         defaults.set(result, forKey: "blankLastAssistantExecutionResult")
         return AssistantProtectionExecution(

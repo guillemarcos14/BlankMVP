@@ -4756,7 +4756,7 @@ private struct ReportFlatCardModifier: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(colorScheme == .dark ? BlankColors.pureWhite.opacity(0.12) : BlankColors.pureWhite)
+                    .fill(colorScheme == .dark ? BlankColors.pureWhite.opacity(0.12) : BlankColors.minimalCardSurface)
             }
     }
 }

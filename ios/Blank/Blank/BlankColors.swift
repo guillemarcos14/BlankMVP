@@ -49,11 +49,11 @@ enum BlankColors {
     static let premiumBlue = seafoam
     static let controlSurface = pureWhite.opacity(0.16)
     static let activeControlSurface = pureWhite.opacity(0.09)
-    static let minimalBackground = powderGray
+    static let minimalBackground = pureWhite
     static let minimalInk = charcoal
     static let minimalSecondary = secondaryText
     static let minimalFaded = paleSteelBlue.opacity(0.72)
-    static let minimalCardSurface = pureWhite
+    static let minimalCardSurface = powderGray
     static let darkCardSurface = paleSteelBlue.opacity(0.16)
     static let newLookDarkBackground = charcoal
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)

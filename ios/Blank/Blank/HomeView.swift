@@ -2804,6 +2804,7 @@ struct HomeSectionScreen: View {
             routeContent
                 .environment(\.blankMinimalAppearance, minimalAppearance)
                 .environment(\.blankSectionHorizontalPadding, sectionHorizontalPadding)
+                .padding(.top, 60)
                 .frame(width: contentWidth, height: screenHeight, alignment: .top)
                 .frame(width: screenWidth, height: screenHeight, alignment: .top)
                 .offset(x: horizontalOffset)

@@ -292,6 +292,16 @@ async function scheduleActionRetry(connection, pending) {
   }
 }
 
+function canReusePendingAction(existing, pending, now = Date.now()) {
+  const requestedAt = Date.parse(existing?.requested_at || "");
+  const expiresAt = Date.parse(existing?.expires_at || "");
+  return existing?.fingerprint === pending?.fingerprint
+    && Number.isFinite(requestedAt)
+    && Number.isFinite(expiresAt)
+    && requestedAt <= now
+    && expiresAt > now;
+}
+
 async function queuePendingAssistantAction(connection, plan, prompt = "") {
   if (!connection?.connectCode) return null;
   const pending = pendingActionFromPlan(plan, prompt);
@@ -303,7 +313,7 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
     if (semanticPersistenceRequired()) throw error;
   }
   const existing = memory.pending_assistant_action;
-  if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
+  if (canReusePendingAction(existing, pending)) {
     let pushResult;
     try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, existing); }
     catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
@@ -665,4 +675,4 @@ exports.handler = async (event) => {
   }
 };
 
-exports._test = { whatsappReplyText };
+exports._test = { canReusePendingAction, whatsappReplyText };

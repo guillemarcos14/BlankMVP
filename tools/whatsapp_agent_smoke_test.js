@@ -16,6 +16,19 @@ const permissionReply = _test.whatsappReplyText({
 assert.match(permissionReply, /Screen Time permission/i);
 assert.doesNotMatch(permissionReply, /Open Blankmind to choose the apps/i);
 
+const pendingNow = Date.now();
+const currentPending = {
+  fingerprint: "same-action",
+  requested_at: new Date(pendingNow - 1_000).toISOString(),
+  expires_at: new Date(pendingNow + 60_000).toISOString(),
+};
+assert.strictEqual(_test.canReusePendingAction(currentPending, { fingerprint: "same-action" }, pendingNow), true);
+assert.strictEqual(
+  _test.canReusePendingAction({ ...currentPending, requested_at: undefined }, { fingerprint: "same-action" }, pendingNow),
+  false,
+  "legacy actions without exact request time must be replaced instead of replayed"
+);
+
 const semanticMemoryRows = new Map();
 
 function recentAssistantMemoryResponse(target, options = {}) {

@@ -12,7 +12,7 @@
         "components": [
           {
             "/": "/open",
-            "comment": "Open Blanked action links"
+            "comment": "Open Blankmind action links"
           },
           {
             "/": "/open/*",
@@ -20,7 +20,7 @@
           },
           {
             "/": "/open.html",
-            "comment": "Legacy Blanked action bridge"
+            "comment": "Legacy Blankmind action bridge"
           }
         ]
       }

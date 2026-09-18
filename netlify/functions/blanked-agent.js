@@ -165,12 +165,12 @@ function isProductivityPrompt(prompt) {
 function webConversionNote(language = "en", prompt = "") {
   if (isProductivityPrompt(prompt)) {
     return language === "es"
-      ? "En Blanked App, esto puede convertirse en un bloque de trabajo que cierre redes y apps de scroll."
-      : "In Blanked App, this can become a work block that closes social and scroll apps.";
+      ? "En Blankmind, esto puede convertirse en un bloque de trabajo que cierre redes y apps de scroll."
+      : "In Blankmind, this can become a work block that closes social and scroll apps.";
   }
   return language === "es"
-    ? "Desde la web puedo planearlo, pero solo Blanked App puede pedir permisos y bloquear apps automáticamente."
-    : "I can plan it here, but only Blanked App can ask for permissions and block apps automatically.";
+    ? "Desde la web puedo planearlo, pero solo Blankmind puede pedir permisos y bloquear apps automáticamente."
+    : "I can plan it here, but only Blankmind can ask for permissions and block apps automatically.";
 }
 
 function appendWebConversionNote(plan, prompt, context = {}, language = "en") {
@@ -601,10 +601,10 @@ function actionMessage(plan, prompt = "", language = "en") {
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
     if (first.type === "open_app_picker" && first.start_minute != null && first.end_minute != null) {
       return language === "es"
-        ? `Primero elige ${target} en Blanked App y después podré programar ${localizeMinuteText(minuteText(first.start_minute), language)} a ${localizeMinuteText(minuteText(first.end_minute), language)}.`
-        : `Choose ${target} in Blanked App first, then I can schedule ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
+        ? `Primero elige ${target} en Blankmind y después podré programar ${localizeMinuteText(minuteText(first.start_minute), language)} a ${localizeMinuteText(minuteText(first.end_minute), language)}.`
+        : `Choose ${target} in Blankmind first, then I can schedule ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
     }
-    return language === "es" ? `Primero elige ${target} en Blanked App.` : `Choose ${target} in Blanked App first.`;
+    return language === "es" ? `Primero elige ${target} en Blankmind.` : `Choose ${target} in Blankmind first.`;
   }
   if (first.type === "apply_ai_plan") return language === "es" ? "Aplicaría el siguiente ajuste recomendado." : "Apply the next recommended adjustment and review the result later.";
   return "";
@@ -619,7 +619,7 @@ function conversationalMessage(plan, language = "en", prompt = "") {
 
   if (!actions.length && hasQuestion) return response;
   if (!actions.length && /\bsleep target\b|hora objetivo para dormir/i.test(response)) return response;
-  if (!actions.length && /turn it into a Blanked plan|want a Blanked plan|quieres un plan de Blanked|convertirlo en un plan de Blanked/i.test(response)) return response.slice(0, 320);
+  if (!actions.length && /turn it into a Blankmind plan|want a Blankmind plan|quieres un plan de Blankmind|convertirlo en un plan de Blankmind/i.test(response)) return response.slice(0, 320);
   if (!actions.length && move && /tell me|dime|what time|which app|a qu[eé] hora|cu[aá]ndo|app or moment/i.test(response)) return response;
   if (!actions.length && move && !response.toLowerCase().includes(move.toLowerCase())) {
     const normalizedMove = move.charAt(0).toUpperCase() + move.slice(1);
@@ -631,12 +631,12 @@ function conversationalMessage(plan, language = "en", prompt = "") {
     return (actionLine || response).slice(0, 320);
   }
 
-  return response || (language === "es" ? "Puedo ayudarte con eso en Blanked." : "I can help with that in Blanked.");
+  return response || (language === "es" ? "Puedo ayudarte con eso en Blankmind." : "I can help with that in Blankmind.");
 }
 
 function fallbackSpeechText(plan, language = "en") {
   const message = naturalChannelText(plan.message_text || plan.response_text, 420);
-  if (!message) return language === "es" ? "Puedo ayudarte con eso en Blanked." : "I can help with that in Blanked.";
+  if (!message) return language === "es" ? "Puedo ayudarte con eso en Blankmind." : "I can help with that in Blankmind.";
   return message;
 }
 
@@ -645,15 +645,15 @@ function fallbackFollowupText(plan, language = "en") {
   if (!actions.length) return "";
   const first = actions[0];
   if (language === "es") {
-    if (first.type === "apply_schedule") return "Abre Blanked para revisar y aplicar la franja.";
-    if (first.type === "start_protection") return "Abre Blanked para empezar el bloqueo.";
-    if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Abre Blanked para terminar la configuración.";
-    return "Abre Blanked para revisar el siguiente paso.";
+    if (first.type === "apply_schedule") return "Abre Blankmind para revisar y aplicar la franja.";
+    if (first.type === "start_protection") return "Abre Blankmind para empezar el bloqueo.";
+    if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Abre Blankmind para terminar la configuración.";
+    return "Abre Blankmind para revisar el siguiente paso.";
   }
-  if (first.type === "apply_schedule") return "Open Blanked to review and apply the window.";
-  if (first.type === "start_protection") return "Open Blanked to review and confirm the block.";
-  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
-  return "Open Blanked to review the next step.";
+  if (first.type === "apply_schedule") return "Open Blankmind to review and apply the window.";
+  if (first.type === "start_protection") return "Open Blankmind to review and confirm the block.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blankmind to finish setup.";
+  return "Open Blankmind to review the next step.";
 }
 
 function completeBlockingPlan(contract, language = "en", prompt = "") {
@@ -1520,8 +1520,8 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   }
   if (recentTiming && asksForAdvice(prompt) && /what should i do|what do i do|how would you handle|qué hago|qué debería hacer/i.test(cleanText(prompt, 120))) {
     const message = language === "es"
-      ? `Protegería ${recentTiming.app} justo antes de las ${recentTiming.timeText}, para cortar el bucle antes de que empiece. Blanked App puede aplicar esa franja.`
-      : `I’d protect ${recentTiming.app} just before ${recentTiming.timeText}, so the loop is interrupted before it starts. Blanked App can apply that window.`;
+      ? `Protegería ${recentTiming.app} justo antes de las ${recentTiming.timeText}, para cortar el bucle antes de que empiece. Blankmind puede aplicar esa franja.`
+      : `I’d protect ${recentTiming.app} just before ${recentTiming.timeText}, so the loop is interrupted before it starts. Blankmind can apply that window.`;
     return {
       intent: "social",
       title: "App Timing",
@@ -1566,8 +1566,8 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
   }
   if (app !== "the app" && timeText && hasRecentAmbiguousLoss) {
     const message = language === "es"
-      ? `Entendido: ${app} sobre las ${timeText}. Yo lo convertiría en una franja de bloqueo en Blanked App justo antes de ese momento. Desde la web puedo planearlo, pero solo Blanked App puede pedir permisos y bloquear apps automáticamente.`
-      : `Got it: ${app} around ${timeText}. I’d turn that into a Blanked App block just before that moment. I can plan it here, but only Blanked App can ask for permissions and block apps automatically.`;
+      ? `Entendido: ${app} sobre las ${timeText}. Yo lo convertiría en una franja de bloqueo en Blankmind justo antes de ese momento. Desde la web puedo planearlo, pero solo Blankmind puede pedir permisos y bloquear apps automáticamente.`
+      : `Got it: ${app} around ${timeText}. I’d turn that into a Blankmind block just before that moment. I can plan it here, but only Blankmind can ask for permissions and block apps automatically.`;
     return {
       intent: "social",
       title: "App Timing",
@@ -1596,11 +1596,11 @@ function conversationalFollowupPlan(prompt, context = {}, language = "en") {
       /after lunch|around lunch/i.test(recentText) ? "after lunch" :
       /after dinner/i.test(recentText) ? "after dinner" : "at that moment";
     const message = language === "es"
-      ? `Lo resolvería con una franja de bloqueo para ${appLabel} en Blanked App ${moment}. La idea es quitar la decisión antes de que empiece el impulso, no confiar en fuerza de voluntad.`
-      : `I’d solve it with a Blanked App block for ${appLabel} ${moment}. The point is to remove the decision before the pull starts, not rely on willpower.`;
+      ? `Lo resolvería con una franja de bloqueo para ${appLabel} en Blankmind ${moment}. La idea es quitar la decisión antes de que empiece el impulso, no confiar en fuerza de voluntad.`
+      : `I’d solve it with a Blankmind block for ${appLabel} ${moment}. The point is to remove the decision before the pull starts, not rely on willpower.`;
     return {
       intent: "social",
-      title: "Blanked App Block",
+      title: "Blankmind Block",
       response_text: message,
       bullets: [
         `Read: ${appLabel} ${moment} is the target.`,
@@ -1956,7 +1956,7 @@ function fallbackPlan(prompt, context = {}) {
   const weakHours = Array.isArray(memory.weak_hours) ? memory.weak_hours.filter((hour) => Number.isFinite(Number(hour))).slice(0, 3) : [];
   const rememberedRisk = weakHours.length > 0 ? weakHours.map((hour) => hourWindow(Number(hour))).filter(Boolean)[0] : "";
   const missingContext = needsContextBeforeAction(prompt, intent, context);
-  const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow permissions in Blanked App.";
+  const setupLine = selected && authorized ? "Protection can run with your current setup." : "Setup comes first: choose apps and allow permissions in Blankmind.";
   const outcomeLine = lastOutcome === "broke"
     ? "Feedback: the last plan broke, so the next move should be easier and earlier."
     : lastOutcome === "held"
@@ -2034,7 +2034,7 @@ function fallbackPlan(prompt, context = {}) {
         "Move: ask whether they need anything."
       ],
       primary_label: "Tell me",
-      secondary_label: "Open Blanked",
+      secondary_label: "Open Blankmind",
       actions: [],
       requires_selected_apps: false,
       requires_screen_time_authorization: false,
@@ -2254,7 +2254,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose Apps",
-      response_text: `Choose the social apps in Blanked App first, then I can apply the block.`,
+      response_text: `Choose the social apps in Blankmind first, then I can apply the block.`,
       bullets: [
         "Read: this is a category of apps, not one exact app.",
         "Pattern: iOS needs you to choose the apps before Blanked can shield them.",
@@ -2271,7 +2271,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose App",
-      response_text: `I can help block ${unknownApp}, but first you need to choose it in Blanked App.`,
+      response_text: `I can help block ${unknownApp}, but first you need to choose it in Blankmind.`,
       bullets: [
         `Read: ${unknownApp} is the app you want to control.`,
         "Pattern: iOS requires the exact app selection before Blanked can shield it.",
@@ -2290,7 +2290,7 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "social",
       title: "Choose App",
-      response_text: `Choose ${promptApp} in Blanked App first, then I can apply the block.`,
+      response_text: `Choose ${promptApp} in Blankmind first, then I can apply the block.`,
       bullets: [
         `Read: ${promptApp} is the app you want to control.`,
         "Pattern: iOS needs that app inside your authorized selection before Blanked can shield it.",
@@ -2470,7 +2470,7 @@ function fallbackPlan(prompt, context = {}) {
       bullets: [
         "Pattern: the risky moment is already clear, so guessing is unnecessary.",
         `Move: shield distracting apps from ${start} to ${end}.`,
-        selected ? "Use your current app selection." : "Choose the apps Blanked should control first.",
+        selected ? "Use your current app selection." : "Choose the apps Blankmind should control first.",
       ],
       primary_label: "Apply window",
       secondary_label: "Choose apps",
@@ -2809,12 +2809,12 @@ function conversationFallbackPlan(prompt, language = "en") {
     }
   } else if (asksAboutBlankedDataOrPrediction(prompt)) {
     fallbackText = language === "es"
-      ? "No lo adivinamos de la nada. Blanked estima ventanas de riesgo combinando sueño, recuperación, actividad, presión de desbloqueos, cadenas de apps por categoría, check-ins rápidos, resultados de planes y tu baseline personal. La predicción es probabilística y explica el porqué; no es diagnóstico médico ni vigilancia exacta."
-      : "We do not guess it from thin air. Blanked estimates risk windows from sleep, recovery, activity, pickup pressure, app-category chains, quick check-ins, plan outcomes and your personal baseline. The forecast is probabilistic and explains why; it is not a medical diagnosis or exact surveillance.";
+      ? "No lo adivinamos de la nada. Blankmind estima ventanas de riesgo combinando sueño, recuperación, actividad, presión de desbloqueos, cadenas de apps por categoría, check-ins rápidos, resultados de planes y tu baseline personal. La predicción es probabilística y explica el porqué; no es diagnóstico médico ni vigilancia exacta."
+      : "We do not guess it from thin air. Blankmind estimates risk windows from sleep, recovery, activity, pickup pressure, app-category chains, quick check-ins, plan outcomes and your personal baseline. The forecast is probabilistic and explains why; it is not a medical diagnosis or exact surveillance.";
   } else if (isProductivityPrompt(prompt)) {
     fallbackText = language === "es"
-      ? "Para producir más, elige una sola prioridad para el siguiente bloque y reduce decisiones antes de empezar. Trabaja 25-50 minutos, descansa poco y quita notificaciones. Este sí es un buen caso para Blanked: en la app podrías bloquear redes y apps de scroll durante ese bloque."
-      : "To boost productivity, choose one priority for the next work block and remove decisions before you start. Work for 25-50 minutes, take a short break, and turn off nonessential notifications. This is a good Blanked use case: in the app, you could block social and scroll apps during that block.";
+      ? "Para producir más, elige una sola prioridad para el siguiente bloque y reduce decisiones antes de empezar. Trabaja 25-50 minutos, descansa poco y quita notificaciones. Este sí es un buen caso para Blankmind: en la app podrías bloquear redes y apps de scroll durante ese bloque."
+      : "To boost productivity, choose one priority for the next work block and remove decisions before you start. Work for 25-50 minutes, take a short break, and turn off nonessential notifications. This is a good Blankmind use case: in the app, you could block social and scroll apps during that block.";
   }
   return {
     intent: "general",

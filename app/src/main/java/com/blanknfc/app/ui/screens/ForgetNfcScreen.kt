@@ -84,7 +84,7 @@ fun ForgetNfcScreen(
                     )
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "This removes the optional paired key, turns Blanked off, and restarts onboarding. Your protected apps stay saved.",
+                        text = "This removes the optional paired key, turns Blankmind off, and restarts onboarding. Your protected apps stay saved.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = BlankGray,
                         textAlign = TextAlign.Center
@@ -93,7 +93,7 @@ fun ForgetNfcScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
                         Text(
-                            text = "I understand I will need to pair Blanked again.",
+                        text = "I understand I will need to pair Blankmind again.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = BlankOnSurface
                         )

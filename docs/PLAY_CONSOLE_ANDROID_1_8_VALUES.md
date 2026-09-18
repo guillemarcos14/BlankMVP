@@ -1,4 +1,4 @@
-# Blanked Android 1.8 - Play Console Values
+# Blankmind Android 1.8 - Play Console Values
 
 ## Release
 
@@ -17,13 +17,13 @@ FB8548BEA7A950CF550351134020EBB9BBCF64AE77272728929636AEED8D4A87
 Release name:
 
 ```text
-Blanked 1.8
+Blankmind 1.8
 ```
 
 Release notes:
 
 ```text
-Blanked 1.8 aligns Android with the current iOS App Store version: app-only blocking, AI Focus Plans, Digital Wellness Report, Health Connect context, Habits, Stats, Emergency unlocks, and Google Play subscriptions.
+Blankmind 1.8 aligns Android with the current iOS App Store version: app-only blocking, AI Focus Plans, Digital Wellness Report, Health Connect context, Habits, Stats, Emergency unlocks, and Google Play subscriptions.
 ```
 
 ## Store Listing
@@ -31,7 +31,7 @@ Blanked 1.8 aligns Android with the current iOS App Store version: app-only bloc
 App name:
 
 ```text
-Blanked: AI Focus App
+Blankmind: AI Focus App
 ```
 
 Short description:
@@ -43,9 +43,9 @@ Block distractions and build healthier screen habits with AI focus plans.
 Full description:
 
 ```text
-Blanked helps you build healthier screen habits with app blocking, routines, and AI-powered focus plans.
+Blankmind helps you build healthier screen habits with app blocking, routines, and AI-powered focus plans.
 
-Choose the apps that pull you back, start a focus block, and let Blanked create friction before automatic scrolling takes over. Your plan adapts around your patterns so you can protect the moments where you are most likely to lose focus.
+Choose the apps that pull you back, start a focus block, and let Blankmind create friction before automatic scrolling takes over. Your plan adapts around your patterns so you can protect the moments where you are most likely to lose focus.
 
 Features:
 - App blocking for distracting apps
@@ -58,7 +58,7 @@ Features:
 - Optional Health Connect context for sleep, activity, workouts, and heart-rate signals
 
 Privacy:
-Blanked does not read your screen contents, typed text, passwords, messages, contacts, notifications, browsing history, precise location, or raw Health samples. Protected app selections stay on device. Only aggregated product, habit, and wellness signals are sent when needed to provide analytics, AI insights, and app functionality.
+Blankmind does not read your screen contents, typed text, passwords, messages, contacts, notifications, browsing history, precise location, or raw Health samples. Protected app selections stay on device. Only aggregated product, habit, and wellness signals are sent when needed to provide analytics, AI insights, and app functionality.
 ```
 
 Category:
@@ -102,7 +102,7 @@ blanked_monthly_299
 Monthly name:
 
 ```text
-Blanked Pro Monthly
+Blankmind Pro Monthly
 ```
 
 Monthly price:
@@ -120,7 +120,7 @@ blanked_annual_19
 Annual name:
 
 ```text
-Blanked Pro Annual
+Blankmind Pro Annual
 ```
 
 Annual price:
@@ -170,7 +170,7 @@ No
 Health app:
 
 ```text
-No. Blanked is a productivity and digital wellbeing app. Optional Health Connect data is used only as context for focus and screen habit insights, not for medical diagnosis, treatment, or health services.
+No. Blankmind is a productivity and digital wellbeing app. Optional Health Connect data is used only as context for focus and screen habit insights, not for medical diagnosis, treatment, or health services.
 ```
 
 Financial features:
@@ -198,7 +198,7 @@ Screen contents, typed text, passwords, messages, contacts, notifications, brows
 Sharing:
 
 ```text
-No data is sold. Aggregated app and wellness signals are processed by Blanked backend providers to provide analytics, subscriptions-related app functionality, AI insights, and referral rewards.
+No data is sold. Aggregated app and wellness signals are processed by Blankmind backend providers to provide analytics, subscriptions-related app functionality, AI insights, and referral rewards.
 ```
 
 Security:
@@ -218,22 +218,22 @@ No
 Why AccessibilityService is used:
 
 ```text
-Blanked uses Android Accessibility events only to detect when the foreground app changes. If Blanked is active and the foreground package is in the user's selected protected list, Blanked opens its blocking screen.
+Blankmind uses Android Accessibility events only to detect when the foreground app changes. If Blankmind is active and the foreground package is in the user's selected protected list, Blankmind opens its blocking screen.
 
-Blanked does not read screen text, typed text, passwords, messages, notifications, contacts, browsing history, media, or form contents. The service is used only for user-requested app blocking and focus protection.
+Blankmind does not read screen text, typed text, passwords, messages, notifications, contacts, browsing history, media, or form contents. The service is used only for user-requested app blocking and focus protection.
 ```
 
 Reviewer instructions:
 
 ```text
-1. Install and open Blanked.
+1. Install and open Blankmind.
 2. Continue onboarding.
 3. Select one or more distracting apps to protect.
 4. Continue with free blocking or start the Google Play Billing trial.
-5. Enable the Blanked Accessibility Service when prompted.
-6. Start Blanked from Home.
-7. Open a selected protected app and confirm that Blanked shows the block screen.
-8. Use Emergency and type the required phrase if you need to turn Blanked off.
+5. Enable the Blankmind Accessibility Service when prompted.
+6. Start Blankmind from Home.
+7. Open a selected protected app and confirm that Blankmind shows the block screen.
+8. Use Emergency and type the required phrase if you need to turn Blankmind off.
 
 No account or login is required.
 ```

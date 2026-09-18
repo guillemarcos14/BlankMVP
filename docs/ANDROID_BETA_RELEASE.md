@@ -79,7 +79,7 @@ Remaining:
 - App selection works.
 - Accessibility permission can be enabled.
 - Battery optimization prompt works.
-- Start Blanked blocks selected apps.
+- Start Blankmind blocks selected apps.
 - Unselected apps are not blocked.
 - Emergency unlock requires exact phrase.
 - Stats, Habits, AI Focus Plan, Digital Wellness Report and Health Connect screens render correctly.

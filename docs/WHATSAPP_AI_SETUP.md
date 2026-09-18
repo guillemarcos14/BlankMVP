@@ -24,7 +24,7 @@ WHATSAPP_APP_SECRET=meta-app-secret
 WHATSAPP_GRAPH_API_VERSION=v26.0
 BLANKED_APP_DEEP_LINK_SCHEME=blank
 BLANKED_PUBLIC_APP_LINK_BASE=https://getblank.netlify.app
-BLANKMIND_APP_DOWNLOAD_URL=https://apps.apple.com/es/app/blanked/id6789519152
+BLANKMIND_APP_DOWNLOAD_URL=https://apps.apple.com/es/app/id6789519152
 
 TWILIO_ACCOUNT_SID=replace-me
 TWILIO_AUTH_TOKEN=replace-me
@@ -68,8 +68,8 @@ BLANK_SMS_PHONE_NUMBER=+13478366767
 - WhatsApp receives user messages and sends them to `blanked-agent`.
 - Both channels keep the same short conversational shape: up to eight recent turns, with a two-hour expiry for follow-up context. Long-lived facts (selected apps, risk windows and user context) remain separate from that short-term thread.
 - Meta `message.id` and Twilio `MessageSid` are claimed before planning so provider retries and concurrent duplicate deliveries cannot both enter the planner. Migration `014_assistant_inbound_idempotency.sql` provides the unique reservation plus a five-minute lease; the older event-store marker remains as a compatibility fallback during rollout.
-- WhatsApp replies with guidance and, when there is an executable action, uses a review-and-confirm link. A Twilio CTA template is optional through `TWILIO_WHATSAPP_REVIEW_CONTENT_SID`; set `TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED=true` only after verifying that its button label is exactly `Review and confirm`. Otherwise BM sends the precise text link and never falls back to a stale `Open Blanked` button.
-- The WhatsApp button should point to a Universal Link such as `https://getblank.netlify.app/open?action=start-focus...`; move `BLANKED_PUBLIC_APP_LINK_BASE` to `https://blanked.app` only when `/open` and AASA are served there.
+- WhatsApp replies with guidance and, when there is an executable action, uses a review-and-confirm link. A Twilio CTA template is optional through `TWILIO_WHATSAPP_REVIEW_CONTENT_SID`; set `TWILIO_WHATSAPP_REVIEW_TEMPLATE_ENABLED=true` only after verifying that its button label is exactly `Review and confirm`. Otherwise BM sends the precise text link and never falls back to a stale `Open Blankmind` button.
+- The WhatsApp button should point to a Universal Link such as `https://blankmind.ai/open?action=start-focus...`; keep `BLANKED_PUBLIC_APP_LINK_BASE` aligned with the public `blankmind.ai` domain once `/open` and AASA are served there.
 - Twilio WhatsApp/SMS can receive audio inputs, transcribe them with OpenAI, and answer with BM text. BM never attaches audio or generates a spoken reply.
 - iOS is still the authority for Screen Time actions.
 - `/.netlify/functions/assistant-channel` stores the user's preferred BM interface (`whatsapp` or `sms`) by `CONNECT <code>` and sends proactive BM alerts through the selected channel after the external thread has sent `CONNECT`.
@@ -118,17 +118,17 @@ Audio-input smoke expected result: `sms-agent audio input smoke tests passed`.
 - Keep `WHATSAPP_APP_SECRET` configured in Netlify; production rejects Meta callbacks without a valid `X-Hub-Signature-256`.
 - Configure Xcode build settings with `BLANK_WHATSAPP_PHONE_NUMBER` and `BLANK_SMS_PHONE_NUMBER`.
 - Configure Twilio credentials in Netlify if SMS outbound should be active.
-- On iPhone, open Blanked, tap `Assistant`, then `Connect WhatsApp`.
+- On iPhone, open Blankmind, tap `Assistant`, then `Connect WhatsApp`.
 - Confirm WhatsApp opens with `CONNECT <code>`.
-- Send the message and confirm Blanked replies `Connected`.
-- For SMS, configure the SMS provider inbound webhook to `https://getblank.netlify.app/.netlify/functions/sms-agent`, then tap `Connect SMS` in Blanked and send `CONNECT <code>`.
+- Send the message and confirm Blankmind replies `Connected`.
+- For SMS, configure the SMS provider inbound webhook to `https://getblank.netlify.app/.netlify/functions/sms-agent`, then tap `Connect SMS` in Blankmind and send `CONNECT <code>`.
 - Send `Block Instagram TikTok and X from 10 to 7`.
-- In WhatsApp, confirm the reply says `Review and confirm in Blanked` and never uses the legacy `Open Blanket`/`Open Blanked` action label.
+- In WhatsApp, confirm the reply says `Review and confirm in Blankmind` and never uses an obsolete action label.
 - In SMS, confirm the first reply says `Reply BLOCK` without a raw URL; reply `BLOCK` and confirm the next SMS includes the Universal Link.
 - Send a WhatsApp audio note or a text asking for a voice note.
 - Confirm the audio is interpreted and the reply is text-only, with no TwiML `<Media>` element.
 - Trigger a BM proactive alert and confirm `assistant-channel` attempts delivery through the selected channel.
-- Tap the link, confirm Blanked opens the native app picker, and select the apps.
+- Tap the link, confirm Blankmind opens the native app picker, and select the apps.
 
 ## Voice status
 

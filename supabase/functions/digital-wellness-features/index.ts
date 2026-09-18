@@ -203,7 +203,7 @@ function buildInsight(payload: Record<string, any>) {
     recommendations.push("Choose your distractions once so BM can optimize when that single block should run.");
   }
 
-  const nextStep = recommendations[0] || "Complete one focus block so Blanked can learn your baseline.";
+  const nextStep = recommendations[0] || "Complete one focus block so Blankmind can learn your baseline.";
   const confidence = Math.min(100, Math.max(20, (weekly.days_count || 0) * 6 + (weekly.active_days_7d || 0) * 8));
   const behaviorForecast = buildBehaviorForecast(payload, weakWindow, confidence);
 
@@ -240,7 +240,7 @@ function buildBehaviorForecast(payload: Record<string, any>, weakWindow: string 
   if (weekly.dominant_app_sequence || weekly.behavior_chain) reasons.push("A repeated app-category chain is visible.");
   if (Number(weekly.plan_adherence_percent || 0) < 60) reasons.push("Recent plans are not holding cleanly.");
   if (lowRecovery) reasons.push("Recovery context is low.");
-  if (!reasons.length) reasons.push("Blanked is still learning baseline timing and outcomes.");
+  if (!reasons.length) reasons.push("Blankmind is still learning baseline timing and outcomes.");
   return {
     window: weakWindow || hourWindow(weekly.weakest_hour) || "Learning",
     risk_score: riskScore,
@@ -486,7 +486,7 @@ async function buildModelInsight(payload: Record<string, any>, fallback: Record<
         {
           role: "system",
           content:
-            "You generate concise digital wellness insights for Blanked. The user has one fixed block called selected_distractions. Never choose individual apps, create or name modes, switch targets, or propose allow-lists. Use only the aggregated features provided, including pickup pressure, behavior chains, weekday and time patterns, outcomes, check-ins, Health/wearable signals, and baseline timing. You may optimize only when the selected-distractions block starts, ends, repeats, or how long the experiment runs. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely digital risk window. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive window for selected_distractions. Return practical, specific, non-alarming English.",
+            "You generate concise digital wellness insights for Blankmind. The user has one fixed block called selected_distractions. Never choose individual apps, create or name modes, switch targets, or propose allow-lists. Use only the aggregated features provided, including pickup pressure, behavior chains, weekday and time patterns, outcomes, check-ins, Health/wearable signals, and baseline timing. You may optimize only when the selected-distractions block starts, ends, repeats, or how long the experiment runs. Do not claim medical diagnosis, therapy, health treatment, exact app surveillance, exact location, or certainty. Do not use the word coach. Every summary, pattern, recommendation, next_step, behavior_forecast reason, experiment hypothesis, and success_metric must be a complete sentence ending with punctuation. behavior_forecast must explain the next likely digital risk window. experiment must pick one small intervention test with a measurable outcome. plan_update must propose one preventive window for selected_distractions. Return practical, specific, non-alarming English.",
         },
         {
           role: "user",

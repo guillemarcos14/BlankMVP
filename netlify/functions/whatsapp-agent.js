@@ -333,7 +333,7 @@ function whatsappReplyText(plan, delivery = null) {
     .replace(/[^.?!]*(?:review|revisa|revisar)[^.?!]*(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim()
-    .slice(0, 320) || "I can help with that in Blanked.";
+    .slice(0, 320) || "I can help with that in Blankmind.";
   if (!action) return text;
   const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
@@ -509,7 +509,7 @@ async function processMessage(message) {
     await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
     return sendWhatsAppMessage(
       message.from,
-      "Hey! Blanked here 👋 Connected. This WhatsApp thread is now linked to your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
+      "Hey! Blankmind here 👋 Connected. This WhatsApp thread is now linked to your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
     );
   }
 
@@ -532,7 +532,7 @@ async function processMessage(message) {
       },
       source: "assistant_channel_paused",
     });
-    return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blanked when you want to use this channel again.");
+    return sendWhatsAppMessage(message.from, "WhatsApp updates paused. Reconnect from Blankmind when you want to use this channel again.");
   }
   let pendingMemory = {};
   try {

@@ -232,7 +232,7 @@ function decide({ macro, micro, fallback, explorationRate = 0, seed = "" }) {
     return {
       decision_source: "experiment",
       final_recommendation: explorationVariant(fallback, seed),
-      reason: "Evidence is not strong enough yet, so Blanked tests a bounded variation to learn faster.",
+      reason: "Evidence is not strong enough yet, so Blankmind tests a bounded variation to learn faster.",
       confidence: Math.max(20, Math.min(55, macro?.confidence || 35)),
       evidence: { macro, micro, contradiction, exploration: true },
     };
@@ -241,7 +241,7 @@ function decide({ macro, micro, fallback, explorationRate = 0, seed = "" }) {
     return {
       decision_source: "macro",
       final_recommendation: macro.value,
-      reason: "No stronger personal pattern exists yet, so Blanked starts from the best matching segment pattern.",
+      reason: "No stronger personal pattern exists yet, so Blankmind starts from the best matching segment pattern.",
       confidence: macro.confidence,
       evidence: { macro, micro, contradiction, exploration: false },
     };
@@ -362,7 +362,7 @@ async function sendOwnerEmail(change) {
     body: JSON.stringify({
       from,
       to,
-      subject: `[Blanked] ${change.title}`,
+      subject: `[Blankmind] ${change.title}`,
       text: [
         change.summary,
         "",

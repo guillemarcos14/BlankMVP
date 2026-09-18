@@ -12,7 +12,7 @@ private enum BlankWidgetPalette {
 
 struct StartQuickBlockIntent: AppIntent {
     static var title: LocalizedStringResource = "Start Blank"
-    static var description = IntentDescription("Starts a quick block with your current Blanked configuration.")
+    static var description = IntentDescription("Starts a quick block with your current Blankmind configuration.")
 
     func perform() async throws -> some IntentResult {
         let defaults = BlankSharedState.defaults
@@ -36,7 +36,6 @@ struct BlankWidgetEntry: TimelineEntry {
     let date: Date
     let activeState: BlankSharedState.ActiveState
     let hasConfiguration: Bool
-    let pendingTimerMinutes: Int?
 }
 
 struct BlankWidgetProvider: TimelineProvider {
@@ -48,8 +47,7 @@ struct BlankWidgetProvider: TimelineProvider {
                 startedAt: nil,
                 endsAt: nil
             ),
-            hasConfiguration: true,
-            pendingTimerMinutes: nil
+            hasConfiguration: true
         )
     }
 
@@ -71,8 +69,7 @@ struct BlankWidgetProvider: TimelineProvider {
         return BlankWidgetEntry(
             date: date,
             activeState: BlankSharedState.loadActiveState(now: date, defaults: defaults),
-            hasConfiguration: BlankSharedState.hasConfiguredBlock(in: defaults),
-            pendingTimerMinutes: BlankSharedState.pendingWidgetTimerMinutes(defaults: defaults)
+            hasConfiguration: BlankSharedState.hasConfiguredBlock(in: defaults)
         )
     }
 }
@@ -83,22 +80,14 @@ struct BlankWidgetView: View {
     private var isActive: Bool { entry.activeState.isActive }
     private var titleColor: Color { isActive ? BlankWidgetPalette.pureWhite.opacity(0.96) : BlankWidgetPalette.charcoal }
     private let textColumnInset: CGFloat = 7
-    private let timerTopInset: CGFloat = 15
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             actionContent
                 .buttonStyle(.plain)
-
-            if showsTimerBadge {
-                timerBadge
-                    .padding(.top, timerTopInset)
-                    .padding(.leading, textColumnInset)
-            }
         }
             .blankWidgetBackground(isActive: entry.activeState.isActive, family: widgetFamily)
             .animation(.easeInOut(duration: 0.45), value: isActive)
-            .animation(.easeInOut(duration: 0.28), value: entry.pendingTimerMinutes)
     }
 
     @ViewBuilder
@@ -128,13 +117,13 @@ struct BlankWidgetView: View {
         Group {
             switch widgetFamily {
             case .accessoryInline:
-                Text(isActive ? "Blanked active" : "Start Blanked")
+                Text(isActive ? "Blankmind active" : "Start Blank")
             case .accessoryCircular:
                 Image(systemName: isActive ? "lock.fill" : "lock.open.fill")
                     .font(.system(size: 18, weight: .semibold))
             case .accessoryRectangular:
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(isActive ? "Blanked" : "Start Blank")
+                    Text(isActive ? "Blankmind" : "Start Blank")
                         .font(.headline.weight(.semibold))
                     Text(isActive ? "Protected now" : entry.hasConfiguration ? "Tap to block" : "Choose apps")
                         .font(.caption2)
@@ -173,71 +162,7 @@ struct BlankWidgetView: View {
     }
 
     private var title: String {
-        entry.activeState.isActive ? "Blanked" : "Start Blank"
-    }
-
-    private var showsTimerBadge: Bool {
-        switch widgetFamily {
-        case .systemSmall:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private var timerBadge: some View {
-        Link(destination: URL(string: "blank://timer")!) {
-            timerBadgeContent
-                .foregroundStyle(timerBadgeForeground)
-                .frame(minWidth: 38, minHeight: 24, alignment: .leading)
-                .contentShape(Rectangle())
-        }
-    }
-
-    @ViewBuilder
-    private var timerBadgeContent: some View {
-        if entry.activeState.isActive, let endsAt = entry.activeState.endsAt {
-            ViewThatFits(in: .horizontal) {
-                Text(endsAt, style: .timer)
-                    .timerBadgeTextStyle()
-                Text(compactRemainingText(until: endsAt))
-                    .timerBadgeTextStyle()
-            }
-        } else if let pendingTimerMinutes = entry.pendingTimerMinutes {
-            Text(formatTimerBadge(minutes: pendingTimerMinutes))
-                .timerBadgeTextStyle()
-        } else {
-            Text("Timer")
-                .timerBadgeTextStyle()
-        }
-    }
-
-    private var timerBadgeForeground: Color {
-        isActive ? BlankWidgetPalette.pureWhite : BlankWidgetPalette.charcoal.opacity(0.86)
-    }
-
-    private func compactRemainingText(until endsAt: Date) -> String {
-        let seconds = max(0, endsAt.timeIntervalSince(entry.date))
-        let minutes = max(1, Int(ceil(seconds / 60)))
-        return formatTimerBadge(minutes: minutes)
-    }
-
-    private func formatTimerBadge(minutes: Int) -> String {
-        if minutes < 60 {
-            return "\(minutes)m"
-        }
-        let hours = minutes / 60
-        let rest = minutes % 60
-        return rest == 0 ? "\(hours)h" : "\(hours)h\(rest)"
-    }
-}
-
-private extension View {
-    func timerBadgeTextStyle() -> some View {
-        font(.custom("Inter", size: 11.5, relativeTo: .caption2).weight(.semibold))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.62)
+        entry.activeState.isActive ? "Blankmind" : "Start Blank"
     }
 }
 
@@ -350,7 +275,7 @@ struct BlankQuickBlockWidget: Widget {
         StaticConfiguration(kind: kind, provider: BlankWidgetProvider()) { entry in
             BlankWidgetView(entry: entry)
         }
-        .configurationDisplayName("Blanked")
+        .configurationDisplayName("Blankmind")
         .description("Start a quick block.")
         .supportedFamilies([.systemSmall, .accessoryInline, .accessoryCircular, .accessoryRectangular])
     }

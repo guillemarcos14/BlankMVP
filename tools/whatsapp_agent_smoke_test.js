@@ -171,7 +171,7 @@ async function connectGreeting() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /Hey! Blanked here/);
+    assert.match(outboundText, /Hey! Blankmind here/);
     assert.match(outboundText, /Connected/);
   } finally {
     global.fetch = originalFetch;

@@ -1,4 +1,4 @@
-# Blank iOS App Store Prep
+# Blankmind iOS App Store Prep
 
 Use this file to keep the App Store Connect values, privacy answers, review notes, asset status, and first Xcode build checklist in one place.
 
@@ -101,53 +101,55 @@ Age rating baseline:
 Subtitle:
 
 ```text
-Focus with a physical NFC tag
+Block apps. Stay focused.
 ```
 
 Promotional text:
 
 ```text
-Blank helps you block distracting apps with a physical NFC tag, so the way out is not just another button on your phone.
+Blankmind learns your phone habits and helps protect the moments where scrolling, sleep, focus and routine start to drift.
 ```
 
 Description:
 
 ```text
-Blank is a physical commitment tool for digital focus.
+Blankmind is a personal assistant that understands your phone use and helps you reduce it.
 
-Choose the apps, categories, or web domains you want to protect, pair a small NFC tag, and start Blank when you want a real focus session. While Blank is active, iPhone shields the selected distractions with Apple's Screen Time APIs. Scan the paired tag again to exit.
+It connects to your iPhone and optional wearables to detect behavioral patterns, model high-risk moments, and help you act on them. Blankmind is built for the moments that shape your day: sleep, focus, energy, recovery and routine.
 
-Blank is built for studying, deep work, late-night scrolling limits, and any moment when you want friction between you and the apps you usually open automatically.
+Talk to Blankmind on WhatsApp or via SMS to describe what you want to change. When real device action is needed, the app handles permissions, app selection and Screen Time protection.
+
+Choose the apps and websites that pull you in, protect the windows where you usually lose control, and let your plan adapt as your behavior changes. Blankmind learns from starts, exits, completed sessions and relapses so the next intervention can fit your life better.
 
 Privacy-first:
-- Your paired NFC tag and Screen Time selections stay on your device.
-- Blank does not read messages, passwords, screen contents, contacts, notifications, or browsing history.
-- Blank does not require an account.
-- Blank uses FamilyControls and ManagedSettings on iPhone, not screen scraping.
+- Your exact Screen Time app, category and website selections stay on your device.
+- Blankmind does not read messages, passwords, screen contents, contacts, notifications or browsing history.
+- Apple Health and wearable signals are optional and used only for digital wellness insights.
+- Blankmind is not a medical device and does not provide diagnosis, treatment or medical advice.
 ```
 
 Keywords:
 
 ```text
-focus, app blocker, nfc, screen time, productivity, digital wellbeing, study, deep work
+focus, screen time, app blocker, digital wellness, habits, sleep, productivity, phone use
 ```
 
 Support URL:
 
 ```text
-https://getblank.netlify.app/
+https://blankmind.ai/
 ```
 
 Marketing URL:
 
 ```text
-https://getblank.netlify.app/
+https://blankmind.ai/
 ```
 
 Privacy Policy URL:
 
 ```text
-https://getblank.netlify.app/privacy.html
+https://blankmind.ai/privacy
 ```
 
 Copyright:
@@ -158,23 +160,24 @@ Copyright:
 
 ## App Review Notes
 
-Use this in App Review notes after uploading the first build:
+Use this in App Review notes after uploading the build:
 
 ```text
-Blank is a digital wellbeing app controlled by a physical NFC tag.
+Blankmind is a digital wellness app that helps users understand phone habits and protect distracting apps with Apple's Screen Time frameworks.
+
+The app icon is intentionally an opaque, completely white square with no letter, symbol or decorative mark. This is a deliberate part of Blankmind's minimalist visual identity and branding, not a missing, transparent or corrupted asset. Please review the icon as designed.
 
 To test:
-1. Install Blank on a physical iPhone with NFC.
+1. Install Blankmind on a physical iPhone.
 2. Open the app and authorize Screen Time access when prompted.
 3. Use the Apple Family Activity picker to select one or more apps, categories, or web domains.
-4. Scan a physical NFC tag to pair it.
-5. Finish setup and start Blank mode.
-6. Confirm the selected apps/categories/domains are shielded while Blank is active.
-7. Scan the same NFC tag again to deactivate Blank and clear the shields.
+4. Finish setup and start a protection session.
+5. Confirm the selected apps/categories/domains are shielded while protection is active.
+6. Use Emergency or the available session controls to end protection and clear the shields.
 
-Blank stores setup state locally on the device. It does not collect screen contents, messages, passwords, contacts, notifications, browsing history, or selected Screen Time tokens on a server.
+Blankmind stores setup state locally on the device. It does not collect screen contents, messages, passwords, contacts, notifications, browsing history, or exact selected Screen Time tokens on a server.
 
-If NFC testing is not possible during review, the app also includes an emergency unlock phrase so reviewers can clear shields and continue testing.
+The app also includes an emergency unlock path so reviewers can clear shields and continue testing.
 ```
 
 ## Privacy Answers

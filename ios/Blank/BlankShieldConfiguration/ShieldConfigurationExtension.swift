@@ -23,7 +23,7 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             backgroundColor: BlankShieldPalette.charcoal.withAlphaComponent(0.92),
             icon: nil,
             title: ShieldConfiguration.Label(
-                text: "\(appName) is Blanked",
+                text: "\(appName) is blocked",
                 color: BlankShieldPalette.pureWhite
             ),
             subtitle: ShieldConfiguration.Label(

@@ -22,7 +22,7 @@ Device setup:
 Checks:
 
 - Grant all requested Apple Health permissions.
-- Reopen Blanked and open Stats.
+- Reopen Blankmind and open Stats.
 - Confirm `Health Sources / Wearables` shows one of: `Connected`, `No data`, `Stale`, or `Partial`.
 - Confirm visible metrics when available: sleep, steps, workouts, HR, resting HR, HRV, respiratory rate, oxygen saturation, VO2 max, energy and flights.
 - Confirm Digital Wellness report changes plan/recovery context when real Health signals exist.
@@ -64,7 +64,7 @@ Device setup:
 Checks:
 
 - Grant all Health Connect permissions.
-- Reopen Blanked and open Stats.
+- Reopen Blankmind and open Stats.
 - Confirm `Health Sources` shows one of: `Connected`, `No data`, `Stale`, `Partial`, `Not connected`, or `Unavailable`.
 - Confirm visible metrics when available: sleep, steps, distance, calories, elevation/floors, workouts, mindfulness, HR, resting HR, HRV, respiratory rate, oxygen saturation and VO2 max.
 - Grant only part of the permission set and confirm `Partial permission` appears.

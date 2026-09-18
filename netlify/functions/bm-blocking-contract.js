@@ -422,7 +422,7 @@ function missingQuestion(contract, language = "en") {
   }
   if (language === "es") {
     if (missing.includes("apps") && missing.includes("start") && missing.includes("end")) return "¿Qué aplicaciones quieres bloquear, lo iniciamos ahora o a qué hora exacta, y durante cuánto tiempo?";
-    if (missing.includes("apps")) return "¿Qué aplicaciones quieres bloquear? Puedes decirme los nombres o elegirlas manualmente en Blanked.";
+    if (missing.includes("apps")) return "¿Qué aplicaciones quieres bloquear? Puedes decirme los nombres o elegirlas manualmente en Blankmind.";
     if (missing.includes("start") && missing.includes("end") && missing.includes("recurrence")) return "¿Lo iniciamos ahora o a qué hora exacta, durante cuánto tiempo y es solo una vez o se repite?";
     if (missing.includes("start")) return "¿Lo iniciamos ahora o prefieres programarlo para una hora exacta?";
     if (missing.includes("end")) return "¿Durante cuánto tiempo quieres bloquearlas, o lo dejamos indefinido?";
@@ -431,7 +431,7 @@ function missingQuestion(contract, language = "en") {
     return "Dime los detalles del bloqueo que faltan y lo prepararé.";
   }
   if (missing.includes("apps") && missing.includes("start") && missing.includes("end")) return "Which apps should I block, should it start now or at an exact time, and for how long?";
-  if (missing.includes("apps")) return "Which apps do you want to block? You can name them or choose them manually in Blanked.";
+  if (missing.includes("apps")) return "Which apps do you want to block? You can name them or choose them manually in Blankmind.";
   if (missing.includes("start") && missing.includes("end") && missing.includes("recurrence")) return "Should it start now or at an exact time, for how long, and is it one time or recurring?";
   if (missing.includes("start")) return "Should I start it now, or would you like to schedule it for an exact time?";
   if (missing.includes("end")) return "How long should I block them, or should it stay indefinite?";

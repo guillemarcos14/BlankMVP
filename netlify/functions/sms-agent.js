@@ -195,7 +195,7 @@ function escapeXml(value) {
 
 function connectReply(from, channel) {
   const label = channel === "whatsapp" ? "WhatsApp" : "SMS";
-  return `Hey! Blanked here 👋 Connected. BM will use ${label} for this number${from ? ` (${from})` : ""}.`;
+  return `Hey! Blankmind here 👋 Connected. BM will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
 function detectedLanguage(text) {
@@ -262,11 +262,11 @@ function messageLanguage(text, savedLanguage = "") {
 function actionIntro(actions) {
   const first = primaryAction(actions);
   if (!first) return "";
-  if (first.type === "set_daily_limit") return "Open Blanked to review the daily limit.";
-  if (first.type === "apply_schedule") return "Open Blanked to review the protection window.";
-  if (first.type === "start_protection") return "Open Blanked to start the block.";
-  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blanked to finish setup.";
-  return "Open Blanked to review the next step.";
+  if (first.type === "set_daily_limit") return "Open Blankmind to review the daily limit.";
+  if (first.type === "apply_schedule") return "Open Blankmind to review the protection window.";
+  if (first.type === "start_protection") return "Open Blankmind to start the block.";
+  if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") return "Open Blankmind to finish setup.";
+  return "Open Blankmind to review the next step.";
 }
 
 function minuteText(value) {
@@ -289,7 +289,7 @@ function actionSentence(actions, appNames = []) {
   const first = primaryAction(actions);
   if (!first) return "";
   if (first.type === "apply_schedule") {
-    return `This opens Blanked with a protection window for ${appTargetText(appNames)} from ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
+    return `This opens Blankmind with a protection window for ${appTargetText(appNames)} from ${minuteText(first.start_minute)} to ${minuteText(first.end_minute)}.`;
   }
   if (first.type === "start_protection") {
     return Number.isFinite(first.minutes)
@@ -297,18 +297,18 @@ function actionSentence(actions, appNames = []) {
       : "This opens Blankmind with an app block ready to review.";
   }
   if (first.type === "open_app_picker" || first.type === "request_screen_time_permission") {
-    return "This opens Blanked so you can choose the apps to block.";
+    return "This opens Blankmind so you can choose the apps to block.";
   }
   if (first.type === "set_daily_limit") {
     return Number.isFinite(first.minutes)
       ? `This opens Blankmind with a ${first.minutes}-minute daily limit ready to review.`
       : "This opens Blankmind to review the daily limit.";
   }
-  if (first.type === "enable_allow_only") return "This opens Blanked so you can turn on Allow Only.";
-  if (first.type === "enable_adult_filter") return "This opens Blanked so you can turn on adult web protection.";
-  if (first.type === "pause_rules") return "This opens Blanked so you can pause scheduled protection.";
-  if (first.type === "disable_pause") return "This opens Blanked so you can resume scheduled protection.";
-  return "This opens Blanked so you can review the next step.";
+  if (first.type === "enable_allow_only") return "This opens Blankmind so you can turn on Allow Only.";
+  if (first.type === "enable_adult_filter") return "This opens Blankmind so you can turn on adult web protection.";
+  if (first.type === "pause_rules") return "This opens Blankmind so you can pause scheduled protection.";
+  if (first.type === "disable_pause") return "This opens Blankmind so you can resume scheduled protection.";
+  return "This opens Blankmind so you can review the next step.";
 }
 
 function voiceActionText(actions, appNames, link) {
@@ -366,9 +366,9 @@ function commandForAction(actions) {
 
 function smsActionCue(actions) {
   const command = commandForAction(actions);
-  if (command === "BLOCK") return "Reply BLOCK to open Blanked with this ready.";
-  if (command === "START") return "Reply START to open Blanked with this ready.";
-  return "Reply OPEN to review it in Blanked.";
+  if (command === "BLOCK") return "Reply BLOCK to open Blankmind with this ready.";
+  if (command === "START") return "Reply START to open Blankmind with this ready.";
+  return "Reply OPEN to review it in Blankmind.";
 }
 
 function pendingActionFromMemory(memory = {}, now = Date.now()) {
@@ -415,13 +415,13 @@ async function smsCommandReply(from, command) {
   }
   const pending = pendingActionFromMemory(memory);
   if (command === "REPORT" && !pending) {
-    return { text: "Tell me what you want to review, and I will turn it into a Blanked next step." };
+    return { text: "Tell me what you want to review, and I will turn it into a Blankmind next step." };
   }
   if (!pending) {
-    return { text: "No pending Blanked action. Tell me what you want to block or change." };
+    return { text: "No pending Blankmind action. Tell me what you want to block or change." };
   }
   if (command !== "OPEN" && command !== pending.command && !(command === "START" && pending.command === "BLOCK")) {
-    return { text: `I have one Blanked action ready. Reply ${pending.command} or OPEN to continue.` };
+    return { text: `I have one Blankmind action ready. Reply ${pending.command} or OPEN to continue.` };
   }
   try {
     await recordAssistantMemory({
@@ -440,7 +440,7 @@ async function smsCommandReply(from, command) {
     // Clearing a pending action must never block delivery.
   }
   const intro = pending.summary ? `${pending.summary}\n\n` : "";
-  return { text: `${intro}Open Blanked: ${pending.link}` };
+  return { text: `${intro}Open Blankmind: ${pending.link}` };
 }
 
 function voiceInputSummary(prompt) {
@@ -458,9 +458,9 @@ function naturalReplyText(text) {
   return cleanText(text, 1400)
     .replace(/\b(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):\s*/gi, "")
     .replace(/\bAction:\s*/gi, "")
-    .replace(/\bI prepared a Blanked link\b/gi, "This Blanked link")
-    .replace(/\bI[’']ll give you one concrete Blanked action for it\.?/gi, "I prepared the next step in Blanked for it.")
-    .replace(/\bone concrete Blanked action\b/gi, "a simple next step in Blanked")
+    .replace(/\bI prepared a Blankmind link\b/gi, "This Blankmind link")
+    .replace(/\bI[’']ll give you one concrete Blankmind action for it\.?/gi, "I prepared the next step in Blankmind for it.")
+    .replace(/\bone concrete Blankmind action\b/gi, "a simple next step in Blankmind")
     .trim();
 }
 

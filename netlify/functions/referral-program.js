@@ -124,7 +124,7 @@ async function status(event) {
   if (!anonymousUserId) return json(409, { error: "identity_not_linked" });
   const record = await codeFor(user.id, anonymousUserId);
   const data = await statusFor(record);
-  const base = process.env.PUBLIC_WEB_URL || "https://blanked.guillemarcos.chatgpt.site";
+  const base = process.env.PUBLIC_WEB_URL || "https://blankmind.ai";
   return json(200, { ok: true, ...data, referral_link: `${base.replace(/\/$/, "")}/signup?ref=${encodeURIComponent(record.code)}` });
 }
 

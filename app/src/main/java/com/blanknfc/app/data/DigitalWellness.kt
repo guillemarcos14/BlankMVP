@@ -92,7 +92,7 @@ object DigitalWellnessEngine {
                 "Keep your current app list for the next 3 sessions."
             },
             reportInsight = if (sessions == 0) {
-                "Start Blanked and come back after your first protected session."
+                "Start Blankmind and come back after your first protected session."
             } else {
                 "Score $score/100. Next risk: $riskWindow."
             },
@@ -139,7 +139,7 @@ object DigitalWellnessEngine {
         if (behaviorChain != "learning") reasons += "Repeated chain: $behaviorChain."
         if (breaks > 0) reasons += "Recent exits increase risk in $riskWindow."
         if (healthSummary.lowRecoverySignal) reasons += "Recovery suggests using lighter protection."
-        if (reasons.isEmpty()) reasons += "Blanked is learning baseline timing and outcomes."
+        if (reasons.isEmpty()) reasons += "Blankmind is learning baseline timing and outcomes."
         return reasons.take(4)
     }
 

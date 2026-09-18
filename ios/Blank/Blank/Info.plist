@@ -9,7 +9,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Blanked</string>
+	<string>Blankmind</string>
 	<key>BlankMembershipAPIBaseURL</key>
 	<string>$(BLANK_MEMBERSHIP_API_BASE_URL)</string>
 	<key>BlankWhatsAppPhoneNumber</key>
@@ -23,7 +23,7 @@
 		<string>en</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>Blanked</string>
+	<string>Blankmind</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -46,17 +46,17 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NFCReaderUsageDescription</key>
-	<string>Blanked may use NFC for legacy tag backup flows when enabled.</string>
+	<string>Blankmind may use NFC for legacy tag backup flows when enabled.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Blanked reads Apple Health data you allow, including sleep, activity, workouts, mindful minutes, heart rate, resting heart rate, HRV, respiratory rate, oxygen saturation, VO2 max and energy, to generate digital wellness insights. It does not provide medical diagnosis.</string>
+	<string>Blankmind reads Apple Health data you allow, including sleep, activity, workouts, mindful minutes, heart rate, resting heart rate, HRV, respiratory rate, oxygen saturation, VO2 max and energy, to generate digital wellness insights. It does not provide medical diagnosis.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Blanked does not write data to Apple Health.</string>
+	<string>Blankmind does not write data to Apple Health.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Blanked uses Face ID or your device passcode to protect advanced blocking settings when you enable PIN protection.</string>
+	<string>Blankmind uses Face ID or your device passcode to protect advanced blocking settings when you enable PIN protection.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Blanked uses the microphone so you can dictate messages to BM.</string>
+	<string>Blankmind uses the microphone so you can dictate messages to BM.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Blanked uses speech recognition to turn your dictated messages into text for BM.</string>
+	<string>Blankmind uses speech recognition to turn your dictated messages into text for BM.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>instrument_serif_regular.ttf</string>

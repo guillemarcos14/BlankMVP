@@ -1,54 +1,38 @@
-# Store and Landing Copy
+# Blankmind Store Listing Copy
 
-## One-Liner
+## Name
 
-Blank blocks distracting apps with a physical NFC tag.
+Blankmind
 
-## Short Description
+## Subtitle
 
-Tap your Blank tag to lock distracting apps. Tap it again to unlock.
+Block apps. Stay focused.
 
-## Longer Description
+## Promotional Text
 
-Blank is a physical commitment tool for digital focus.
+Blankmind learns your phone habits and helps protect the moments where scrolling, sleep, focus and routine start to drift.
 
-Choose the apps you want to block, pair a small NFC tag, and tap the tag when you want to enter Blank mode. While Blank mode is active, selected apps are blocked until you tap the paired tag again.
+## Description
 
-Blank is built for focus sessions, studying, deep work, and reducing late-night scrolling.
+Blankmind is a personal assistant that understands your phone use and helps you reduce it.
 
-Privacy-first MVP:
+It connects to your iPhone and optional wearables to detect behavioral patterns, model high-risk moments, and help you act on them. Blankmind is built for the moments that shape your day: sleep, focus, energy, recovery and routine.
 
-- Your paired tag and selected apps stay on your device.
-- Blank does not read messages, passwords, screen contents, or notifications.
-- Android uses Accessibility only to detect foreground app changes and show the block screen.
-- iPhone uses Apple's Screen Time APIs where available.
+Talk to Blankmind on WhatsApp or via SMS to describe what you want to change. When real device action is needed, the app handles permissions, app selection and Screen Time protection.
 
-## Launch Page Sections
+Choose the apps and websites that pull you in, protect the windows where you usually lose control, and let your plan adapt as your behavior changes. Blankmind learns from starts, exits, completed sessions and relapses so the next intervention can fit your life better.
 
-- Hero: "Block apps with a physical tap."
-- Problem: App blockers are easy to ignore when the escape hatch is on the same phone.
-- Mechanism: Choose apps, pair tag, tap to blank, tap again to unblank.
-- Trust: Local-first, transparent permissions, no screen reading.
-- Founder CTA: Join Blank early or claim founder access if already signed up.
+Privacy-first:
 
-## Pricing
+- Your exact Screen Time app, category and website selections stay on your device.
+- Blankmind does not read messages, passwords, screen contents, contacts, notifications or browsing history.
+- Apple Health and wearable signals are optional and used only for digital wellness insights.
+- Blankmind is not a medical device and does not provide diagnosis, treatment or medical advice.
 
-- Blank Physical Device launch price: 12.99 EUR.
-- Pricing should increase gradually after the first launch phase.
-- Future subscription: 1.99 EUR/month.
-- The subscription is not implemented yet and should only be described as future/planned.
+## Keywords
 
-## Founders
+focus, screen time, app blocker, digital wellness, habits, sleep, productivity, phone use
 
-Founders are users who signed up before Blank was created or publicly launched.
+## Review Note: Intentional All-White App Icon
 
-There is only one founder group. Benefits should be positioned as a thank-you for early trust:
-
-- 24-hour priority access before the public launch.
-- Founder acknowledgement in communications.
-- 3-day preferred stock reservation window.
-- 50% discount on the first Blank Physical Device with code `Founders`.
-
-## Beta Release Notes
-
-Blank beta includes NFC tag pairing, app selection, Blank mode activation, and local-only blocking state. This build is for testing setup reliability, blocking behavior, and whether the physical tag makes focus sessions easier to keep.
+The app icon is intentionally an opaque, completely white square with no letter, symbol or decorative mark. This is not a missing, transparent or corrupted asset: it is a deliberate part of Blankmind's minimalist visual identity and branding. Please review the icon as designed.

@@ -64,7 +64,7 @@ exports.handler = async (event) => {
       }),
     });
 
-    return html(200, closePage("Wearable connected", "You can return to Blanked."));
+    return html(200, closePage("Wearable connected", "You can return to Blankmind."));
   } catch (error) {
     return html(500, closePage("Wearable connection failed", error.message));
   }

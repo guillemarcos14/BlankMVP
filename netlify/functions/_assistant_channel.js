@@ -485,7 +485,7 @@ async function recordAssistantUserContext({ connectCode, context = {}, channel =
       app_version: "",
       build_number: "",
       data_consent: true,
-      consent_text: "Assistant personal context sync authorized in Blanked",
+      consent_text: "Assistant personal context sync authorized in Blankmind",
       privacy_raw_health_samples_sent: false,
       privacy_raw_sleep_stage_timestamps_sent: false,
       privacy_exact_app_selection_sent: true,

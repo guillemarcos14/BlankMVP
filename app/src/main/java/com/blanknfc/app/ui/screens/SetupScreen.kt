@@ -4,7 +4,6 @@ import android.content.Intent
 import android.app.Activity
 import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -44,11 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
@@ -132,7 +128,7 @@ fun SetupScreen(
     val aiGoal = aiGoalFor(selectedGoal, weakMoment)
     fun responses(plan: String = selectedPlan): AndroidOnboardingResponses {
         return AndroidOnboardingResponses(
-            name = onboardingName.trim().ifBlank { "Blanked" },
+            name = onboardingName.trim().ifBlank { "Blankmind" },
             ageRange = selectedAgeRange,
             goal = selectedGoal,
             profile = selectedProfile,
@@ -235,7 +231,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.AWARENESS -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Your phone is taking more of your life than you think",
-                                description = "Blanked helps you block distractions, understand your patterns, and stay in control.",
+                                description = "Blankmind helps you block distractions, understand your patterns, and stay in control.",
                                 primaryText = "Let's see how much",
                                 onPrimary = { currentStep++ }
                             )
@@ -249,13 +245,13 @@ fun SetupScreen(
                             AndroidOnboardingStep.DOPAMINE -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "The loop starts before you notice.",
-                                description = "Blanked is built to interrupt that loop before it wins.",
+                                description = "Blankmind is built to interrupt that loop before it wins.",
                                 primaryText = "Build my plan",
                                 onPrimary = { currentStep++ }
                             )
                             AndroidOnboardingStep.NAME -> TextInputStep(
                                 stepText = stepText(currentStep, steps.size),
-                                title = "What should Blanked call you?",
+                                title = "What should Blankmind call you?",
                                 description = "This personalizes your AI plan without using your identity for ads.",
                                 value = onboardingName,
                                 placeholder = "Your name",
@@ -266,7 +262,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.GOAL -> ChoiceStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "What do you want back?",
-                                description = "Pick the goal that best matches the habit you want Blanked to protect.",
+                                description = "Pick the goal that best matches the habit you want Blankmind to protect.",
                                 selected = selectedGoal,
                                 options = listOf(
                                     "reduce_scrolling" to "Reduce scrolling",
@@ -280,7 +276,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.AGE -> ChoiceStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Which age range are you in?",
-                                description = "Blanked uses this only to calibrate your onboarding plan.",
+                                description = "Blankmind uses this only to calibrate your onboarding plan.",
                                 selected = selectedAgeRange,
                                 options = listOf(
                                     "18_24" to "18-24",
@@ -306,7 +302,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.PROFILE -> ChoiceStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "When does it usually happen?",
-                                description = "This becomes the weak moment Blanked uses for your first plan.",
+                                description = "This becomes the weak moment Blankmind uses for your first plan.",
                                 selected = selectedProfile,
                                 options = listOf(
                                     "night_scroller" to "At night",
@@ -320,7 +316,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.DAILY_USE -> TextInputStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "How many hours a day?",
-                                description = "Use your honest estimate. Blanked only sends the number after consent.",
+                                description = "Use your honest estimate. Blankmind only sends the number after consent.",
                                 value = dailyHoursText,
                                 placeholder = "4",
                                 keyboardType = KeyboardType.Decimal,
@@ -331,7 +327,7 @@ fun SetupScreen(
                             AndroidOnboardingStep.RESULT -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Your pattern is visible.",
-                                description = "Blanked will start with $aiGoal",
+                                description = "Blankmind will start with $aiGoal",
                                 primaryText = "Show my diagnosis",
                                 onPrimary = { currentStep++ }
                             )
@@ -352,14 +348,14 @@ fun SetupScreen(
                             AndroidOnboardingStep.COMMITMENT -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Commit to one protected window.",
-                                description = "Start small. Blanked learns from starts, exits, emergency unlocks and Health context.",
+                                description = "Start small. Blankmind learns from starts, exits, emergency unlocks and Health context.",
                                 primaryText = "I commit",
                                 onPrimary = { currentStep++ }
                             )
                             AndroidOnboardingStep.PERSONALIZATION -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Let's personalize the plan.",
-                                description = "Blanked sends your answers with consent so your AI Focus Plan and Digital Wellness report can adapt.",
+                                description = "Blankmind sends your answers with consent so your AI Focus Plan and Digital Wellness report can adapt.",
                                 primaryText = "Personalize my plan",
                                 onPrimary = {
                                     submitPersonalization()
@@ -403,14 +399,14 @@ fun SetupScreen(
                             AndroidOnboardingStep.NOTIFICATIONS -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Allow preventive reminders.",
-                                description = "Android notification permission can be enabled later. Blanked will still work without it.",
+                                description = "Android notification permission can be enabled later. Blankmind will still work without it.",
                                 primaryText = "Continue",
                                 onPrimary = { currentStep++ }
                             )
                             AndroidOnboardingStep.APPS -> MainSetupStep(
                                 stepText = stepText(currentStep, steps.size),
                                 title = "Choose your distractions.",
-                                description = if (selectedAppCount > 0) "$selectedAppCount distractions selected. Blanked will reuse this one private list for every protection." else "Select every app that pulls your attention: social media, games, streaming, or anything else. Blanked will reuse this one private list for every protection.",
+                                description = if (selectedAppCount > 0) "$selectedAppCount distractions selected. Blankmind will reuse this one private list for every protection." else "Select every app that pulls your attention: social media, games, streaming, or anything else. Blankmind will reuse this one private list for every protection.",
                                 statusText = if (selectedAppCount > 0) "Distractions ready" else null,
                                 primaryText = stringResource(R.string.setup_select_apps),
                                 secondaryText = if (selectedAppCount > 0) stringResource(R.string.setup_continue) else null,
@@ -438,7 +434,7 @@ private fun OnboardingHeader(currentStep: Int, totalSteps: Int) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "Blanked", style = MaterialTheme.typography.bodyLarge, color = BlankOnSurface)
+        Text(text = "Blankmind", style = MaterialTheme.typography.bodyLarge, color = BlankOnSurface)
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             val checkpoints = 6
             repeat(checkpoints) { index ->
@@ -450,46 +446,6 @@ private fun OnboardingHeader(currentStep: Int, totalSteps: Int) {
                 ) {}
             }
         }
-    }
-}
-
-@Composable
-private fun SetupHero(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            modifier = Modifier
-                .size(158.dp)
-                .graphicsLayer { rotationZ = -12f },
-            color = Color(0x1F202124),
-            shape = RoundedCornerShape(44.dp)
-        ) {}
-        Image(
-            painter = painterResource(R.drawable.blank_device_cutout),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .width(206.dp)
-                .graphicsLayer {
-                    rotationZ = -12f
-                    translationX = -48f
-                    translationY = 20f
-                }
-        )
-        Image(
-            painter = painterResource(R.drawable.blank_phone_cutout),
-            contentDescription = null,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier
-                .width(206.dp)
-                .graphicsLayer {
-                    rotationZ = -4f
-                    translationX = 58f
-                    translationY = -12f
-                }
-        )
     }
 }
 
@@ -693,7 +649,7 @@ private fun PermissionsStep(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Allow Blanked to block.",
+            text = "Allow Blankmind to block.",
             style = MaterialTheme.typography.headlineLarge,
             color = BlankOnSurface,
             textAlign = TextAlign.Center

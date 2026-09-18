@@ -175,7 +175,6 @@ final class SessionStore: ObservableObject {
     }
 
     @Published var shouldOpenBlockConfiguration = false
-    @Published var shouldScanBlankFromWidget = false
     @Published var shouldShowWidgetTimerSelector = false
     @Published var pendingPlanAppNames: [String] = []
     @Published var pendingPlanShouldActivate = false
@@ -328,29 +327,6 @@ final class SessionStore: ObservableObject {
         )
     }
 
-    func handleNfcTag(uid: String) -> NfcResult {
-        guard let savedUid = nfcTagUid else {
-            nfcTagUid = uid
-            return .tagRegistered
-        }
-
-        guard savedUid == uid else {
-            return .wrongTag
-        }
-
-        if isBlankActive {
-            if hardBlankActive {
-                return .hardBlankLocked
-            }
-            if schedule.enabled, schedule.contains(Date()) {
-                return pauseScheduleWithNfc()
-            }
-            return deactivateBlank(entryMode: .nfc, endedReason: .nfc)
-        }
-
-        return activateBlank(entryMode: .nfc)
-    }
-
     func activateBlank(
         forceStarted: Bool = false,
         durationMinutes: Int? = nil,
@@ -469,13 +445,6 @@ final class SessionStore: ObservableObject {
             mergedWithExisting: mergedWithExisting,
             result: result
         )
-    }
-
-    func pauseScheduleWithNfc(minutes: Int = 5) -> NfcResult {
-        let now = Date()
-        schedulePausedUntil = scheduleEndDate(containing: now) ?? now.addingTimeInterval(TimeInterval(minutes * 60))
-        _ = deactivateBlank(entryMode: .nfc, endedReason: .nfc)
-        return .schedulePaused
     }
 
     func deactivateBlank(
@@ -634,15 +603,6 @@ final class SessionStore: ObservableObject {
         pendingAssistantAction = nil
     }
 
-    func selectWidgetTimer(minutes: Int?) {
-        pendingWidgetTimerMinutes = minutes
-    }
-
-    func requestBlankScanFromWidget() {
-        syncFromSharedDefaults()
-        shouldScanBlankFromWidget = true
-    }
-
     func syncFromSharedDefaults(now: Date = Date()) {
         BlankSharedState.finishExpiredBlock(defaults: defaults, now: now)
         let activeState = BlankSharedState.loadActiveState(now: now, defaults: defaults)
@@ -703,65 +663,6 @@ final class SessionStore: ObservableObject {
             context["expires_at"] = expiresAt.timeIntervalSince1970
         }
         return context
-    }
-
-    func saveManualSchedule(
-        startMinute: Int,
-        endMinute: Int,
-        weekdays: [Int],
-        repeatsWeekly: Bool
-    ) {
-        let scheduleName = "Protection \(Self.clockLabel(startMinute))"
-        var windows = schedule.windows.filter {
-            $0.name.caseInsensitiveCompare(scheduleName) != .orderedSame
-        }
-        if repeatsWeekly {
-            windows.append(
-                BlankHabitWindow(
-                    name: scheduleName,
-                    enabled: true,
-                    startMinute: startMinute,
-                    endMinute: endMinute,
-                    weekdays: weekdays
-                )
-            )
-        }
-        let first = windows.first ?? BlankHabitWindow(
-            name: scheduleName,
-            enabled: false,
-            startMinute: startMinute,
-            endMinute: endMinute,
-            weekdays: weekdays
-        )
-        schedule = BlankFocusSchedule(
-            enabled: windows.contains(where: \.enabled),
-            startMinute: first.startMinute,
-            endMinute: first.endMinute,
-            windows: windows
-        )
-        schedulePausedUntil = nil
-    }
-
-    func deleteScheduleWindow(_ windowId: UUID) {
-        let wasActiveSchedule = isBlankActive && activeSessionStartedBySchedule
-        let remainingWindows = schedule.windows.filter { $0.id != windowId }
-        let first = remainingWindows.first
-
-        schedule = BlankFocusSchedule(
-            enabled: remainingWindows.contains(where: \.enabled),
-            startMinute: first?.startMinute ?? schedule.startMinute,
-            endMinute: first?.endMinute ?? schedule.endMinute,
-            windows: remainingWindows
-        )
-
-        if remainingWindows.isEmpty {
-            schedulePausedUntil = nil
-            adaptiveScheduleExpiresAt = nil
-        }
-
-        if wasActiveSchedule {
-            applyScheduleWindow()
-        }
     }
 
     func applyOnboardingPlan(startHour: Int) {
@@ -1118,11 +1019,6 @@ final class SessionStore: ObservableObject {
         !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
     }
 
-    private static func clockLabel(_ minute: Int) -> String {
-        let normalized = ((minute % (24 * 60)) + (24 * 60)) % (24 * 60)
-        return String(format: "%02d:%02d", normalized / 60, normalized % 60)
-    }
-
     private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {
         let currentWeekKey = Self.currentWeekKey(for: date)
         guard defaults.string(forKey: Keys.emergencyUnlockWeekKey) != currentWeekKey else {
@@ -1233,69 +1129,6 @@ final class SessionStore: ObservableObject {
 
 #if DEBUG
 extension SessionStore {
-    func loadAIDemoData(now: Date = Date()) {
-        let calendar = Calendar.current
-        let weekStart = BlankWeeklySessionAggregator.startOfWeek(for: now, calendar: calendar)
-        let modeName = Self.canonicalProtectionName
-        let snapshot = BlankSelectionSnapshot(applicationCount: 3, categoryCount: 1, webDomainCount: 0)
-        let weakHour = calendar.component(.hour, from: now.addingTimeInterval(20 * 60))
-        let currentWeekday = calendar.component(.weekday, from: now)
-
-        previewSelectionCount = snapshot.totalCount
-        isBlankActive = false
-        blankActiveSince = nil
-        blankActiveUntil = nil
-        deviceActivityTimerScheduled = false
-        schedulePausedUntil = nil
-        setupComplete = true
-
-        let demoSessions: [BlankSession] = [
-            demoSession(hoursAgo: 130, durationMinutes: 70, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 104, durationMinutes: 35, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 80, durationMinutes: 50, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 55, durationMinutes: 40, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 31, durationMinutes: 25, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 26, durationMinutes: 18, endedReason: .emergency, localHour: weakHour, weekday: currentWeekday, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 5, durationMinutes: 55, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 2, durationMinutes: 35, modeName: modeName, snapshot: snapshot, now: now),
-            demoSession(hoursAgo: 1, durationMinutes: 12, endedReason: .emergency, localHour: weakHour, weekday: currentWeekday, modeName: modeName, snapshot: snapshot, now: now)
-        ].filter { $0.startedAt >= weekStart && $0.startedAt <= now }
-
-        let sessionEvents = demoSessions.flatMap { session -> [BlankUsageEvent] in
-            let endDate = session.endedAt ?? session.startedAt
-            return [
-                BlankUsageEvent(
-                    kind: .blockStarted,
-                    sessionId: session.id,
-                    occurredAt: session.startedAt,
-                    entryMode: session.entryMode ?? .app,
-                    selectionSnapshot: snapshot,
-                    modeName: session.modeName,
-                    localHour: session.localStartHour,
-                    weekday: session.startWeekday,
-                    plannedDurationMinutes: session.plannedDurationMinutes
-                ),
-                BlankUsageEvent(
-                    kind: session.endedReason == .emergency ? .blockBroken : .blockEnded,
-                    sessionId: session.id,
-                    occurredAt: endDate,
-                    entryMode: session.entryMode ?? .app,
-                    endedReason: session.endedReason,
-                    duration: session.duration,
-                    selectionSnapshot: snapshot,
-                    modeName: session.modeName,
-                    localHour: session.localStartHour,
-                    weekday: session.startWeekday,
-                    plannedDurationMinutes: session.plannedDurationMinutes
-                )
-            ]
-        }
-
-        sessions = demoSessions
-        usageEvents = sessionEvents
-        emergencyUnlocksThisWeek = min(demoSessions.filter { $0.endedReason == .emergency }.count, Self.maxEmergencyUnlocksPerWeek)
-    }
-
     static func preview(
         isBlankActive: Bool = false,
         protectedSelectionCount: Int = 3,
@@ -1322,35 +1155,5 @@ extension SessionStore {
         return store
     }
 
-    private func demoSession(
-        hoursAgo: Int,
-        durationMinutes: Int,
-        endedReason: BlankEndedReason = .timer,
-        localHour: Int? = nil,
-        weekday: Int? = nil,
-        modeName: String,
-        snapshot: BlankSelectionSnapshot,
-        now: Date
-    ) -> BlankSession {
-        let calendar = Calendar.current
-        let startedAt = now.addingTimeInterval(TimeInterval(-hoursAgo * 60 * 60))
-        let endedAt = startedAt.addingTimeInterval(TimeInterval(durationMinutes * 60))
-        return BlankSession(
-            profileId: Self.canonicalProtectionId,
-            strategy: .manual,
-            startTag: nfcTagUid,
-            startedAt: startedAt,
-            endedAt: min(endedAt, now.addingTimeInterval(-60)),
-            forceStarted: false,
-            entryMode: .app,
-            endedReason: endedReason,
-            selectionSnapshot: snapshot,
-            modeName: modeName,
-            localStartHour: localHour ?? calendar.component(.hour, from: startedAt),
-            startWeekday: weekday ?? calendar.component(.weekday, from: startedAt),
-            plannedDurationMinutes: durationMinutes,
-            calendar: calendar
-        )
-    }
 }
 #endif

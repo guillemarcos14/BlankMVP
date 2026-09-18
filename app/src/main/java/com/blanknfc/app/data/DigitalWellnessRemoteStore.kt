@@ -55,10 +55,6 @@ class DigitalWellnessRemoteStore(
         }
     }
 
-    fun recordOutcome(recommendationId: String?, outcome: String) {
-        recordExecution(recommendationId, null, outcome == "activated" || outcome == "completed", outcome)
-    }
-
     fun recordExecution(
         recommendationId: String?,
         plan: DigitalWellnessPlan?,

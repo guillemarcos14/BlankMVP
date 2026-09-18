@@ -18,8 +18,6 @@
 		8A0000010000000000000009 /* BlankDomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001B /* BlankDomainModels.swift */; };
 		8A000001000000000000000A /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001C /* ReportView.swift */; };
 		8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */; };
-		8A000001000000000000000B /* MembershipStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001D /* MembershipStore.swift */; };
-		8A0000010000000000000024 /* MembershipActivationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000023 /* MembershipActivationView.swift */; };
 		8A0000010000000000000026 /* BlankSharedState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000025 /* BlankSharedState.swift */; };
 		8A0000010000000000000028 /* StoreKitPurchaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000027 /* StoreKitPurchaseStore.swift */; };
 		8A000001000000000000002A /* HealthKitStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000029 /* HealthKitStore.swift */; };
@@ -104,12 +102,10 @@
 		8A000001000000000000001A /* Blank.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Blank.entitlements; sourceTree = "<group>"; };
 		8A000001000000000000001B /* BlankDomainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankDomainModels.swift; sourceTree = "<group>"; };
 		8A000001000000000000001C /* ReportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportView.swift; sourceTree = "<group>"; };
-		8A000001000000000000001D /* MembershipStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipStore.swift; sourceTree = "<group>"; };
 		8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceActivityTimerScheduler.swift; sourceTree = "<group>"; };
 		8A000001000000000000001F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8A0000010000000000000021 /* instrument_serif_regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = instrument_serif_regular.ttf; sourceTree = "<group>"; };
 		8A0000010000000000000022 /* inter_variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = inter_variable.ttf; sourceTree = "<group>"; };
-		8A0000010000000000000023 /* MembershipActivationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MembershipActivationView.swift; sourceTree = "<group>"; };
 		8A0000010000000000000025 /* BlankSharedState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankSharedState.swift; sourceTree = "<group>"; };
 		8A0000010000000000000027 /* StoreKitPurchaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitPurchaseStore.swift; sourceTree = "<group>"; };
 		8A0000010000000000000029 /* HealthKitStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitStore.swift; sourceTree = "<group>"; };
@@ -198,11 +194,9 @@
 				8A0000010000000000000018 /* HomeView.swift */,
 				8A000001000000000000001B /* BlankDomainModels.swift */,
 				8A000001000000000000001C /* ReportView.swift */,
-				8A000001000000000000001D /* MembershipStore.swift */,
 				8A0000010000000000000027 /* StoreKitPurchaseStore.swift */,
 				8A0000010000000000000029 /* HealthKitStore.swift */,
 				8A000001000000000000002B /* BAIProactiveSignalEngine.swift */,
-				8A0000010000000000000023 /* MembershipActivationView.swift */,
 				8A0000010000000000000025 /* BlankSharedState.swift */,
 				8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */,
 				8A000001000000000000001F /* Assets.xcassets */,
@@ -491,12 +485,10 @@
 				8A0000010000000000000008 /* HomeView.swift in Sources */,
 				8A0000010000000000000009 /* BlankDomainModels.swift in Sources */,
 				8A000001000000000000000A /* ReportView.swift in Sources */,
-				8A000001000000000000000B /* MembershipStore.swift in Sources */,
 				8A0000010000000000000028 /* StoreKitPurchaseStore.swift in Sources */,
 				8A000001000000000000002A /* HealthKitStore.swift in Sources */,
 				8A000001000000000000002C /* BAIProactiveSignalEngine.swift in Sources */,
 				8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */,
-				8A0000010000000000000024 /* MembershipActivationView.swift in Sources */,
 				8A0000010000000000000026 /* BlankSharedState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

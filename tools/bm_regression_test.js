@@ -3,11 +3,6 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
-const {
-  advanceLoop,
-  createLoop,
-  publicLoop,
-} = require("../netlify/functions/bm-loop");
 const { buildAgentContext } = require("../netlify/functions/bm-context");
 const { policyForPlan } = require("../netlify/functions/bm-policy");
 
@@ -48,51 +43,13 @@ function blockBetween(source, startMarker, endMarker) {
   return source.slice(start, end);
 }
 
-function iosLikeLoop(loop) {
-  const publicState = publicLoop(loop);
-  return {
-    loop_version: publicState.loop_version,
-    loop_id: publicState.loop_id,
-    idempotency_key: publicState.idempotency_key,
-    status: publicState.status,
-    phase: publicState.phase,
-    goal: publicState.goal,
-    iteration: publicState.iteration,
-    max_iterations: publicState.max_iterations,
-    next_step: publicState.next_step,
-    action_types: publicState.action_types,
-    trigger: publicState.trigger,
-    consent: publicState.consent,
-    verification: publicState.verification,
-    stop_conditions: publicState.stop_conditions,
-    last_event: publicState.last_event,
-    event_ids: publicState.event_ids,
-    event_history: publicState.event_history,
-    state_version: publicState.state_version,
-    event_sequence: publicState.event_sequence,
-  };
-}
-
-check("ios_loop_round_trip_preserves_confirmation_contract", () => {
-  const loopBlock = blockBetween(ios, "private struct AgentLoop: Codable, Equatable {", "private struct AgentPlan:");
-  assert.match(loopBlock, /\bvar\s+consent\b/, "iOS AgentLoop must carry consent across JSON round-trips");
-
-  const loop = createLoop({
-    prompt: "Block the evening scroll",
-    runId: "regression_ios_round_trip",
-    context: { has_selected_apps: true, screen_time_authorized: true },
-    plan: { intent: "focus", title: "Focus", response_text: "ok", actions: [{ type: "apply_schedule" }] },
-  });
-  const result = advanceLoop(iosLikeLoop(loop), { type: "confirm", event_id: "ios_round_trip_confirm" });
-  assert.strictEqual(result.accepted, true);
-  assert.strictEqual(result.transition, "ready_for_execution");
-});
-
-check("ios_persists_loop_before_first_advance", () => {
-  const clientBlock = blockBetween(ios, "private struct BMLoopClient", "private struct RemoteAgentResponse");
-  const reportBlock = blockBetween(ios, "private func reportAgentExecution", "private func agentAnonymousUserId");
-  assert.match(clientBlock, /operation\s*=\s*["']start["']|startLoop\(/, "iOS BMLoopClient must expose a start operation");
-  assert.match(reportBlock, /\.start\(|startLoop\(/, "iOS execution reporting must persist the loop before advancing it");
+check("ios_pending_action_lifecycle_is_durable", () => {
+  const receiptBlock = blockBetween(home, "enum AssistantActionReceiptStore", "struct AssistantActionInboxClient");
+  const finishBlock = blockBetween(home, "private func finishPendingAssistantAction", "private var contextualPickerHeaderText");
+  assert.match(receiptBlock, /static func save/);
+  assert.match(receiptBlock, /static func load/);
+  assert.match(finishBlock, /AssistantActionReceiptStore\.save/);
+  assert.match(finishBlock, /acknowledgeLifecycle/);
 });
 
 check("context_preserves_autonomy_and_native_control_fields", () => {
@@ -116,21 +73,21 @@ check("context_preserves_autonomy_and_native_control_fields", () => {
 });
 
 check("ios_verification_uses_device_state_not_label_count", () => {
-  const reportBlock = blockBetween(ios, "private func reportAgentExecution", "private func agentAnonymousUserId");
+  const reportBlock = blockBetween(home, "private func finishPendingAssistantAction", "private var contextualPickerHeaderText");
   assert.doesNotMatch(
     ios,
     /verified:\s*appliedLabels\.count\s*>=\s*plan\.executableActionCount/,
     "verification cannot be inferred from UI labels");
   assert.match(
     reportBlock,
-    /evidence|deviceState|actualState|stateMatches|verifyDevice/i,
-    "execution reporting must include explicit device-state verification");
+    /requestedAt:[\s\S]*startedAt:[\s\S]*effectiveUntil:[\s\S]*startDelaySeconds:/,
+    "execution reporting must include measured native execution evidence");
 });
 
 check("native_clients_close_loop_with_outcome_recorded", () => {
-  const reportBlock = blockBetween(ios, "private func reportAgentExecution", "private func agentAnonymousUserId");
+  const reportBlock = blockBetween(home, "private func finishPendingAssistantAction", "private var contextualPickerHeaderText");
   const executionBlock = blockBetween(android, "fun recordExecution(", "private fun startLoop(");
-  assert.match(reportBlock, /outcome_recorded/, "iOS must send outcome_recorded after execution");
+  assert.match(reportBlock, /acknowledgeLifecycle/, "iOS must acknowledge the native lifecycle after execution");
   assert.match(executionBlock, /outcome_recorded/, "Android must send outcome_recorded after execution");
 });
 
@@ -181,9 +138,8 @@ check("assistant_context_sync_reaches_messaging_identity", () => {
   assert.match(bmContext, /app_presence_state/);
   assert.match(assistantChannelShared, /last_seen_at: now/);
   assert.match(ios, /AssistantContextSyncClient/);
-  assert.match(ios, /BlankmindAppPresence\.payload/);
   assert.match(home, /BlankmindAppPresence\.payload/);
-  assert.match(ios, /single_distraction_block/);
+  assert.match(home, /single_distraction_block/);
   assert.match(home, /assistantContextPayload/);
   assert.match(home, /syncAssistantContext/);
   assert.match(sessionStore, /func restoreSavedSelectionForAssistant/);

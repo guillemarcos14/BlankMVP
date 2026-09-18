@@ -390,7 +390,6 @@ struct HomeView: View {
     @State private var contextualPlanSelection = FamilyActivitySelection()
     @State private var showingRelink = false
     @State private var showingForgetConfirm = false
-    @State private var nfcReader = NFCReader()
     @StateObject private var healthKitStore = HealthKitStore()
     @State private var unblankHoldProgress = 0.0
     @State private var isAnimatingUnblankHold = false
@@ -501,7 +500,6 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             processPendingBlockConfigurationIfNeeded()
-            openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
@@ -514,7 +512,6 @@ struct HomeView: View {
             screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             processPendingBlockConfigurationIfNeeded()
-            openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
@@ -629,10 +626,6 @@ struct HomeView: View {
                     )
                 }
             }
-        }
-        .onChange(of: sessionStore.shouldScanBlankFromWidget) { shouldScan in
-            guard shouldScan else { return }
-            openWidgetScanIfNeeded()
         }
         .fullScreenCover(isPresented: $showingAssistantConnect) {
             AssistantConnectSheet(
@@ -799,7 +792,7 @@ struct HomeView: View {
         }
         context.evaluatePolicy(
             .deviceOwnerAuthentication,
-            localizedReason: "Unlock Blanked advanced settings."
+            localizedReason: "Unlock Blankmind advanced settings."
         ) { success, _ in
             Task { @MainActor in
                 if success {
@@ -819,11 +812,6 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private func topHomePanel(width: CGFloat) -> some View {
-        EmptyView()
-    }
-
-    @ViewBuilder
     private func minimalHome(layout: HomeLayoutMetrics) -> some View {
         if sessionStore.isBlankActive {
             activeMinimalHome(layout: layout)
@@ -839,15 +827,15 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: -8) {
                 minimalStartRow
 
-                minimalHomeRow("progress", color: BlankColors.paleSteelBlue) {
+                minimalHomeRow("progress", color: BlankColors.homeLightOption) {
                     openSection(.report)
                 }
 
-                minimalHomeRow("distractions", color: BlankColors.paleSteelBlue) {
+                minimalHomeRow("distractions", color: BlankColors.homeLightOption) {
                     openSection(.distractions)
                 }
 
-                minimalHomeRow("settings", color: BlankColors.paleSteelBlue) {
+                minimalHomeRow("settings", color: BlankColors.homeLightOption) {
                     openSection(.settings)
                 }
 
@@ -1034,11 +1022,7 @@ struct HomeView: View {
     private func minimalHomeRow(_ title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                .foregroundStyle(color)
-                .tracking(-0.6)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .blankHomeDisplayTextStyle(color: color)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
         }
@@ -1191,7 +1175,7 @@ struct HomeView: View {
     private func bottomAction(width: CGFloat) -> some View {
         VStack(spacing: 12) {
             let buttonWidth = sessionStore.isBlankActive ? min(width, 244) : min(width, 184)
-            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard Blanked" : "Hold to Unblank") : "Start Blanked") {
+            Button(sessionStore.isBlankActive ? (sessionStore.hardBlankActive ? "Hard protection" : "Hold to Unblank") : "Start Blank") {
                 if sessionStore.isBlankActive {
                     return
                 } else {
@@ -1267,43 +1251,6 @@ struct HomeView: View {
                     .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.62) : BlankColors.mutedInk)
             }
         }
-    }
-
-    private func bottomShortcutBar(width: CGFloat) -> some View {
-        HStack {
-            #if targetEnvironment(simulator)
-            footerShortcut(title: "Onboarding", icon: "rectangle.on.rectangle") {
-                openOnboardingDemo()
-            }
-
-            footerShortcut(title: "Pro", icon: "sparkles") {
-                enableDemoPro()
-            }
-            #endif
-
-            footerShortcut(title: "Assistant", icon: "message") {
-                showingAssistantConnect = true
-            }
-        }
-        .frame(width: min(width, isSimulatorBuild ? 318 : 150), height: 44)
-    }
-
-    private func footerShortcut(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                Text(title)
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .foregroundStyle(BlankColors.pureWhite.opacity(0.72))
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     private func applyScreenTimeControls() {
@@ -1464,15 +1411,6 @@ struct HomeView: View {
         return "\(String(format: "%02d", minutes)):\(String(format: "%02d", remainingSeconds))"
     }
 
-    private func startTimedBlank(minutes: Int, hardMode: Bool) {
-        let result = withAnimation(.easeInOut(duration: 0.65)) {
-            sessionStore.activateBlank(durationMinutes: minutes, hardMode: hardMode)
-        }
-        screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-        setMessage(for: result)
-        closeSection()
-    }
-
     private func processPendingBlockConfigurationIfNeeded() {
         guard sessionStore.shouldOpenBlockConfiguration else { return }
         contextualPlanSelection = sessionStore.selection
@@ -1502,7 +1440,7 @@ struct HomeView: View {
         case .applyAIPlan:
             return "Apply the recommended adaptive plan?"
         case .openAppPicker:
-            return "Open the app picker to choose what Blanked can protect?"
+            return "Open the app picker to choose what Blankmind can protect?"
         case .configureAndOpenAppPicker(_, let durationMinutes, _, let schedule):
             if let schedule {
                 return "Choose your distractions once, then protect them from \(formatMinute(schedule.startMinute)) to \(formatMinute(schedule.endMinute))?"
@@ -1865,46 +1803,6 @@ struct HomeView: View {
         }
     }
 
-    private func dismissPendingAssistantAction(status: String) {
-        let actionId = pendingAssistantActionId
-        let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
-        sessionStore.clearAssistantActionConfirmation()
-        guard !actionId.isEmpty, channel == "whatsapp" || channel == "sms" else {
-            assistantActionExecutionInFlight = false
-            return
-        }
-        lastAssistantActionPollAt = Date()
-        let phoneNumber = assistantPhoneNumber
-        let receipt = AssistantActionReceipt(
-            actionId: actionId,
-            status: status,
-            detail: "user_cancelled",
-            executionStarted: false
-        )
-        AssistantActionReceiptStore.save(
-            actionId: receipt.actionId,
-            status: receipt.status,
-            detail: receipt.detail,
-            executionStarted: receipt.executionStarted
-        )
-        Task {
-            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
-                receipt: receipt,
-                connectCode: code,
-                channel: channel,
-                phoneNumber: phoneNumber
-            )
-            await MainActor.run {
-                assistantActionExecutionInFlight = false
-                if acknowledged {
-                    AssistantActionReceiptStore.clear(actionId: actionId)
-                    pendingAssistantActionId = ""
-                }
-            }
-        }
-    }
-
     private var relapseIntervention: RelapseIntervention {
         guard let recoveryScore = homeRecoveryScore(), recoveryScore < 45 else {
             return aiSystem.relapseIntervention
@@ -1954,36 +1852,6 @@ struct HomeView: View {
         }
     }
 
-    private func scanTag() {
-        nfcReader.scan { result in
-            Task { @MainActor in
-                switch result {
-                case .success(let uid):
-                    let nfcResult = withAnimation(.easeInOut(duration: 0.65)) {
-                        sessionStore.handleNfcTag(uid: uid)
-                    }
-                    screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-                    setMessage(for: nfcResult)
-                case .failure(let error):
-                    message = error.localizedDescription
-                    messageAction = nil
-                }
-            }
-        }
-    }
-
-    private func openWidgetScanIfNeeded() {
-        guard scenePhase == .active, sessionStore.shouldScanBlankFromWidget else { return }
-        guard sessionStore.isBlankActive else {
-            sessionStore.shouldScanBlankFromWidget = false
-            return
-        }
-        sessionStore.shouldScanBlankFromWidget = false
-        DispatchQueue.main.async {
-            scanTag()
-        }
-    }
-
     private func showPendingBAIProactiveAlertIfNeeded() {
         let defaults = BlankSharedState.defaults
         guard let id = defaults.string(forKey: "blankBAIProactiveAlertId"),
@@ -2020,7 +1888,7 @@ struct HomeView: View {
             message = "No apps selected"
             messageAction = .selectApps
         case .hardBlankLocked:
-            message = "Hard Blanked: use Emergency to unlock early."
+            message = "Hard protection: use Emergency to unlock early."
             messageAction = nil
         }
     }
@@ -2041,6 +1909,17 @@ struct HomeView: View {
             return "\(hours)h \(minutes)m"
         }
         return "\(minutes)m"
+    }
+}
+
+private extension View {
+    func blankHomeDisplayTextStyle(color: Color) -> some View {
+        font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+            .foregroundStyle(color)
+            .tracking(-0.6)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .lineSpacing(0)
     }
 }
 
@@ -2154,514 +2033,7 @@ struct AppBackground: View {
     }
 }
 
-private struct DistractionsList: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.blankMinimalAppearance) private var minimalAppearance
-    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
-    @Binding var showingPicker: Bool
-    let onFinish: () -> Void
-    @State private var windows: [BlankHabitWindow] = [BlankHabitWindow(name: "Routine 1", enabled: false)]
-    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
-
-    @ViewBuilder
-    var body: some View {
-        Group {
-            if minimalAppearance {
-                newLookPlan
-            } else {
-                List {
-            TopSheetHeader(
-                title: "Plan",
-                subtitle: "Protection, routines, safeguards.",
-                titleColor: textColor,
-                subtitleColor: secondaryColor
-            )
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 12)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
-            baiPlanSummary
-                .padding(.horizontal, 24)
-                .padding(.vertical, 8)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
-            protectedAppsCapsule
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
-            .listRowInsets(EdgeInsets())
-            .listRowBackground(Color.clear)
-            .listRowSeparator(.hidden)
-
-            planRoutineEditor
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
-            planAdvancedControls
-                .padding(.horizontal, 24)
-                .padding(.top, 10)
-                .padding(.bottom, 34)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                }
-                .tint(textColor)
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .scrollIndicators(.hidden)
-                .background(Color.clear)
-            }
-        }
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .onAppear {
-            windows = sessionStore.schedule.windows.isEmpty
-                ? [BlankHabitWindow(name: "Routine 1", enabled: false)]
-                : sessionStore.schedule.windows
-        }
-    }
-
-    private var newLookPlan: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(
-                    title: "plan",
-                    subtitle: "one distraction list for every protection.",
-                    action: onFinish,
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
-                .padding(.bottom, 24)
-
-                Text("your distractions")
-                    .font(.blankInter(size: 32, weight: .bold, relativeTo: .title2))
-                    .tracking(-0.8)
-                    .foregroundStyle(textColor)
-
-                Text(blockedAppsText)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(secondaryColor)
-                    .padding(.top, 4)
-
-                newLookRule
-
-                newLookPlanRow(title: "edit distractions", detail: blockedAppsText) {
-                    showingPicker = true
-                    onFinish()
-                }
-
-                newLookPlanRow(title: "routines", detail: routineSummaryText) {}
-
-                planRoutineEditor
-                    .padding(.top, 20)
-
-                planAdvancedControls
-                    .padding(.top, 24)
-                    .padding(.bottom, 34)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, sectionHorizontalPadding)
-    }
-
-    private var newLookRule: some View {
-        Rectangle()
-            .fill(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.newLookRule)
-            .frame(height: 1)
-            .padding(.top, 26)
-            .padding(.bottom, 8)
-    }
-
-    private func newLookPlanRow(title: String, detail: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                Text(title)
-                    .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
-                    .tracking(-0.45)
-                    .foregroundStyle(textColor)
-                Spacer(minLength: 8)
-                Text(detail)
-                    .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(secondaryColor)
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(2)
-            }
-            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var baiPlanSummary: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("current protection")
-                        .font(.blankInter(size: 23, weight: .semibold, relativeTo: .title3))
-                    Text("One reusable list")
-                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                        .foregroundStyle(secondaryColor)
-                }
-
-                Spacer()
-
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.caption.weight(.semibold))
-                    Text("automatic")
-                        .font(.caption.weight(.semibold))
-                }
-                .foregroundStyle(textColor)
-                .padding(.horizontal, 11)
-                .frame(height: 30)
-                .background { Capsule().fill(textColor.opacity(0.10)) }
-            }
-
-            HStack(spacing: 10) {
-                planVisualTile(title: "apps", value: "\(sessionStore.selectionCount)", symbol: "square.grid.2x2.fill")
-                planVisualTile(title: "rule", value: sessionStore.allowOnlyModeEnabled ? "allow" : "block", symbol: "shield.fill")
-                planVisualTile(title: "exit", value: sessionStore.hardBlankActive ? "emergency" : "hold", symbol: "hand.raised.fill")
-            }
-        }
-        .foregroundStyle(textColor)
-        .padding(18)
-        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.14, emphasized: true)
-    }
-
-    private var protectedAppsCapsule: some View {
-        Button {
-            showingPicker = true
-            onFinish()
-        } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "app.badge.fill")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(textColor.opacity(0.10)))
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("protected apps")
-                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                        Text(blockedAppsText)
-                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                            .foregroundStyle(secondaryColor)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(secondaryColor)
-                }
-
-                HStack(spacing: 5) {
-                    ForEach(0..<12, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(index < min(12, max(1, sessionStore.selectionCount)) ? textColor.opacity(0.42) : textColor.opacity(0.10))
-                            .frame(height: 12)
-                    }
-                }
-                .accessibilityHidden(true)
-            }
-            .foregroundStyle(textColor)
-            .padding(18)
-            .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func planVisualTile(title: String, value: String, symbol: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Image(systemName: symbol)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(textColor.opacity(0.84))
-            Text(title)
-                .font(.caption2)
-                .foregroundStyle(secondaryColor)
-            Text(value)
-                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(textColor)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 11)
-        .background {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .fill(textColor.opacity(0.075))
-        }
-    }
-
-    private var planRoutineEditor: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 34, height: 34)
-                        .background(Circle().fill(textColor.opacity(0.10)))
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("recurring routines")
-                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                        Text(routineSummaryText)
-                            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                            .foregroundStyle(secondaryColor)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-                }
-
-                routineTimeline
-            }
-            .foregroundStyle(textColor)
-            .padding(18)
-            .blankControlSurface(cornerRadius: 20, tintOpacity: 0.10)
-
-            VStack(spacing: 12) {
-                ForEach($windows) { $window in
-                    HabitWindowCard(
-                        window: $window,
-                        canDelete: windows.count > 1,
-                        textColor: textColor,
-                        secondaryColor: secondaryColor
-                    ) {
-                        deleteWindow(window.id)
-                    }
-                }
-            }
-
-            Button {
-                addWindow()
-            } label: {
-                Label("add manual routine", systemImage: "plus")
-                    .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                    .foregroundStyle(textColor)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.22)
-            }
-            .buttonStyle(.plain)
-
-            VacationModeCard(
-                textColor: textColor,
-                secondaryColor: secondaryColor
-            )
-
-            Button {
-                saveSchedule()
-            } label: {
-                    TopSheetPrimaryButtonLabel(title: "save plan")
-            }
-            .padding(.top, 2)
-        }
-    }
-
-    private var routineTimeline: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<7, id: \.self) { index in
-                VStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(enabledWindows.isEmpty ? textColor.opacity(0.10) : textColor.opacity(index < enabledWindows.count ? 0.46 : 0.18))
-                        .frame(height: index < enabledWindows.count ? 28 : 15)
-                    Text(shortWeekday(index))
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(secondaryColor.opacity(0.84))
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(height: 50)
-        .accessibilityLabel(routineSummaryText)
-    }
-
-    private var planAdvancedControls: some View {
-        DisclosureGroup {
-            VStack(alignment: .leading, spacing: 14) {
-                AdvancedModeControls(
-                    showingPicker: $showingPicker,
-                    onFinish: onFinish,
-                    textColor: textColor,
-                    secondaryColor: secondaryColor
-                )
-            }
-            .padding(.top, 10)
-        } label: {
-            HStack {
-                Label("safeguards", systemImage: "ellipsis.circle")
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-                Spacer()
-                Text("advanced")
-                    .font(.caption)
-                    .foregroundStyle(secondaryColor)
-            }
-        }
-        .foregroundStyle(textColor)
-        .padding(18)
-        .blankControlSurface(cornerRadius: 20, tintOpacity: 0.08)
-    }
-
-    private var enabledWindows: [BlankHabitWindow] {
-        windows.filter { $0.enabled }
-    }
-
-    private var routineSummaryText: String {
-        let count = enabledWindows.count
-        guard count > 0 else {
-            return "no routine approved yet."
-        }
-        if count == 1, let first = enabledWindows.first {
-            return "\(first.name): \(formatMinute(first.startMinute)) to \(formatMinute(first.endMinute))"
-        }
-        return "\(count) active routines. configure each one below."
-    }
-
-    private func shortWeekday(_ index: Int) -> String {
-        ["m", "t", "w", "t", "f", "s", "s"][index]
-    }
-
-    private func saveSchedule() {
-        let normalized = windows.enumerated().map { index, window in
-            BlankHabitWindow(
-                id: window.id,
-                name: window.name.isEmpty ? "Routine \(index + 1)" : window.name,
-                enabled: window.enabled,
-                startMinute: window.startMinute,
-                endMinute: window.endMinute,
-                weekdays: window.weekdays
-            )
-        }
-        let first = normalized.first ?? BlankHabitWindow(enabled: false)
-        sessionStore.schedule = BlankFocusSchedule(
-            enabled: normalized.contains { $0.enabled },
-            startMinute: first.startMinute,
-            endMinute: first.endMinute,
-            windows: normalized
-        )
-        onFinish()
-    }
-
-    private func addWindow() {
-        let number = windows.count + 1
-        windows.append(BlankHabitWindow(name: "Routine \(number)", enabled: true, startMinute: 9 * 60, endMinute: 10 * 60))
-    }
-
-    private func deleteWindow(_ id: UUID) {
-        guard windows.count > 1 else { return }
-        windows.removeAll { $0.id == id }
-    }
-
-    private var blockedAppsText: String {
-        let count = sessionStore.selectionCount
-        return count == 0 ? "choose distractions" : "\(count) selected"
-    }
-}
-
-private struct AdvancedModeControls: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @Binding var showingPicker: Bool
-    let onFinish: () -> Void
-    let textColor: Color
-    let secondaryColor: Color
-
-    private static func cooldownSettingText(for seconds: Int) -> String {
-        if seconds == 0 { return "off" }
-        let minutes = seconds / 60
-        let remainingSeconds = seconds % 60
-        if minutes == 0 { return "\(remainingSeconds)s" }
-        return remainingSeconds == 0 ? "\(minutes)m" : "\(minutes)m \(remainingSeconds)s"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("advanced")
-                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .headline))
-                .foregroundStyle(secondaryColor)
-
-            Toggle("allow only", isOn: $sessionStore.allowOnlyModeEnabled)
-                .advancedControlStyle(textColor: textColor)
-
-            Toggle("adult website filter", isOn: $sessionStore.adultContentBlockingEnabled)
-                .advancedControlStyle(textColor: textColor)
-
-            Toggle("pin protection", isOn: $sessionStore.pinProtectionEnabled)
-                .advancedControlStyle(textColor: textColor)
-
-            Stepper(value: $sessionStore.manualUnblankCooldownSeconds, in: 0...300, step: 15) {
-                HStack {
-                    Text("unblank cooldown")
-                    Spacer()
-                    Text(Self.cooldownSettingText(for: sessionStore.manualUnblankCooldownSeconds))
-                        .monospacedDigit()
-                        .foregroundStyle(secondaryColor)
-                }
-            }
-            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-            .foregroundStyle(textColor)
-            .padding(.horizontal, 18)
-            .frame(height: 52)
-            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.16)
-
-            VStack(alignment: .leading, spacing: 10) {
-                Toggle("Daily time limit", isOn: $sessionStore.dailyLimitEnabled)
-                    .advancedControlStyle(textColor: textColor)
-
-                if sessionStore.dailyLimitEnabled {
-                    Stepper(value: $sessionStore.dailyLimitMinutes, in: 5...240, step: 5) {
-                        HStack {
-                            Text("limit")
-                            Spacer()
-                            Text("\(sessionStore.dailyLimitMinutes) min")
-                                .monospacedDigit()
-                        }
-                    }
-                    .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                    .foregroundStyle(textColor)
-                    .padding(.horizontal, 18)
-                    .frame(height: 52)
-                    .blankGlassCard(cornerRadius: 18, tintOpacity: 0.20)
-                }
-            }
-
-            if sessionStore.allowOnlyModeEnabled && sessionStore.selection.applicationTokens.isEmpty && sessionStore.selection.webDomainTokens.isEmpty {
-                Button {
-                    showingPicker = true
-                    onFinish()
-                } label: {
-                        Text("choose allowed apps")
-                        .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                        .foregroundStyle(textColor)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
 private extension View {
-    func advancedControlStyle(textColor: Color) -> some View {
-        self
-            .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-            .foregroundStyle(textColor)
-            .padding(.horizontal, 18)
-            .frame(height: 52)
-            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.24)
-    }
 }
 
 struct HomeSectionScreen: View {
@@ -3353,57 +2725,6 @@ private struct WheelTimePicker: View {
     }
 }
 
-private struct StaticScheduleRow: View {
-    let title: String
-    let value: String
-    let textColor: Color
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-            Spacer()
-            Text(value)
-                .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
-        }
-        .foregroundStyle(textColor)
-        .padding(.horizontal, 18)
-        .frame(height: 56)
-        .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
-    }
-}
-
-private struct TimeMenuRow: View {
-    let title: String
-    @Binding var minute: Int
-    let textColor: Color
-
-    private let options = stride(from: 0, through: 23 * 60 + 30, by: 30).map { $0 }
-
-    var body: some View {
-        Menu {
-            ForEach(options, id: \.self) { option in
-                Button(formatMinute(option)) {
-                    minute = option
-                }
-            }
-        } label: {
-            HStack {
-                Text(title)
-                    .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
-                Spacer()
-                Text(formatMinute(minute))
-                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .title3))
-                    .monospacedDigit()
-            }
-            .foregroundStyle(textColor)
-            .padding(.horizontal, 18)
-            .frame(height: 56)
-            .blankGlassCard(cornerRadius: 18, tintOpacity: 0.30)
-        }
-    }
-}
-
 private struct ForgetBlankConfirmSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onConfirm: () -> Void
@@ -3601,7 +2922,7 @@ private struct EmergencyScreen: View {
         if isConfirming {
             return minimalAppearance
                 ? "this unlocks blankmind now. you will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
-                : "This unlocks Blanked now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
+                : "This unlocks Blankmind now. You will have \(max(0, emergencyUnlocksRemaining - 1)) left this week."
         }
         guard sessionStore.isBlankActive else {
             return minimalAppearance ? "no active block right now." : "No active block right now."
@@ -3760,6 +3081,8 @@ private struct DistractionsScreen: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let homeContentBottomMargin = max(proxy.safeAreaInsets.bottom + 18, 34) * 2
+
             ZStack(alignment: .bottomLeading) {
                 VStack(alignment: .leading, spacing: 0) {
                     SectionBackHeader(action: onClose)
@@ -3788,31 +3111,19 @@ private struct DistractionsScreen: View {
                                 ForEach(Array(sessionStore.selection.applicationTokens), id: \.self) { token in
                                     Label(token)
                                         .labelStyle(.titleOnly)
-                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                        .foregroundStyle(textColor)
-                                        .tracking(-0.6)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.72)
+                                        .blankHomeDisplayTextStyle(color: textColor)
                                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 }
                                 ForEach(Array(sessionStore.selection.categoryTokens), id: \.self) { token in
                                     Label(token)
                                         .labelStyle(.titleOnly)
-                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                        .foregroundStyle(textColor)
-                                        .tracking(-0.6)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.72)
+                                        .blankHomeDisplayTextStyle(color: textColor)
                                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 }
                                 ForEach(Array(sessionStore.selection.webDomainTokens), id: \.self) { token in
                                     Label(token)
                                         .labelStyle(.titleOnly)
-                                        .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                        .foregroundStyle(textColor)
-                                        .tracking(-0.6)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.72)
+                                        .blankHomeDisplayTextStyle(color: textColor)
                                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                 }
                             }
@@ -3831,7 +3142,7 @@ private struct DistractionsScreen: View {
 
                 editButton
                     .padding(.leading, sectionHorizontalPadding)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, homeContentBottomMargin)
             }
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3865,481 +3176,6 @@ private struct DistractionsScreen: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Edit distractions")
         .accessibilityHint("Choose apps to add or remove from your distractions")
-    }
-}
-
-private struct ScheduleEditorScreen: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
-    @State private var startMinute = 13 * 60
-    @State private var endMinute = 14 * 60
-    @State private var selectedWeekdays = Set(1...7)
-    @State private var repeatsWeekly = true
-
-    private let weekdayOrder = [2, 3, 4, 5, 6, 7, 1]
-    private let weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"]
-
-    private var textColor: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.minimalInk
-    }
-
-    private var secondaryColor: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.minimalSecondary
-    }
-
-    private var canSave: Bool {
-        sessionStore.hasSelectedApps
-            && startMinute != endMinute
-            && (!repeatsWeekly || !selectedWeekdays.isEmpty)
-    }
-
-    private var surfaceColor: Color {
-        sessionStore.isBlankActive ? BlankColors.darkCardSurface : BlankColors.minimalCardSurface
-    }
-
-    private var fieldFill: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.08) : BlankColors.minimalBackground
-    }
-
-    private var fieldBorder: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.minimalInk.opacity(0.10)
-    }
-
-    private var primaryButtonFill: Color {
-        sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal
-    }
-
-    private var primaryButtonText: Color {
-        sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite
-    }
-
-    var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(
-                    title: "new schedule",
-                    subtitle: "protect the same distraction list automatically.",
-                    action: { dismiss() },
-                    titleColor: textColor,
-                    subtitleColor: secondaryColor
-                )
-                .padding(.bottom, 24)
-
-                sectionCard(title: "protected") {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text("your distractions")
-                            .font(.blankInter(size: 16, weight: .semibold, relativeTo: .body))
-                            .foregroundStyle(textColor)
-                        Spacer(minLength: 8)
-                        Text("\(sessionStore.selectionCount) selected")
-                            .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
-                            .foregroundStyle(secondaryColor)
-                    }
-                }
-
-                sectionCard(title: "schedule") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("time")
-                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                            .foregroundStyle(secondaryColor)
-
-                        HStack(spacing: 10) {
-                            TimeMenuRow(title: "starts", minute: $startMinute, textColor: textColor)
-                            TimeMenuRow(title: "ends", minute: $endMinute, textColor: textColor)
-                        }
-
-                        Text("days")
-                            .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                            .foregroundStyle(secondaryColor)
-                            .padding(.top, 4)
-
-                        HStack(spacing: 6) {
-                            ForEach(0..<weekdayOrder.count, id: \.self) { index in
-                                let weekday = weekdayOrder[index]
-                                dayButton(weekday: weekday, label: weekdayLabels[index])
-                            }
-                        }
-
-                        Toggle("repeat weekly", isOn: $repeatsWeekly)
-                            .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                            .foregroundStyle(textColor)
-                            .tint(BlankColors.statusGreen)
-                            .padding(.horizontal, 14)
-                            .frame(height: 50)
-                            .background {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(fieldFill)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(fieldBorder, lineWidth: 1)
-                                    }
-                            }
-
-                        if !repeatsWeekly {
-                                Text("without repetition, protection stays available on demand.")
-                                .font(.blankInter(size: 13, weight: .medium, relativeTo: .caption))
-                                .foregroundStyle(secondaryColor)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-                .padding(.top, 12)
-
-                Button {
-                    saveSchedule()
-                } label: {
-                    Text("create schedule")
-                        .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
-                        .foregroundStyle(canSave ? primaryButtonText : secondaryColor)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(canSave ? primaryButtonFill : textColor.opacity(0.08))
-                        }
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSave)
-                .padding(.top, 18)
-                .padding(.bottom, 32)
-            }
-            .padding(.horizontal, sectionHorizontalPadding)
-        }
-        .background {
-            (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
-                .ignoresSafeArea()
-        }
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-    }
-
-    private func sectionCard<Content: View>(
-        title: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(secondaryColor)
-
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(surfaceColor)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(fieldBorder, lineWidth: 1)
-                }
-        }
-    }
-
-    private func dayButton(weekday: Int, label: String) -> some View {
-        let isSelected = selectedWeekdays.contains(weekday)
-        let selectedFill = sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.charcoal
-        let selectedText = sessionStore.isBlankActive ? BlankColors.charcoal : BlankColors.pureWhite
-
-        return Button {
-            guard repeatsWeekly else { return }
-            if isSelected {
-                guard selectedWeekdays.count > 1 else { return }
-                selectedWeekdays.remove(weekday)
-            } else {
-                selectedWeekdays.insert(weekday)
-            }
-        } label: {
-            Text(label)
-                .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
-                .foregroundStyle(isSelected && repeatsWeekly ? selectedText : secondaryColor)
-                .frame(width: 30, height: 30)
-                .background {
-                    Circle()
-                        .fill(isSelected && repeatsWeekly ? selectedFill : textColor.opacity(0.06))
-                }
-        }
-        .buttonStyle(.plain)
-        .disabled(!repeatsWeekly)
-        .opacity(repeatsWeekly ? 1 : 0.45)
-    }
-
-    private func saveSchedule() {
-        sessionStore.saveManualSchedule(
-            startMinute: startMinute,
-            endMinute: endMinute,
-            weekdays: Array(selectedWeekdays).sorted(),
-            repeatsWeekly: repeatsWeekly
-        )
-        dismiss()
-    }
-}
-
-private struct TimerScreen: View {
-    @EnvironmentObject private var sessionStore: SessionStore
-    @Environment(\.blankMinimalAppearance) private var minimalAppearance
-    @Environment(\.blankSectionHorizontalPadding) private var sectionHorizontalPadding
-    @State private var hardMode = false
-    @State private var selectedMinutes = 30
-    let onStart: (Int, Bool) -> Void
-    private let options = [15, 30, 45, 60, 90, 120]
-    private var textColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite : BlankColors.ink }
-    private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
-    private var recommendedMinutes: Int { sessionStore.digitalWellnessV3.plan.recommendedDurationMinutes }
-
-    var body: some View {
-        Group {
-            if minimalAppearance {
-                newLookTimer
-            } else {
-                VStack(spacing: 22) {
-            Spacer(minLength: 0)
-
-            TopSheetHeader(
-                title: "Timer",
-                subtitle: "Choose a focused block.",
-                titleColor: textColor,
-                subtitleColor: secondaryColor
-            )
-
-            VStack(spacing: 18) {
-                timerDurationRing
-
-                Button {
-                    selectedMinutes = recommendedMinutes
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.caption.weight(.semibold))
-                        Text("Recommended: \(formatDuration(recommendedMinutes)) now")
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-                    }
-                    .foregroundStyle(textColor)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 38)
-                    .background {
-                        RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 20, style: .continuous)
-                            .fill(textColor.opacity(0.10))
-                    }
-                }
-                .buttonStyle(.plain)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                    ForEach(options, id: \.self) { minutes in
-                        timerOptionButton(minutes)
-                    }
-                }
-
-                Toggle(isOn: $hardMode) {
-                    HStack(spacing: 10) {
-                        Image(systemName: hardMode ? "lock.shield.fill" : "shield")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(textColor.opacity(0.86))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Hard mode")
-                                .font(.blankInter(size: 15, weight: .semibold, relativeTo: .subheadline))
-                            Text("Early exit uses Emergency")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(secondaryColor)
-                        }
-                    }
-                }
-                .toggleStyle(.switch)
-                .tint(textColor.opacity(0.72))
-                .foregroundStyle(textColor)
-                .padding(.horizontal, 16)
-                .frame(height: 58)
-                .blankControlSurface(cornerRadius: 18, tintOpacity: hardMode ? 0.16 : 0.08)
-
-                Button {
-                    if !sessionStore.isBlankActive {
-                        onStart(selectedMinutes, hardMode)
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: sessionStore.isBlankActive ? "shield.fill" : "timer")
-                        Text(sessionStore.isBlankActive ? "Blanked is active" : "Start block")
-                    }
-                }
-                .buttonStyle(BlankPrimaryButtonStyle())
-                .disabled(sessionStore.isBlankActive)
-                .opacity(sessionStore.isBlankActive ? 0.62 : 1)
-            }
-            .padding(18)
-            .blankControlSurface(cornerRadius: 24, tintOpacity: 0.08, emphasized: true)
-
-                    Spacer(minLength: 0)
-                }
-                .padding(24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.clear)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.clear)
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-    }
-
-    private var newLookTimer: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            TopSheetHeader(
-                title: "Timer",
-                subtitle: "Choose a focused block.",
-                titleColor: textColor,
-                subtitleColor: secondaryColor
-            )
-
-            Spacer(minLength: 38)
-
-            Text(durationNumber(selectedMinutes))
-                .font(.blankInter(size: 92, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-3)
-                .foregroundStyle(textColor)
-                .monospacedDigit()
-                .lineLimit(1)
-
-            Text(durationUnit(selectedMinutes))
-                .font(.blankInter(size: 20, weight: .bold, relativeTo: .title3))
-                .foregroundStyle(secondaryColor)
-
-            Rectangle()
-                .fill(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.16) : BlankColors.newLookRule)
-                .frame(height: 1)
-                .padding(.top, 28)
-                .padding(.bottom, 8)
-
-            VStack(spacing: 0) {
-                ForEach(options, id: \.self) { minutes in
-                    Button {
-                        selectedMinutes = minutes
-                    } label: {
-                        HStack {
-                            Text(formatDuration(minutes))
-                                .font(.blankInter(size: 24, weight: .bold, relativeTo: .title3))
-                                .tracking(-0.4)
-                            Spacer()
-                            if selectedMinutes == minutes {
-                                Text("selected")
-                                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                                    .foregroundStyle(secondaryColor)
-                            }
-                        }
-                        .foregroundStyle(selectedMinutes == minutes ? textColor : secondaryColor)
-                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-
-            Toggle("hard mode", isOn: $hardMode)
-                .font(.blankInter(size: 18, weight: .bold, relativeTo: .headline))
-                .foregroundStyle(textColor)
-                .tint(textColor.opacity(0.75))
-                .padding(.top, 16)
-
-            Spacer(minLength: 26)
-
-            Button {
-                if !sessionStore.isBlankActive {
-                    onStart(selectedMinutes, hardMode)
-                }
-            } label: {
-                Text(sessionStore.isBlankActive ? "blank is active" : "start blank")
-                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
-                    .tracking(-0.6)
-                    .foregroundStyle(textColor)
-                    .frame(minWidth: 44, minHeight: 52, alignment: .leading)
-            }
-            .buttonStyle(.plain)
-            .disabled(sessionStore.isBlankActive)
-            .opacity(sessionStore.isBlankActive ? 0.52 : 1)
-        }
-        .padding(.horizontal, sectionHorizontalPadding)
-        .padding(.top, 12)
-        .padding(.bottom, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var timerDurationRing: some View {
-        ZStack {
-            Circle()
-                .stroke(textColor.opacity(0.08), lineWidth: 10)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(selectedMinutes, 120)) / 120)
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            BlankColors.premiumBlue.opacity(0.34),
-                            textColor.opacity(0.92),
-                            BlankColors.premiumBlue.opacity(0.62)
-                        ],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-
-            VStack(spacing: 2) {
-                Text(durationNumber(selectedMinutes))
-                    .font(.blankInter(size: 56, weight: .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(textColor)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Text(durationUnit(selectedMinutes))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(secondaryColor)
-            }
-        }
-        .frame(width: 188, height: 188)
-        .accessibilityLabel("Timer \(formatDuration(selectedMinutes))")
-    }
-
-    private func timerOptionButton(_ minutes: Int) -> some View {
-        Button {
-            selectedMinutes = minutes
-        } label: {
-            Text(formatDuration(minutes))
-                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(textColor)
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background {
-                    RoundedRectangle(cornerRadius: minimalAppearance ? 0 : 21, style: .continuous)
-                        .fill(selectedMinutes == minutes ? BlankColors.premiumBlue.opacity(0.24) : textColor.opacity(0.08))
-                }
-                .overlay {
-                    if minimalAppearance {
-                        Rectangle()
-                            .stroke(BlankColors.line, lineWidth: 0.8)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func durationNumber(_ minutes: Int) -> String {
-        if minutes == 60 { return "1" }
-        if minutes == 120 { return "2" }
-        return "\(minutes)"
-    }
-
-    private func durationUnit(_ minutes: Int) -> String {
-        if minutes == 60 { return "hour" }
-        if minutes == 120 { return "hours" }
-        return "minutes"
-    }
-
-    private func formatDuration(_ minutes: Int) -> String {
-        if minutes < 60 {
-            return "\(minutes) min"
-        }
-        let hours = minutes / 60
-        let rest = minutes % 60
-        return rest == 0 ? "\(hours) h" : "\(hours) h \(rest) min"
     }
 }
 
@@ -4380,7 +3216,7 @@ private struct AssistantConnectSheet: View {
                                     .tracking(minimalAppearance ? -0.6 : 0)
                                     .lineLimit(1)
 
-                                Text(minimalAppearance ? "use blankmind from whatsapp or sms." : "Use Blanked from WhatsApp or SMS.")
+                                Text(minimalAppearance ? "use blankmind from whatsapp or sms." : "Use Blankmind from WhatsApp or SMS.")
                                     .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
                                     .foregroundStyle(secondaryColor)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -4868,21 +3704,9 @@ private func distractionTimeLabel(_ minuteOfDay: Int) -> String {
     let hour = max(0, min(23, minuteOfDay / 60))
     let minute = max(0, min(59, minuteOfDay % 60))
     let displayHour = hour % 12 == 0 ? 12 : hour % 12
-    let meridiem = hour < 12 ? "a.m." : "p.m."
+    let meridiem = hour < 12 ? "am" : "pm"
     let minuteText = minute == 0 ? "" : ":\(String(format: "%02d", minute))"
-    return "\(displayHour)\(minuteText) \(meridiem)"
-}
-
-private func parseMinute(_ value: String) -> Int? {
-    let parts = value.split(separator: ":")
-    guard parts.count == 2,
-          let hour = Int(parts[0]),
-          let minute = Int(parts[1]),
-          (0...23).contains(hour),
-          (0...59).contains(minute) else {
-        return nil
-    }
-    return hour * 60 + minute
+    return "\(displayHour)\(minuteText)\(meridiem)"
 }
 
 private func dateForMinute(_ minuteOfDay: Int) -> Date {

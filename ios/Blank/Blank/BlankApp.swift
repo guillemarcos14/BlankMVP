@@ -6,7 +6,6 @@ import UserNotifications
 struct BlankApp: App {
     @UIApplicationDelegateAdaptor(BlankAppDelegate.self) private var appDelegate
     @StateObject private var sessionStore = SessionStore()
-    @StateObject private var membershipStore = MembershipStore()
     @StateObject private var purchaseStore = StoreKitPurchaseStore()
     @StateObject private var screenTimeBlocker = ScreenTimeBlocker()
     @Environment(\.scenePhase) private var scenePhase
@@ -20,16 +19,12 @@ struct BlankApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(sessionStore)
-                .environmentObject(membershipStore)
                 .environmentObject(purchaseStore)
                 .environmentObject(screenTimeBlocker)
                 .environment(\.font, .blankBody)
                 .task {
                     appDelegate.registerForRemoteActions()
                     await purchaseStore.loadProducts()
-                    if BlankedRuntimeMode.legacyAccessEnabled {
-                        await membershipStore.refreshIfNeeded()
-                    }
                     await screenTimeBlocker.restore(selection: sessionStore.selection)
                     sessionStore.syncRecurringSchedule()
                     screenTimeBlocker.updateAdvancedControls(
@@ -44,11 +39,6 @@ struct BlankApp: App {
                 }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
-                        if BlankedRuntimeMode.legacyAccessEnabled {
-                            Task {
-                                await membershipStore.refreshIfNeeded(force: true)
-                            }
-                        }
                         screenTimeBlocker.refreshAuthorizationStatus()
                         sessionStore.syncRecurringSchedule()
                         screenTimeBlocker.updateAdvancedControls(
@@ -84,11 +74,6 @@ struct BlankApp: App {
             Task { await claimAppHandoff(token) }
             return
         }
-        if action == "scan-blank", BlankedRuntimeMode.legacyNfcEnabled {
-            sessionStore.requestBlankScanFromWidget()
-            return
-        }
-
         if action == "timer" || action == "schedule-timer" {
             sessionStore.requestWidgetTimerSelector()
             return

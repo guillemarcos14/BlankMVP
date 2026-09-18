@@ -100,14 +100,16 @@ check("learning_contract", () => {
 });
 
 check("native_platform_parity", () => {
-  const ios = `${file("ios/Blank/Blank/ContentView.swift")}\n${file("ios/Blank/Blank/BlankDomainModels.swift")}`;
+  const ios = file("ios/Blank/Blank/HomeView.swift");
   const android = file("app/src/main/java/com/blanknfc/app/data/DigitalWellnessRemoteStore.kt");
-  for (const event of ["execution_started", "executed", "verified"]) {
+  for (const event of ["execution_started", "verified"]) {
     assert.ok(ios.includes(`"${event}"`), `iOS missing ${event}`);
+  }
+  for (const event of ["execution_started", "executed", "verified"]) {
     assert.ok(android.includes(`"${event}"`), `Android missing ${event}`);
   }
-  assert.ok(ios.includes("bai-outcome") && android.includes("bai-outcome"));
-  assert.ok(ios.includes("bm-loop") && android.includes("bm-loop"));
+  assert.ok(ios.includes("acknowledgeLifecycle") && ios.includes("assistant-channel"));
+  assert.ok(android.includes("bai-outcome") && android.includes("bm-loop"));
 });
 
 check("durable_store_security", () => {

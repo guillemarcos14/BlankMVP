@@ -1,4 +1,4 @@
-﻿package com.blanknfc.app.ui.screens
+package com.blanknfc.app.ui.screens
 
 import android.content.Intent
 import android.net.Uri
@@ -117,12 +117,6 @@ private data class ConfigIssue(
     val body: String,
     val action: String?,
     val onAction: () -> Unit = {}
-)
-
-private data class ProgressPeriodSummary(
-    val label: String,
-    val value: String,
-    val caption: String
 )
 
 private const val HomeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
@@ -253,7 +247,7 @@ fun HomeScreen(
             add(
                 ConfigIssue(
                     title = "Accessibility pending",
-                    body = "Enable Blanked in Accessibility so Android can detect protected apps.",
+                    body = "Enable Blankmind in Accessibility so Android can detect protected apps.",
                     action = "Open Accessibility",
                     onAction = { AccessibilityHelper.openAccessibilitySettings(context) }
                 )
@@ -263,7 +257,7 @@ fun HomeScreen(
             add(
                 ConfigIssue(
                     title = "Battery restricted",
-                    body = "Allow Blanked to keep running in the background so blocks stay stable.",
+                    body = "Allow Blankmind to keep running in the background so blocks stay stable.",
                     action = "Open Battery",
                     onAction = { BatteryHelper.openBatteryOptimizationSettings(context) }
                 )
@@ -350,7 +344,7 @@ fun HomeScreen(
                 topTitle = "NFC",
                 label = "Nueva etiqueta",
                 title = "Vincula una nueva pieza.",
-                body = "Blanked will keep your protected apps and replace only the optional unlock key.",
+                body = "Blankmind will keep your protected apps and replace only the optional unlock key.",
                 action = "Open pairing",
                 buttonLight = buttonLight,
                 onBack = { panel = HomePanel.SETTINGS },
@@ -532,7 +526,7 @@ private fun HomePanelContent(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 HomeBlankearButton(
-                    text = if (isBlankActive) "Blanked active" else "Start Blanked",
+                    text = if (isBlankActive) "Blankmind active" else "Start Blankmind",
                     enabled = !isBlankActive,
                     modifier = Modifier.widthIn(max = if (isBlankActive) 342.dp else 178.dp),
                     onClick = onMainAction
@@ -711,53 +705,6 @@ private fun ConfigIssuesCard(issues: List<ConfigIssue>, modifier: Modifier = Mod
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun TopBar(
-    left: @Composable () -> Unit,
-    right: @Composable () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        left()
-        right()
-    }
-}
-
-@Composable
-private fun IconDotsAligned(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .size(44.dp)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        VerticalDotsIcon(color = BlankOnSurface)
-    }
-}
-
-@Composable
-private fun VerticalDotsIcon(color: Color) {
-    Canvas(modifier = Modifier.size(width = 4.dp, height = 18.dp)) {
-        val radius = 1.45.dp.toPx()
-        val centerX = size.width / 2f
-        val dotColor = color.copy(alpha = 0.78f)
-        drawCircle(color = dotColor, radius = radius, center = Offset(centerX, radius))
-        drawCircle(color = dotColor, radius = radius, center = Offset(centerX, size.height / 2f))
-        drawCircle(color = dotColor, radius = radius, center = Offset(centerX, size.height - radius))
-    }
-}
-
-@Composable
-private fun IconDots(onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
-        Text(text = "⋮", color = BlankOnSurface, fontSize = 24.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -953,7 +900,7 @@ private fun WellnessDashboardCard(
             Spacer(modifier = Modifier.height(14.dp))
             SummaryLine("Next risk", "${aiPlan.riskScore}/100", aiPlan.riskWindow, textColor)
             ProgressDivider(textColor)
-            SummaryLine("Behavior chain", aiPlan.behaviorChain, aiPlan.forecastReasons.firstOrNull() ?: "Blanked is learning your baseline.", textColor)
+            SummaryLine("Behavior chain", aiPlan.behaviorChain, aiPlan.forecastReasons.firstOrNull() ?: "Blankmind is learning your baseline.", textColor)
             ProgressDivider(textColor)
             SummaryLine("Experiment", aiPlan.experimentName, aiPlan.experimentWhy, textColor)
             Spacer(modifier = Modifier.height(14.dp))
@@ -1084,7 +1031,7 @@ private fun WeeklySummaryCard(
         Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
             Text(text = "This week", color = textColor, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(12.dp))
-            SummaryLine("Protected", formatProtectedTime(stats.protectedMsThisWeek), "Time in Blanked", textColor)
+            SummaryLine("Protected", formatProtectedTime(stats.protectedMsThisWeek), "Time in Blankmind", textColor)
             ProgressDivider(textColor)
             SummaryLine("Sessions", stats.sessionsThisWeek.toString(), "Focus blocks", textColor)
             ProgressDivider(textColor)
@@ -1371,7 +1318,7 @@ private fun ProgressDetailCard(
             }
             if (expanded) {
                 Spacer(modifier = Modifier.height(10.dp))
-                SummaryLine("Blanked time", formatProtectedTime(stats.totalProtectedMs), "Total protected", textColor)
+                SummaryLine("Blankmind time", formatProtectedTime(stats.totalProtectedMs), "Total protected", textColor)
                 ProgressDivider(textColor)
                 SummaryLine("Best day", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), textColor)
                 ProgressDivider(textColor)
@@ -1407,103 +1354,6 @@ private fun ProgressDivider(textColor: Color) {
             .height(1.dp)
             .background(textColor.copy(alpha = 0.08f))
     )
-}
-
-@Composable
-private fun ProgressHeroCarousel(
-    selectedPage: Int,
-    onPageChange: (Int) -> Unit,
-    stats: FocusStats,
-    savedMs: Long,
-    buttonLight: Boolean
-) {
-    val values = if (selectedPage == 0) {
-        savedChartValues(stats)
-    } else {
-        focusChartValues(stats.activityDays, stats.protectedMsThisWeek)
-    }
-    val label = if (selectedPage == 0) "Time saved" else "Time in Blanked"
-    val value = if (selectedPage == 0) formatProtectedTime(savedMs) else formatProtectedTime(stats.totalProtectedMs)
-    val description = if (selectedPage == 0) "Recovered from your life with Blanked" else "Protected with Blanked"
-    val chartTitle = if (selectedPage == 0) "Estimated saved" else "Blanked mode"
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.72f),
-        shape = RoundedCornerShape(26.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ProgressTab("Time saved", selectedPage == 0, buttonLight) { onPageChange(0) }
-                ProgressTab("Time in Blanked", selectedPage == 1, buttonLight) { onPageChange(1) }
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-                color = progressTextColor(buttonLight).copy(alpha = 0.64f)
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Medium),
-                color = progressTextColor(buttonLight)
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = progressTextColor(buttonLight).copy(alpha = 0.68f)
-            )
-            ProgressLineChart(
-                title = chartTitle,
-                values = values,
-                buttonLight = buttonLight,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(150.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                ProgressDot(active = selectedPage == 0, buttonLight = buttonLight)
-                Spacer(modifier = Modifier.size(7.dp))
-                ProgressDot(active = selectedPage == 1, buttonLight = buttonLight)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ProgressTab(text: String, selected: Boolean, buttonLight: Boolean, onClick: () -> Unit) {
-    Surface(
-        color = if (selected) progressTextColor(buttonLight) else progressTextColor(buttonLight).copy(alpha = 0.08f),
-        contentColor = if (selected) {
-            if (buttonLight) Color.White else Color.Black
-        } else {
-            progressTextColor(buttonLight).copy(alpha = 0.72f)
-        },
-        shape = RoundedCornerShape(999.dp),
-        onClick = onClick
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-        )
-    }
-}
-
-@Composable
-private fun ProgressDot(active: Boolean, buttonLight: Boolean) {
-    val color = progressTextColor(buttonLight)
-    Canvas(modifier = Modifier.size(width = if (active) 18.dp else 6.dp, height = 6.dp)) {
-        drawRoundRect(
-            color = color.copy(alpha = if (active) 0.8f else 0.2f),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f, size.height / 2f)
-        )
-    }
 }
 
 @Composable
@@ -1559,120 +1409,6 @@ private fun ProgressLineChart(title: String, values: List<Long>, buttonLight: Bo
 }
 
 @Composable
-private fun ProgressPeriodGrid(
-    stats: FocusStats,
-    buttonLight: Boolean
-) {
-    val summaries = progressPeriodSummaries(stats)
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        summaries.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { summary ->
-                    PeriodCard(
-                        summary = summary,
-                        buttonLight = buttonLight,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (row.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PeriodCard(
-    summary: ProgressPeriodSummary,
-    buttonLight: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
-    Surface(
-        modifier = modifier,
-        color = rowColor,
-        shape = RoundedCornerShape(22.dp)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text(text = summary.label, color = textColor.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(text = summary.value, color = textColor, style = MaterialTheme.typography.titleLarge)
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text = summary.caption, color = textColor.copy(alpha = 0.62f), style = MaterialTheme.typography.bodySmall)
-        }
-    }
-}
-
-@Composable
-private fun ProgressInsightCards(
-    stats: FocusStats,
-    emergencyUnlocksRemaining: Int,
-    buttonLight: Boolean
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatRow(
-            label = "Risk moment",
-            value = riskMomentValue(stats),
-            caption = riskMomentCaption(stats),
-            buttonLight = buttonLight
-        )
-        StatRow(
-            label = "Protection quality",
-            value = "${protectionQualityScore(stats, emergencyUnlocksRemaining)}/100",
-            caption = protectionQualityCaption(stats, emergencyUnlocksRemaining),
-            buttonLight = buttonLight
-        )
-        StatRow(
-            label = "Control recovered",
-            value = controlRecoveryValue(stats, emergencyUnlocksRemaining),
-            caption = controlRecoveryCaption(stats, emergencyUnlocksRemaining),
-            buttonLight = buttonLight
-        )
-    }
-}
-
-@Composable
-private fun ProgressMetricList(
-    stats: FocusStats,
-    emergencyUnlocksRemaining: Int,
-    buttonLight: Boolean
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatRow("Sessions", stats.sessionsThisWeek.toString(), "Completed", buttonLight)
-        StatRow("Average protected", formatProtectedTime(averageSessionMs(stats)), "Per real session", buttonLight)
-        StatRow("Streak", "${currentStreakDays(stats.activityDays)}d", "Days with Blanked", buttonLight)
-        StatRow("Best day", bestDayValue(stats.activityDays), bestDayCaption(stats.activityDays), buttonLight)
-        StatRow("Urges stopped", stats.blockedAttemptsThisWeek.toString(), "Times Blanked created a pause", buttonLight)
-        StatRow("Emergency", "${usedEmergencyUnlocks(emergencyUnlocksRemaining)}/3", emergencyCaption(emergencyUnlocksRemaining), buttonLight)
-    }
-}
-
-@Composable
-private fun StatRow(label: String, value: String, caption: String, buttonLight: Boolean) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
-    val metaColor = textColor.copy(alpha = 0.64f)
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = rowColor,
-        shape = RoundedCornerShape(22.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = label, color = textColor, style = MaterialTheme.typography.bodyLarge)
-                Text(text = caption, color = metaColor, style = MaterialTheme.typography.bodySmall)
-            }
-            Text(text = value, color = textColor, style = MaterialTheme.typography.titleLarge)
-        }
-    }
-}
-
-@Composable
 private fun SchedulePanel(
     schedule: FocusSchedule,
     buttonLight: Boolean,
@@ -1689,7 +1425,7 @@ private fun SchedulePanel(
         Text(text = "Daily window", style = MaterialTheme.typography.headlineLarge, color = BlankOnSurface)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Blanked can turn on automatically during this window. Emergency unlock stays available when needed.",
+            text = "Blankmind can turn on automatically during this window. Emergency unlock stays available when needed.",
             style = MaterialTheme.typography.bodyLarge,
             color = BlankOnSurface
         )
@@ -1825,7 +1561,7 @@ private fun DistractionsPanel(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Choose every app that pulls your attention. Blanked reuses this list whenever it protects your time.",
+            text = "Choose every app that pulls your attention. Blankmind reuses this list whenever it protects your time.",
             style = MaterialTheme.typography.bodyLarge,
             color = BlankGray
         )
@@ -1898,28 +1634,6 @@ private fun DistractionPickerDialog(
 }
 
 @Composable
-private fun TextPanel(
-    title: String,
-    backLabel: String,
-    onBack: () -> Unit,
-    blocks: List<Pair<String, String>>
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        ScreenHeader(title = title, backLabel = backLabel, onBack = onBack)
-        Spacer(modifier = Modifier.height(52.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            blocks.forEach { (heading, body) ->
-                Column {
-                    Text(text = heading, style = MaterialTheme.typography.headlineMedium, color = BlankOnSurface)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = body, style = MaterialTheme.typography.bodyLarge, color = BlankOnSurface)
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun CenterActionPanel(
     topTitle: String,
     label: String,
@@ -1959,14 +1673,14 @@ private fun ForgetConfirmPanel(
                 Text(text = "Confirmation", color = BlankOnSurface, style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Forget my Blanked key.",
+                    text = "Forget my Blankmind key.",
                     style = MaterialTheme.typography.headlineLarge,
                     color = BlankOnSurface,
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Blanked will turn off, the optional key will be removed, and onboarding will restart.",
+                    text = "Blankmind will turn off, the optional key will be removed, and onboarding will restart.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = BlankOnSurface,
                     textAlign = TextAlign.Center
@@ -1982,7 +1696,7 @@ private fun ForgetConfirmPanel(
                     ) {
                         Checkbox(checked = confirmed, onCheckedChange = { confirmed = it })
                         Text(
-                            text = "I understand I will need to pair Blanked again.",
+                            text = "I understand I will need to pair Blankmind again.",
                             color = progressTextColor(buttonLight),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -1991,7 +1705,7 @@ private fun ForgetConfirmPanel(
             }
         }
         MainActionButton(
-            text = "Yes, forget Blanked",
+            text = "Yes, forget Blankmind",
             enabled = confirmed,
             light = buttonLight,
             onClick = onConfirm
@@ -2191,20 +1905,9 @@ private fun estimatedSavedMs(stats: FocusStats): Long {
     return estimated.coerceAtMost(stats.totalProtectedMs).coerceAtLeast(0L)
 }
 
-private fun savedTimeExplanation(stats: FocusStats): String {
-    val saved = formatProtectedTime(estimatedSavedMs(stats))
-    val protected = formatProtectedTime(stats.totalProtectedMs)
-    return "Time saved: $saved estimated from completed sessions, capped at $protected real time in Blanked."
-}
-
 private fun averageSessionMs(stats: FocusStats): Long {
     if (stats.sessionsThisWeek <= 0) return 0L
     return stats.protectedMsThisWeek / stats.sessionsThisWeek
-}
-
-private fun focusChartValues(days: List<FocusActivityDay>, fallbackWeekMs: Long): List<Long> {
-    val values = days.sortedBy { it.key }.takeLast(28).map { it.protectedMs }
-    return values.ifEmpty { listOf(fallbackWeekMs) }
 }
 
 private fun savedChartValues(stats: FocusStats): List<Long> {
@@ -2212,56 +1915,6 @@ private fun savedChartValues(stats: FocusStats): List<Long> {
         (day.sessions * 15L * 60L * 1000L).coerceAtMost(day.protectedMs)
     }
     return values.ifEmpty { listOf(estimatedSavedMs(stats)) }
-}
-
-private fun progressPeriodSummaries(stats: FocusStats): List<ProgressPeriodSummary> {
-    val calendar = Calendar.getInstance().apply {
-        firstDayOfWeek = Calendar.MONDAY
-        minimalDaysInFirstWeek = 4
-    }
-    val todayOrdinal = calendar.get(Calendar.YEAR) * 400 + calendar.get(Calendar.DAY_OF_YEAR)
-    val monthStartOrdinal = startOrdinal(calendar, Calendar.DAY_OF_MONTH)
-    val yearStartOrdinal = calendar.get(Calendar.YEAR) * 400 + 1
-
-    fun daysSince(startOrdinal: Int): List<FocusActivityDay> {
-        return stats.activityDays.filter { day ->
-            val ordinal = dayOrdinal(day.key) ?: return@filter false
-            ordinal in startOrdinal..todayOrdinal
-        }
-    }
-
-    return listOf(
-        periodSummary("Today", daysSince(todayOrdinal)),
-        ProgressPeriodSummary(
-            label = "Week",
-            value = formatProtectedTime(stats.protectedMsThisWeek),
-            caption = if (stats.sessionsThisWeek == 1) "1 session" else "${stats.sessionsThisWeek} sessions"
-        ),
-        periodSummary("Month", daysSince(monthStartOrdinal)),
-        periodSummary("Year", daysSince(yearStartOrdinal))
-    )
-}
-
-private fun periodSummary(label: String, days: List<FocusActivityDay>): ProgressPeriodSummary {
-    val protectedMs = days.sumOf { it.protectedMs }
-    val sessions = days.sumOf { it.sessions }
-    return ProgressPeriodSummary(
-        label = label,
-        value = formatProtectedTime(protectedMs),
-        caption = if (sessions == 1) "1 session" else "$sessions sessions"
-    )
-}
-
-private fun startOrdinal(calendar: Calendar, field: Int): Int {
-    val copy = calendar.clone() as Calendar
-    if (field == Calendar.DAY_OF_WEEK) {
-        while (copy.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-            copy.add(Calendar.DAY_OF_YEAR, -1)
-        }
-    } else {
-        copy.set(field, 1)
-    }
-    return copy.get(Calendar.YEAR) * 400 + copy.get(Calendar.DAY_OF_YEAR)
 }
 
 private fun roundedChartScale(valuesMax: Long): Long {
@@ -2335,23 +1988,6 @@ private fun dayName(dayOfWeek: Int): String {
     }
 }
 
-private fun riskMomentValue(stats: FocusStats): String {
-    val riskyDay = riskiestDay(stats.activityDays)
-    return riskyDay?.let { dayName(it.dayOfWeek) } ?: "No pattern"
-}
-
-private fun riskMomentCaption(stats: FocusStats): String {
-    val riskyDay = riskiestDay(stats.activityDays)
-        ?: return "Your vulnerable window will appear after more sessions"
-    if (riskyDay.blockedAttempts > 0) {
-        return "${riskyDay.blockedAttempts} urges stopped that day"
-    }
-    if (riskyDay.sessions > 0) {
-        return "The day you use Blanked most"
-    }
-    return "No risk signals yet"
-}
-
 private fun riskiestDay(days: List<FocusActivityDay>): FocusActivityDay? {
     return days
         .filter { it.blockedAttempts > 0 || it.sessions > 0 || it.protectedMs > 0L }
@@ -2383,38 +2019,6 @@ private fun protectionQualityScore(stats: FocusStats, emergencyUnlocksRemaining:
     return (76 + durationBonus + streakBonus - attemptPenalty - emergencyPenalty).coerceIn(0, 100)
 }
 
-private fun protectionQualityCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
-    if (stats.sessionsThisWeek <= 0) return "Complete a session to measure it"
-    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
-    return when {
-        usedEmergencies == 0 && stats.blockedAttemptsThisWeek == 0 -> "Clean sessions, no exits or urges"
-        usedEmergencies == 0 -> "Urges appeared, but Blanked held"
-        usedEmergencies < 3 -> "Improves as emergency use goes down"
-        else -> "Fragile week: all emergency unlocks used"
-    }
-}
-
-private fun controlRecoveryValue(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
-    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
-    return when {
-        stats.blockedAttemptsThisWeek > 0 -> "${stats.blockedAttemptsThisWeek} pauses"
-        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "Stable"
-        usedEmergencies < 3 -> "${3 - usedEmergencies} left"
-        else -> "Limit"
-    }
-}
-
-private fun controlRecoveryCaption(stats: FocusStats, emergencyUnlocksRemaining: Int): String {
-    val usedEmergencies = usedEmergencyUnlocks(emergencyUnlocksRemaining)
-    return when {
-        stats.blockedAttemptsThisWeek > 0 && usedEmergencies == 0 -> "Urges stopped without emergency unlocks"
-        stats.blockedAttemptsThisWeek > 0 -> "Blanked surfaced the urge before action"
-        usedEmergencies == 0 && stats.sessionsThisWeek > 0 -> "No emergency unlocks needed this week"
-        usedEmergencies < 3 -> "Emergency unlocks left this week"
-        else -> "Emergency limit reached"
-    }
-}
-
 private fun usedEmergencyUnlocks(emergencyUnlocksRemaining: Int): Int {
     return (3 - emergencyUnlocksRemaining).coerceIn(0, 3)
 }
@@ -2430,23 +2034,23 @@ private fun emergencyCaption(emergencyUnlocksRemaining: Int): String {
 
 private fun nextStepText(stats: FocusStats): String {
     val riskyDay = riskiestDay(stats.activityDays)
-        ?: return "Complete a few more sessions and Blanked will detect which moment needs support."
+        ?: return "Complete a few more sessions and Blankmind will detect which moment needs support."
     val day = dayName(riskyDay.dayOfWeek).lowercase()
     return when {
-        riskyDay.blockedAttempts > 0 -> "Your risk moment is usually $day. Schedule Blanked before that window."
-        riskyDay.sessions > 1 -> "$day is when you use Blanked most. Reinforce that routine before opening apps."
+        riskyDay.blockedAttempts > 0 -> "Your risk moment is usually $day. Schedule Blankmind before that window."
+        riskyDay.sessions > 1 -> "$day is when you use Blankmind most. Reinforce that routine before opening apps."
         else -> "$day was your most sensitive point. Reinforce that window before the urge appears."
     }
 }
 
 private fun progressInsight(stats: FocusStats, savedMs: Long): String {
     return when {
-        stats.totalSessions == 0 -> "After your first session, Blanked will start building weekly progress."
+        stats.totalSessions == 0 -> "After your first session, Blankmind will start building weekly progress."
         protectionQualityScore(stats, 3) >= 90 -> "Your sessions are clean: low urge pressure and strong protected time."
-        stats.blockedAttemptsThisWeek >= 5 -> "Your pattern is visible: Blanked is intercepting urges before they take over."
-        savedMs >= 60L * 60L * 1000L -> "You have recovered more than one hour of attention with Blanked."
+        stats.blockedAttemptsThisWeek >= 5 -> "Your pattern is visible: Blankmind is intercepting urges before they take over."
+        savedMs >= 60L * 60L * 1000L -> "You have recovered more than one hour of attention with Blankmind."
         stats.sessionsThisWeek >= 3 -> "Repetition is starting to count: several sessions completed this week."
-        stats.blockedAttemptsThisWeek > 0 -> "Blanked has already intercepted automatic urges. That pause is the product."
+        stats.blockedAttemptsThisWeek > 0 -> "Blankmind has already intercepted automatic urges. That pause is the product."
         else -> "One completed session is one less automatic interruption."
     }
 }
@@ -2464,13 +2068,4 @@ private fun formatMinute(minuteOfDay: Int): String {
 
 private fun timeOptions(): List<Int> {
     return (0..47).map { it * 30 }
-}
-
-private fun parseMinute(value: String): Int? {
-    val parts = value.trim().split(":")
-    if (parts.size != 2) return null
-    val hour = parts[0].toIntOrNull() ?: return null
-    val minute = parts[1].toIntOrNull() ?: return null
-    if (hour !in 0..23 || minute !in 0..59) return null
-    return hour * 60 + minute
 }

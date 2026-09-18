@@ -436,7 +436,7 @@ struct SetupView: View {
                 .text("to pull you back", icon: "sparkles"),
                 .text("before you notice")
             ],
-            body: "Blanked is built to interrupt that loop before it wins",
+            body: "Blankmind is built to interrupt that loop before it wins",
             primaryTitle: "Continue",
             primaryAction: goForward
         )
@@ -681,12 +681,12 @@ struct SetupView: View {
                 eyebrow: nil,
                 lines: [
                     .text("Don't lose \(lostLifetimeYears) years"),
-                    .text("Start with Blanked")
+                    .text("Start with Blankmind")
                 ],
                 body: nil
             )
 
-            Text("Blanked blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again")
+            Text("Blankmind blocks your biggest distractions,\nturns weak moments into protected time,\nand helps you feel in control again")
                 .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
                 .foregroundStyle(BlankColors.pureWhite.opacity(0.50))
                 .multilineTextAlignment(.leading)
@@ -791,7 +791,7 @@ struct SetupView: View {
         referenceScene(
             lines: [
                 .text(screenTimeBlocker.authorizationStatus == .approved ? "Screen Time is ready" : "Allow Screen Time"),
-                .text("so Blanked can", icon: "lock.shield.fill"),
+                .text("so Blankmind can", icon: "lock.shield.fill"),
                 .text("block distractions")
             ],
             body: screenTimeDescription,
@@ -875,44 +875,10 @@ struct SetupView: View {
         )
     }
 
-    private func stepContent(
-        eyebrow: String,
-        title: String,
-        body: String,
-        statusText: String? = nil,
-        primaryTitle: String,
-        secondaryTitle: String?,
-        primaryAction: @escaping () -> Void,
-        secondaryAction: (() -> Void)? = nil
-    ) -> some View {
-        VStack(spacing: 15) {
-            OnboardingHeader(eyebrow: eyebrow, title: title, body: body)
-
-            if let statusText {
-                StatusPill(text: statusText)
-                    .padding(.top, 8)
-            }
-
-            Spacer(minLength: 28)
-
-            Button(primaryTitle, action: primaryAction)
-                .buttonStyle(BlankPrimaryButtonStyle(light: true))
-                .frame(width: onboardingButtonWidth(for: primaryTitle))
-                .padding(.top, 12)
-
-            if let secondaryTitle, let secondaryAction {
-                Button(secondaryTitle, action: secondaryAction)
-                    .buttonStyle(BlankSecondaryButtonStyle())
-                    .frame(width: onboardingButtonWidth(for: secondaryTitle))
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-
     private var notificationPreview: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("Blanked")
+                Text("Blankmind")
                     .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                 Spacer()
                 Text("now")
@@ -958,9 +924,9 @@ struct SetupView: View {
 
     private var screenTimeDescription: String {
         if screenTimeBlocker.authorizationStatus == .approved {
-            return "Blanked can now shield the apps you choose"
+            return "Blankmind can now shield the apps you choose"
         }
-        return "Apple requires this permission before Blanked can block distracting apps"
+        return "Apple requires this permission before Blankmind can block distracting apps"
     }
 
     private var selectedPlanRenewalDisclosure: String {
@@ -983,7 +949,7 @@ struct SetupView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Invite 3 friends")
                         .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                    Text("Get 7 days of Pro when 3 friends activate Blanked with your code")
+                    Text("Get 7 days of Pro when 3 friends activate Blankmind with your code")
                         .font(.blankInter(size: 12, relativeTo: .caption))
                         .foregroundStyle(BlankColors.pureWhite.opacity(0.62))
                         .fixedSize(horizontal: false, vertical: true)
@@ -1041,7 +1007,7 @@ struct SetupView: View {
 
     private var referralShareText: String {
         let code = currentOnboardingAnonymousUserId()
-        return "Try Blanked with my invite code: \(code)\n\nOpen the app if you have it: blank://referral?ref=\(code)\n\nDownload: https://blanked.app/ios"
+        return "Try Blankmind with my invite code: \(code)\n\nOpen the app if you have it: blank://referral?ref=\(code)\n\nDownload: https://blankmind.ai/ios"
     }
 
     private var legalDisclosure: some View {
@@ -1377,22 +1343,6 @@ struct SetupView: View {
             animatedLostYears = targetYears
         }
     }
-
-    private func startRecoveryCountAnimation() {
-        let targetYears = recoveredYears
-        animatedRecoveredYears = 0
-
-        Task { @MainActor in
-            for frame in 1...34 {
-                try? await Task.sleep(nanoseconds: 20_000_000)
-                let progress = Double(frame) / 34.0
-                let easedProgress = 1.0 - pow(1.0 - progress, 3.0)
-                animatedRecoveredYears = Int((Double(targetYears) * easedProgress).rounded())
-            }
-            animatedRecoveredYears = targetYears
-        }
-    }
-
 
     private func requestNotifications() {
         Task {
@@ -1747,10 +1697,6 @@ struct SetupView: View {
         message = nil
     }
 
-    private func onboardingButtonWidth(for title: String) -> CGFloat {
-        let estimated = CGFloat(title.count) * 8.2 + 66
-        return min(max(estimated, 184), 316)
-    }
 }
 
 private struct ReferenceTextLine: Identifiable {
@@ -2054,187 +2000,6 @@ private struct PaywallPrimaryButtonStyle: ButtonStyle {
             .shadow(color: BlankColors.pureWhite.opacity(configuration.isPressed ? 0.10 : 0.20), radius: 18, x: 0, y: 0)
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
             .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
-    }
-}
-
-private struct OnboardingHeader: View {
-    let eyebrow: String
-    let title: String
-    let bodyText: String
-
-    init(eyebrow: String, title: String, body: String) {
-        self.eyebrow = eyebrow
-        self.title = title
-        self.bodyText = body
-    }
-
-    var body: some View {
-        VStack(spacing: 10) {
-            if !eyebrow.isEmpty {
-                Text(eyebrow.uppercased())
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.58))
-            }
-
-            Text(title)
-                .font(.blankInter(size: 31, weight: .medium, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .lineSpacing(1)
-                .lineLimit(4)
-                .minimumScaleFactor(0.76)
-                .frame(maxWidth: 354)
-
-            if !bodyText.isEmpty {
-                Text(bodyText)
-                    .font(.blankInter(size: 16, relativeTo: .body))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.68))
-                    .multilineTextAlignment(.center)
-                    .lineSpacing(3)
-                    .frame(maxWidth: 318)
-                    .padding(.top, 2)
-            }
-        }
-    }
-}
-
-private struct ResultMetricView: View {
-    let value: String
-    let unit: String
-    let caption: String
-
-    var body: some View {
-        VStack(spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(value)
-                    .font(.blankInter(size: 48, weight: .semibold, relativeTo: .largeTitle))
-                    .monospacedDigit()
-
-                Text(unit)
-                    .font(.blankInter(size: 24, weight: .semibold, relativeTo: .title3))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
-            }
-            .foregroundStyle(BlankColors.pureWhite)
-            .lineLimit(1)
-            .minimumScaleFactor(0.74)
-            .shadow(color: BlankColors.pureWhite.opacity(0.46), radius: 10, x: 0, y: 0)
-            .shadow(color: BlankColors.airMist.opacity(0.38), radius: 24, x: 0, y: 0)
-
-            Text(caption)
-                .font(.blankInter(size: 15, relativeTo: .subheadline))
-                .foregroundStyle(BlankColors.pureWhite.opacity(0.66))
-                .multilineTextAlignment(.center)
-                .lineSpacing(2)
-        }
-    }
-}
-
-private struct OnboardingInsightCard: View {
-    let systemName: String
-    let title: String
-    let value: String
-    let caption: String
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: systemName)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(BlankColors.airMist)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(BlankColors.pureWhite.opacity(0.10)))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.blankInter(size: 12, weight: .semibold, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.56))
-
-                Text(value)
-                    .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.94))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.78)
-
-                Text(caption)
-                    .font(.blankInter(size: 12, relativeTo: .caption))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.56))
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(BlankColors.pureWhite.opacity(0.09))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(BlankColors.pureWhite.opacity(0.12), lineWidth: 1)
-        }
-    }
-}
-
-private struct OnboardingPlanPreviewRow: View {
-    let number: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            Text(number)
-                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
-                .foregroundStyle(BlankColors.ink)
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(BlankColors.pureWhite.opacity(0.86)))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.blankInter(size: 17, weight: .semibold, relativeTo: .headline))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.94))
-
-                Text(detail)
-                    .font(.blankInter(size: 13, relativeTo: .footnote))
-                    .foregroundStyle(BlankColors.pureWhite.opacity(0.62))
-                    .lineSpacing(2)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(16)
-        .background {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(BlankColors.pureWhite.opacity(0.09))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(BlankColors.pureWhite.opacity(0.12), lineWidth: 1)
-        }
-    }
-}
-
-private struct PaywallValueRow: View {
-    let systemName: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(BlankColors.pureWhite.opacity(0.86))
-                .frame(width: 20)
-
-            Text(text)
-                .font(.blankInter(size: 13, weight: .medium, relativeTo: .footnote))
-                .foregroundStyle(BlankColors.pureWhite.opacity(0.82))
-                .lineLimit(2)
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 34)
-        .background {
-            Capsule().fill(BlankColors.pureWhite.opacity(0.075))
-        }
     }
 }
 
@@ -2552,15 +2317,15 @@ private struct LegalDocumentView: View {
             return [
                 (
                     "Agreement",
-                    "By using Blanked, you agree to these Terms of Use and Apple's Standard End User License Agreement. If these terms conflict with Apple's Standard EULA, Apple's Standard EULA applies where required by Apple."
+                    "By using Blankmind, you agree to these Terms of Use and Apple's Standard End User License Agreement. If these terms conflict with Apple's Standard EULA, Apple's Standard EULA applies where required by Apple."
                 ),
                 (
                     "Subscription",
-                    "Blanked offers auto-renewable subscriptions through the App Store. If you start a free trial, it lasts 3 days. After the trial, Apple charges the price shown on the App Store purchase sheet for the selected plan unless you cancel before the trial ends."
+                    "Blankmind offers auto-renewable subscriptions through the App Store. If you start a free trial, it lasts 3 days. After the trial, Apple charges the price shown on the App Store purchase sheet for the selected plan unless you cancel before the trial ends."
                 ),
                 (
                     "Referral Access",
-                    "Blanked may offer temporary Pro access when invited users activate the app with your invite code. Referral rewards are promotional, non-transferable and may be adjusted or removed if misuse is detected."
+                    "Blankmind may offer temporary Pro access when invited users activate the app with your invite code. Referral rewards are promotional, non-transferable and may be adjusted or removed if misuse is detected."
                 ),
                 (
                     "Renewal And Cancellation",
@@ -2568,11 +2333,11 @@ private struct LegalDocumentView: View {
                 ),
                 (
                     "Use Of The App",
-                    "Blanked helps you block distracting apps and websites using Apple's Screen Time frameworks. You are responsible for choosing what to block and for keeping access to essential apps, contacts, and services available when needed."
+                    "Blankmind helps you block distracting apps and websites using Apple's Screen Time frameworks. You are responsible for choosing what to block and for keeping access to essential apps, contacts, and services available when needed."
                 ),
                 (
                     "No Medical Advice",
-                    "Blanked may provide digital wellness insights, but it is not a medical device and does not provide diagnosis, treatment, or medical advice."
+                    "Blankmind may provide digital wellness insights, but it is not a medical device and does not provide diagnosis, treatment, or medical advice."
                 ),
                 (
                     "Contact",
@@ -2583,35 +2348,35 @@ private struct LegalDocumentView: View {
             return [
                 (
                     "Overview",
-                    "Blanked is a digital wellness app that helps you block distracting apps and websites. We collect only the data needed to provide the app, process subscriptions, and personalize the onboarding experience on your device."
+                    "Blankmind is a digital wellness app that helps you block distracting apps and websites. We collect only the data needed to provide the app, process subscriptions, and personalize the onboarding experience on your device."
                 ),
                 (
                     "Data Stored On Device",
-                    "Blanked stores setup state, blocking status, selected Screen Time categories, session timing, onboarding progress, app settings, and aggregated funnel events on your device. Your exact Screen Time app and website selections stay on your device."
+                    "Blankmind stores setup state, blocking status, selected Screen Time categories, session timing, onboarding progress, app settings, and aggregated funnel events on your device. Your exact Screen Time app and website selections stay on your device."
                 ),
                 (
                     "Onboarding Data",
-                    "When you tap Personalize my plan, Blanked sends your onboarding answers to its backend to personalize your plan, improve recommendations, and generate AI-powered plan updates when available. Blanked does not share your app list or raw screen time data."
+                    "When you tap Personalize my plan, Blankmind sends your onboarding answers to its backend to personalize your plan, improve recommendations, and generate AI-powered plan updates when available. Blankmind does not share your app list or raw screen time data."
                 ),
                 (
                     "Product Analytics",
-                    "Blanked may send aggregated product events such as onboarding step, permission status, selected item counts, trial actions, block starts, emergency exits, referral events, Health permission status, and AI plan update status. These events do not include your exact app list, website list, raw Health samples, precise location, contacts, messages, payment card details, or advertising identifier."
+                    "Blankmind may send aggregated product events such as onboarding step, permission status, selected item counts, trial actions, block starts, emergency exits, referral events, Health permission status, and AI plan update status. These events do not include your exact app list, website list, raw Health samples, precise location, contacts, messages, payment card details, or advertising identifier."
                 ),
                 (
                     "Purchases",
-                    "Subscriptions are processed by Apple through the App Store. Blanked can check whether you have an active entitlement, but Apple handles payment details and billing."
+                    "Subscriptions are processed by Apple through the App Store. Blankmind can check whether you have an active entitlement, but Apple handles payment details and billing."
                 ),
                 (
                     "Referrals",
-                    "If you use an invite code, Blanked stores anonymous referral IDs to count activated referrals and unlock temporary Pro access. Blanked does not need your contacts to do this."
+                    "If you use an invite code, Blankmind stores anonymous referral IDs to count activated referrals and unlock temporary Pro access. Blankmind does not need your contacts to do this."
                 ),
                 (
                     "Apple Health",
-                    "Apple Health access is optional. If you allow it, Blanked may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to personalize your digital wellness plan. Blanked only sends aggregated wellness features to its backend after you have chosen to personalize your plan; it does not send raw Health samples."
+                    "Apple Health access is optional. If you allow it, Blankmind may read health signals such as sleep, steps, workouts, heart rate, HRV, mindful minutes, and related wellness metrics to personalize your digital wellness plan. Blankmind only sends aggregated wellness features to its backend after you have chosen to personalize your plan; it does not send raw Health samples."
                 ),
                 (
                     "Sharing",
-                    "Blanked does not sell your personal data and does not share it with third-party advertisers."
+                    "Blankmind does not sell your personal data and does not share it with third-party advertisers."
                 ),
                 (
                     "Your Choices",

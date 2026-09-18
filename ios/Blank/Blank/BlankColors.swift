@@ -59,7 +59,7 @@ enum BlankColors {
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
     static let homeLightBackground = pureWhite
     static let homeLightInk = charcoal
-    static let homeLightOption = secondaryText
+    static let homeLightOption = Color(red: 201 / 255.0, green: 202 / 255.0, blue: 196 / 255.0)
     static let homeLightSecondary = charcoal.opacity(0.68)
     static let homeDarkBackground = charcoal
     static let homeDarkSecondary = paleSteelBlue.opacity(0.46)
@@ -77,10 +77,6 @@ enum BlankColors {
 }
 
 extension Font {
-    static func blankSerif(size: CGFloat, relativeTo textStyle: TextStyle = .title) -> Font {
-        .custom("Instrument Serif", size: size, relativeTo: textStyle)
-    }
-
     static func blankInter(size: CGFloat, weight: Weight = .regular, relativeTo textStyle: TextStyle = .body) -> Font {
         .custom("Inter", size: size, relativeTo: textStyle).weight(weight)
     }
@@ -119,33 +115,6 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
                 .allowsHitTesting(false)
             }
             .shadow(color: minimalAppearance ? .clear : BlankColors.charcoal.opacity(configuration.isPressed ? 0.02 : 0.05), radius: 5, y: 3)
-            .scaleEffect(configuration.isPressed ? 0.985 : 1)
-    }
-}
-
-struct BlankSecondaryButtonStyle: ButtonStyle {
-    @Environment(\.blankMinimalAppearance) private var minimalAppearance
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))
-            .frame(maxWidth: .infinity)
-            .frame(height: minimalAppearance ? 52 : 48)
-            .foregroundStyle(BlankColors.ink)
-            .background {
-                ZStack {
-                    if minimalAppearance {
-                        Rectangle()
-                            .fill(BlankColors.minimalInk.opacity(configuration.isPressed ? 0.08 : 0.04))
-                    } else {
-                        Capsule().fill(.ultraThinMaterial)
-                        Capsule().fill(BlankColors.pureWhite.opacity(configuration.isPressed ? 0.42 : 0.30))
-                        Capsule().stroke(BlankColors.glassBorder, lineWidth: 1)
-                    }
-                }
-                .allowsHitTesting(false)
-            }
-            .shadow(color: minimalAppearance ? .clear : BlankColors.charcoal.opacity(configuration.isPressed ? 0.01 : 0.035), radius: 5, y: 3)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
     }
 }

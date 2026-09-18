@@ -230,10 +230,6 @@ enum BlankSharedState {
         var startedAt: Date?
         var endsAt: Date?
 
-        func elapsedSeconds(now: Date = Date()) -> Int {
-            guard isActive, let startedAt else { return 0 }
-            return max(0, Int(now.timeIntervalSince(startedAt)))
-        }
     }
 
     enum Keys {

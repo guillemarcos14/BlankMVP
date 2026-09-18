@@ -306,34 +306,6 @@ struct BlankUsageEvent: Codable, Identifiable, Equatable {
     }
 }
 
-struct BlankProfile: Codable, Identifiable, Equatable {
-    var id: UUID
-    var name: String
-    var strategy: BlankStrategyKind
-    var createdAt: Date
-    var updatedAt: Date
-    var physicalUnlockItems: [PhysicalUnlockItem]
-    var estimatedMinutesSavedPerBlock: Int
-
-    init(
-        id: UUID = UUID(),
-        name: String,
-        strategy: BlankStrategyKind = .manual,
-        createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        physicalUnlockItems: [PhysicalUnlockItem] = [],
-        estimatedMinutesSavedPerBlock: Int = 15
-    ) {
-        self.id = id
-        self.name = name
-        self.strategy = strategy
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-        self.physicalUnlockItems = physicalUnlockItems
-        self.estimatedMinutesSavedPerBlock = estimatedMinutesSavedPerBlock
-    }
-}
-
 struct LegacyFocusMode: Codable, Identifiable, Equatable {
     var id: UUID
     var name: String
@@ -550,30 +522,6 @@ struct BlankFocusSchedule: Codable, Equatable {
         } else {
             windows = []
         }
-    }
-}
-
-struct PhysicalUnlockItem: Codable, Identifiable, Hashable {
-    enum Kind: String, Codable {
-        case nfc
-    }
-
-    var id: UUID
-    var name: String
-    var kind: Kind
-    var codeValue: String
-
-    init(id: UUID = UUID(), name: String, kind: Kind, codeValue: String) {
-        self.id = id
-        self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.kind = kind
-        self.codeValue = Self.normalized(codeValue, kind: kind)
-    }
-
-    static func normalized(_ value: String, kind: Kind) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        return trimmed
     }
 }
 
@@ -798,79 +746,6 @@ struct DigitalWellnessDiagnosis: Codable, Equatable {
     var recommendedHour: Int
     var plan: [DigitalWellnessPlanItem]
     var createdAt: Date
-}
-
-struct SmartBlockRecommendation: Equatable {
-    var title: String
-    var detail: String
-    var durationMinutes: Int
-}
-
-struct DigitalWellnessDataManifest: Equatable {
-    struct Section: Identifiable, Equatable {
-        var id: String { area }
-        var area: String
-        var rawLocalData: [String]
-        var backendFeatures: [String]
-        var sendsRawData: Bool
-    }
-
-    static let sections: [Section] = [
-        Section(
-            area: "Onboarding",
-            rawLocalData: ["name", "age range", "goal", "profile", "declared daily usage", "declared weak moment"],
-            backendFeatures: ["goal", "profile", "age_range", "declared_daily_usage_hours", "weak_moment", "motivation_cluster"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Blocking",
-            rawLocalData: ["exact session starts and ends", "entry mode", "duration", "result"],
-            backendFeatures: ["blocks_started", "blocks_completed", "blocked_minutes", "avg_block_duration_minutes", "plan_adherence_percent"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Relapse",
-            rawLocalData: ["break attempts", "emergency unlocks", "local hour", "duration"],
-            backendFeatures: ["relapses_count", "relapse_rate", "weakest_hour", "worst_window", "unlock_pressure_score"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Apps",
-            rawLocalData: ["exact selected apps", "categories", "web domains"],
-            backendFeatures: ["selection_count", "category_mix", "distraction_cluster"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Sleep",
-            rawLocalData: ["sleep stage intervals", "in bed intervals", "awake intervals", "bedtime and wake timestamps"],
-            backendFeatures: ["sleep_total_minutes", "deep_sleep_minutes", "rem_sleep_minutes", "core_sleep_minutes", "awake_minutes", "sleep_efficiency", "bedtime_local", "wake_time_local", "sleep_debt_minutes"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Heart",
-            rawLocalData: ["heart rate samples", "resting heart rate samples", "HRV samples"],
-            backendFeatures: ["resting_hr", "avg_daily_hr", "resting_hr_delta", "hrv_avg", "hrv_vs_baseline_percent", "recovery_score"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Activity",
-            rawLocalData: ["steps", "distance", "active energy", "basal energy", "exercise minutes"],
-            backendFeatures: ["steps_total", "active_energy_kcal", "exercise_minutes", "activity_vs_baseline_percent", "sedentary_day_flag", "high_activity_day_flag"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Workouts",
-            rawLocalData: ["workout samples", "workout timestamps", "workout heart data"],
-            backendFeatures: ["workout_total_minutes", "workout_intensity_score", "training_load_proxy", "late_workout_flag"],
-            sendsRawData: false
-        ),
-        Section(
-            area: "Mindfulness",
-            rawLocalData: ["mindful session intervals"],
-            backendFeatures: ["mindful_minutes", "mindfulness_streak", "mindfulness_before_sleep_flag"],
-            sendsRawData: false
-        )
-    ]
 }
 
 struct DigitalWellnessFeaturePayload: Codable, Equatable {
@@ -1110,7 +985,7 @@ struct DigitalWellnessFeaturesClient {
                     window: payload.weekly.worst_focus_window ?? "Learning",
                     risk_score: 40,
                     confidence: 20,
-                    reasons: ["Blanked is learning your baseline timing."],
+                    reasons: ["Blankmind is learning your baseline timing."],
                     action_label: "Test a light preventive block"
                 ),
                 experiment: DigitalWellnessExperiment(
@@ -1154,34 +1029,6 @@ struct DigitalWellnessFeaturesClient {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .blankFlexibleISO8601
         return try decoder.decode(DigitalWellnessFeatureSubmitResponse.self, from: data).insight
-    }
-
-    func recordOutcome(
-        anonymousUserId: String,
-        recommendationId: String,
-        outcome: String,
-        outcomeScore: Int,
-        metadata: [String: Any] = [:]
-    ) async throws {
-        guard let baseURL else { return }
-        let url = baseURL.appendingPathComponent("bai-outcome")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var body: [String: Any] = [
-            "anonymous_user_id": anonymousUserId,
-            "data_consent": true,
-            "recommendation_id": recommendationId,
-            "outcome": outcome,
-            "outcome_score": outcomeScore,
-            "metadata": metadata,
-        ]
-        body["locale"] = Locale.current.identifier
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (_, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) else {
-            throw URLError(.badServerResponse)
-        }
     }
 
     private static func configuredBaseURL() -> URL? {
@@ -1983,39 +1830,6 @@ enum DigitalWellnessAI {
         return diagnosis
     }
 
-    static func smartBlockRecommendation(
-        defaults: UserDefaults = BlankSharedState.defaults,
-        events: [BlankUsageEvent],
-        sessions: [BlankSession],
-        selectionCount: Int,
-        now: Date = Date()
-    ) -> SmartBlockRecommendation {
-        let diagnosis = currentDiagnosis(
-            defaults: defaults,
-            events: events,
-            sessions: sessions,
-            selectionCount: selectionCount,
-            now: now
-        )
-
-        if let weakHour = weakHour(events: events, sessions: sessions, now: now) {
-            let minutes = minutesUntilNextHour(weakHour, now: now)
-            if minutes <= 90 {
-                return SmartBlockRecommendation(
-                    title: "Protect your weak window",
-                    detail: "\(hourRangeText(weakHour)) is your highest-risk window. Start a \(diagnosis.initialBlockMinutes)-min block.",
-                    durationMinutes: diagnosis.initialBlockMinutes
-                )
-            }
-        }
-
-        return SmartBlockRecommendation(
-            title: "Start your \(diagnosis.archetype) plan",
-            detail: "Day 1: protect \(hourRangeText(diagnosis.recommendedHour)) with a \(diagnosis.initialBlockMinutes)-min block.",
-            durationMinutes: diagnosis.initialBlockMinutes
-        )
-    }
-
     static func relapseIntervention(
         defaults: UserDefaults = BlankSharedState.defaults,
         events: [BlankUsageEvent],
@@ -2113,10 +1927,6 @@ enum DigitalWellnessAI {
 
     static func hourRangeText(_ hour: Int) -> String {
         "\(clockTimeText(hour: hour)) to \(clockTimeText(hour: (hour + 1) % 24))"
-    }
-
-    static func interventionNotificationText(system: DigitalWellnessV3System) -> String {
-        "Your weak window starts soon. Block \(system.profile.dominantModeName ?? "distractions") for \(system.plan.recommendedDurationMinutes) min?"
     }
 
     private static func v3Profile(
@@ -2229,7 +2039,7 @@ enum DigitalWellnessAI {
         } else {
             duration = diagnosis.initialBlockMinutes
             difficulty = "Baseline"
-            reason = "Blanked needs repeated sessions before increasing difficulty."
+            reason = "Blankmind needs repeated sessions before increasing difficulty."
         }
 
         let mode = profile.dominantModeName ?? "main mode"
@@ -2358,7 +2168,7 @@ enum DigitalWellnessAI {
         }
         if windows.isEmpty {
             return [
-                AIWeakWindow(hour: diagnosis.recommendedHour, count: 0, reason: "Predicted from onboarding until Blanked has enough real relapse data.")
+                AIWeakWindow(hour: diagnosis.recommendedHour, count: 0, reason: "Predicted from onboarding until Blankmind has enough real relapse data.")
             ]
         }
         return windows
@@ -2381,7 +2191,7 @@ enum DigitalWellnessAI {
     private static func relapseReviewText(defaults: UserDefaults, profile: DigitalWellnessV3Profile) -> String {
         guard let raw = defaults.string(forKey: "blankLastRelapseReviewReason"),
               let reason = RelapseReviewReason(rawValue: raw) else {
-            return "After the next manual unlock, Blanked will ask why and adjust this plan."
+            return "After the next manual unlock, Blankmind will ask why and adjust this plan."
         }
         return "\(reason.title): \(reason.planAdjustment)"
     }

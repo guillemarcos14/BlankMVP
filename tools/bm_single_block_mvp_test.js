@@ -72,7 +72,6 @@ assert.doesNotMatch(sessionStore, /func duplicateMode\(/);
 assert.doesNotMatch(sessionStore, /func createMode\(/);
 assert.match(setupView, /one reusable protection list/i);
 assert.match(homeView, /"single_distraction_block": true/);
-assert.match(contentView, /"single_distraction_block": true/);
 assert.doesNotMatch(homeView, /ManualModeEditorScreen/);
 assert.doesNotMatch(blankApp, /duplicateMode\(named:/);
 assert.match(agent, /Never create, name, copy, activate or switch modes/);

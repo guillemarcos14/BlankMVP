@@ -71,15 +71,6 @@ enum DeviceActivityTimerScheduler {
         #endif
     }
 
-    static func stopRecurringSchedule() {
-        #if canImport(DeviceActivity)
-        let names = (0..<maxRecurringActivities).map {
-            DeviceActivityName(rawValue: "\(recurringSchedulePrefix):\($0)")
-        }
-        DeviceActivityCenter().stopMonitoring(names + [DeviceActivityName(rawValue: recurringExpiryActivity)])
-        #endif
-    }
-
     static func start(protectionId: UUID, durationMinutes: Int) -> Bool {
         guard durationMinutes > 0 else { return false }
 

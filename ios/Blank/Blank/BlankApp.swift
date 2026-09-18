@@ -2,6 +2,16 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+enum AssistantRemoteNotification {
+    static let categoryIdentifier = "BM_PENDING_ACTION"
+    static let applyActionIdentifier = "BM_APPLY_NOW"
+    static let pollAfterOpenKey = "blankAssistantPollAfterOpen"
+}
+
+extension Notification.Name {
+    static let blankAssistantApplyNowRequested = Notification.Name("blankAssistantApplyNowRequested")
+}
+
 @main
 struct BlankApp: App {
     @UIApplicationDelegateAdaptor(BlankAppDelegate.self) private var appDelegate
@@ -338,13 +348,58 @@ struct BlankApp: App {
 }
 
 @MainActor
-final class BlankAppDelegate: NSObject, UIApplicationDelegate {
+final class BlankAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        configureActionableNotifications()
         registerForRemoteActions()
         return true
+    }
+
+    private func configureActionableNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        let applyNow = UNNotificationAction(
+            identifier: AssistantRemoteNotification.applyActionIdentifier,
+            title: "Apply Now",
+            options: [.foreground]
+        )
+        let category = UNNotificationCategory(
+            identifier: AssistantRemoteNotification.categoryIdentifier,
+            actions: [applyNow],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([category])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        let hasAssistantAction = notification.request.content.userInfo["bm_action_id"] != nil
+        completionHandler(hasAssistantAction ? [.banner, .list, .sound] : [])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = response.notification.request.content.userInfo
+        let isAssistantAction = userInfo["bm_action_id"] != nil
+        let shouldApply = response.actionIdentifier == AssistantRemoteNotification.applyActionIdentifier
+            || response.actionIdentifier == UNNotificationDefaultActionIdentifier
+        if isAssistantAction && shouldApply {
+            BlankSharedState.defaults.set(true, forKey: AssistantRemoteNotification.pollAfterOpenKey)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .blankAssistantApplyNowRequested, object: nil)
+            }
+        }
+        completionHandler()
     }
 
     func registerForRemoteActions() {

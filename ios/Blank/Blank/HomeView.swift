@@ -494,6 +494,9 @@ struct HomeView: View {
             screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
             updateDelayedUnlockMessage(now: date)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .blankAssistantApplyNowRequested)) { _ in
+            pollPendingAssistantActionIfNeeded(force: true)
+        }
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
             applyScreenTimeControls()

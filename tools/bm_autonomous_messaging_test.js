@@ -52,6 +52,10 @@ assert.match(whatsappAgent, /sendAssistantActionPush/);
 assert.doesNotMatch(smsAgent, /Open Blankmind to review and apply it/);
 assert.doesNotMatch(whatsappAgent, /Open Blankmind to review and apply it/);
 assert.match(blankApp, /didReceiveRemoteNotification/);
+assert.match(blankApp, /BM_PENDING_ACTION/);
+assert.match(blankApp, /BM_APPLY_NOW/);
+assert.match(blankApp, /Apply Now/);
+assert.match(blankApp, /UNUserNotificationCenterDelegate/);
 assert.match(blankApp, /AssistantBackgroundActionRunner/);
 assert.match(blankApp, /applyAssistantProtection/);
 assert.match(blankApp, /requestedDurationMinutes/);
@@ -59,6 +63,7 @@ assert.match(assistantChannel, /invalid_execution_evidence/);
 assert.match(whatsappAgent, /last_assistant_push_attempt/);
 assert.doesNotMatch(blankApp, /duplicateMode\(named:/);
 assert.match(home, /confirmPendingAssistantAction\(\)/);
+assert.match(home, /blankAssistantApplyNowRequested/);
 assert.match(home, /native_state_applied_after_selection/);
 assert.match(info, /<string>remote-notification<\/string>/);
 

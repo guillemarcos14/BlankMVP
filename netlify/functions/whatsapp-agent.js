@@ -342,8 +342,7 @@ function whatsappReplyText(plan, delivery = null) {
   if (delivery?.push?.sent === false) {
     return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
   }
-  if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
-  return text;
+  return `${text}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
 }
 
 async function sendPlanReply(to, plan, delivery = null) {

@@ -20,12 +20,13 @@ assert.equal(normalizeDevicePush({ token: "invalid" }), null);
 
 const executable = pushPayload({ id: "action-1", type: "start_protection" });
 assert.equal(executable.aps["content-available"], 1);
-assert.match(executable.aps.alert.body, /applying/i, "immediate actions should use the highest-priority alert+background delivery path");
+assert.equal(executable.aps.category, "BM_PENDING_ACTION");
+assert.match(executable.aps.alert.body, /tap.*apply/i, "blocking actions must wait for an explicit notification tap");
 assert.equal(executable.bm_action_id, "action-1");
 
 const setup = pushPayload({ id: "action-2", type: "open_app_picker" });
 assert.equal(setup.aps["content-available"], 1);
-assert.match(setup.aps.alert.body, /selecting the apps/i);
+assert.match(setup.aps.alert.body, /tap.*choose/i);
 
 const previousAuthKey = process.env.APNS_AUTH_KEY;
 const compactScalar = Buffer.concat([Buffer.alloc(31), Buffer.from([1])]).toString("base64url");
@@ -49,6 +50,7 @@ assert.match(assistantChannel, /status === "verified"/);
 assert.match(assistantChannel, /applied and verified/);
 assert.match(smsAgent, /sendAssistantActionPush/);
 assert.match(whatsappAgent, /sendAssistantActionPush/);
+assert.match(whatsappAgent, /Tap the Blankmind notification to apply it/);
 assert.doesNotMatch(smsAgent, /Open Blankmind to review and apply it/);
 assert.doesNotMatch(whatsappAgent, /Open Blankmind to review and apply it/);
 assert.match(blankApp, /didReceiveRemoteNotification/);
@@ -56,14 +58,17 @@ assert.match(blankApp, /BM_PENDING_ACTION/);
 assert.match(blankApp, /BM_APPLY_NOW/);
 assert.match(blankApp, /Apply Now/);
 assert.match(blankApp, /UNUserNotificationCenterDelegate/);
-assert.match(blankApp, /AssistantBackgroundActionRunner/);
-assert.match(blankApp, /applyAssistantProtection/);
-assert.match(blankApp, /requestedDurationMinutes/);
+assert.match(blankApp, /completionHandler\(\.noData\)/);
+assert.doesNotMatch(blankApp, /AssistantBackgroundActionRunner/);
+assert.match(home, /applyAssistantProtection/);
+assert.match(home, /requestedDurationMinutes/);
 assert.match(assistantChannel, /invalid_execution_evidence/);
 assert.match(whatsappAgent, /last_assistant_push_attempt/);
 assert.doesNotMatch(blankApp, /duplicateMode\(named:/);
 assert.match(home, /confirmPendingAssistantAction\(\)/);
 assert.match(home, /blankAssistantApplyNowRequested/);
+assert.match(home, /applyNowRequested/);
+assert.match(home, /guard applyNowRequested else/);
 assert.match(home, /native_state_applied_after_selection/);
 assert.match(info, /<string>remote-notification<\/string>/);
 

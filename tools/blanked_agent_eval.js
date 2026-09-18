@@ -34,6 +34,8 @@ function baseContext(overrides = {}) {
   };
   const context = {
     is_blank_active: false,
+    single_distraction_block: true,
+    protection_target: "selected_distractions",
     has_selected_apps: true,
     selection_count: 3,
     screen_time_authorized: true,
@@ -91,6 +93,8 @@ function visibleText(plan) {
     plan.title,
     plan.message_text,
     plan.response_text,
+    plan.speech_text,
+    plan.followup_text,
     plan.primary_label,
     plan.secondary_label,
     ...(Array.isArray(plan.bullets) ? plan.bullets : []),
@@ -98,7 +102,12 @@ function visibleText(plan) {
 }
 
 function userVisibleText(plan) {
-  return cleanText(plan.message_text || plan.response_text, 320);
+  return cleanText([
+    plan.message_text,
+    plan.response_text,
+    plan.speech_text,
+    plan.followup_text,
+  ].filter(Boolean).join(" "), 640);
 }
 
 function assertSubset(actual, expected, label) {
@@ -109,6 +118,75 @@ function assertSubset(actual, expected, label) {
 
 function actionTypes(plan) {
   return (plan.actions || []).filter((action) => action.type !== "none").map((action) => action.type);
+}
+
+function assertPlanRequirements(testCase, plan) {
+  const expected = testCase.expect || {};
+  if (typeof expected.requires_selected_apps === "boolean") {
+    assert.strictEqual(plan.requires_selected_apps, expected.requires_selected_apps, `${testCase.id}.requires_selected_apps`);
+  }
+  if (typeof expected.requires_screen_time_authorization === "boolean") {
+    assert.strictEqual(plan.requires_screen_time_authorization, expected.requires_screen_time_authorization, `${testCase.id}.requires_screen_time_authorization`);
+  }
+}
+
+function nativeWeekdays(isoWeekdays) {
+  return Array.from(new Set((isoWeekdays || []).map((day) => day === 7 ? 1 : day + 1))).sort((a, b) => a - b);
+}
+
+function visibleClockMinutes(text) {
+  const values = [];
+  const clockPattern = /\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM)\b|\b([01]?\d|2[0-3]):([0-5]\d)\b/gi;
+  for (const match of String(text || "").matchAll(clockPattern)) {
+    if (match[1]) {
+      const hour = Number(match[1]);
+      const minute = Number(match[2] || 0);
+      const normalized = match[3].toLowerCase() === "pm" ? (hour % 12) + 12 : hour % 12;
+      values.push(normalized * 60 + minute);
+    } else {
+      values.push(Number(match[4]) * 60 + Number(match[5]));
+    }
+  }
+  return Array.from(new Set(values));
+}
+
+function assertBlockingDataMatchesAction(testCase, plan, data, action) {
+  assert.deepStrictEqual(data.apps, ["selected_apps"], `${testCase.id}.blocking_data.canonical_apps`);
+  assert.ok(action, `${testCase.id}.blocking_action_exists`);
+  if (action.type === "start_protection") {
+    assert.strictEqual(data.action, "hard_block", `${testCase.id}.blocking_data.action`);
+    assert.strictEqual(data.start.type, "now", `${testCase.id}.blocking_data.start.type`);
+    assert.strictEqual(data.end.type, "duration", `${testCase.id}.blocking_data.end.type`);
+    assert.strictEqual(data.end.value, action.minutes, `${testCase.id}.blocking_data.duration`);
+    return;
+  }
+  if (action.type === "set_daily_limit") {
+    assert.strictEqual(data.action, "daily_limit", `${testCase.id}.blocking_data.action`);
+    assert.strictEqual(data.start.type, "now", `${testCase.id}.blocking_data.start.type`);
+    assert.strictEqual(data.end.type, "duration", `${testCase.id}.blocking_data.end.type`);
+    assert.strictEqual(data.end.value, action.minutes, `${testCase.id}.blocking_data.duration`);
+    return;
+  }
+  assert.strictEqual(action.type, "apply_schedule", `${testCase.id}.blocking_action_type`);
+  assert.strictEqual(data.action, "hard_block", `${testCase.id}.blocking_data.action`);
+  assert.strictEqual(data.start.type, "time", `${testCase.id}.blocking_data.start.type`);
+  assert.strictEqual(data.start.value, action.start_minute, `${testCase.id}.blocking_data.start`);
+  assert.ok(["time", "duration"].includes(data.end.type), `${testCase.id}.blocking_data.end.type`);
+  if (data.end.type === "time") {
+    assert.strictEqual(data.end.value, action.end_minute, `${testCase.id}.blocking_data.end`);
+  } else {
+    const duration = (action.end_minute - action.start_minute + 1440) % 1440;
+    assert.strictEqual(data.end.value, duration, `${testCase.id}.blocking_data.duration`);
+  }
+  assert.ok(data.recurrence && Array.isArray(data.recurrence.value), `${testCase.id}.blocking_data.recurrence`);
+  assert.deepStrictEqual(nativeWeekdays(data.recurrence.value), [...action.weekdays].sort((a, b) => a - b), `${testCase.id}.blocking_data.weekdays`);
+  const expectedClocks = [action.start_minute, action.end_minute].sort((a, b) => a - b);
+  for (const [surface, value] of [["message_text", plan.message_text], ["response_text", plan.response_text], ["speech_text", plan.speech_text]]) {
+    assert.match(String(value || ""), /selected distractions/i, `${testCase.id}.${surface}.canonical_target_text`);
+    const clocks = visibleClockMinutes(value).sort((a, b) => a - b);
+    if (clocks.length) assert.deepStrictEqual(clocks, expectedClocks, `${testCase.id}.${surface}.visible_schedule_times`);
+    assert.doesNotMatch(String(value || ""), /\b(?:permanently|forever|all apps)\b/i, `${testCase.id}.${surface}.bounded_execution_text`);
+  }
 }
 
 function assertBlockingContract(testCase, plan) {
@@ -129,9 +207,14 @@ function assertBlockingContract(testCase, plan) {
       assert.ok(data[field] !== null && data[field] !== undefined, `${testCase.id}.complete_blocking_data.${field}`);
     }
     assert.ok(actualActions.length > 0, `${testCase.id}.complete_block_has_action`);
-    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit", "open_app_picker"].includes(type)), `${testCase.id}.complete_block_action_type`);
+    assert.ok(actualActions.every((type) => ["start_protection", "apply_schedule", "set_daily_limit"].includes(type)), `${testCase.id}.complete_block_action_type`);
     assert.deepStrictEqual(plan.blocking_missing_fields, [], `${testCase.id}.complete_block_has_no_missing_fields`);
+    assertBlockingDataMatchesAction(testCase, plan, data, plan.actions.find((action) => action.type !== "none"));
+    assert.match(userVisibleText(plan), /selected distractions/i, `${testCase.id}.canonical_target_text`);
+    assert.doesNotMatch(userVisibleText(plan), /\b(?:permanently|forever|all apps)\b/i, `${testCase.id}.bounded_execution_text`);
   }
+
+  assertPlanRequirements(testCase, plan);
 
   assert.doesNotMatch(visibleText(plan), DEBUG_TEXT_PATTERN, `${testCase.id}.no_internal_text`);
   assert.doesNotMatch(visibleText(plan), BANNED_TEXT_PATTERN, `${testCase.id}.no_banned_text`);
@@ -169,6 +252,7 @@ function assertPlan(testCase, plan) {
   const hasBlockingContract = assertBlockingContract(testCase, plan);
   assert.strictEqual(plan.intent, expected.intent, `${testCase.id}.intent`);
   assert.deepStrictEqual(actionTypes(plan), expected.action_types, `${testCase.id}.action_types`);
+  assertPlanRequirements(testCase, plan);
 
   if (hasBlockingContract) {
     if (expected.first_action) {
@@ -192,14 +276,6 @@ function assertPlan(testCase, plan) {
   if (expected.first_action) {
     assert.ok(plan.actions && plan.actions[0], `${testCase.id}.first_action exists`);
     assertSubset(plan.actions[0], expected.first_action, `${testCase.id}.first_action`);
-  }
-
-  if (typeof expected.requires_selected_apps === "boolean") {
-    assert.strictEqual(plan.requires_selected_apps, expected.requires_selected_apps, `${testCase.id}.requires_selected_apps`);
-  }
-
-  if (typeof expected.requires_screen_time_authorization === "boolean") {
-    assert.strictEqual(plan.requires_screen_time_authorization, expected.requires_screen_time_authorization, `${testCase.id}.requires_screen_time_authorization`);
   }
 
   const text = visibleText(plan);

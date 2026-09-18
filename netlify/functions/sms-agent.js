@@ -542,9 +542,7 @@ function whatsappReplyText(plan, fallbackText) {
       ? `${clean}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
       : `${clean}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
   }
-  return /\b(?:applying|aplicando|executing|ejecutando)\b/i.test(clean)
-    ? clean
-    : `${clean}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
+  return `${clean}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
 }
 
 function whatsappSetupButton(plan, appNames = []) {
@@ -722,6 +720,8 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   const actionLink = actionDeepLink(actions, responseApps, plan.blocking_data);
   const modelFollowup = naturalReplyText(plan.followup_text || "");
   const primaryPendingAction = (Array.isArray(actions) ? actions : []).find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  const existingPendingAction = memory.pending_assistant_action;
+  const isRecurrenceReply = /^(?:just\s+)?(?:once|one\s+time|single\s+time|daily|every\s+day|recurring|for\s+\d+\s+days?)\b/i.test(prompt.trim());
   let queuedAction = null;
   if (channel === "whatsapp" || channel === "sms") {
     try {
@@ -740,21 +740,52 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
       if (semanticPersistenceRequired()) throw error;
     }
   }
+  const effectivePendingAction = primaryPendingAction || queuedAction || memory.pending_assistant_action;
+  const duplicatePendingRequest = Boolean(
+    channel === "whatsapp"
+      && primaryPendingAction
+      && queuedAction?.fingerprint
+      && existingPendingAction?.fingerprint === queuedAction.fingerprint
+      && !isRecurrenceReply
+  );
   if (channel === "whatsapp") {
+    if (duplicatePendingRequest) {
+      try {
+        await recordAssistantMemory({
+          channel,
+          channelUser: from,
+          memory: { pending_assistant_action: null },
+          source: "assistant_action_replaced_by_new_request",
+        });
+      } catch (_) {
+        // The conversational clarification remains safe even if cleanup is unavailable.
+      }
+      const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+      return { text: spanish ? "¿Quieres aplicarlo una vez o de forma recurrente?" : "Would you like this once or recurring?" };
+    }
     const actionButton = queuedAction ? whatsappSetupButton(plan, responseApps) : null;
-    const cleanReply = whatsappReplyText(plan, message)
+    const replyPlan = effectivePendingAction && !primaryPendingAction ? { ...plan, actions: [effectivePendingAction] } : plan;
+    const cleanReply = whatsappReplyText(replyPlan, message)
       .replace(/\n\n(?:Select the apps to apply it|Selecciona las apps para aplicarlo):\nhttps?:\/\/\S+/i, "")
       .trim();
     if (actionButton) return { text: cleanReply, actionButton };
     const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+    const asksRecurrence = /once or recurring|once or every day/i.test(cleanReply);
+    const tapRequired = effectivePendingAction
+      && !["open_app_picker", "request_screen_time_permission"].includes(effectivePendingAction.type)
+      && !asksRecurrence;
+    const replyText = tapRequired && !/tap the blankmind notification|pulsa la notificación de blankmind/i.test(cleanReply)
+      ? `${cleanReply}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`
+      : cleanReply;
     return {
       text: primaryPendingAction && ["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)
-        ? `${cleanReply}\n\n${spanish ? "Abre Blankmind para elegir las aplicaciones." : "Open Blankmind to choose the apps."}`
-        : cleanReply,
+        ? `${replyText}\n\n${spanish ? "Abre Blankmind para elegir las aplicaciones." : "Open Blankmind to choose the apps."}`
+        : replyText,
     };
   }
-  if (channel === "sms" && primaryPendingAction && !["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)) {
-    return { text: whatsappReplyText(plan, message) };
+  if (channel === "sms" && effectivePendingAction && !["open_app_picker", "request_screen_time_permission"].includes(effectivePendingAction.type)) {
+    const pendingPlan = primaryPendingAction ? plan : { ...plan, actions: [effectivePendingAction] };
+    return { text: whatsappReplyText(pendingPlan, message) };
   }
   if (channel === "sms" && plan.semantic_state && !actionLink) {
     try {

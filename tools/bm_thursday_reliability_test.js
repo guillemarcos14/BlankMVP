@@ -99,8 +99,8 @@ assert.match(home, /AssistantActionReceiptStore\.load/, "foreground must retry a
 assert.match(home, /acknowledgeLifecycle/, "foreground lifecycle delivery must be retryable");
 assert.match(home, /screen_time_permission_denied/, "permission denial must end explicitly");
 assert.match(home, /assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
-assert.match(app, /AssistantActionReceiptStore\.load/, "background execution must recover an unacknowledged outcome");
-assert.match(app, /guard await client\.acknowledge\([\s\S]*?status: "confirmed"/, "background execution must not start before confirmation is recorded");
+assert.match(app, /completionHandler\(\.noData\)/, "silent pushes must never execute a pending action");
+assert.doesNotMatch(app, /AssistantBackgroundActionRunner/, "background execution is removed from the tap-gated flow");
 assert.match(channel, /action_expired_before_execution/, "expired actions must have an explicit terminal outcome");
 assert.match(channel, /invalid_execution_evidence/, "generic active state must not verify an exact immediate action");
 assert.match(channel, /Cancelled\. Nothing was changed on the iPhone\./, "dismissal must be reported accurately");

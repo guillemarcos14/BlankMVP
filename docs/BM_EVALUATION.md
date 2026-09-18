@@ -4,7 +4,7 @@
 
 El resultado del gate separa unidades que antes podían confundirse: **grupos de checks**, **conversaciones únicas**, **turnos únicos**, repeticiones, incidentes históricos y casos físicos. Un `17/17` significa únicamente que aprobaron 17 grupos automatizados; no significa 17 conversaciones ni una release validada.
 
-`tools/bm_evaluator_integrity_gate.js` reproduce seis fallos observados en WhatsApp y muta cada condición que los detecta. Solo aprueba si el comportamiento correcto pasa y todos los mutantes fallan. `tools/bm_action_envelope_contract_test.js` verifica que los campos críticos de una acción —incluidos `source_mode_name` y `copy_mode`— sobreviven al contrato canónico, la cola SMS, el canal y el decodificador iOS. `tools/bm_autonomous_messaging_test.js` exige que una selección exacta guardada se duplique y ejecute sin segunda confirmación nativa; si no existe, exige enlace directo al selector y aplicación automática al aceptar.
+`tools/bm_evaluator_integrity_gate.js` reproduce seis fallos observados en WhatsApp y muta cada condición que los detecta. Solo aprueba si el comportamiento correcto pasa y todos los mutantes fallan. `tools/bm_action_envelope_contract_test.js` verifica los campos canónicos de una acción y conserva `activate_mode`/`switch_mode` únicamente como entradas de migración, nunca como dominio productivo. `tools/bm_autonomous_messaging_test.js` exige que WhatsApp/SMS guarde la orden sobre la única selección de distracciones y que el bloqueo permanezca pendiente hasta que la persona pulse la notificación; si falta la selección, el toque abre el selector y la aplicación ocurre al aceptar.
 
 La autorización final es independiente: `tools/bm_release_readiness_gate.js` exige el commit, deploy backend, build iOS y hash del artefacto exactos; 200 conversaciones únicas con modelo activo y juez independiente; y 20 casos físicos con trazas, estado observado y evidencia enlazada al mismo candidato. Si falta cualquiera de esas pruebas, `production_release_verified` permanece en `false`; ningún promedio puede compensarlo.
 
@@ -22,7 +22,7 @@ El dataset de release debe contener al menos 200 conversaciones realmente distin
 
 La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión. Tras confirmación conversacional, pedir abrir Blankmind o una segunda confirmación cuando existe selección exacta es fallo duro. Afirmar éxito antes del acuse positivo del dispositivo también suspende el caso.
 
-El juez conoce el contrato real de doble confirmación: la confirmación conversacional congela la propuesta y la confirmación nativa autoriza la ejecución. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`. Con `--production` evalúa además las respuestas obtenidas del endpoint desplegado y guarda `tmp/bm-semantic/sol-quality-deployed-gate.json`.
+El juez conoce el contrato real de activación: la petición conversacional crea una orden pendiente y el toque de la notificación autoriza la ejecución nativa. Sus resultados no sustituyen el oracle, la compilación ni la prueba física. El gate completo se ejecuta con `node tools/bai_release_gate.js --save --count 125 --quality-judge`; exige clave API y guarda `tmp/bm-semantic/sol-quality-release-gate.json`. Con `--production` evalúa además las respuestas obtenidas del endpoint desplegado y guarda `tmp/bm-semantic/sol-quality-deployed-gate.json`.
 
 ## 1. Qué demuestra cada resultado
 
@@ -36,7 +36,7 @@ Las revisiones de otro agente se identifican como tales; no equivalen a revisió
 
 La equivalencia estructural admite únicamente transformaciones que preservan significado: orden de conjuntos de apps/días, campos nulos de acciones, alias públicos `end`/`end_or_duration` y `screen_time_permission`/`permissions`, y duración calculable de un intervalo cerrado. Nunca sobrescribe dos valores explícitos incompatibles para hacerlos coincidir.
 
-También compara los slots `hard_mode` y `requested_capability`. En fixtures anteriores, su ausencia significa `null` (no solicitado), nunca permiso implícito. `hard_mode` debe coincidir con la acción que lo admite; una solicitud de capacidad no soportada o de revisión de información no puede convertirse en bloqueo. En acciones `activate_mode` y `switch_mode`, `name` es el modo que se ejecuta y se compara exactamente; solo nombres de presentación como el título de una franja pueden ignorarse.
+También compara los slots `hard_mode` y `requested_capability`. En fixtures anteriores, su ausencia significa `null` (no solicitado), nunca permiso implícito. `hard_mode` debe coincidir con la acción que lo admite; una solicitud de capacidad no soportada o de revisión de información no puede convertirse en bloqueo. `activate_mode` y `switch_mode` solo se aceptan para migrar entradas antiguas a `start_protection`/`open_app_picker`; el producto actual siempre ejecuta sobre la lista canónica de distracciones.
 
 ## 2. Ejecución
 
@@ -94,18 +94,18 @@ Después se revisaron 17 snapshots obtenidos mediante lectura de eventos product
 
 Durante la auditoría apareció un requisito que el contrato inicial omitía: iOS/Android/web convierten `duration_days:null` en siete días. Por tanto el estado incorpora `schedule_horizon_days` explícito para programaciones recurrentes. Un fixture v1 sin ese campo significa `null`, nunca siete días. Los datasets v2 especifican el horizonte en el input y lo verifican en estado y acción; los originales y los primeros informes se conservan. Cambiar este contrato debe documentarse como migración de capacidades, no como corrección oculta de asserts.
 
-`tools/bm_legacy_evaluator_audit.js` llama al **mismo `assertPlan` usado por la suite anterior**, exportado sin modificar sus asserts. Construye seis planes deliberadamente erróneos que ese evaluador acepta:
+`tools/bm_legacy_evaluator_audit.js` llama al mismo `assertPlan` usado por la suite y construye seis planes deliberadamente erróneos. El gate actual exige que todos sean rechazados:
 
-| Contraejemplo | Por qué pasaba |
+| Contraejemplo | Qué protege ahora |
 | --- | --- |
-| Hora/app/ejecución visibles contradictorias | Basta un token horario esperado; no compara significado |
-| `blocking_data` distinto de la acción | Comprueba presencia de campos, no equivalencia |
-| Días de recurrencia cambiados | El fixture solo comprueba parte de la primera acción |
-| Permisos falsos | La rama blocking retorna antes de comprobar expectativas de permisos |
-| Texto absurdo con palabras correctas | Longitud, formato y palabras puntúan como calidad/utilidad |
-| Voz/follow-up contradictorios | Esas superficies no entran en `visibleText`/`userVisibleText` |
+| Hora/app/ejecución visibles contradictorias | Revisa todas las superficies visibles, incluida voz y follow-up |
+| `blocking_data` distinto de la acción | Compara `blocking_data` con la acción ejecutable |
+| Días de recurrencia cambiados | Compara también días y duración |
+| Permisos falsos | Comprueba permisos también en la rama de bloqueo |
+| Texto absurdo con palabras correctas | Mantiene las comprobaciones semánticas además de las métricas blandas |
+| Voz/follow-up contradictorios | Incluye `speech_text` y `followup_text` en las superficies visibles |
 
-Cinco contraejemplos mantienen intactas las expectativas del fixture original; el de permisos añade dos expectativas explícitas para demostrar que la rama las ignora. Son falsos positivos construidos y reproducibles del evaluador, no respuestas atribuidas al modelo productivo.
+Son mutaciones construidas para el evaluador, no respuestas atribuidas al modelo productivo. El informe debe terminar con `false_positives: 0`.
 
 El nuevo test modifica deliberadamente horarios, duración, apps, recurrencia, horizonte, confirmación, procedencia, acción, siguiente paso, idioma y texto. Ejecuta el evaluador real para cada mutante. Las mutaciones de texto arbitrario invalidan la revisión vinculada; se distinguen de los errores semánticos que se detectan directamente. También comprueba 200 trabajos concurrentes con límite real, continuidad de estado y conservación de errores por turno.
 
@@ -113,7 +113,7 @@ El nuevo test modifica deliberadamente horarios, duración, apps, recurrencia, h
 
 No aprobar una release si queda cualquier fallo duro, revisión visible pendiente, resultado de modelo ocultado por fallback o gate existente fallido. Exigir coincidencia de estado y siguiente paso, correcciones que invaliden confirmación, acciones equivalentes, cero valores inventados y cero acciones prematuras en desarrollo y un holdout nuevo. Repetir el modelo activo y comprobar que no aparecen variantes semánticas graves.
 
-Los tests de contexto por canal verifican el backend compartido, no la entrega de APNs ni la ejecución en dispositivos. La release necesita además gates de transporte/persistencia, compilación nativa y smoke final real de: copia no destructiva, ejecución en segundo plano, acuse verificado, fallo honesto cuando iOS no despierta y selector con aplicación automática cuando falta una selección exacta. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.
+Los tests de contexto por canal verifican el backend compartido, no la entrega de APNs ni la ejecución en dispositivos. La release necesita además gates de transporte/persistencia, compilación nativa y smoke final real de: push visible sin ejecución silenciosa, activación al pulsar la notificación, acuse verificado, fallo honesto cuando iOS no despierta y selector con aplicación automática cuando falta una selección exacta. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.
 
 No presentar `114/114`, la ausencia de crashes, las métricas blandas o una suite determinista repetida como prueba de comprensión general. La evidencia final debe nombrar dataset, versión de contrato, hash de implementación, fuentes reales, repeticiones, fallos pendientes y alcance de las revisiones independientes.
 

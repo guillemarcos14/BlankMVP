@@ -69,13 +69,15 @@ function normalizeDevicePush(value) {
 }
 
 function pushPayload(action) {
-  const needsForeground = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
-  const immediateProtection = action?.type === "start_protection";
+  const needsSelection = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
+  const alertBody = needsSelection
+    ? "Tap to choose your distractions and finish this block."
+    : "Tap to apply this block in Blankmind.";
   return {
     aps: {
       "content-available": 1,
-      ...(needsForeground ? { alert: { title: "Blankmind", body: "Tap to finish selecting the apps for this block." } } : {}),
-      ...(immediateProtection ? { alert: { title: "Blankmind", body: "Applying your requested block on this iPhone." } } : {}),
+      category: "BM_PENDING_ACTION",
+      alert: { title: "Blankmind", body: alertBody },
     },
     bm_action_id: String(action?.id || "").slice(0, 80),
     bm_action_type: String(action?.type || "").slice(0, 60),
@@ -98,8 +100,6 @@ async function sendAssistantActionPushOnce(devicePush, action) {
   if (!auth || !topic) return { sent: false, reason: "apns_not_configured" };
   const host = device.environment === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
   const body = JSON.stringify(pushPayload(action));
-  const needsForeground = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
-  const immediateProtection = action?.type === "start_protection";
   const apnsId = crypto.randomUUID();
 
   return new Promise((resolve) => {
@@ -120,8 +120,8 @@ async function sendAssistantActionPushOnce(devicePush, action) {
       ":path": `/3/device/${device.token}`,
       authorization: `bearer ${auth}`,
       "apns-topic": topic,
-      "apns-push-type": needsForeground || immediateProtection ? "alert" : "background",
-      "apns-priority": needsForeground || immediateProtection ? "10" : "5",
+      "apns-push-type": "alert",
+      "apns-priority": "10",
       "apns-expiration": String(pushExpiration(action)),
       "apns-collapse-id": String(action?.id || "blankmind-action").slice(0, 64),
       "apns-id": apnsId,

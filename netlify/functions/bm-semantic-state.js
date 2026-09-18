@@ -204,7 +204,7 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
   }
   const questionAdvice = /^(?:how (?:can|do|should)|why|what (?:should|can)|can you explain|como (?:puedo|hago)|por que|que (?:puedo|deberia)|explica)/.test(full);
   const modeActivationRequest = usesSingleDistractionBlock(context) && /\b(?:start|activate|use|switch to|inicia|activa|usa|cambia a)\b[^.!?]{0,80}\b(?:mode|modo|profile|perfil)\b/.test(full);
-  const actionRequest = (/\b(?:block|bloquea|bloquear|protect|proteger|protege|schedule|programa|programar|set (?:a |an )?(?:daily |\d+[ -])?limit|limita|limitar|daily limit|limite diario|start protection|inicia un bloqueo)\b/.test(full) || modeActivationRequest) && !questionAdvice;
+  const actionRequest = (/\b(?:block|bloquea|bloquear|protect|proteger|protege|schedule|programa|programar|set (?:a |an )?(?:daily |\d+[ -])?limit|limita|limitar|daily limit|limite diario|start protection|start focus|focus now|strict block|inicia un bloqueo|inicia foco|activa foco)\b/.test(full) || modeActivationRequest) && !questionAdvice;
   const digitalBehavior = /\b(?:(?:doom)?scroll\w*|phone|screen\w*|apps?|social media|m[oó]vil|pantallas?|redes sociales|distra\w*)\b/.test(full) || extractApps(full,context).length > 0;
   const behaviorGoal = /\b(?:i want|i need|i wish|i keep|i usually|i often|i struggle|i.m trying|i am trying|i can.t stop|too much|less|reduce|stop checking|quiero|necesito|me gustaria|suelo|me cuesta|no puedo parar|demasiado|menos)\b/.test(full);
   const advice = questionAdvice || (!actionRequest && digitalBehavior && behaviorGoal);

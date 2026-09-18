@@ -3453,6 +3453,9 @@ exports.handler = async (event, runtime = {}) => {
 };
 
 function semanticPlan(result, language, prompt) {
+  const executableActions = result.actions.filter((item) => item && item.type && item.type !== "none");
+  const requiresSelection = executableActions.some((item) => actionNeedsSelection(item.type));
+  const requiresScreenTime = executableActions.some((item) => actionNeedsScreenTime(item.type));
   const plan = {
     intent: classify(prompt, {}) === "general" ? "social" : classify(prompt, {}),
     title: result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
@@ -3469,8 +3472,8 @@ function semanticPlan(result, language, prompt) {
     secondary_label: language === "es" ? "Ahora no" : "Not now",
     actions: result.actions.map(item => action(item.type, item)),
     review_only_actions: result.reviewOnlyAppPresence === true,
-     requires_selected_apps: false,
-    requires_screen_time_authorization: false,
+    requires_selected_apps: requiresSelection,
+    requires_screen_time_authorization: requiresScreenTime,
     blocking_ready: result.blockingContract.user_request ? result.blockingContract.ready : null,
     blocking_user_request: result.blockingContract.user_request,
     blocking_missing_fields: result.blockingContract.user_request ? result.blockingContract.missing_fields : [],

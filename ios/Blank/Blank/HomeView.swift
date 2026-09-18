@@ -1765,6 +1765,7 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
+        let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
         if let receipt = AssistantActionReceiptStore.load() {
             Task {
                 let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
@@ -1797,7 +1798,8 @@ struct HomeView: View {
                 guard let remoteAction,
                       let pendingAction = remoteAction.toPendingAction(),
                       sessionStore.pendingAssistantAction == nil else { return }
-                BlankSharedState.defaults.removeObject(forKey: "blankAssistantPollAfterOpen")
+                guard applyNowRequested else { return }
+                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
                 pendingAssistantActionId = remoteAction.id
                 pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)

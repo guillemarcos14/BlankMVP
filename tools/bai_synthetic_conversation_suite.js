@@ -59,6 +59,8 @@ function pick(items) {
 function baseContext(overrides = {}) {
   return {
     is_blank_active: false,
+    single_distraction_block: true,
+    protection_target: "selected_distractions",
     has_selected_apps: true,
     selection_count: 3,
     screen_time_authorized: true,

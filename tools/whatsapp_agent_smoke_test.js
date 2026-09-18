@@ -351,7 +351,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /applying it now/i);
+    assert.match(requests[0].Body, /Tap the Blankmind notification to apply it/i);
     assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
   } finally {
     global.fetch = originalFetch;

@@ -542,6 +542,9 @@ function whatsappReplyText(plan, fallbackText) {
       ? `${clean}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
       : `${clean}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
   }
+  if (action.type === "start_protection") {
+    return `${clean.replace(/\s*(?:I['’]m applying it now|Lo estoy aplicando ahora)\.?$/i, "").trim()}\n\n${spanish ? "Pulsa Apply Now en la notificación de Blankmind para iniciar el bloqueo." : "Tap Apply Now in the Blankmind notification to start the block."}`;
+  }
   return /\b(?:applying|aplicando|executing|ejecutando)\b/i.test(clean)
     ? clean
     : `${clean}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;

@@ -4,6 +4,8 @@ const http2 = require("http2");
 let cachedProviderToken = null;
 let cachedProviderTokenAt = 0;
 
+const ASSISTANT_ACTION_CATEGORY = "BM_PENDING_ACTION";
+
 function base64url(value) {
   return Buffer.from(value).toString("base64url");
 }
@@ -71,11 +73,19 @@ function normalizeDevicePush(value) {
 function pushPayload(action) {
   const needsForeground = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
   const immediateProtection = action?.type === "start_protection";
+  const duration = Number.isInteger(action?.minutes) ? action.minutes : null;
   return {
     aps: {
       "content-available": 1,
       ...(needsForeground ? { alert: { title: "Blankmind", body: "Tap to finish selecting the apps for this block." } } : {}),
-      ...(immediateProtection ? { alert: { title: "Blankmind", body: "Applying your requested block on this iPhone." } } : {}),
+      ...(immediateProtection ? {
+        alert: {
+          title: "Your block is ready",
+          body: duration ? `Block distractions for ${duration} minutes.` : "Block your selected distractions now.",
+        },
+        category: ASSISTANT_ACTION_CATEGORY,
+        sound: "default",
+      } : {}),
     },
     bm_action_id: String(action?.id || "").slice(0, 80),
     bm_action_type: String(action?.type || "").slice(0, 60),
@@ -153,4 +163,4 @@ async function sendAssistantActionPush(devicePush, action) {
   return result;
 }
 
-module.exports = { apnsCredentials, normalizeDevicePush, pushPayload, pushExpiration, sendAssistantActionPush };
+module.exports = { ASSISTANT_ACTION_CATEGORY, apnsCredentials, normalizeDevicePush, pushPayload, pushExpiration, sendAssistantActionPush };

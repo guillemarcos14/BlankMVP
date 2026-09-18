@@ -20,7 +20,9 @@ assert.equal(normalizeDevicePush({ token: "invalid" }), null);
 
 const executable = pushPayload({ id: "action-1", type: "start_protection" });
 assert.equal(executable.aps["content-available"], 1);
-assert.match(executable.aps.alert.body, /applying/i, "immediate actions should use the highest-priority alert+background delivery path");
+assert.match(executable.aps.alert.body, /selected distractions/i, "immediate actions should explain the pending block");
+assert.equal(executable.aps.category, "BM_PENDING_ACTION");
+assert.equal(executable.aps.sound, "default");
 assert.equal(executable.bm_action_id, "action-1");
 
 const setup = pushPayload({ id: "action-2", type: "open_app_picker" });

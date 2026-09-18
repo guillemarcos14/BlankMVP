@@ -18,7 +18,7 @@ const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 
-const WHATSAPP_RUNTIME_CONTRACT = "bm-immediate-v4";
+const WHATSAPP_RUNTIME_CONTRACT = "bm-actionable-v5";
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -392,7 +392,9 @@ function whatsappReplyText(plan, delivery = null) {
   if (delivery?.push?.sent === false) {
     return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
   }
-  if (!/\b(?:applying|aplicando|executing|ejecutando)\b/i.test(text)) return `${text}\n\n${spanish ? "Lo estoy aplicando ahora." : "I'm applying it now."}`;
+  if (action.type === "start_protection") {
+    return `${text.replace(/\s*(?:I['’]m applying it now|Lo estoy aplicando ahora)\.?$/i, "").trim()}\n\n${spanish ? "Pulsa Apply Now en la notificación de Blankmind para iniciar el bloqueo." : "Tap Apply Now in the Blankmind notification to start the block."}`;
+  }
   return text;
 }
 

@@ -295,7 +295,7 @@ function deploy(args) {
     run(process.execPath, [
       "tools/verify_bm_runtime.js",
       "--url", "https://getblank.netlify.app/.netlify/functions/whatsapp-agent",
-      "--expected", "bm-immediate-v4",
+      "--expected", "bm-actionable-v5",
     ], { inherit: true });
     actions.push("netlify getblank");
   }

@@ -68,7 +68,7 @@ async function prepare() {
   reset();
   await send("Block Instagram now for 18 minutes, once.");
   const response = await send("Yes");
-  assert.match(response.body, /sending it to your linked device|applying it now/i);
+  assert.match(response.body, /sending it to your linked device|Tap Apply Now in the Blankmind notification/i);
   assert.doesNotMatch(response.body, /Reply BLOCK|Open Blankmind|review-action/i);
   assert.equal(memory.pending_assistant_action.type, "start_protection");
   assert.equal(memory.pending_assistant_action.minutes, 18);

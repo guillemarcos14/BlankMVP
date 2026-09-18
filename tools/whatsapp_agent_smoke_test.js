@@ -47,7 +47,7 @@ const recoveredReadyAction = _test.pendingActionFromPlan({
 });
 assert.strictEqual(recoveredReadyAction.type, "start_protection");
 assert.strictEqual(recoveredReadyAction.minutes, 10);
-assert.strictEqual(recoveredReadyAction.contract_version, "bm-immediate-v4");
+assert.strictEqual(recoveredReadyAction.contract_version, "bm-actionable-v5");
 
 const semanticMemoryRows = new Map();
 
@@ -102,8 +102,8 @@ async function verifyWebhook() {
     queryStringParameters: { bm_runtime: "1" },
   });
   assert.strictEqual(runtime.statusCode, 200, runtime.body);
-  assert.strictEqual(JSON.parse(runtime.body).runtime_contract, "bm-immediate-v4");
-  assert.strictEqual(runtime.headers["x-bm-runtime-contract"], "bm-immediate-v4");
+  assert.strictEqual(JSON.parse(runtime.body).runtime_contract, "bm-actionable-v5");
+  assert.strictEqual(runtime.headers["x-bm-runtime-contract"], "bm-actionable-v5");
 
   const response = await handler({
     httpMethod: "GET",
@@ -115,7 +115,7 @@ async function verifyWebhook() {
   });
   assert.strictEqual(response.statusCode, 200, response.body);
   assert.strictEqual(response.body, "challenge-ok");
-  assert.strictEqual(response.headers["x-bm-runtime-contract"], "bm-immediate-v4");
+  assert.strictEqual(response.headers["x-bm-runtime-contract"], "bm-actionable-v5");
 }
 
 async function receiveMessage() {
@@ -279,7 +279,7 @@ async function linkIncludesRequestedApps() {
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /Do you confirm|review-action/i);
     assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
-    assert.match(outboundText, /(applying it now|couldn't wake the iPhone now)/i);
+    assert.match(outboundText, /(Tap Apply Now in the Blankmind notification|couldn't wake the iPhone now)/i);
     assert.doesNotMatch(outboundText, /Open Blankmind/i);
     const pendingRows = [...semanticMemoryRows.values()].flat()
       .map((row) => row.payload?.properties?.memory?.pending_assistant_action)
@@ -382,7 +382,7 @@ async function queuesCompleteActionWithoutRecentConnectCode() {
     assert.strictEqual(pendingRows.length, 1, "a signed linked thread must queue from its own durable memory");
     assert.strictEqual(pendingRows[0].type, "start_protection");
     assert.strictEqual(pendingRows[0].minutes, 10);
-    assert.strictEqual(pendingRows[0].contract_version, "bm-immediate-v4");
+    assert.strictEqual(pendingRows[0].contract_version, "bm-actionable-v5");
   } finally {
     global.fetch = originalFetch;
     semanticMemoryRows.clear();
@@ -441,7 +441,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /(applying it now|couldn't wake the iPhone now)/i);
+    assert.match(requests[0].Body, /(Tap Apply Now in the Blankmind notification|couldn't wake the iPhone now)/i);
     assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
   } finally {
     global.fetch = originalFetch;

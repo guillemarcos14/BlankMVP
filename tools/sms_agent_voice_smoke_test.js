@@ -203,7 +203,7 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
     });
     assert.strictEqual(second.statusCode, 200, second.body);
     assert.match(second.body, /selected distractions.*5 minutes.*once/i);
-    assert.match(second.body, /applying it now/i);
+    assert.match(second.body, /Tap Apply Now in the Blankmind notification/i);
     assert.doesNotMatch(second.body, /https?:\/\//);
     assert.doesNotMatch(second.body, /https?:\/\/|review-action|ContentSid|Do you confirm/i);
     assert.doesNotMatch(second.body, /Open Blankmind/i);
@@ -318,7 +318,7 @@ async function whatsappUsesCanonicalSelectionForRequestedApp() {
     });
     assert.match((await send("Block Instagram now for 5 minutes", "SMcopy-1")).body, /once or recurring/i);
     const activated = await send("Once", "SMcopy-2");
-    assert.match(activated.body, /applying it now/i);
+    assert.match(activated.body, /Tap Apply Now in the Blankmind notification/i);
     assert.doesNotMatch(activated.body, /Do you confirm|Open Blankmind|Select exactly Instagram/i);
 
     const polled = await assistantChannelHandler({

@@ -148,7 +148,7 @@ check("immediate_protection_does_not_invent_duration", () => {
 });
 
 check("messaging_actions_execute_without_native_confirmation", () => {
-  assert.match(whatsapp, /I'm applying it now/);
+  assert.match(whatsapp, /Tap Apply Now in the Blankmind notification/);
   assert.doesNotMatch(whatsapp, /Open Blankmind to review and apply it/);
   assert.match(assistantChannel, /poll_pending_action/);
   assert.match(assistantChannel, /ack_pending_action/);

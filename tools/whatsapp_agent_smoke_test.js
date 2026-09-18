@@ -87,6 +87,7 @@ async function verifyWebhook() {
   });
   assert.strictEqual(response.statusCode, 200, response.body);
   assert.strictEqual(response.body, "challenge-ok");
+  assert.strictEqual(response.headers["x-bm-runtime-contract"], "bm-immediate-v4");
 }
 
 async function receiveMessage() {

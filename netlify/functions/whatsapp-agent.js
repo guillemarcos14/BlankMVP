@@ -18,6 +18,8 @@ const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 
+const WHATSAPP_RUNTIME_CONTRACT = "bm-immediate-v4";
+
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
@@ -130,7 +132,11 @@ function verifyChallenge(event) {
   }
   return {
     statusCode: 200,
-    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+      "x-bm-runtime-contract": WHATSAPP_RUNTIME_CONTRACT,
+    },
     body: params["hub.challenge"],
   };
 }
@@ -245,6 +251,7 @@ function pendingActionFromPlan(plan, prompt = "") {
   const fingerprint = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
   return {
     id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
+    contract_version: WHATSAPP_RUNTIME_CONTRACT,
     fingerprint,
     ...payload,
     status: "queued",

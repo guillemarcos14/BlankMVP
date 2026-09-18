@@ -84,28 +84,9 @@ function completeNaturalText(value, maxLength = 420) {
 }
 
 function responseLanguage(prompt, context = {}) {
-  const text = cleanText(prompt, 600).toLowerCase();
-  if (/\b(?:in english|en ingl[eé]s)\b/.test(text)) return "en";
-  if (/\b(?:in spanish|en espa[nñ]ol|en castellano)\b/.test(text)) return "es";
-  const previousLanguage = context.semantic_state?.language || context.memory?.conversation_state?.semantic_state?.language;
-  const explicit = cleanText(previousLanguage || context.language || context.locale || "", 20).toLowerCase();
-  const spanishScore = [
-    "¿", "á", "é", "í", "ó", "ú", "ñ",
-    "como puedo", "cómo puedo", "que deberia", "qué debería", "quiero", "bloquear", "bloquea",
-    "despues", "después", "comer", "cenar", "despertar", "trabajar", "estudiar",
-    "movil", "móvil", "no uso", "lo necesito", "para siempre", "consejo", "ayudame", "ayúdame",
-    "bienestar digital", "redes", "redes sociales", "perdiendo mucho tiempo", "por la noche", "estoy", "me quedo", "scrolleando", "dormir", "fatal",
-    "concentrarme", "asistente personal", "controlar mi móvil", "controlar mi movil", "hazme",
-    "recuérdame", "recuerdame", "esta tarde", "esta noche", "reanuda", "reanudar", "reactiva", "reactivar", "quita la pausa", "pausa las reglas",
-  ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
-  const englishScore = [
-    "how can i", "what should i", "block", "after", "phone", "sleep", "work", "study",
-    "scroll", "focus", "advice", "help me", "minutes", "hours", "instead", "only once",
-  ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
-  const shortSpanish = /\b(?:vale|minutos|hora|horas|solo|mejor|diario|diariamente|siempre|cada|confirma|confirmo|s[ií]|hoy|ahora)\b/.test(text) ? 2 : 0;
-  if (spanishScore + shortSpanish > englishScore) return "es";
-  if (englishScore > 0) return "en";
-  return explicit.startsWith("es") ? "es" : "en";
+  // Blankmind currently ships one product language. Input parsing can still
+  // understand existing Spanish facts, but every user-facing surface is English.
+  return "en";
 }
 
 function isWebPreview(context = {}) {
@@ -831,6 +812,20 @@ function asksForPlan(prompt) {
     "quiero un plan",
     "hazme un plan",
   ]);
+}
+
+function hasSpanishSurfaceLeak(plan) {
+  const text = [
+    plan?.title,
+    plan?.response_text,
+    plan?.message_text,
+    plan?.speech_text,
+    plan?.followup_text,
+    plan?.primary_label,
+    plan?.secondary_label,
+    ...(Array.isArray(plan?.bullets) ? plan.bullets : []),
+  ].filter(Boolean).join(" ");
+  return /[¿¡áéíóúñ]|\b(?:bienvenido|para empezar|elige|elige las|pulsa|selecciona|distracciones|notificación|bloquea|bloquear|móvil|noche|mañana|franja|límite|cuéntame|ayúdame|hecho|cancelado|ahora)\b/i.test(text);
 }
 
 function asksForDigitalDetoxPlan(prompt) {
@@ -2898,6 +2893,10 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
           content: "You are BM, Blankmind's digital wellness assistant. Stay strictly inside digital wellness: phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and phone-control actions. Do not provide generic wellness, training, running, nutrition, stress-management, recovery, or sleep plans unless the user's question clearly connects the problem to phones, screens, apps, or digital behavior. If the user asks about general wellness or anything outside digital wellness, briefly say you can only help with digital wellness and invite them to share the phone/screen part of the problem. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough digital context, ask one clear question and do not add advice yet. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blanked-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blanked App executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blanked App that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blanked, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain only how those signals improve digital wellness decisions and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blanked can use connected wearable/Health signals, phone-use patterns, pickup pressure, app-category chains, quick check-ins, plan outcomes, personal baseline, recent routines, global behavioral patterns, and AI forecasts to estimate digital risk windows; be clear this is probabilistic behavioral forecasting, not medical diagnosis or exact app/location surveillance. If the message is small talk, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Use the requested language.",
         },
         {
+          role: "system",
+          content: "English only: every visible response, title, label, bullet, and speech text must be written in English, regardless of the input language or locale.",
+        },
+        {
           role: "user",
           content: JSON.stringify({
             prompt: cleanText(prompt, 600),
@@ -2915,6 +2914,9 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
   }
   const reply = completeNaturalText(extractResponseText(await response.json()), 280);
   if (!reply) return { plan: fallback, source: `openai:${model}:conversation_empty` };
+  if (hasSpanishSurfaceLeak({ response_text: reply })) {
+    return { plan: fallback, source: `openai:${model}:english_fallback_after_language_leak` };
+  }
   return {
     plan: {
       ...fallback,
@@ -3162,6 +3164,7 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
           asksForPermanentLockout(prompt) ||
           (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt, context) && !anchorWindow(prompt))));
   const shouldUseLanguageFallback = language === "es" && hasSpanishLanguageLeak(plan);
+  const shouldUseEnglishFallback = hasSpanishSurfaceLeak(plan);
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i.test(item)).length >= 2;
   const preserveFallbackText = contains(fallback.response_text, [
@@ -3170,15 +3173,15 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     "I can help make access harder, but I will only create",
     "I can use counts and context you choose to share",
   ]);
-  const title = shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.title : userFacingText(plan.title, 70) || fallback.title;
-  const responseText = shouldUseFallbackPresentation || shouldUseLanguageFallback || preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text;
+  const title = shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.title : userFacingText(plan.title, 70) || fallback.title;
+  const responseText = shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback || preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text;
   const normalizedPlan = {
     intent: shouldUseFallbackPresentation || shouldUseLanguageFallback || preservesScrollLoopActions ? fallback.intent : planIntent,
     title,
     response_text: responseText,
-    bullets: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallbackBullets : visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
-    primary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.primary_label : cleanText(plan.primary_label, 32) || fallback.primary_label,
-    secondary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.secondary_label : cleanText(plan.secondary_label, 32) || fallback.secondary_label,
+    bullets: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallbackBullets : visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
+    primary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.primary_label : cleanText(plan.primary_label, 32) || fallback.primary_label,
+    secondary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.secondary_label : cleanText(plan.secondary_label, 32) || fallback.secondary_label,
     actions,
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
@@ -3285,6 +3288,10 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
           role: "system",
           content:
               "You are BM, Blankmind's personal assistant for digital wellness and healthier screen habits. Naturalness is the top priority. Write like a real person, not a product template, report, support bot, funnel, or setup wizard. Conversation is the default mode: first answer the human intent of the exact message, but only inside digital wellness. Digital wellness means phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and app blocking. Do not provide generic wellness, running, training, nutrition, recovery, stress-management, or sleep plans unless the user clearly connects the problem to phones, screens, apps, or digital behavior. If the message is outside digital wellness, briefly say you can only help with digital wellness and ask for the phone/screen part of the problem. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. If the message is small talk, a greeting, thanks, or a normal conversational turn, just reply naturally and do not mention Blanked, the app, blocks, plans, reports, setup, links, or capabilities. Guide toward Blanked App when a concrete Blanked solution would genuinely help the current turn, or when the person explicitly asks for an action Blanked can execute. On web preview, sell by value: answer the digital-wellness question fully before any conversion line, never replace an explanation with 'download the app', and mention Blanked App only as a final short note when personal signals or real execution are needed. Think independently: infer the likely underlying digital pattern, go one useful step beyond the literal request, and propose the best next move only when useful. When the person corrects the app, timing, or situation, treat that correction as the current truth and explicitly carry the corrected app or moment into the next answer. For messaging channels, keep the visible reply short, human and executable. For web/app, make response_text slightly clearer and educational, but still direct. If the person asks for help, advice, what to do, or how to improve, answer with useful digital-wellness guidance before suggesting any app action. If the person has not given enough digital context, ask one clear question and do not add advice yet. Do not turn every message into a Blanked trigger. Be specific about the moment, tradeoff or behavior, not generic motivation. You may answer, ask for one missing detail, recommend an app action, or propose no action. Blankmind has one editable list of distracting apps, categories and websites. Every protection, schedule and limit reuses that list. Never create, name, copy, activate or switch modes. Use start_protection for immediate blocks, apply_schedule for time windows, set_daily_limit for caps, and open_app_picker only when the distraction list is missing or the person asks to edit it. Otherwise, recommend executable actions only when clearly useful or explicitly requested: start_protection, apply_schedule, set_daily_limit, enable_allow_only, enable_adult_filter, pause_rules/disable_pause, open_app_picker/request_screen_time_permission, or apply_ai_plan. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blanked App can block apps or create a plan for that exact problem. Prefer Blanked App blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. Prefer the most concrete action only when the person wants action: if they describe a recurring risk moment and want help applying protection, prefer apply_schedule over a vague immediate block. Never say you already set, created, scheduled, blocked, or changed something; the app executes after confirmation. Prefer active phrasing like I'd protect, I'd block, I'd start, Choose apps first. Avoid weak phrasing like This sounds like, sleep target, I can help you apply this, I prepared a link, open this in Blanked, apply this plan, useful move, pattern, read, signal, backend, template, or implementation. For proactive mode, explain why you are interrupting and propose one concrete digital solution. Do not force blocks for vague inputs, but do not be passive when a sensible digital next step exists. For emotional inputs, acknowledge the state briefly and offer a small concrete move inside Blanked only when phone behavior is relevant. Stay inside digital wellness, phone behavior, focus, screen-related sleep disruption, attention, urges, relapse prevention, and app blocking. Do not claim therapy, treatment, medical diagnosis, device surveillance, exact app visibility, or impossible permanent blocking. Do not use the word coach. Respond in response_language: English for en, Spanish for es. Keep JSON keys, intent values and action types in English. Write directly to the person; never say user, the user, ask user, or mention internal details. Keep response_text to 1-3 natural sentences. For speech_text, write a brief natural WhatsApp voice note: no labels, no numbered structure, no URLs, no backend phrasing, and only mention a link if followup_text is non-empty. For followup_text, write only a short link lead-in when actions are present; otherwise return an empty string. Never output labels such as Action:, Read:, Pattern:, Move:, Signal:, Feedback:, Protection:. Bullets are internal structure only and may use Read/Pattern/Move/Protection in English, or Lectura/Patrón/Movimiento/Protección in Spanish. Every action object must include all nullable action fields.",
+        },
+        {
+          role: "system",
+          content: "English only: every visible response, title, label, bullet, and speech text must be written in English, regardless of the input language or locale.",
         },
         {
           role: "user",
@@ -3553,7 +3560,7 @@ async function traceEvaluationTurn({ prompt, context = {}, mode = "bm_final" }) 
     const request = {
       model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
       input: [
-        { role: "system", content: "You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in the user's language. Do not claim to have performed device actions." },
+        { role: "system", content: "You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in English only, regardless of the user's language. Do not claim to have performed device actions." },
         ...(context.recent_messages || []).filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map(m => ({ role: m.role, content: m.content })),
         { role: "user", content: prompt },
       ],

@@ -330,10 +330,7 @@ async function pollPendingAction(body) {
       source: "assistant_action_expired",
     });
     if (expiredOutcome) {
-      const spanish = String(memory.language || "").toLowerCase().startsWith("es");
-      const message = spanish
-        ? "La acción caducó antes de llegar al iPhone. No se aplicó ningún cambio. Puedes pedírmela otra vez."
-        : "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
+      const message = "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
       try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The explicit outcome remains recorded. */ }
     }
   }
@@ -429,32 +426,23 @@ async function acknowledgePendingAction(body) {
     source: `assistant_action_${status}`,
   });
   if (terminal) {
-    const spanish = String(memory.language || "").toLowerCase().startsWith("es");
     let message;
     if (status === "verified") {
       const target = pending.app_names.length ? pending.app_names.join(", ") : "the selected distractions";
       if (pending.type === "start_protection") {
-        message = spanish
-          ? `${target} ${pending.minutes ? `está bloqueado durante ${pending.minutes} minutos` : "está bloqueado"}.`
-          : `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
+        message = `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
       } else if (pending.type === "apply_schedule") {
-        message = spanish ? "El nuevo horario de bloqueo ya está aplicado." : "The new blocking schedule is applied.";
+        message = "The new blocking schedule is applied.";
       } else {
-        message = spanish ? "Hecho. El cambio está aplicado y verificado." : "Done. The change is applied and verified.";
+        message = "Done. The change is applied and verified.";
       }
     } else if (status === "delayed") {
       const delay = execution?.start_delay_seconds || 0;
-      message = spanish
-        ? `El iPhone aplicó la orden con ${delay} segundos de retraso. La protección efectiva termina a las ${execution?.effective_until || "hora registrada por el dispositivo"}; no la cuento como ejecución inmediata.`
-        : `The iPhone applied the request ${delay} seconds late. Effective protection ends at ${execution?.effective_until || "the device-recorded time"}; I am not counting it as immediate execution.`;
+      message = `The iPhone applied the request ${delay} seconds late. Effective protection ends at ${execution?.effective_until || "the device-recorded time"}; I am not counting it as immediate execution.`;
     } else if (status === "dismissed") {
-      message = spanish
-        ? "Cancelado. No se ha cambiado nada en el iPhone."
-        : "Cancelled. Nothing was changed on the iPhone.";
+      message = "Cancelled. Nothing was changed on the iPhone.";
     } else {
-      message = spanish
-        ? "No he podido aplicar el bloqueo en el iPhone. No se ha marcado como completado."
-        : "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
+      message = "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
     }
     try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The verified outcome remains recorded. */ }
   }

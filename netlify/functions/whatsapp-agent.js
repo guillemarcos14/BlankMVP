@@ -198,22 +198,6 @@ function requestedAppNames(text) {
     .map((candidate) => candidate.label);
 }
 
-function detectedLanguage(text) {
-  const value = cleanText(text, 800).toLowerCase();
-  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
-    ? "es"
-    : "en";
-}
-
-function messageLanguage(text, savedLanguage = "") {
-  const value = cleanText(text, 120).toLowerCase();
-  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
-  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
-  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
-  if (neutralFollowup && /^es|^en/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
-  return detectedLanguage(text);
-}
-
 const PENDING_ACTION_TYPES = new Set([
   "start_protection", "apply_schedule", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
@@ -341,14 +325,13 @@ function whatsappReplyText(plan, delivery = null) {
     .trim()
     .slice(0, 320) || "I can help with that in Blankmind.";
   if (!action) return text;
-  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
-    return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
+    return `${text}\n\nOpen Blankmind to choose the apps. The plan will apply when you confirm the selection.`;
   }
   if (delivery?.push?.sent === false) {
-    return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
+    return `${text}\n\nI couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence.`;
   }
-  return `${text}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
+  return `${text}\n\nTap the Blankmind notification to apply it.`;
 }
 
 async function sendPlanReply(to, plan, delivery = null) {
@@ -420,7 +403,7 @@ async function agentContext(from, prompt) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt, savedMemory);
-  const language = messageLanguage(prompt, savedMemory.language);
+  const language = "en";
   const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
@@ -445,7 +428,6 @@ async function agentContext(from, prompt) {
     channel: "whatsapp",
     assistant_channel: "whatsapp",
     language,
-    allow_spanish_response: true,
     is_blank_active: userContext.is_blank_active === undefined ? false : userContext.is_blank_active,
     has_selected_apps: userContext.has_selected_apps === true,
     selection_count: Number.isFinite(userContext.selection_count) ? userContext.selection_count : 0,

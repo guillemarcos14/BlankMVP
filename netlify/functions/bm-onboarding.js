@@ -10,11 +10,6 @@ function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
 
-function spanishContext(context = {}) {
-  const language = cleanText(context.language || context.locale, 24).toLowerCase();
-  return language === "es" || language.startsWith("es-") || language.startsWith("es_");
-}
-
 function hasSelectedDistractions(context = {}) {
   return context.has_selected_apps === true
     || Number(context.selection_count) > 0
@@ -22,13 +17,6 @@ function hasSelectedDistractions(context = {}) {
 }
 
 function onboardingMessages(context = {}) {
-  if (spanishContext(context)) {
-    return {
-      welcome: "Bienvenido a Blankmind. Estoy aquí para ayudarte a relacionarte mejor con el móvil, poco a poco y sin convertir cada conversación en una lección. Puedes contarme qué te está enganchando, pedirme un plan de detox digital o decirme cuándo necesitas protegerte de una app.",
-      setup: "Para empezar, elige las aplicaciones que tú consideras distracciones. Esa será tu única lista de distracciones y todos los bloqueos y planes partirán de ahí. Pulsa el botón de abajo para elegirlas en Blankmind y después vuelve aquí; hablaremos con normalidad.",
-      ready: "Ya tienes Blankmind preparado. Desde aquí, háblame con normalidad: cuéntame qué te está costando, cuándo acabas entrando en el móvil o qué te gustaría cambiar.",
-    };
-  }
   return {
     welcome: "Welcome to Blankmind. I'm here to help you build a better relationship with your phone, one small change at a time. You can tell me what's pulling you in, ask for a digital detox plan, or say when you need a little help staying off an app.",
     setup: "To get started, choose the apps you consider distractions. That becomes your one distraction list, and every block or plan will work from it. Tap the button below to choose them in Blankmind, then come back here and talk to me normally.",

@@ -3,6 +3,7 @@ const assert = require("assert");
 process.env.OPENAI_API_KEY = "";
 
 const { handler } = require("../netlify/functions/blanked-agent");
+const { onboardingMessages } = require("../netlify/functions/bm-onboarding");
 
 async function call(prompt, context = {}) {
   const response = await handler({
@@ -46,6 +47,11 @@ function baseContext(overrides = {}) {
 }
 
 (async () => {
+  const onboarding = onboardingMessages({ language: "es", locale: "es-ES" });
+  assert.match(onboarding.welcome, /Welcome to Blankmind/);
+  assert.match(onboarding.setup, /choose the apps you consider distractions/);
+  assert.doesNotMatch(Object.values(onboarding).join(" "), /Bienvenido|Para empezar|Ya tienes/i);
+
   const smallTalk = await call("how you doing?", baseContext({ channel: "whatsapp", assistant_channel: "whatsapp" }));
   assert.strictEqual(smallTalk.intent, "general");
   assert.strictEqual(smallTalk.actions.length, 0);
@@ -265,10 +271,12 @@ function baseContext(overrides = {}) {
   assert.strictEqual(appSpanishLocale.semantic_state.language,"en");
   noAction(appSpanishLocale);
   const whatsappSpanish = await call("Bloquea Instagram de 10 de la noche a 7 de la mañana cada día.",baseContext({channel:"whatsapp"}));
-  assert.strictEqual(whatsappSpanish.semantic_state.language,"es");
+  assert.strictEqual(whatsappSpanish.semantic_state.language,"en");
   assert.deepStrictEqual(fact(whatsappSpanish,"start"),{type:"time",minute:1320});
   assert.strictEqual(fact(whatsappSpanish,"end"),420);
   noAction(whatsappSpanish);
+  const spanishVisible = [whatsappSpanish.title, whatsappSpanish.message_text, whatsappSpanish.response_text, whatsappSpanish.speech_text, ...(whatsappSpanish.bullets || [])].join(" ");
+  assert.doesNotMatch(spanishVisible, /bloquear|bloquea|noche|mañana|cada día|¿/i);
   const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am",baseContext());
   noAction(sleepGoalWindow); // A sleep goal is not authorization for a guessed 22:45 block.
   assert.notStrictEqual(sleepGoalWindow.semantic_state.intent,"block");

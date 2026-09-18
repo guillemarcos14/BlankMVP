@@ -29,6 +29,26 @@ assert.strictEqual(
   "legacy actions without exact request time must be replaced instead of replayed"
 );
 
+const recoveredReadyAction = _test.pendingActionFromPlan({
+  actions: [],
+  blocking_user_request: true,
+  blocking_ready: true,
+  blocking_data: {
+    start: { type: "now", value: "now" },
+    end: { type: "duration", value: 10 },
+    recurrence: { type: "once", value: [0] },
+  },
+  semantic_state: {
+    intent: "block",
+    status: "ready",
+    slots: { confirmation: { value: { status: "confirmed" } } },
+  },
+  message_text: "Block your selected distractions now for 10 minutes, just once.",
+});
+assert.strictEqual(recoveredReadyAction.type, "start_protection");
+assert.strictEqual(recoveredReadyAction.minutes, 10);
+assert.strictEqual(recoveredReadyAction.contract_version, "bm-immediate-v4");
+
 const semanticMemoryRows = new Map();
 
 function recentAssistantMemoryResponse(target, options = {}) {

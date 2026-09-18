@@ -232,8 +232,27 @@ const PENDING_ACTION_TYPES = new Set([
 ]);
 
 function pendingActionFromPlan(plan, prompt = "") {
-  const action = (Array.isArray(plan.actions) ? plan.actions : [])
+  const explicitAction = (Array.isArray(plan.actions) ? plan.actions : [])
     .find((item) => item && PENDING_ACTION_TYPES.has(item.type));
+  const contract = plan?.blocking_data;
+  const recoveredImmediateAction = plan?.blocking_user_request === true
+    && plan?.blocking_ready === true
+    && plan?.semantic_state?.intent === "block"
+    && plan?.semantic_state?.status === "ready"
+    && plan?.semantic_state?.slots?.confirmation?.value?.status === "confirmed"
+    && contract?.start?.type === "now"
+    && contract?.end?.type === "duration"
+    && Number.isInteger(contract.end.value)
+    && contract.end.value >= 5
+    && contract.end.value <= 240
+    && contract?.recurrence?.type === "once"
+      ? { type: "start_protection", minutes: contract.end.value, hard_mode: false }
+      : null;
+  // The semantic reducer can suppress a repeated ready action while retaining
+  // the complete authorized contract. Transport idempotency owns duplicate
+  // protection, so recover that exact immediate action instead of replying
+  // "sending" without ever putting anything on the device queue.
+  const action = explicitAction || recoveredImmediateAction;
   if (!action) return null;
   if (action.type === "apply_schedule" && (
     !Number.isInteger(action.start_minute)
@@ -694,4 +713,4 @@ exports.handler = async (event) => {
   }
 };
 
-exports._test = { canReusePendingAction, whatsappReplyText };
+exports._test = { canReusePendingAction, pendingActionFromPlan, queuePendingAssistantAction, whatsappReplyText };

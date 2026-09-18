@@ -136,10 +136,10 @@ async function connectMessage() {
 async function connectGreeting() {
   process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
-  let outboundText = "";
+  const outboundTexts = [];
   const originalFetch = global.fetch;
   global.fetch = async (_url, options) => {
-    outboundText = JSON.parse(options.body).text.body;
+    outboundTexts.push(JSON.parse(options.body).text.body);
     return {
       ok: true,
       json: async () => ({ ok: true }),
@@ -171,8 +171,12 @@ async function connectGreeting() {
       }),
     });
     assert.strictEqual(response.statusCode, 200, response.body);
-    assert.match(outboundText, /Hey! Blankmind here/);
-    assert.match(outboundText, /Connected/);
+    assert.strictEqual(outboundTexts.length, 2);
+    assert.match(outboundTexts[0], /Welcome to Blankmind/i);
+    assert.match(outboundTexts[0], /better relationship with your phone/i);
+    assert.match(outboundTexts[1], /choose the apps you consider distractions/i);
+    assert.match(outboundTexts[1], /talk to me normally/i);
+    assert.doesNotMatch(outboundTexts[0], /connected|thread|digital wellness assistant/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.WHATSAPP_ACCESS_TOKEN;

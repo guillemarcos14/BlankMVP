@@ -7,6 +7,12 @@ const { sendAssistantActionPush } = require("./_assistant_push");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
 const { proposalFingerprint, buildSemanticActions, buildSemanticReviewAction } = require("./bm-semantic-state");
 const {
+  hasSelectedDistractions,
+  onboardingMessages,
+  queueOnboardingPicker,
+  markOnboardingSent,
+} = require("./bm-onboarding");
+const {
   attachAssistantUserContext,
   claimAssistantInboundMessage,
   connectCodeFromText,
@@ -181,7 +187,9 @@ async function transcribeAudio(item) {
 }
 
 function twiml(message) {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>${escapeXml(message)}</Body></Message></Response>`;
+  const messages = Array.isArray(message) ? message : [message];
+  const body = messages.filter(Boolean).map((item) => `<Message><Body>${escapeXml(item)}</Body></Message>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`;
 }
 
 function escapeXml(value) {
@@ -191,11 +199,6 @@ function escapeXml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
-}
-
-function connectReply(from, channel) {
-  const label = channel === "whatsapp" ? "WhatsApp" : "SMS";
-  return `Hey! Blankmind here 👋 Connected. BM will use ${label} for this number${from ? ` (${from})` : ""}.`;
 }
 
 function detectedLanguage(text) {
@@ -559,6 +562,13 @@ function whatsappSetupButton(plan, appNames = []) {
 }
 
 async function recordMessageConnection(connectCode, from, channel) {
+  let previousMemory = {};
+  try {
+    previousMemory = await getAssistantMemory(channel, from);
+  } catch (_) {
+    // Connection delivery must still work when durable memory is temporarily unavailable.
+  }
+  let context = {};
   try {
     await recordAssistantChannel({
       event: "assistant_channel_connected",
@@ -567,10 +577,34 @@ async function recordMessageConnection(connectCode, from, channel) {
       connectCode,
       channelUser: from,
     });
-    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
+    const attachedContext = await attachAssistantUserContext({ connectCode, channel, channelUser: from });
+    context = attachedContext && Object.keys(attachedContext).length ? attachedContext : previousMemory.user_context || {};
   } catch (_) {
-    return;
+    // Connection delivery must not depend on the context snapshot being available.
   }
+  return {
+    firstConnection: previousMemory.assistant_onboarding_version !== "natural-v1",
+    context: context || {},
+  };
+}
+
+async function connectionOnboarding(channel, from, connection = {}) {
+  if (connection.firstConnection === false) return null;
+  const context = connection.context || {};
+  const messages = onboardingMessages(context);
+  const selected = hasSelectedDistractions(context);
+  let queued = null;
+  if (!selected) {
+    try {
+      queued = await queueOnboardingPicker({ channel, channelUser: from, messages });
+    } catch (_) {
+      // The visible copy remains useful even when the action store or APNs is unavailable.
+    }
+  }
+  return {
+    messages: [messages.welcome, selected ? messages.ready : messages.setup],
+    button: queued?.button || null,
+  };
 }
 
 function namedApps(text) {
@@ -920,13 +954,36 @@ exports.handler = async (event) => {
   let reply;
   try {
     reply = connectCode
-      ? { text: (await recordMessageConnection(connectCode, from, channel), connectReply(from, channel)) }
+      ? { onboarding: await connectionOnboarding(channel, from, await recordMessageConnection(connectCode, from, channel)) }
       : command
         ? await smsCommandReply(from, command)
       : await askBAI(prompt, from, channel, linkedConnection);
   } catch (error) {
     try { await releaseAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* Leave the provider request failed. */ }
     throw error;
+  }
+
+  if (reply.onboarding) {
+    if (channel === "whatsapp") {
+      try {
+        await sendWhatsAppMessage(from, reply.onboarding.messages[0]);
+        await sendWhatsAppMessage(from, reply.onboarding.messages[1]);
+        if (reply.onboarding.button) await sendWhatsAppMessage(from, "", reply.onboarding.button);
+      } catch (error) {
+        if (!String(error?.message || "").includes("twilio_whatsapp_send_failed")) throw error;
+      }
+      if (messageSid) {
+        try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+      }
+      await markOnboardingSent(channel, from);
+      return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
+    }
+    if (messageSid) {
+      try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
+    }
+    const onboardingResponse = text(200, twiml(reply.onboarding.messages), "application/xml; charset=utf-8");
+    await markOnboardingSent(channel, from);
+    return onboardingResponse;
   }
 
   if (channel === "whatsapp" && reply.actionButton) {

@@ -833,6 +833,17 @@ function asksForPlan(prompt) {
   ]);
 }
 
+function asksForDigitalDetoxPlan(prompt) {
+  const text = cleanText(prompt, 600).toLowerCase();
+  return contains(text, [
+    "digital detox",
+    "detox digital",
+    "detox plan",
+    "plan de detox",
+    "plan detox",
+  ]);
+}
+
 function isSimpleGreeting(prompt) {
   const text = cleanText(prompt, 120).toLowerCase().replace(/[!?.¡¿,]/g, "").trim();
   return /^(hey|hi|hello|yo|hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches)(\s+blanked|\s+bai|\s+bm)?$/.test(text);
@@ -2045,7 +2056,9 @@ function fallbackPlan(prompt, context = {}) {
     return {
       intent: "general",
       title: "Personal Assistant",
-      response_text: "I can read your phone-habit patterns, explain what is changing, and turn that into blocks, schedules, limits, reports or setup steps when it helps.",
+      response_text: language === "es"
+        ? "Estoy para ayudarte con lo que se te va del móvil: scroll, notificaciones, concentración y noches. Podemos hablarlo, montar un plan o bloquear tus distracciones. ¿Qué te cuesta más últimamente?"
+        : "I help with the parts of phone use that run away from you: scrolling, notifications, focus and bedtime. We can talk, make a plan, or block your distractions. What's been hardest lately?",
       bullets: [
         "Read: I can respond when you ask and also use signals when your pattern changes.",
         "Pattern: the useful move depends on your apps, weak hours, plan history and permissions.",
@@ -2624,6 +2637,25 @@ function fallbackPlan(prompt, context = {}) {
   }
 
   if (intent === "general" && (asksForAdvice(prompt) || asksForPlan(prompt) || asksWhereToStart(prompt)) && !hasExplicitBlockRequest(prompt)) {
+    if (asksForDigitalDetoxPlan(prompt)) {
+      const responseText = language === "es"
+        ? "Sí. Yo lo haría de forma práctica: elegiría las apps que más te arrastran, protegería una sola franja de riesgo al día y dejaría tranquilo el resto del móvil, para no intentar arreglarlo todo de golpe. Empezaría por el momento en que más se te va de las manos y solo lo haría más estricto si hace falta. ¿Cuándo suele empezar?"
+        : "Yes. I’d keep it practical: choose the apps that pull you in, protect one high-risk window each day, and leave the rest of the phone alone so you’re not fighting everything at once. Start with the moment you lose control most often, then make the boundary stronger only if you need to. When does it usually start?";
+      return {
+        ...base,
+        title: "Digital Detox",
+        response_text: responseText,
+        bullets: [
+          "Read: the goal is a lighter phone, not a punishment.",
+          "Pattern: one repeated risk moment is easier to change than the whole day.",
+          "Move: choose the distractions and tell me when the pull is strongest.",
+        ],
+        primary_label: language === "es" ? "Decir momento" : "Tell me the moment",
+        actions: [],
+        requires_selected_apps: false,
+        requires_screen_time_authorization: false,
+      };
+    }
     if (asksForPlan(prompt)) {
       return {
         ...base,
@@ -2785,7 +2817,11 @@ function conversationFallbackPlan(prompt, language = "en") {
   const lower = cleanText(prompt, 700).toLowerCase();
   if (isConversationalOnly(prompt)) return conversationalOnlyPlan(prompt, language);
   let fallbackText = language === "es" ? "Estoy aquí. Cuéntame qué ha pasado." : "I'm here. Tell me what's on your mind.";
-  if (contains(lower, ["scroll", "scrolling", "doomscroll", "night", "bedtime", "at night", "noche", "cama"])) {
+  if (asksForDigitalDetoxPlan(prompt)) {
+    fallbackText = language === "es"
+      ? "Sí. Yo lo haría de forma práctica: elige las apps que más te arrastran, protege una sola franja de riesgo al día y no intentes arreglar todo el móvil de golpe. Empezaría por el momento en que más se te va de las manos. ¿Cuándo suele empezar?"
+      : "Yes. I’d keep it practical: choose the apps that pull you in, protect one high-risk window each day, and don’t try to fix the whole phone at once. I’d start with the moment you lose control most often. When does it usually start?";
+  } else if (contains(lower, ["scroll", "scrolling", "doomscroll", "night", "bedtime", "at night", "noche", "cama"])) {
     fallbackText = language === "es"
       ? "Empezaría antes de meterte en la cama, no cuando ya estás cansado. Dime a qué hora quieres estar dormido y ajustaré el límite a ese momento."
       : "I’d start before you get into bed, not once you’re already tired. Tell me when you want to be asleep and I’ll shape the boundary around that.";
@@ -2913,6 +2949,7 @@ function deterministicNoActionTitle(title) {
     "App Privacy",
     "Digital Wellness Read",
     "Plan Context",
+    "Digital Detox",
     "Plan Timing",
     "Scroll Window",
     "Personal Assistant",
@@ -3118,11 +3155,12 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     (hasExecutableActions && actions.some((item) => item.type === "apply_schedule") && Boolean(explicitTimeWindow(prompt, context) || anchorWindow(prompt))) ||
     (!hasExecutableActions &&
       modelProposedAction &&
-      (asksAboutAssistantCapabilities(prompt) ||
-        asksForUnsupportedReminder(prompt) ||
-        asksForBroadAutomation(prompt) ||
-        asksForPermanentLockout(prompt) ||
-        (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt, context) && !anchorWindow(prompt))));
+        (asksAboutAssistantCapabilities(prompt) ||
+          asksForDigitalDetoxPlan(prompt) ||
+          asksForUnsupportedReminder(prompt) ||
+          asksForBroadAutomation(prompt) ||
+          asksForPermanentLockout(prompt) ||
+          (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt, context) && !anchorWindow(prompt))));
   const shouldUseLanguageFallback = language === "es" && hasSpanishLanguageLeak(plan);
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i.test(item)).length >= 2;

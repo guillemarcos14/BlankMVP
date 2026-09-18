@@ -63,6 +63,18 @@ function baseContext(overrides = {}) {
   assert.strictEqual(thanks.actions.length, 0);
   assert.doesNotMatch(thanks.message_text, /Blanked|app|block|plan|screen-habit|diagnosis|protection|Open/i);
 
+  const capabilityAnswer = await call("How can you help me?", baseContext({ channel: "whatsapp", assistant_channel: "whatsapp" }));
+  assert.strictEqual(capabilityAnswer.actions.length, 0);
+  assert.match(capabilityAnswer.message_text, /scrolling|notifications|focus|app/i);
+  assert.match(capabilityAnswer.message_text, /what('|’)s been hardest|qué es lo que más/i);
+  assert.doesNotMatch(capabilityAnswer.message_text, /Read:|Pattern:|Move:|I can read your phone-habit patterns/i);
+
+  const digitalDetox = await call("Can you define a digital detox plan for me?", baseContext({ channel: "whatsapp", assistant_channel: "whatsapp" }));
+  assert.strictEqual(digitalDetox.actions.length, 0);
+  assert.match(digitalDetox.message_text, /choose the apps|protect one high-risk window|When does it usually start/i);
+  assert.doesNotMatch(digitalDetox.message_text, /Tell me the app, moment, or habit/i);
+  assert.doesNotMatch(digitalDetox.message_text, /Read:|Pattern:|Move:/i);
+
   const webPrediction = await call("How can you know that tomorrow I will be more tired than today?", baseContext({
     channel: "web_preview",
     assistant_channel: "web",

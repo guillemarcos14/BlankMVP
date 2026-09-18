@@ -17,6 +17,12 @@ const {
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
+const {
+  hasSelectedDistractions,
+  onboardingMessages,
+  queueOnboardingPicker,
+  markOnboardingSent,
+} = require("./bm-onboarding");
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -469,6 +475,13 @@ async function callBlankedAgent(prompt, from) {
 }
 
 async function recordAssistantConnection({ channel, connectCode, from }) {
+  let previousMemory = {};
+  try {
+    previousMemory = await getAssistantMemory(channel, from);
+  } catch (_) {
+    // Connection delivery must still work when durable memory is temporarily unavailable.
+  }
+  let context = {};
   try {
     await recordAssistantChannel({
       event: "assistant_channel_connected",
@@ -486,10 +499,39 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
       },
       source: "assistant_channel_connected",
     });
-    await attachAssistantUserContext({ connectCode, channel, channelUser: from });
+    const attachedContext = await attachAssistantUserContext({ connectCode, channel, channelUser: from });
+    context = attachedContext && Object.keys(attachedContext).length ? attachedContext : previousMemory.user_context || {};
   } catch (_) {
-    return;
+    // Connection delivery must not depend on the context snapshot being available.
   }
+  return {
+    firstConnection: previousMemory.assistant_onboarding_version !== "natural-v1",
+    context: context || {},
+  };
+}
+
+async function sendConnectionOnboarding(from, connection = {}) {
+  if (connection.firstConnection === false) return { sent: false, reason: "already_onboarded" };
+  const context = connection.context || {};
+  const messages = onboardingMessages(context);
+  const selected = hasSelectedDistractions(context);
+  let queued = null;
+  if (!selected) {
+    try {
+      queued = await queueOnboardingPicker({ channel: "whatsapp", channelUser: from, messages });
+    } catch (_) {
+      // The visible copy remains useful even when the action store or APNs is unavailable.
+    }
+  }
+
+  const firstDelivery = await sendWhatsAppMessage(from, messages.welcome);
+  const secondDelivery = await sendWhatsAppMessage(from, selected ? messages.ready : messages.setup);
+  if (firstDelivery?.skipped || secondDelivery?.skipped) {
+    return { skipped: true, reason: firstDelivery?.reason || secondDelivery?.reason || "whatsapp_delivery_skipped" };
+  }
+  if (queued?.button) await sendWhatsAppMessage(from, "", queued.button);
+  await markOnboardingSent("whatsapp", from);
+  return { sent: true, selected, push: queued?.push || null };
 }
 
 async function processMessage(message) {
@@ -505,11 +547,11 @@ async function processMessage(message) {
   if (!prompt) return sendWhatsAppMessage(message.from, "I could not read that message yet. Send it as text or try another audio.");
   const connectCode = connectCodeFromText(prompt);
   if (connectCode) {
-    await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
-    return sendWhatsAppMessage(
-      message.from,
-      "Hey! Blankmind here 👋 Connected. This WhatsApp thread is now linked to your digital wellness assistant. Open the app to see blocks, Health, reports and settings."
-    );
+    const connection = await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
+    const onboarding = await sendConnectionOnboarding(message.from, connection);
+    return onboarding?.skipped
+      ? onboarding
+      : { sent: true, onboarding: connection.firstConnection !== false };
   }
 
   let linkedConnection = null;

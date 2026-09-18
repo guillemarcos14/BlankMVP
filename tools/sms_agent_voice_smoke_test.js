@@ -309,6 +309,35 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
   }
 }
 
+async function connectOnboardingIsNaturalAndQueuesPicker() {
+  await withAssistantMemoryMock(async () => {
+    const response = await smsHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+      body: new URLSearchParams({
+        From: "+34600000001",
+        Body: "CONNECT ABC123",
+        MessageSid: "SM-onboarding",
+      }).toString(),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    assert.strictEqual((response.body.match(/<Message>/g) || []).length, 2);
+    assert.match(response.body, /Welcome to Blankmind/i);
+    assert.match(response.body, /choose the apps you consider distractions/i);
+    assert.match(response.body, /talk to me normally/i);
+    assert.doesNotMatch(response.body, /Hey! Blankmind here|Connected\. This WhatsApp thread/i);
+
+    const polled = await assistantChannelHandler({
+      httpMethod: "POST",
+      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "sms" }),
+    });
+    const body = JSON.parse(polled.body);
+    assert.strictEqual(polled.statusCode, 200, polled.body);
+    assert.strictEqual(body.pending_action.type, "open_app_picker");
+    assert.strictEqual(body.pending_action.name, null);
+  }, []);
+}
+
 async function whatsappUsesCanonicalSelectionForRequestedApp() {
   await withAssistantMemoryMock(async () => {
     const send = (body, sid) => smsHandler({
@@ -443,6 +472,7 @@ async function smsSignatureAndMidnightLinkChecks() {
   await whatsappBlockingFollowupKeepsPendingContract();
   await whatsappTextHasNoAudioAttachment();
   await whatsappMissingSelectionCarriesConfirmedProtection();
+  await connectOnboardingIsNaturalAndQueuesPicker();
   await whatsappUsesCanonicalSelectionForRequestedApp();
   await whatsappInputAudioGetsTranscribedTextReply();
   await audioEndpointIsDisabled();

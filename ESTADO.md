@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-17
+Ultima actualizacion: 2026-09-18
 
 ## Resumen actual
+- 2026-09-18: Corregido el falso setup de BM cuando FamilyControls sincroniza brevemente `screen_time_authorized=false` al despertar. Commit `cd59b0e`, deploy Netlify `6aacf2789d1cd0039e109537`: WhatsApp/SMS entregan la orden al dispositivo registrado si ya existe la selección; iOS conserva la validación final y espera la estabilización antes de sincronizar en la próxima build. Smoke productivo del estado real genera `start_protection` sin Choose Apps.
 - 2026-09-17: Fiabilidad de bloqueo inmediato BM cerrada por código y backend: APNs de prioridad alta con expiración exacta, resultado registrado, reintentos en background y aviso a los 60 s si no hay acuse; iOS verifica `action_id`, inicio real, duración, origen y fin efectivo, clasifica retrasos y fusiona intervalos sin acortar horarios. Backend en producción `6aac177a571ea02c1129cb62`; iOS Build CI `35247396488` en verde. Requiere nueva build/TestFlight y prueba física.
 - 2026-09-17: MacinCloud FF368 compiló el checkout actual `/Users/user301201/blankmvp/ios/Blank` con `xcodebuild -project blank.xcodeproj -sdk iphonesimulator -configuration debug build`; resultado `** BUILD SUCCEEDED **`. No se operó Xcode. La revisión visual de la nueva pantalla de distracciones sigue pendiente.
 - 2026-09-17: La Home iOS ahora muestra `blank`, `progress`, `distractions` y `settings` en ese orden. La antigua superficie `Sessions` queda convertida en una lista visual de las aplicaciones seleccionadas, con sus franjas horarias activas en la esquina superior izquierda y un botón circular para abrir Choose Apps. Product harness `33/33` y `git diff --check` en verde; falta compilar/revisar visualmente iOS.
@@ -22,6 +23,7 @@ Ultima actualizacion: 2026-09-17
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-18: Diagnosticada la prueba física de las 10:01 mediante Supabase: selección `9`, dispositivo registrado y último permiso falso transitorio; al abrir, el permiso volvió a `true` en tres segundos. Separado el copy de permisos/selector, delegado el check final al iPhone registrado y estabilizada la sincronización nativa. Harness `33/33`, semántica `86/86`, smoke WhatsApp y producción en verde.
 - 2026-09-17: MacinCloud FF368 confirmó `** BUILD SUCCEEDED **` para el build de simulador desde `/Users/user301201/blankmvp/ios/Blank`. La Terminal quedó en el prompt y no se operó Xcode.
 - 2026-09-17: Reemplazada la pantalla antigua de `Sessions` por `DistractionsScreen`: filas de apps con `Label(ApplicationToken)` y tipografía de Home, horarios desde `schedule.activeWindows`, y botón circular negro con `+` blanco que abre el selector nativo de Apple. La navegación visible queda `blank / progress / distractions / settings`. Validado con product harness `33/33` y `git diff --check`; pendiente build/revisión visual en MacinCloud.
 - 2026-09-17: El juez Sol detectó `12/48` respuestas pobres (`9` contradicciones duras) porque el renderer aún decía `Review it in Blankmind to apply it`. Se corrigió antes de continuar, se añadió regresión, se vinculó la revisión independiente a hashes exactos y la repetición final aprobó `48/48` con `100 %` y cero fallos duros.

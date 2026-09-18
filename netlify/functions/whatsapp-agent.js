@@ -321,7 +321,7 @@ function canReusePendingAction(existing, pending, now = Date.now()) {
 }
 
 async function queuePendingAssistantAction(connection, plan, prompt = "") {
-  if (!connection?.connectCode) return null;
+  if (!connection?.channel || !connection?.channelUser) return null;
   const pending = pendingActionFromPlan(plan, prompt);
   if (!pending) return null;
   let memory = {};
@@ -623,13 +623,14 @@ async function processMessage(message) {
   }
   let queued = null;
   try {
-    queued = await queuePendingAssistantAction(linkedConnection, plan, prompt);
+    const actionConnection = linkedConnection || { channel: "whatsapp", channelUser: message.from };
+    queued = await queuePendingAssistantAction(actionConnection, plan, prompt);
     const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
       || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
-    if (!queued && linkedConnection?.connectCode && invalidatesQueuedAction) {
+    if (!queued && invalidatesQueuedAction) {
       await recordAssistantMemory({
-        channel: linkedConnection.channel,
-        channelUser: linkedConnection.channelUser,
+        channel: actionConnection.channel,
+        channelUser: actionConnection.channelUser,
         memory: { pending_assistant_action: null },
         source: "assistant_action_invalidated",
       });

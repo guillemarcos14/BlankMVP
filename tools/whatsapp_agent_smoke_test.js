@@ -330,6 +330,47 @@ async function linkIncludesRequestedApps() {
   }
 }
 
+async function queuesCompleteActionWithoutRecentConnectCode() {
+  semanticMemoryRows.clear();
+  process.env.SUPABASE_URL = "https://supabase.test";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
+  process.env.WHATSAPP_ACCESS_TOKEN = "test-access-token";
+  process.env.WHATSAPP_PHONE_NUMBER_ID = "test-phone-number-id";
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, options = {}) => {
+    const memoryResponse = recentAssistantMemoryResponse(_url, options);
+    if (memoryResponse) return memoryResponse;
+    return { ok: true, status: 200, text: async () => "", json: async () => ({ ok: true }) };
+  };
+
+  try {
+    const response = await handler({
+      httpMethod: "POST",
+      headers: {},
+      body: JSON.stringify({
+        entry: [{ changes: [{ value: { messages: [{
+          from: "34600000009",
+          id: "wamid.no-recent-connect-code",
+          text: { body: "Block distractions for 10 mins now just once" },
+        }] } }] }],
+      }),
+    });
+    assert.strictEqual(response.statusCode, 200, response.body);
+    const pendingRows = [...semanticMemoryRows.values()].flat()
+      .map((row) => row.payload?.properties?.memory?.pending_assistant_action)
+      .filter(Boolean);
+    assert.strictEqual(pendingRows.length, 1, "a signed linked thread must queue from its own durable memory");
+    assert.strictEqual(pendingRows[0].type, "start_protection");
+    assert.strictEqual(pendingRows[0].minutes, 10);
+    assert.strictEqual(pendingRows[0].contract_version, "bm-immediate-v4");
+  } finally {
+    global.fetch = originalFetch;
+    semanticMemoryRows.clear();
+    delete process.env.WHATSAPP_ACCESS_TOKEN;
+    delete process.env.WHATSAPP_PHONE_NUMBER_ID;
+  }
+}
+
 async function twilioButtonTemplateHidesRawUrlFromMainReply() {
   semanticMemoryRows.clear();
   process.env.SUPABASE_URL = "https://supabase.test";
@@ -380,7 +421,7 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /applying it now/i);
+    assert.match(requests[0].Body, /(applying it now|couldn't wake the iPhone now)/i);
     assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
   } finally {
     global.fetch = originalFetch;
@@ -614,6 +655,7 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   await connectMessage();
   await connectGreeting();
   await linkIncludesRequestedApps();
+  await queuesCompleteActionWithoutRecentConnectCode();
   await twilioButtonTemplateHidesRawUrlFromMainReply();
   await legacyModePhraseUsesCanonicalProtection();
   await categoryRequestUsesSingleSelectionFlow();

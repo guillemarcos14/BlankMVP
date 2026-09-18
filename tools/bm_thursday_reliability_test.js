@@ -101,6 +101,7 @@ assert.match(home, /screen_time_permission_denied/, "permission denial must end 
 assert.match(home, /assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
 assert.match(app, /AssistantActionReceiptStore\.load/, "background execution must recover an unacknowledged outcome");
 assert.match(app, /guard await client\.acknowledge\([\s\S]*?status: "confirmed"/, "background execution must not start before confirmation is recorded");
+assert.match(app, /await blocker\.refreshAuthorizationStatusUntilSettled\(\)/, "background execution must wait for FamilyControls authorization to stabilize");
 assert.match(channel, /action_expired_before_execution/, "expired actions must have an explicit terminal outcome");
 assert.match(channel, /invalid_execution_evidence/, "generic active state must not verify an exact immediate action");
 assert.match(channel, /Cancelled\. Nothing was changed on the iPhone\./, "dismissal must be reported accurately");

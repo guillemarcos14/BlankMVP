@@ -466,7 +466,7 @@ private struct AssistantBackgroundActionRunner {
         let store = SessionStore(defaults: defaults)
         let blocker = ScreenTimeBlocker()
         await blocker.restore(selection: store.selection)
-        blocker.refreshAuthorizationStatus()
+        await blocker.refreshAuthorizationStatusUntilSettled()
         guard blocker.authorizationStatus == .approved else {
             let receipt = AssistantActionReceipt(
                 actionId: remote.id,

@@ -174,41 +174,6 @@ struct ReportView: View {
                         .padding(.top, 8)
                 }
 
-                if !sessionStore.isBlankActive {
-                    Button {
-                        startBlank()
-                    } label: {
-                        HStack(spacing: 12) {
-                            Text("start blank")
-                                .font(.blankInter(size: 28, weight: .bold, relativeTo: .title2))
-                                .tracking(-0.6)
-                                .foregroundStyle(accentBlue)
-
-                            Spacer(minLength: 12)
-
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(accentBlue)
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-                        .background(accentBlue.opacity(0.10), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(accentBlue.opacity(0.24), lineWidth: 1)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 4)
-                    .accessibilityLabel("start blank")
-                    .accessibilityHint("starts a blank session")
-                }
-
-                Text("for digital wellness only.")
-                    .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
-                    .foregroundStyle(reportSecondary.opacity(0.68))
-                    .padding(.top, 12)
-                    .padding(.bottom, 30)
             }
             .padding(.horizontal, 0)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -590,17 +590,9 @@ struct ReportView: View {
         }
     }
 
-    @ViewBuilder
     private var reportBackground: some View {
-        if minimalAppearance {
-            (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
-                .ignoresSafeArea()
-        } else if usesMainBackground {
-            Color.clear
-        } else {
-            ReportLiquidBackground(isActive: sessionStore.isBlankActive)
-                .ignoresSafeArea()
-        }
+        (sessionStore.isBlankActive ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
+            .ignoresSafeArea()
     }
 
     private func startBlank(durationMinutes: Int? = nil) {

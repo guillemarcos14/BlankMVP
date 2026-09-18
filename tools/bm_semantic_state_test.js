@@ -195,6 +195,17 @@ test("app possession claims are not device presence evidence", () => {
 test("permission setup contains no hidden executable payload", () => {
   const r = turn("Block Instagram now for 30 minutes once",null,{...DEVICE,screen_time_authorized:false}); assert.deepEqual(r.actions,[{type:"request_screen_time_permission"}]);
 });
+test("messaging delegates a transient permission snapshot to the registered device", () => {
+  const r = turn("Block distractions now for 10 minutes once",null,{
+    ...DEVICE,
+    channel:"whatsapp",
+    screen_time_authorized:false,
+    device_execution_ready:true,
+    app_presence_recent:true,
+  });
+  assert.equal(r.decision.type,"ready");
+  assert.deepEqual(r.actions,[{type:"start_protection",minutes:10,hard_mode:false}]);
+});
 test("capability arrival does not change semantic requested facts", () => {
   const initial = turn("Block Instagram now for 30 minutes once",null,{...DEVICE,screen_time_authorized:false});
   const ready = turn("ready",initial.state,DEVICE); assert.equal(ready.actions[0].type,"start_protection"); equalSlot(ready,"duration_minutes",30);

@@ -6,8 +6,15 @@ process.env.WHATSAPP_VERIFY_TOKEN = "test-token";
 delete process.env.WHATSAPP_ACCESS_TOKEN;
 delete process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-const { handler } = require("../netlify/functions/whatsapp-agent");
+const { handler, _test } = require("../netlify/functions/whatsapp-agent");
 const { handler: assistantChannelHandler } = require("../netlify/functions/assistant-channel");
+
+const permissionReply = _test.whatsappReplyText({
+  message_text: "The proposal has not been applied yet.",
+  actions: [{ type: "request_screen_time_permission" }],
+});
+assert.match(permissionReply, /Screen Time permission/i);
+assert.doesNotMatch(permissionReply, /Open Blankmind to choose the apps/i);
 
 const semanticMemoryRows = new Map();
 

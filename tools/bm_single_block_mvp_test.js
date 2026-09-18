@@ -59,6 +59,15 @@ assert.equal(missingApp.decision.slot, "app_presence");
 assert.equal(missingApp.reviewOnlyAppPresence, true);
 assert.deepEqual(missingApp.actions, [{ type:"start_protection", minutes:30, hard_mode:false }]);
 
+const transientPermission = activate("Block distractions now for 10 minutes just once", {
+  ...readyContext,
+  channel:"whatsapp",
+  screen_time_authorized:false,
+  app_presence_recent:true,
+});
+assert.equal(transientPermission.decision.type, "ready");
+assert.deepEqual(transientPermission.actions, [{ type:"start_protection", minutes:10, hard_mode:false }]);
+
 const sessionStore = read("ios/Blank/Blank/SessionStore.swift");
 const setupView = read("ios/Blank/Blank/SetupView.swift");
 const homeView = read("ios/Blank/Blank/HomeView.swift");

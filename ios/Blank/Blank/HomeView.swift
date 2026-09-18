@@ -498,32 +498,31 @@ struct HomeView: View {
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
             applyScreenTimeControls()
-            screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             processPendingBlockConfigurationIfNeeded()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
-            syncAssistantContext()
-            pollPendingAssistantActionIfNeeded(force: true)
+            refreshAuthorizationAndSyncAssistantContext()
         }
         .onChange(of: scenePhase) { phase in
             guard phase == .active else { return }
             sessionStore.syncFromSharedDefaults()
             applyScreenTimeControls()
-            screenTimeBlocker.refreshAuthorizationStatus()
             healthKitStore.refresh()
             processPendingBlockConfigurationIfNeeded()
             openWidgetScanIfNeeded()
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
-            syncAssistantContext()
-            pollPendingAssistantActionIfNeeded(force: true)
+            refreshAuthorizationAndSyncAssistantContext()
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
+            syncAssistantContext()
+        }
+        .onChange(of: screenTimeBlocker.authorizationStatus) { _ in
             syncAssistantContext()
         }
         .onChange(of: sessionStore.schedule) { _ in syncAssistantContext() }
@@ -1809,6 +1808,14 @@ struct HomeView: View {
                 phoneNumber: assistantPhoneNumber,
                 payload: payload
             )
+        }
+    }
+
+    private func refreshAuthorizationAndSyncAssistantContext() {
+        Task { @MainActor in
+            await screenTimeBlocker.refreshAuthorizationStatusUntilSettled()
+            syncAssistantContext()
+            pollPendingAssistantActionIfNeeded(force: true)
         }
     }
 

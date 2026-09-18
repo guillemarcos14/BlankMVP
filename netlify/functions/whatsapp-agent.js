@@ -336,8 +336,11 @@ function whatsappReplyText(plan, delivery = null) {
     .slice(0, 320) || "I can help with that in Blanked.";
   if (!action) return text;
   const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
-  if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
+  if (action.type === "open_app_picker") {
     return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
+  }
+  if (action.type === "request_screen_time_permission") {
+    return `${text}\n\n${spanish ? "Abre Blankmind para que iOS compruebe el permiso de Tiempo de uso. No necesitas volver a elegir las apps." : "Open Blankmind so iOS can verify Screen Time permission. You do not need to choose the apps again."}`;
   }
   if (delivery?.push?.sent === false) {
     return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
@@ -661,3 +664,5 @@ exports.handler = async (event) => {
     return json(500, { error: "whatsapp_agent_failed", detail: error.message });
   }
 };
+
+exports._test = { whatsappReplyText };

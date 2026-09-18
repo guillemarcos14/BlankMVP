@@ -438,9 +438,16 @@ function requiredFields(state, context = {}) {
 function capabilityGap(state, context) {
   const channel = fold(context.channel || context.assistant_channel);
   const native = ["ios", "android", "app"].includes(channel);
+  const remoteDeviceCanVerifyPermission = ["whatsapp", "sms"].includes(channel)
+    && context.has_selected_apps === true
+    && context.device_execution_ready === true;
   const present = native || context.device_execution_ready === true || context.app_presence_recent === true || context.app_presence_state === "recently_seen";
   if (!present) return "app_presence";
-  if (context.screen_time_authorized !== true) return "permissions";
+  // FamilyControls can report a transient false while iOS is waking. Messaging
+  // may still deliver the requested action to a registered device; the native
+  // executor performs the authoritative permission check and reports failure
+  // instead of letting the server claim success.
+  if (context.screen_time_authorized !== true && !remoteDeviceCanVerifyPermission) return "permissions";
   if (usesSingleDistractionBlock(context)) return context.has_selected_apps === true ? null : "app_selection";
   return context.has_selected_apps === true ? null : "app_selection";
 }

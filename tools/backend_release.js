@@ -292,6 +292,11 @@ function deploy(args) {
       "--dir", "web/landing", "--functions", "netlify/functions",
       "--site", siteId, "--skip-functions-cache",
     ], { inherit: true });
+    run(process.execPath, [
+      "tools/verify_bm_runtime.js",
+      "--url", "https://getblank.netlify.app/.netlify/functions/whatsapp-agent",
+      "--expected", "bm-immediate-v4",
+    ], { inherit: true });
     actions.push("netlify getblank");
   }
   const reportPath = writeReport("deploy.json", {

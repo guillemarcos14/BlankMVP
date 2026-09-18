@@ -77,6 +77,14 @@ function recentAssistantMemoryResponse(target, options = {}) {
 }
 
 async function verifyWebhook() {
+  const runtime = await handler({
+    httpMethod: "GET",
+    queryStringParameters: { bm_runtime: "1" },
+  });
+  assert.strictEqual(runtime.statusCode, 200, runtime.body);
+  assert.strictEqual(JSON.parse(runtime.body).runtime_contract, "bm-immediate-v4");
+  assert.strictEqual(runtime.headers["x-bm-runtime-contract"], "bm-immediate-v4");
+
   const response = await handler({
     httpMethod: "GET",
     queryStringParameters: {

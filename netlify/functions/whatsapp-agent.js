@@ -123,6 +123,17 @@ function verifySignature(event) {
 
 function verifyChallenge(event) {
   const params = event.queryStringParameters || {};
+  if (params.bm_runtime === "1") {
+    return {
+      statusCode: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "x-bm-runtime-contract": WHATSAPP_RUNTIME_CONTRACT,
+      },
+      body: JSON.stringify({ ok: true, runtime_contract: WHATSAPP_RUNTIME_CONTRACT }),
+    };
+  }
   const token = process.env.WHATSAPP_VERIFY_TOKEN;
   if (params["hub.mode"] !== "subscribe" || !params["hub.challenge"]) {
     return json(400, { error: "invalid_whatsapp_challenge" });

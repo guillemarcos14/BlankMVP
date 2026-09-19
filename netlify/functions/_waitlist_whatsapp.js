@@ -299,13 +299,53 @@ async function sendTwilioContent(phone, contentSid, fetchImpl = fetch) {
   return { id: payload.sid || null, provider: "twilio" };
 }
 
-async function sendOpeningMessage(phone, index, fetchImpl = fetch) {
+async function sendTwilioSms(phone, body, fetchImpl = fetch) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = phoneForStorage(process.env.TWILIO_FROM_NUMBER);
+  const messagingServiceSid = cleanText(process.env.TWILIO_MESSAGING_SERVICE_SID, 80);
+  if (!sid || !token || (!from && !messagingServiceSid)) throw new Error("waitlist_sms_credentials_missing");
+
+  const form = new URLSearchParams({ To: phone, Body: body });
+  if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
+  else form.set("From", from);
+
+  const response = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  const raw = await response.text();
+  let payload = {};
+  try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = {}; }
+  if (!response.ok) throw new Error(`waitlist_sms_send_${response.status}:${cleanText(payload.message || raw, 180)}`);
+  return { id: payload.sid || null, provider: "twilio" };
+}
+
+function openingArguments(channelOrFetch, maybeFetch) {
+  if (typeof channelOrFetch === "function") {
+    return { channel: "whatsapp", fetchImpl: channelOrFetch };
+  }
+  return {
+    channel: cleanText(channelOrFetch, 20).toLowerCase() || "whatsapp",
+    fetchImpl: typeof maybeFetch === "function" ? maybeFetch : fetch,
+  };
+}
+
+async function sendOpeningMessage(phone, index, channelOrFetch = "whatsapp", maybeFetch = fetch) {
   if (![1, 2].includes(index)) throw new Error("waitlist_opening_index_invalid");
+  const opening = index === 1 ? OPENING_MESSAGE_1 : OPENING_MESSAGE_2;
+  const { channel, fetchImpl } = openingArguments(channelOrFetch, maybeFetch);
+  if (channel === "sms") return sendTwilioSms(phone, opening, fetchImpl);
+  if (channel !== "whatsapp") throw new Error("waitlist_channel_invalid");
   const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase()
     || (process.env.WAITLIST_WHATSAPP_OPENING_CONTENT_SID_1 ? "twilio" : "meta");
   if (!isProduction() && process.env.WAITLIST_ALLOW_FREEFORM_OPENING === "true") {
     if (provider !== "meta") throw new Error("waitlist_freeform_opening_meta_only");
-    return sendMetaText(phone, index === 1 ? OPENING_MESSAGE_1 : OPENING_MESSAGE_2, fetchImpl);
+    return sendMetaText(phone, opening, fetchImpl);
   }
   if (provider === "twilio") {
     const contentSid = process.env[`WAITLIST_WHATSAPP_OPENING_CONTENT_SID_${index}`];
@@ -333,6 +373,7 @@ module.exports = {
   sendMetaText,
   sendOpening,
   sendOpeningMessage,
+  sendTwilioSms,
   transcribeAudio,
   twimlResponse,
   verifyMetaChallenge,

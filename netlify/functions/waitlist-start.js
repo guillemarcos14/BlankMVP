@@ -19,7 +19,10 @@ async function startWaitlist(event) {
   const authUser = await getSupabaseUser(event);
   if (!authUser?.id || !authUser?.phone) return json(401, { error: "waitlist_auth_required" });
   const body = parseJsonBody(event);
-  if (body.data_consent !== true || body.whatsapp_consent !== true) {
+  const channel = String(body.channel || "whatsapp").trim().toLowerCase();
+  const messagingConsent = body.messaging_consent === true || body.whatsapp_consent === true;
+  if (!["whatsapp", "sms"].includes(channel)) return json(400, { error: "waitlist_channel_invalid" });
+  if (body.data_consent !== true || !messagingConsent) {
     return json(400, { error: "waitlist_consent_required" });
   }
 
@@ -32,7 +35,7 @@ async function startWaitlist(event) {
 
   const sent = [];
   if (!user.opening_first_sent_at) {
-    const result = await sendOpeningMessage(user.phone_e164, 1);
+    const result = await sendOpeningMessage(user.phone_e164, 1, channel);
     await recordMessage({
       userId: user.id,
       provider: result.provider,
@@ -46,7 +49,7 @@ async function startWaitlist(event) {
   }
 
   if (!user.opening_second_sent_at) {
-    const result = await sendOpeningMessage(user.phone_e164, 2);
+    const result = await sendOpeningMessage(user.phone_e164, 2, channel);
     await recordMessage({
       userId: user.id,
       provider: result.provider,
@@ -61,10 +64,11 @@ async function startWaitlist(event) {
     user = await patchUser(user.id, { opening_sent_at: now() });
   }
 
-  if (sent.length) await recordEvent(user.id, "waitlist_started", { opening_messages_sent: sent });
+  if (sent.length) await recordEvent(user.id, "waitlist_started", { channel, opening_messages_sent: sent });
   return json(200, {
     ok: true,
     waitlist_status: user.status,
+    channel,
     opening_sent: Boolean(user.opening_sent_at),
     sent,
   });

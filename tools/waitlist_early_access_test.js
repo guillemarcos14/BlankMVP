@@ -22,6 +22,7 @@ const {
   validateExtractedFacts,
 } = require("../netlify/functions/_waitlist_ai");
 const { handler } = require("../netlify/functions/waitlist-agent");
+const { handler: waitlistStartHandler } = require("../netlify/functions/waitlist-start");
 
 function response(status, body, headers = {}) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -83,6 +84,92 @@ async function openingDeliveryContract() {
       TWILIO_WHATSAPP_FROM_NUMBER: previous.from,
       WAITLIST_WHATSAPP_OPENING_CONTENT_SID_1: previous.first,
       WAITLIST_WHATSAPP_OPENING_CONTENT_SID_2: previous.second,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
+async function smsOpeningDeliveryContract() {
+  const previous = {
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_FROM_NUMBER,
+    messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+  };
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "token";
+  process.env.TWILIO_FROM_NUMBER = "+13478366767";
+  process.env.TWILIO_MESSAGING_SERVICE_SID = "MGtest";
+  const state = {
+    user: {
+      id: "11111111-1111-4111-8111-111111111111",
+      auth_user_id: "22222222-2222-4222-8222-222222222222",
+      phone_e164: "+13475550123",
+      status: "active",
+      data_consent: true,
+      whatsapp_consent: true,
+      opening_first_sent_at: null,
+      opening_second_sent_at: null,
+      opening_sent_at: null,
+    },
+    twilio: [],
+    events: [],
+  };
+  const previousFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    const value = String(url);
+    if (value === "https://supabase.test/auth/v1/user") {
+      return response(200, { id: state.user.auth_user_id, phone: state.user.phone_e164 });
+    }
+    if (value.includes("api.twilio.com/2010-04-01/Accounts/")) {
+      const body = new URLSearchParams(options.body);
+      state.twilio.push(body);
+      return response(201, { sid: `SM-opening-${state.twilio.length}` });
+    }
+    if (!value.startsWith("https://supabase.test/rest/v1/")) throw new Error(`unexpected fetch ${value}`);
+    const parsed = new URL(value);
+    const resource = parsed.pathname.replace("/rest/v1/", "");
+    const method = options.method || "GET";
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (resource === "waitlist_users" && method === "GET") return response(200, [state.user]);
+    if (resource === "waitlist_users" && method === "PATCH") {
+      state.user = { ...state.user, ...body };
+      return response(200, [state.user]);
+    }
+    if (resource === "waitlist_messages" && method === "POST") return response(201, [{ id: "message" }]);
+    if (resource === "waitlist_events" && method === "POST") {
+      state.events.push(body);
+      return response(201, []);
+    }
+    throw new Error(`unexpected supabase operation ${method} ${resource}`);
+  };
+
+  try {
+    const result = await waitlistStartHandler({
+      httpMethod: "POST",
+      headers: { authorization: "Bearer access-token" },
+      body: JSON.stringify({ data_consent: true, messaging_consent: true, channel: "sms" }),
+    });
+    assert.strictEqual(result.statusCode, 200);
+    const payload = JSON.parse(result.body);
+    assert.deepStrictEqual(payload.sent, [1, 2]);
+    assert.strictEqual(payload.channel, "sms");
+    assert.strictEqual(state.twilio.length, 2);
+    assert.strictEqual(state.twilio[0].get("To"), "+13475550123");
+    assert.strictEqual(state.twilio[0].get("From"), null);
+    assert.strictEqual(state.twilio[0].get("MessagingServiceSid"), "MGtest");
+    assert.strictEqual(state.twilio[0].get("Body"), OPENING_MESSAGE_1);
+    assert.strictEqual(state.twilio[1].get("Body"), OPENING_MESSAGE_2);
+    assert.strictEqual(state.events[0].properties.channel, "sms");
+  } finally {
+    global.fetch = previousFetch;
+    const mapping = {
+      TWILIO_ACCOUNT_SID: previous.sid,
+      TWILIO_AUTH_TOKEN: previous.token,
+      TWILIO_FROM_NUMBER: previous.from,
+      TWILIO_MESSAGING_SERVICE_SID: previous.messagingServiceSid,
     };
     for (const [key, value] of Object.entries(mapping)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
@@ -257,12 +344,14 @@ function isolationContract() {
   const client = fs.readFileSync(path.join(__dirname, "../web/landing/early-access.js"), "utf8");
   assert.match(page, /securely process this conversation, including voice-note transcripts/i);
   assert.match(client, /waitlist-start/);
-  assert.match(client, /channel:\s*"whatsapp"/);
+  assert.match(client, /channel\s*[,}]/);
+  assert.match(client, /messaging_consent:\s*true/);
 }
 
 async function main() {
   openingContract();
   await openingDeliveryContract();
+  await smsOpeningDeliveryContract();
   extractionContract();
   safetyContract();
   providerParsingContract();

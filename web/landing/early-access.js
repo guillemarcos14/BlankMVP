@@ -2,10 +2,13 @@
   const phoneForm = document.querySelector("#phone-form");
   const codeForm = document.querySelector("#code-form");
   const phoneInput = document.querySelector("#phone");
+  const channelInput = document.querySelector("#channel");
   const codeInput = document.querySelector("#code");
   const consentInput = document.querySelector("#consent");
   const status = document.querySelector("#status");
   let phone = "";
+  let channel = new URLSearchParams(window.location.search).get("channel") === "sms" ? "sms" : "whatsapp";
+  channelInput.value = channel;
 
   function setStatus(message, isError = false) {
     status.textContent = message;
@@ -33,15 +36,16 @@
       return;
     }
     phone = phoneInput.value.trim();
+    channel = channelInput.value === "sms" ? "sms" : "whatsapp";
     phoneForm.querySelector("button").disabled = true;
     setStatus("I’m sending your verification code now.");
     try {
-      const result = await post("app-auth", { action: "request_otp", phone, channel: "whatsapp" });
+      const result = await post("app-auth", { action: "request_otp", phone, channel });
       phone = result.phone_e164 || phone;
       phoneForm.hidden = true;
       codeForm.hidden = false;
       codeInput.focus();
-      setStatus("I sent the code to WhatsApp. Enter it here when it arrives.");
+      setStatus(`I sent the code to ${channel === "sms" ? "Messages" : "WhatsApp"}. Enter it here when it arrives.`);
     } catch (error) {
       setStatus(error.message, true);
       phoneForm.querySelector("button").disabled = false;
@@ -60,10 +64,12 @@
       });
       await post("waitlist-start", {
         data_consent: true,
+        channel,
+        messaging_consent: true,
         whatsapp_consent: true,
       }, verified.access_token);
       codeForm.hidden = true;
-      setStatus("You’re in. I’ve just started our conversation on WhatsApp.");
+      setStatus(`You’re in. I’ve just started our conversation on ${channel === "sms" ? "Messages" : "WhatsApp"}.`);
     } catch (error) {
       setStatus(error.message, true);
       codeForm.querySelector("button").disabled = false;

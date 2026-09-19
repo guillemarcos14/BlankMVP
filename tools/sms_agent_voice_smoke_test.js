@@ -338,6 +338,54 @@ async function connectOnboardingIsNaturalAndQueuesPicker() {
   }, []);
 }
 
+async function skippedWhatsappOnboardingIsNotMarkedDispatched() {
+  const previous = {
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+    onboardingContent: process.env.TWILIO_WHATSAPP_ONBOARDING_CONTENT_SID,
+    actionContent: process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID,
+  };
+  delete process.env.TWILIO_ACCOUNT_SID;
+  delete process.env.TWILIO_AUTH_TOKEN;
+  delete process.env.TWILIO_WHATSAPP_FROM_NUMBER;
+  delete process.env.TWILIO_WHATSAPP_ONBOARDING_CONTENT_SID;
+  delete process.env.TWILIO_WHATSAPP_ACTION_CONTENT_SID;
+  try {
+    await withAssistantMemoryMock(async ({ rows }) => {
+      const response = await smsHandler({
+        httpMethod: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", host: "getblank.netlify.app" },
+        body: new URLSearchParams({
+          From: "whatsapp:+34600000001",
+          Body: "CONNECT ABC123",
+          MessageSid: "SM-onboarding-skipped",
+        }).toString(),
+      });
+      assert.strictEqual(response.statusCode, 200, response.body);
+      const memories = [...rows.values()].flat()
+        .map((row) => row.payload?.properties?.memory)
+        .filter(Boolean);
+      assert.strictEqual(
+        memories.some((memory) => memory.assistant_onboarding_status === "dispatched"),
+        false,
+        "a skipped WhatsApp send was recorded as dispatched",
+      );
+    }, []);
+  } finally {
+    const envMap = {
+      sid: "TWILIO_ACCOUNT_SID",
+      token: "TWILIO_AUTH_TOKEN",
+      from: "TWILIO_WHATSAPP_FROM_NUMBER",
+      onboardingContent: "TWILIO_WHATSAPP_ONBOARDING_CONTENT_SID",
+      actionContent: "TWILIO_WHATSAPP_ACTION_CONTENT_SID",
+    };
+    for (const [key, envKey] of Object.entries(envMap)) {
+      if (previous[key] == null) delete process.env[envKey]; else process.env[envKey] = previous[key];
+    }
+  }
+}
+
 async function whatsappUsesCanonicalSelectionForRequestedApp() {
   await withAssistantMemoryMock(async () => {
     const send = (body, sid) => smsHandler({
@@ -473,6 +521,7 @@ async function smsSignatureAndMidnightLinkChecks() {
   await whatsappTextHasNoAudioAttachment();
   await whatsappMissingSelectionCarriesConfirmedProtection();
   await connectOnboardingIsNaturalAndQueuesPicker();
+  await skippedWhatsappOnboardingIsNotMarkedDispatched();
   await whatsappUsesCanonicalSelectionForRequestedApp();
   await whatsappInputAudioGetsTranscribedTextReply();
   await audioEndpointIsDisabled();

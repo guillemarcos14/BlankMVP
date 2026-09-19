@@ -27,6 +27,7 @@ assert.equal(executable.bm_action_id, "action-1");
 const setup = pushPayload({ id: "action-2", type: "open_app_picker" });
 assert.equal(setup.aps["content-available"], 1);
 assert.match(setup.aps.alert.body, /tap.*choose/i);
+assert.doesNotMatch(setup.aps.alert.body, /block/i, "onboarding selection must not imply that a block already exists");
 
 const previousAuthKey = process.env.APNS_AUTH_KEY;
 const compactScalar = Buffer.concat([Buffer.alloc(31), Buffer.from([1])]).toString("base64url");

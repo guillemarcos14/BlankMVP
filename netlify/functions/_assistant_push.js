@@ -69,10 +69,11 @@ function normalizeDevicePush(value) {
 }
 
 function pushPayload(action) {
-  const needsSelection = ["open_app_picker", "request_screen_time_permission"].includes(action?.type);
-  const alertBody = needsSelection
-    ? "Tap to choose your distractions and finish this block."
-    : "Tap to apply this block in Blankmind.";
+  const alertBody = action?.type === "open_app_picker"
+    ? "Tap to choose your distractions in Blankmind."
+    : action?.type === "request_screen_time_permission"
+      ? "Tap to finish setting up Blankmind."
+      : "Tap to apply this block in Blankmind.";
   return {
     aps: {
       "content-available": 1,

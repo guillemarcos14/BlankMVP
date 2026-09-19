@@ -10,8 +10,16 @@ const {
   hasSelectedDistractions,
   onboardingMessages,
   queueOnboardingPicker,
-  markOnboardingSent,
+  markOnboardingDispatched,
+  onboardingProgress,
+  dispatchWhatsAppOnboarding,
+  shouldSendOnboarding,
 } = require("./bm-onboarding");
+const {
+  PENDING_ASSISTANT_ACTION_TYPES,
+  firstPendingAction,
+  pendingActionFromPlan,
+} = require("./bm-pending-action");
 const {
   attachAssistantUserContext,
   claimAssistantInboundMessage,
@@ -451,44 +459,8 @@ function naturalReplyText(text) {
     .trim();
 }
 
-const PENDING_ASSISTANT_ACTION_TYPES = new Set([
-  "start_protection", "apply_schedule", "set_daily_limit",
-  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
-  "open_app_picker", "request_screen_time_permission",
-]);
-
 function pendingAssistantActionFromPlan(plan, appNames = []) {
-  const action = (Array.isArray(plan.actions) ? plan.actions : [])
-    .find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
-  if (!action) return null;
-  if (action.type === "apply_schedule" && (
-    !Number.isInteger(action.start_minute)
-    || !Number.isInteger(action.end_minute)
-    || action.start_minute === action.end_minute
-  )) return null;
-  const payload = {
-    type: action.type,
-    name: action.name || null,
-    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
-    hard_mode: action.hard_mode === true,
-    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
-    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
-    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
-    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
-    hours: Number.isInteger(action.hours) ? action.hours : null,
-    // App mentions remain useful context, but never select the activation target.
-    app_names: [],
-  };
-  const createdAt = new Date().toISOString();
-  return {
-    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
-    fingerprint: crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32),
-    ...payload,
-    status: "queued",
-    summary: cleanText(plan.message_text || plan.response_text, 320),
-    created_at: createdAt,
-    expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-  };
+  return pendingActionFromPlan(plan, { idPrefix: "wa" });
 }
 
 async function queuePendingAssistantAction(connection, plan, appNames) {
@@ -512,7 +484,7 @@ async function queuePendingAssistantAction(connection, plan, appNames) {
 }
 
 function whatsappReplyText(plan, fallbackText) {
-  const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ASSISTANT_ACTION_TYPES.has(item.type));
+  const action = firstPendingAction(plan);
   const clean = naturalReplyText(plan.message_text || plan.response_text || fallbackText)
     .replace(/(?:https?|blank):\/\/\S+/gi, "")
     .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
@@ -566,8 +538,9 @@ async function recordMessageConnection(connectCode, from, channel) {
     // Connection delivery must not depend on the context snapshot being available.
   }
   return {
-    firstConnection: previousMemory.assistant_onboarding_version !== "natural-v1",
+    firstConnection: shouldSendOnboarding(previousMemory),
     context: context || {},
+    onboardingProgress: onboardingProgress(previousMemory),
   };
 }
 
@@ -587,6 +560,7 @@ async function connectionOnboarding(channel, from, connection = {}) {
   return {
     messages: [messages.welcome, selected ? messages.ready : messages.setup],
     button: queued?.button || null,
+    progress: connection.onboardingProgress || {},
   };
 }
 
@@ -945,24 +919,33 @@ exports.handler = async (event) => {
 
   if (reply.onboarding) {
     if (channel === "whatsapp") {
-      try {
-        await sendWhatsAppMessage(from, reply.onboarding.messages[0]);
-        await sendWhatsAppMessage(from, reply.onboarding.messages[1]);
-        if (reply.onboarding.button) await sendWhatsAppMessage(from, "", reply.onboarding.button);
-      } catch (error) {
-        if (!String(error?.message || "").includes("twilio_whatsapp_send_failed")) throw error;
-      }
+      const dispatch = await dispatchWhatsAppOnboarding({
+        channel,
+        channelUser: from,
+        messages: {
+          welcome: reply.onboarding.messages[0],
+          setup: reply.onboarding.messages[1],
+        },
+        button: reply.onboarding.button,
+        progress: reply.onboarding.progress,
+        sendMessage: sendWhatsAppMessage,
+      });
       if (messageSid) {
         try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
       }
-      await markOnboardingSent(channel, from);
+      if (!dispatch.dispatched) console.warn(`assistant_onboarding_not_dispatched:${cleanText(dispatch.reason, 160)}`);
       return text(200, `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`, "application/xml; charset=utf-8");
     }
     if (messageSid) {
       try { await completeAssistantInboundMessage(channel, from, messageSid); } catch (_) { /* best effort */ }
     }
     const onboardingResponse = text(200, twiml(reply.onboarding.messages), "application/xml; charset=utf-8");
-    await markOnboardingSent(channel, from);
+    await markOnboardingDispatched(channel, from, {
+      welcomeAccepted: true,
+      setupAccepted: true,
+      buttonRequired: false,
+      buttonAccepted: true,
+    });
     return onboardingResponse;
   }
 

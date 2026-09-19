@@ -164,9 +164,9 @@ function buildContextRetention(index) {
   const app = pick(socialApps);
   const moment = pick(weakMoments);
   return scenario(`synthetic_context_${index}_${moment.key}`, "context_retention", "web", [
-    user(`I lose control ${moment.phrase}.`, expect([/what do you mean|what do you lose control|do you mean|with what|which app|what happens|qué quieres decir|a qué te refieres/i], [moment.wrong, /walk|drink water|put your phone|block|protect|Blanked App/i], { maxWords: 45 })),
+    user(`I lose control ${moment.phrase}.`, expect([/what do you mean|what do you lose control|do you mean|with what|which app|what happens|qué quieres decir|a qué te refieres/i], [moment.wrong, /walk|drink water|put your phone|block|protect|Blankmind/i], { maxWords: 45 })),
     user(`${app}. Usually around ${moment.detail}.`, expect([new RegExp(app.split(" ")[0], "i"), moment.match], [moment.wrong])),
-    user("What should I do?", expect([new RegExp(app.split(" ")[0], "i"), moment.match, /Blanked App|block|protect|boundary/i], [moment.wrong, /download|install|put your phone away|put your phone out of reach/i])),
+    user("What should I do?", expect([new RegExp(app.split(" ")[0], "i"), moment.match, /Blankmind|block|protect|boundary/i], [moment.wrong, /download|install|put your phone away|put your phone out of reach/i])),
   ], channelContext("web"));
 }
 
@@ -176,7 +176,7 @@ function buildCorrection(index) {
   return scenario(`synthetic_correction_${index}`, "correction", "whatsapp", [
     user("I keep losing the night to TikTok.", expect([/TikTok|night|what time|bed|block|protect/i], [])),
     user(`No, I do not use TikTok. It is ${app} ${corrected}.`, expect([new RegExp(app.split(" ")[0], "i"), corrected === "when I wake up" ? /wake|waking|morning/i : /after lunch|around lunch|after work|after dinner/i, /got it|what time|finish|thing to solve/i], [/old app|context|TikTok is|bedtime scroll|sleep target/i])),
-    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /Blanked App|block|protect|boundary|start|unavailable|free|limit/i], [/TikTok is|bedtime scroll|sleep target|put your phone away|put your phone out of reach/i])),
+    user("Exactly. How would you handle it?", expect([new RegExp(app.split(" ")[0], "i"), /Blankmind|block|protect|boundary|start|unavailable|free|limit/i], [/TikTok is|bedtime scroll|sleep target|put your phone away|put your phone out of reach/i])),
   ], {
     ...channelContext("whatsapp"),
     memory: { main_apps: ["TikTok"], last_topic: "sleep", weak_hours: [23] },
@@ -187,7 +187,7 @@ function buildWebAppSameProduct(index) {
   const app = pick(["Instagram", "TikTok", "YouTube", "Reddit"]);
   return scenario(`synthetic_web_app_${index}`, "web_same_product", "web", [
     user(`Can you block ${app} from 10 to 7?`, expect([/10|7/i, /app|permission|execute|apply|automatic/i], [/different product|copy this manually/i])),
-    user("So web cannot do it?", expect([/same|plan|explain|web|app|permission|execute|automatic|Blanked App/i], [/weaker assistant|different product|Screen Time|Digital Wellbeing|built-in/i])),
+    user("So web cannot do it?", expect([/same|plan|explain|web|app|permission|execute|automatic|Blankmind/i], [/weaker assistant|different product|Screen Time|Digital Wellbeing|built-in/i])),
   ], channelContext("web"));
 }
 

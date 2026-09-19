@@ -14,6 +14,7 @@ const {
 } = require("./_assistant_channel");
 const { identityForAppInstall, identityForPhone } = require("./_identity");
 const { normalizeDevicePush } = require("./_assistant_push");
+const { PENDING_ASSISTANT_ACTION_TYPES: PENDING_ACTION_TYPES } = require("./bm-pending-action");
 
 async function registerPreference(body) {
   const connectCode = normalizeConnectCode(body.connect_code);
@@ -160,12 +161,6 @@ async function registerDevicePush(body) {
   });
   return json(200, { ok: true, registered: true, environment: devicePush.environment });
 }
-
-const PENDING_ACTION_TYPES = new Set([
-  "start_protection", "apply_schedule", "set_daily_limit",
-  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
-  "open_app_picker", "request_screen_time_permission",
-]);
 
 const TERMINAL_ACTION_STATUSES = new Set(["verified", "delayed", "failed", "dismissed"]);
 const ACTION_STATUS_TRANSITIONS = {

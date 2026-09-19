@@ -21,8 +21,15 @@ const {
   hasSelectedDistractions,
   onboardingMessages,
   queueOnboardingPicker,
-  markOnboardingSent,
+  onboardingProgress,
+  dispatchWhatsAppOnboarding,
+  shouldSendOnboarding,
 } = require("./bm-onboarding");
+const {
+  PENDING_ASSISTANT_ACTION_TYPES: PENDING_ACTION_TYPES,
+  firstPendingAction,
+  pendingActionFromPlan: buildPendingActionFromPlan,
+} = require("./bm-pending-action");
 
 function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -198,51 +205,8 @@ function requestedAppNames(text) {
     .map((candidate) => candidate.label);
 }
 
-const PENDING_ACTION_TYPES = new Set([
-  "start_protection", "apply_schedule", "set_daily_limit",
-  "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
-  "open_app_picker", "request_screen_time_permission",
-]);
-
 function pendingActionFromPlan(plan, prompt = "") {
-  const action = (Array.isArray(plan.actions) ? plan.actions : [])
-    .find((item) => item && PENDING_ACTION_TYPES.has(item.type));
-  if (!action) return null;
-  if (action.type === "apply_schedule" && (
-    !Number.isInteger(action.start_minute)
-    || !Number.isInteger(action.end_minute)
-    || action.start_minute === action.end_minute
-  )) return null;
-  const createdAt = new Date().toISOString();
-  const immediateDurationMs = action.type === "start_protection" && Number.isInteger(action.minutes)
-    ? action.minutes * 60 * 1000
-    : null;
-  const expiresAt = new Date(Date.now() + (immediateDurationMs || 2 * 60 * 60 * 1000)).toISOString();
-  const payload = {
-    type: action.type,
-    name: action.name || null,
-    minutes: Number.isInteger(action.minutes) ? action.minutes : null,
-    hard_mode: action.hard_mode === true,
-    start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,
-    end_minute: Number.isInteger(action.end_minute) ? action.end_minute : null,
-    weekdays: Array.isArray(action.weekdays) ? action.weekdays : [],
-    duration_days: Number.isInteger(action.duration_days) ? action.duration_days : null,
-    hours: Number.isInteger(action.hours) ? action.hours : null,
-    // App mentions remain conversational context only. Native execution always
-    // targets the one canonical distraction selection.
-    app_names: [],
-  };
-  const fingerprint = crypto.createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 32);
-  return {
-    id: `wa_${Date.now().toString(36)}_${crypto.randomBytes(6).toString("hex")}`,
-    fingerprint,
-    ...payload,
-    status: "queued",
-    summary: cleanText(plan.message_text || plan.response_text, 320),
-    created_at: createdAt,
-    requested_at: createdAt,
-    expires_at: expiresAt,
-  };
+  return buildPendingActionFromPlan(plan, { idPrefix: "wa" });
 }
 
 async function recordPushAttempt(connection, pending, pushResult) {
@@ -316,7 +280,7 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
 }
 
 function whatsappReplyText(plan, delivery = null) {
-  const action = (Array.isArray(plan.actions) ? plan.actions : []).find((item) => item && PENDING_ACTION_TYPES.has(item.type));
+  const action = firstPendingAction(plan);
   const text = cleanText(plan.message_text || plan.response_text, 480)
     .replace(/(?:https?|blank):\/\/\S+/gi, "")
     .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
@@ -487,8 +451,9 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
     // Connection delivery must not depend on the context snapshot being available.
   }
   return {
-    firstConnection: previousMemory.assistant_onboarding_version !== "natural-v1",
+    firstConnection: shouldSendOnboarding(previousMemory),
     context: context || {},
+    onboardingProgress: onboardingProgress(previousMemory),
   };
 }
 
@@ -506,13 +471,15 @@ async function sendConnectionOnboarding(from, connection = {}) {
     }
   }
 
-  const firstDelivery = await sendWhatsAppMessage(from, messages.welcome);
-  const secondDelivery = await sendWhatsAppMessage(from, selected ? messages.ready : messages.setup);
-  if (firstDelivery?.skipped || secondDelivery?.skipped) {
-    return { skipped: true, reason: firstDelivery?.reason || secondDelivery?.reason || "whatsapp_delivery_skipped" };
-  }
-  if (queued?.button) await sendWhatsAppMessage(from, "", queued.button);
-  await markOnboardingSent("whatsapp", from);
+  const dispatch = await dispatchWhatsAppOnboarding({
+    channel: "whatsapp",
+    channelUser: from,
+    messages: { welcome: messages.welcome, setup: selected ? messages.ready : messages.setup },
+    button: queued?.button || null,
+    progress: connection.onboardingProgress || {},
+    sendMessage: sendWhatsAppMessage,
+  });
+  if (!dispatch.dispatched) return { skipped: true, reason: dispatch.reason || "whatsapp_delivery_skipped" };
   return { sent: true, selected, push: queued?.push || null };
 }
 

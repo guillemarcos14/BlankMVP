@@ -2,4 +2,6 @@
 /vida.html / 301!
 /open /open.html 200
 /open.html /open.html 200
+/early-access /early-access.html 200
+/signup /early-access.html 200
 /* /index.html 200

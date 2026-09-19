@@ -56,3 +56,69 @@ footer {
 .legal-content ul {
   padding-left: 22px;
 }
+
+.early-access {
+  max-width: 560px;
+}
+
+.plain-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+}
+
+.access-form {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0 14px;
+}
+
+.access-form input[type="tel"],
+.access-form input[type="text"] {
+  border: 1px solid #222;
+  border-radius: 0;
+  box-sizing: border-box;
+  font: inherit;
+  max-width: 360px;
+  padding: 12px;
+  width: 100%;
+}
+
+.access-form button {
+  background: #000;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  max-width: 360px;
+  padding: 12px 16px;
+}
+
+.access-form button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.consent-row {
+  align-items: flex-start;
+  display: flex;
+  font-size: 14px;
+  gap: 9px;
+  line-height: 1.35;
+  max-width: 520px;
+}
+
+.consent-row input {
+  margin-top: 3px;
+}
+
+.access-status {
+  min-height: 1.4em;
+}
+
+.access-status.is-error {
+  color: #a00000;
+}
+
+.access-privacy {
+  font-size: 14px;
+}

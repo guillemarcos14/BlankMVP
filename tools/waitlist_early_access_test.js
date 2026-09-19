@@ -1,4 +1,5 @@
 const assert = require("assert");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
@@ -11,9 +12,12 @@ process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
 const {
   OPENING_MESSAGE_1,
   OPENING_MESSAGE_2,
+  enqueueTwilioMessage,
   parseMetaMessages,
   parseTwilioMessage,
+  sendTwilioText,
   sendOpeningMessage,
+  verifyBackgroundSignature,
 } = require("../netlify/functions/_waitlist_whatsapp");
 const {
   ageBand,
@@ -23,6 +27,7 @@ const {
   validateExtractedFacts,
 } = require("../netlify/functions/_waitlist_ai");
 const { handler } = require("../netlify/functions/waitlist-agent");
+const { handler: backgroundHandler } = require("../netlify/functions/waitlist-agent-background");
 
 function response(status, body, headers = {}) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -169,6 +174,9 @@ async function fullTurnContract() {
     if (value === "https://api.openai.com/v1/audio/transcriptions") {
       return response(200, { text: "I work as an architect and I open Instagram after client calls." });
     }
+    if (value.startsWith("https://api.twilio.com/")) {
+      return response(201, { sid: "SM-background-delivery", status: "queued" });
+    }
     if (value === "https://api.openai.com/v1/responses") {
       state.responseCalls += 1;
       state.responseInFlight += 1;
@@ -277,8 +285,133 @@ async function fullTurnContract() {
     assert.ok(state.messages.some((message) => message.message_kind === "audio_transcript"));
     assert.ok(state.events.some((event) => event.event_name === "audio_transcribed"));
     assert.ok(state.maxResponseConcurrency >= 2, "audio extraction and reply generation should run together");
+
+    const previousTwilio = {
+      token: process.env.TWILIO_AUTH_TOKEN,
+      sid: process.env.TWILIO_ACCOUNT_SID,
+      from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+    };
+    process.env.TWILIO_AUTH_TOKEN = "background-token";
+    process.env.TWILIO_ACCOUNT_SID = "ACtest";
+    process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+    try {
+      const backgroundMessage = {
+        provider: "twilio",
+        providerMessageId: "SM-background-1",
+        phone: "+34600111222",
+        text: "I usually scroll after lunch.",
+        audio: null,
+      };
+      const backgroundBody = JSON.stringify({ message: backgroundMessage });
+      const signature = `sha256=${crypto.createHmac("sha256", process.env.TWILIO_AUTH_TOKEN).update(backgroundBody, "utf8").digest("hex")}`;
+      const backgroundResult = await backgroundHandler({
+        httpMethod: "POST",
+        headers: { "x-waitlist-background-signature": signature },
+        body: backgroundBody,
+      });
+      assert.strictEqual(backgroundResult.statusCode, 200);
+      assert.match(backgroundResult.body, /SM-background-delivery/);
+      assert.ok(state.messages.some((message) => message.provider_message_id === "SM-background-delivery"));
+      assert.ok(state.events.some((event) => event.event_name === "waitlist_reply_delivered"));
+    } finally {
+      const mapping = {
+        TWILIO_AUTH_TOKEN: previousTwilio.token,
+        TWILIO_ACCOUNT_SID: previousTwilio.sid,
+        TWILIO_WHATSAPP_FROM_NUMBER: previousTwilio.from,
+      };
+      for (const [key, value] of Object.entries(mapping)) {
+        if (value === undefined) delete process.env[key]; else process.env[key] = value;
+      }
+    }
   } finally {
     global.fetch = previousFetch;
+  }
+}
+
+async function twilioAsyncDeliveryContract() {
+  const previous = {
+    asyncMode: process.env.WAITLIST_TWILIO_ASYNC,
+    backgroundUrl: process.env.WAITLIST_TWILIO_BACKGROUND_URL,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+  };
+  process.env.WAITLIST_TWILIO_ASYNC = "true";
+  process.env.WAITLIST_TWILIO_BACKGROUND_URL = "https://background.test/waitlist-agent-background";
+  process.env.TWILIO_AUTH_TOKEN = "background-token";
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+  const previousFetch = global.fetch;
+  try {
+    let queued = null;
+    global.fetch = async (url, options = {}) => {
+      assert.strictEqual(url, "https://background.test/waitlist-agent-background");
+      queued = { url, options };
+      const backgroundEvent = {
+        body: options.body,
+        headers: { "x-waitlist-background-signature": options.headers["x-waitlist-background-signature"] },
+      };
+      assert.strictEqual(verifyBackgroundSignature(backgroundEvent), true);
+      return response(202, { accepted: true });
+    };
+    const body = new URLSearchParams({
+      From: "whatsapp:+34600111222",
+      Body: "This should be queued immediately",
+      MessageSid: "SM-async-1",
+    }).toString();
+    const result = await handler({
+      httpMethod: "POST",
+      path: "/.netlify/functions/waitlist-agent",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    assert.strictEqual(result.statusCode, 200);
+    assert.match(result.body, /<Response><\/Response>/);
+    assert.match(queued.options.body, /SM-async-1/);
+  } finally {
+    global.fetch = previousFetch;
+    const mapping = {
+      WAITLIST_TWILIO_ASYNC: previous.asyncMode,
+      WAITLIST_TWILIO_BACKGROUND_URL: previous.backgroundUrl,
+      TWILIO_AUTH_TOKEN: previous.token,
+      TWILIO_ACCOUNT_SID: previous.sid,
+      TWILIO_WHATSAPP_FROM_NUMBER: previous.from,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
+async function twilioTextDeliveryContract() {
+  const previous = {
+    token: process.env.TWILIO_AUTH_TOKEN,
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    from: process.env.TWILIO_WHATSAPP_FROM_NUMBER,
+  };
+  process.env.TWILIO_AUTH_TOKEN = "token";
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "+13478366767";
+  try {
+    let request = null;
+    const result = await sendTwilioText("+34600111222", "A reliable WhatsApp reply", async (url, options) => {
+      request = { url, body: new URLSearchParams(options.body), authorization: options.headers.authorization };
+      return response(201, { sid: "SM-delivered-1", status: "queued" });
+    });
+    assert.strictEqual(result.id, "SM-delivered-1");
+    assert.match(request.url, /Accounts\/ACtest\/Messages\.json$/);
+    assert.strictEqual(request.body.get("To"), "whatsapp:+34600111222");
+    assert.strictEqual(request.body.get("Body"), "A reliable WhatsApp reply");
+    assert.match(request.authorization, /^Basic /);
+  } finally {
+    const mapping = {
+      TWILIO_AUTH_TOKEN: previous.token,
+      TWILIO_ACCOUNT_SID: previous.sid,
+      TWILIO_WHATSAPP_FROM_NUMBER: previous.from,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
   }
 }
 
@@ -306,6 +439,8 @@ async function main() {
   providerParsingContract();
   isolationContract();
   await fullTurnContract();
+  await twilioAsyncDeliveryContract();
+  await twilioTextDeliveryContract();
   console.log("waitlist early access tests passed");
 }
 

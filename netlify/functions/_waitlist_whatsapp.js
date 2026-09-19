@@ -102,6 +102,20 @@ function twilioWebhookUrl(event) {
   return host ? `${protocol}://${host}${path}` : "";
 }
 
+function twilioBackgroundUrl(event) {
+  const configured = cleanText(process.env.WAITLIST_TWILIO_BACKGROUND_URL, 800);
+  if (configured) return configured;
+  if (isProduction()) return "https://getblank.netlify.app/.netlify/functions/waitlist-agent-background";
+  const protocol = header(event, "x-forwarded-proto") || "https";
+  const host = header(event, "x-forwarded-host") || header(event, "host");
+  return host ? `${protocol}://${host}/.netlify/functions/waitlist-agent-background` : "";
+}
+
+function shouldUseAsyncTwilio() {
+  if (process.env.WAITLIST_TWILIO_ASYNC === "false") return false;
+  return process.env.WAITLIST_TWILIO_ASYNC === "true" || isProduction();
+}
+
 function verifyTwilioSignature(event) {
   const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
   const shouldValidate = configured === "true" || (isProduction() && configured !== "false");
@@ -304,6 +318,65 @@ async function sendTwilioContent(phone, contentSid, fetchImpl = fetch) {
   return { id: payload.sid || null, provider: "twilio" };
 }
 
+async function sendTwilioText(phone, body, fetchImpl = fetch) {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const from = phoneForStorage(process.env.TWILIO_WHATSAPP_FROM_NUMBER || process.env.TWILIO_FROM_NUMBER);
+  const message = cleanText(body, 4000);
+  if (!sid || !token || !from || !phone || !message) throw new Error("waitlist_twilio_text_missing");
+  const form = new URLSearchParams({
+    From: `whatsapp:${from}`,
+    To: `whatsapp:${phone}`,
+    Body: message,
+  });
+  const response = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
+    method: "POST",
+    headers: {
+      authorization: `Basic ${Buffer.from(`${sid}:${token}`).toString("base64")}`,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: form.toString(),
+  });
+  const raw = await response.text();
+  let payload = {};
+  try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = {}; }
+  if (!response.ok) throw new Error(`waitlist_twilio_text_send_${response.status}:${cleanText(payload.message || raw, 180)}`);
+  if (!payload.sid) throw new Error("waitlist_twilio_text_send_missing_sid");
+  return { id: payload.sid, provider: "twilio", status: payload.status || null };
+}
+
+function backgroundSignature(body) {
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  if (!token) return "";
+  return `sha256=${crypto.createHmac("sha256", token).update(body, "utf8").digest("hex")}`;
+}
+
+function verifyBackgroundSignature(event) {
+  const body = rawBody(event);
+  const expected = backgroundSignature(body);
+  return Boolean(expected) && timingSafeEqual(header(event, "x-waitlist-background-signature"), expected);
+}
+
+async function enqueueTwilioMessage(message, event, fetchImpl = fetch) {
+  const url = twilioBackgroundUrl(event);
+  const body = JSON.stringify({ message });
+  const signature = backgroundSignature(body);
+  if (!url || !signature) throw new Error("waitlist_twilio_background_not_configured");
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-waitlist-background-signature": signature,
+    },
+    body,
+  });
+  const raw = await response.text();
+  if (!response.ok && response.status !== 202) {
+    throw new Error(`waitlist_twilio_background_enqueue_${response.status}:${cleanText(raw, 180)}`);
+  }
+  return { accepted: true };
+}
+
 async function sendOpeningMessage(phone, index, fetchImpl = fetch) {
   if (![1, 2].includes(index)) throw new Error("waitlist_opening_index_invalid");
   const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase() || "twilio";
@@ -334,11 +407,15 @@ module.exports = {
   isTwilioEvent,
   parseMetaMessages,
   parseTwilioMessage,
+  enqueueTwilioMessage,
   sendMetaText,
+  sendTwilioText,
   sendOpening,
   sendOpeningMessage,
+  shouldUseAsyncTwilio,
   transcribeAudio,
   twimlResponse,
+  verifyBackgroundSignature,
   verifyMetaChallenge,
   verifyMetaSignature,
   verifyTwilioSignature,

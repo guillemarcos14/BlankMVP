@@ -18,9 +18,11 @@ const {
 } = require("./_waitlist_store");
 const {
   isTwilioEvent,
+  enqueueTwilioMessage,
   parseMetaMessages,
   parseTwilioMessage,
   sendMetaText,
+  shouldUseAsyncTwilio,
   transcribeAudio,
   twimlResponse,
   verifyMetaChallenge,
@@ -59,7 +61,7 @@ function deletionIsPending(user) {
 }
 
 async function saveOutbound(user, provider, reply, kind = "text", providerMessageId = null) {
-  await recordMessage({
+  return recordMessage({
     userId: user.id,
     provider,
     providerMessageId,
@@ -92,14 +94,15 @@ async function privacyReply({ user, provider, prompt }) {
   return "";
 }
 
-async function processMessage(message) {
+async function processMessage(message, options = {}) {
+  const deferDelivery = options.deferDelivery === true;
   const claim = await claimInbound(message.provider, message.providerMessageId);
   if (!claim.claimed) return { skipped: true, reason: "duplicate_inbound" };
 
   let user = await userByPhone(message.phone);
   if (!user || user.status !== "active" || user.data_consent !== true || user.whatsapp_consent !== true) {
-    await completeInbound(message.provider, message.providerMessageId);
-    return { reply: noConsentReply(), user: null, kind: "privacy" };
+    if (!deferDelivery) await completeInbound(message.provider, message.providerMessageId);
+    return { reply: noConsentReply(), user: null, kind: "privacy", deliveryDeferred: deferDelivery };
   }
 
   try {
@@ -113,20 +116,25 @@ async function processMessage(message) {
       } catch (error) {
         await recordEvent(user.id, "audio_transcription_failed", { provider: message.provider, reason: cleanText(error.message, 160) });
         const reply = "I couldn’t make out that voice note clearly. Could you send it again, or write it here instead?";
-        await saveOutbound(user, message.provider, reply);
-        await completeInbound(message.provider, message.providerMessageId);
+        if (!deferDelivery) {
+          await saveOutbound(user, message.provider, reply);
+          await completeInbound(message.provider, message.providerMessageId);
+        }
         return {
           reply,
           user,
           kind: "text",
+          deliveryDeferred: deferDelivery,
         };
       }
     }
     if (!prompt) {
       const reply = "I didn’t catch anything in that message. Could you try again?";
-      await saveOutbound(user, message.provider, reply);
-      await completeInbound(message.provider, message.providerMessageId);
-      return { reply, user, kind: "text" };
+      if (!deferDelivery) {
+        await saveOutbound(user, message.provider, reply);
+        await completeInbound(message.provider, message.providerMessageId);
+      }
+      return { reply, user, kind: "text", deliveryDeferred: deferDelivery };
     }
 
     const privacy = await privacyReply({ user, provider: message.provider, prompt });
@@ -141,10 +149,10 @@ async function processMessage(message) {
           messageKind: "privacy",
           body: prompt,
         });
-        await saveOutbound(user, message.provider, privacy, "privacy");
+        if (!deferDelivery) await saveOutbound(user, message.provider, privacy, "privacy");
       }
-      await completeInbound(message.provider, message.providerMessageId);
-      return { reply: privacy, user: null, kind: "privacy" };
+      if (!deferDelivery) await completeInbound(message.provider, message.providerMessageId);
+      return { reply: privacy, user: null, kind: "privacy", deliveryDeferred: deferDelivery };
     }
 
     const inbound = await recordMessage({
@@ -230,18 +238,30 @@ async function processMessage(message) {
       }
     }
 
-    await saveOutbound(user, message.provider, generated.reply);
-    await Promise.all([
-      recordEvent(user.id, "waitlist_turn_completed", {
-        provider: message.provider,
-        input_kind: messageKind,
-        facts_saved: saved.length,
-        focus: generated.focus,
-        restricted_topic: generated.restricted === true,
-      }),
-      completeInbound(message.provider, message.providerMessageId),
-    ]);
-    return { reply: generated.reply, user, kind: "text", factsSaved: saved.length };
+    const completion = {
+      provider: message.provider,
+      input_kind: messageKind,
+      facts_saved: saved.length,
+      focus: generated.focus,
+      restricted_topic: generated.restricted === true,
+    };
+    if (!deferDelivery) {
+      await saveOutbound(user, message.provider, generated.reply);
+      await Promise.all([
+        recordEvent(user.id, "waitlist_turn_completed", completion),
+        completeInbound(message.provider, message.providerMessageId),
+      ]);
+    }
+    return {
+      reply: generated.reply,
+      user,
+      kind: "text",
+      factsSaved: saved.length,
+      inputKind: messageKind,
+      focus: generated.focus,
+      restricted: generated.restricted === true,
+      deliveryDeferred: deferDelivery,
+    };
   } catch (error) {
     await releaseInbound(message.provider, message.providerMessageId).catch(() => null);
     throw error;
@@ -252,6 +272,14 @@ async function handleTwilio(event) {
   if (!verifyTwilioSignature(event)) return json(403, { error: "invalid_twilio_signature" });
   const messages = parseTwilioMessage(event);
   if (!messages.length) return twimlResponse("");
+  if (shouldUseAsyncTwilio()) {
+    try {
+      await enqueueTwilioMessage(messages[0], event);
+      return twimlResponse("");
+    } catch (error) {
+      return json(503, { error: "waitlist_twilio_queue_failed", detail: cleanText(error.message, 240) });
+    }
+  }
   const result = await processMessage(messages[0]);
   return twimlResponse(result.reply || "");
 }
@@ -287,3 +315,4 @@ exports.handler = async (event) => {
 };
 
 module.exports.processMessage = processMessage;
+module.exports.saveOutbound = saveOutbound;

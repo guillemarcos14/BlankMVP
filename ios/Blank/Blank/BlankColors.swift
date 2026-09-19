@@ -49,19 +49,24 @@ enum BlankColors {
     static let premiumBlue = seafoam
     static let controlSurface = pureWhite.opacity(0.16)
     static let activeControlSurface = pureWhite.opacity(0.09)
-    static let minimalBackground = powderGray
+    static let minimalBackground = paleSteelBlue
     static let minimalInk = charcoal
     static let minimalSecondary = secondaryText
     static let minimalFaded = paleSteelBlue.opacity(0.72)
-    static let minimalCardSurface = pureWhite
-    static let darkCardSurface = paleSteelBlue.opacity(0.16)
-    static let newLookDarkBackground = charcoal
+    // One background per app state; every screen inherits these same surfaces.
+    static let appLightBackground = paleSteelBlue
+    static let appDarkBackground = charcoal
+    static let appLightCardSurface = pureWhite
+    static let appDarkCardSurface = paleSteelBlue.opacity(0.18)
+    static let minimalCardSurface = appLightCardSurface
+    static let darkCardSurface = appDarkCardSurface
+    static let newLookDarkBackground = appDarkBackground
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
-    static let homeLightBackground = pureWhite
+    static let homeLightBackground = appLightBackground
     static let homeLightInk = charcoal
     static let homeLightOption = paleSteelBlue
     static let homeLightSecondary = charcoal.opacity(0.68)
-    static let homeDarkBackground = charcoal
+    static let homeDarkBackground = appDarkBackground
     static let homeDarkSecondary = paleSteelBlue.opacity(0.46)
     static let newLookRule = charcoal.opacity(0.16)
     static let glassBorder = LinearGradient(
@@ -121,29 +126,9 @@ struct BlankPrimaryButtonStyle: ButtonStyle {
 
 struct BlankAtmosphericBackground: View {
     var dimmed: Bool = false
-    @Environment(\.blankMinimalAppearance) private var minimalAppearance
 
     var body: some View {
-        ZStack {
-            if minimalAppearance {
-                (dimmed ? BlankColors.newLookDarkBackground : BlankColors.minimalBackground)
-            } else {
-                Image(dimmed ? "blank_home_background_active" : "blank_home_background_idle")
-                    .resizable()
-                    .scaledToFill()
-                    .opacity(dimmed ? 1 : 0.94)
-
-                LinearGradient(
-                    colors: [
-                        BlankColors.pureWhite.opacity(dimmed ? 0.02 : 0.14),
-                        BlankColors.airMist.opacity(dimmed ? 0.10 : 0.20),
-                        BlankColors.airStone.opacity(dimmed ? 0.06 : 0.16)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
+        (dimmed ? BlankColors.appDarkBackground : BlankColors.appLightBackground)
         .ignoresSafeArea()
     }
 }

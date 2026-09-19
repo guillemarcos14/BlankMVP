@@ -2129,14 +2129,9 @@ struct AppBackground: View {
     let isActive: Bool
 
     var body: some View {
-        ZStack {
-            Image(isActive ? "blank_home_background_active" : "blank_home_background_idle")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-        }
+        (isActive ? BlankColors.appDarkBackground : BlankColors.appLightBackground)
         .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.75), value: isActive)
+        .animation(.easeInOut(duration: 0.45), value: isActive)
     }
 }
 

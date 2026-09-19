@@ -2,14 +2,19 @@ package com.blanknfc.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val BlankRed = Color(0xFFD32F2F)
-val BlankRedDark = Color(0xFF202124)
-val BlankGreen = Color(0xFF202124)
-val BlankGreenDark = Color(0xFF1B5E20)
-val BlankBackground = Color(0xFFE9E9E7)
-val BlankSurface = Color(0xFFF5F5F5)
-val BlankOnSurface = Color(0xFF202124)
-val BlankBlockBackground = Color(0xFF000000)
-val BlankGray = Color(0xFF666866)
-val BlankPanel = Color(0xFFF1F1EF)
-val BlankLine = Color(0x1A202124)
+val BlankPaletteCharcoal = Color(0xFF30312A)
+val BlankPaletteLightGray = Color(0xFFC9CAC4)
+val BlankPaletteMediumGray = Color(0xFF8E8F8A)
+val BlankPaletteOffWhite = Color(0xFFF8F9F4)
+
+val BlankRed = BlankPaletteCharcoal
+val BlankRedDark = BlankPaletteCharcoal
+val BlankGreen = BlankPaletteMediumGray
+val BlankGreenDark = BlankPaletteCharcoal
+val BlankBackground = BlankPaletteLightGray
+val BlankSurface = BlankPaletteOffWhite
+val BlankOnSurface = BlankPaletteCharcoal
+val BlankBlockBackground = BlankPaletteCharcoal
+val BlankGray = BlankPaletteMediumGray
+val BlankPanel = BlankPaletteOffWhite
+val BlankLine = Color(0x1A30312A)

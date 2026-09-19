@@ -3279,7 +3279,7 @@ private struct DistractionsScreen: View {
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(BlankColors.pureWhite)
                 .frame(width: 56, height: 56)
-                .background(Circle().fill(Color.black))
+                .background(Circle().fill(BlankColors.charcoal))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Edit distractions")

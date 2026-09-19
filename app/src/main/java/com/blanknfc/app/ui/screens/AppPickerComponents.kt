@@ -47,6 +47,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.blanknfc.app.ui.theme.BlankGray
 import com.blanknfc.app.ui.theme.BlankOnSurface
 import com.blanknfc.app.ui.theme.BlankPanel
+import com.blanknfc.app.ui.theme.BlankSurface
 import com.blanknfc.app.util.AppInfo
 
 private enum class AppPickerCategory(val label: String) {
@@ -101,7 +102,7 @@ internal fun AppPickerContent(
     onSelectedChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     listMaxHeight: Dp? = null,
-    rowColor: Color = Color.White.copy(alpha = 0.66f)
+    rowColor: Color = BlankSurface.copy(alpha = 0.66f)
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(AppPickerCategory.ALL) }
@@ -193,8 +194,8 @@ internal fun AppPickerContent(
 
 @Composable
 private fun CategoryPill(label: String, selected: Boolean, onClick: () -> Unit) {
-    val background = if (selected) BlankOnSurface else Color.White.copy(alpha = 0.66f)
-    val content = if (selected) Color.White else BlankOnSurface
+    val background = if (selected) BlankOnSurface else BlankSurface.copy(alpha = 0.66f)
+    val content = if (selected) BlankSurface else BlankOnSurface
     Surface(
         color = background,
         shape = RoundedCornerShape(999.dp),

@@ -60,6 +60,7 @@ import com.blanknfc.app.data.PlayPurchaseStore
 import com.blanknfc.app.data.PurchaseUiState
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.ui.theme.BlankBackground
+import com.blanknfc.app.ui.theme.BlankBlockBackground
 import com.blanknfc.app.ui.theme.BlankGray
 import com.blanknfc.app.ui.theme.BlankLine
 import com.blanknfc.app.ui.theme.BlankOnSurface
@@ -547,8 +548,8 @@ private fun TextInputStep(
                 unfocusedTextColor = BlankOnSurface,
                 focusedBorderColor = BlankOnSurface,
                 unfocusedBorderColor = BlankLine,
-                focusedContainerColor = Color.White.copy(alpha = 0.62f),
-                unfocusedContainerColor = Color.White.copy(alpha = 0.48f)
+                focusedContainerColor = BlankSurface.copy(alpha = 0.62f),
+                unfocusedContainerColor = BlankSurface.copy(alpha = 0.48f)
             ),
             modifier = Modifier.fillMaxWidth()
         )
@@ -611,7 +612,7 @@ private fun ChoiceStep(
 private fun ChoiceButton(label: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = if (selected) 0.86f else 0.58f),
+        color = BlankSurface.copy(alpha = if (selected) 0.86f else 0.58f),
         shape = RoundedCornerShape(22.dp),
         onClick = onClick
     ) {
@@ -724,7 +725,7 @@ private fun SetupCompleteStep(onFinish: () -> Unit) {
 @Composable
 private fun StatusPill(text: String) {
     Surface(
-        color = Color.White.copy(alpha = 0.72f),
+        color = BlankSurface.copy(alpha = 0.72f),
         shape = RoundedCornerShape(999.dp),
         modifier = Modifier.height(42.dp)
     ) {
@@ -749,7 +750,7 @@ private fun PermissionRow(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.74f),
+        color = BlankSurface.copy(alpha = 0.74f),
         shape = RoundedCornerShape(22.dp),
         onClick = onClick
     ) {
@@ -911,7 +912,7 @@ private fun PlanButton(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = if (selected) 0.86f else 0.68f),
+        color = BlankSurface.copy(alpha = if (selected) 0.86f else 0.68f),
         shape = RoundedCornerShape(22.dp),
         onClick = onClick
     ) {
@@ -941,13 +942,13 @@ private fun PrimaryButton(text: String, enabled: Boolean = true, onClick: () -> 
             .shadow(
                 elevation = if (enabled) 16.dp else 0.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.12f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.12f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.12f)
             ),
         colors = ButtonDefaults.buttonColors(
             containerColor = BlankOnSurface,
             contentColor = BlankSurface,
-            disabledContainerColor = Color(0xFFD8D8D5),
+            disabledContainerColor = BlankBackground,
             disabledContentColor = BlankGray
         )
     ) {

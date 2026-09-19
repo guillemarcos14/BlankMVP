@@ -21,15 +21,15 @@ extension EnvironmentValues {
 }
 
 enum BlankColors {
-    // Blank brand palette: charcoal gray, pale steel blue, seafoam green, powder gray, pure white.
-    static let charcoal = Color(red: 51 / 255.0, green: 59 / 255.0, blue: 65 / 255.0)
-    static let paleSteelBlue = Color(red: 173 / 255.0, green: 191 / 255.0, blue: 201 / 255.0)
-    static let seafoam = Color(red: 118 / 255.0, green: 201 / 255.0, blue: 171 / 255.0)
-    static let powderGray = Color(red: 228 / 255.0, green: 235 / 255.0, blue: 239 / 255.0)
-    static let pureWhite = Color.white
+    // Blank palette: porcelain, lichen, stone and deep olive charcoal.
+    static let charcoal = Color(red: 48 / 255.0, green: 49 / 255.0, blue: 42 / 255.0)
+    static let paleSteelBlue = Color(red: 201 / 255.0, green: 202 / 255.0, blue: 196 / 255.0)
+    static let seafoam = Color(red: 142 / 255.0, green: 143 / 255.0, blue: 138 / 255.0)
+    static let powderGray = Color(red: 201 / 255.0, green: 202 / 255.0, blue: 196 / 255.0)
+    static let pureWhite = Color(red: 248 / 255.0, green: 249 / 255.0, blue: 244 / 255.0)
 
-    // Semantic alert color: retained for error/destructive states because the brand palette has no alert equivalent.
-    static let red = Color(red: 0.827, green: 0.184, blue: 0.184)
+    // The monochrome palette intentionally uses the darkest tone for destructive emphasis.
+    static let red = charcoal
     static let statusGreen = seafoam
     static let redDark = charcoal
     static let green = seafoam
@@ -59,7 +59,7 @@ enum BlankColors {
     static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
     static let homeLightBackground = pureWhite
     static let homeLightInk = charcoal
-    static let homeLightOption = Color(red: 201 / 255.0, green: 202 / 255.0, blue: 196 / 255.0)
+    static let homeLightOption = paleSteelBlue
     static let homeLightSecondary = charcoal.opacity(0.68)
     static let homeDarkBackground = charcoal
     static let homeDarkSecondary = paleSteelBlue.opacity(0.46)

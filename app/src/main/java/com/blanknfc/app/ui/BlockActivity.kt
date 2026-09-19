@@ -44,6 +44,8 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.blanknfc.app.BlankApp
 import com.blanknfc.app.R
+import com.blanknfc.app.ui.theme.BlankBlockBackground
+import com.blanknfc.app.ui.theme.BlankSurface
 import com.blanknfc.app.ui.theme.BlankTheme
 import kotlinx.coroutines.launch
 
@@ -104,7 +106,7 @@ private fun BlockScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(BlankBlockBackground)
     ) {
         Column(
             modifier = Modifier
@@ -117,7 +119,7 @@ private fun BlockScreen(
                     Text(
                         text = stringResource(R.string.emergency_done),
                         style = MaterialTheme.typography.headlineLarge,
-                        color = Color.White,
+                        color = BlankSurface,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -135,7 +137,7 @@ private fun BlockScreen(
                         else
                             stringResource(R.string.block_title),
                         style = MaterialTheme.typography.displayLarge,
-                        color = Color.White,
+                        color = BlankSurface,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(18.dp))
@@ -145,7 +147,7 @@ private fun BlockScreen(
                         else
                             "You are protecting the time you wanted back.",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White.copy(alpha = 0.72f),
+                        color = BlankSurface.copy(alpha = 0.72f),
                         textAlign = TextAlign.Center
                     )
                     if (emergencyMode) {
@@ -156,14 +158,14 @@ private fun BlockScreen(
                             else
                                 "You have used all 3 emergency unlocks this week.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = BlankSurface.copy(alpha = 0.72f),
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = requiredPhrase,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.72f),
+                            color = BlankSurface.copy(alpha = 0.72f),
                             textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -173,12 +175,12 @@ private fun BlockScreen(
                             label = { Text(stringResource(R.string.emergency_phrase_label)) },
                             singleLine = false,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color.White,
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.34f),
-                                focusedLabelColor = Color.White,
-                                unfocusedLabelColor = Color.White.copy(alpha = 0.64f)
+                                focusedTextColor = BlankSurface,
+                                unfocusedTextColor = BlankSurface,
+                                focusedBorderColor = BlankSurface,
+                                unfocusedBorderColor = BlankSurface.copy(alpha = 0.34f),
+                                focusedLabelColor = BlankSurface,
+                                unfocusedLabelColor = BlankSurface.copy(alpha = 0.64f)
                             ),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -197,7 +199,7 @@ private fun BlockScreen(
                         (context as? Activity)?.finish()
                     }
                 ) {
-                    Text("Back to Home", color = Color.White.copy(alpha = 0.64f))
+                    Text("Back to Home", color = BlankSurface.copy(alpha = 0.64f))
                 }
             } else {
                 PrimaryBlockButton(
@@ -208,7 +210,7 @@ private fun BlockScreen(
                     }
                 )
                 TextButton(onClick = { emergencyMode = false }) {
-                    Text(stringResource(R.string.nav_back), color = Color.White.copy(alpha = 0.64f))
+                    Text(stringResource(R.string.nav_back), color = BlankSurface.copy(alpha = 0.64f))
                 }
             }
         }
@@ -226,10 +228,10 @@ private fun PrimaryBlockButton(
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White,
-            contentColor = Color.Black,
-            disabledContainerColor = Color.White.copy(alpha = 0.18f),
-            disabledContentColor = Color.White.copy(alpha = 0.42f)
+            containerColor = BlankSurface,
+            contentColor = BlankBlockBackground,
+            disabledContainerColor = BlankSurface.copy(alpha = 0.18f),
+            disabledContentColor = BlankSurface.copy(alpha = 0.42f)
         ),
         modifier = Modifier
             .fillMaxWidth()
@@ -237,8 +239,8 @@ private fun PrimaryBlockButton(
             .shadow(
                 elevation = if (enabled) 14.dp else 0.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.12f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.12f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.12f)
             )
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium))

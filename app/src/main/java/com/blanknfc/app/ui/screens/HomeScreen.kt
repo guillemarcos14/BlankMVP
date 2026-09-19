@@ -88,6 +88,8 @@ import com.blanknfc.app.data.ReferralStore
 import com.blanknfc.app.data.SessionManager
 import com.blanknfc.app.service.BlankSchedule
 import com.blanknfc.app.ui.theme.BlankGray
+import com.blanknfc.app.ui.theme.BlankBackground
+import com.blanknfc.app.ui.theme.BlankBlockBackground
 import com.blanknfc.app.ui.theme.BlankOnSurface
 import com.blanknfc.app.ui.theme.BlankSurface
 import com.blanknfc.app.util.AccessibilityHelper
@@ -120,16 +122,16 @@ private data class ConfigIssue(
 )
 
 private const val HomeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
-private val HomeGlassScrim = Color.Black.copy(alpha = 0.18f)
+private val HomeGlassScrim = BlankBlockBackground.copy(alpha = 0.18f)
 
 private fun homeCapsuleBorder(): BorderStroke = BorderStroke(
     width = 1.dp,
     brush = Brush.linearGradient(
         colors = listOf(
-            Color.White.copy(alpha = 0.42f),
-            Color.White.copy(alpha = 0.16f),
-            Color.White.copy(alpha = 0.04f),
-            Color.White.copy(alpha = 0.00f)
+            BlankSurface.copy(alpha = 0.42f),
+            BlankSurface.copy(alpha = 0.16f),
+            BlankSurface.copy(alpha = 0.04f),
+            BlankSurface.copy(alpha = 0.00f)
         ),
         start = Offset(0f, 0f),
         end = Offset(180f, 180f)
@@ -138,9 +140,9 @@ private fun homeCapsuleBorder(): BorderStroke = BorderStroke(
 
 private fun homeCapsuleReflection(center: Offset, radius: Float): Brush = Brush.radialGradient(
     colors = listOf(
-        Color.White.copy(alpha = 0.16f),
-        Color.White.copy(alpha = 0.04f),
-        Color.White.copy(alpha = 0.00f)
+        BlankSurface.copy(alpha = 0.16f),
+        BlankSurface.copy(alpha = 0.04f),
+        BlankSurface.copy(alpha = 0.00f)
     ),
     center = center,
     radius = radius
@@ -437,7 +439,7 @@ private fun AppBackground(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isDark) Color.Black else Color(0xFFE7E7E2))
+            .background(if (isDark) BlankBlockBackground else BlankBackground)
     ) {
         if (!isDark) {
             Crossfade(
@@ -520,7 +522,7 @@ private fun HomePanelContent(
                         lineHeight = 39.sp,
                         letterSpacing = (-1.9).sp
                     ),
-                    color = Color.White,
+                    color = BlankSurface,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -545,7 +547,7 @@ private fun AiPlanHomeCard(
 ) {
     Surface(
         modifier = modifier.widthIn(max = 330.dp),
-        color = Color.White.copy(alpha = 0.74f),
+        color = BlankSurface.copy(alpha = 0.74f),
         shape = RoundedCornerShape(18.dp),
         onClick = onOpenReport
     ) {
@@ -567,7 +569,7 @@ private fun AiPlanHomeCard(
             }
             Surface(
                 color = BlankOnSurface,
-                contentColor = Color.White,
+                contentColor = BlankSurface,
                 shape = RoundedCornerShape(999.dp),
                 onClick = onStart
             ) {
@@ -604,8 +606,8 @@ private fun HomeTopNav(
                 elevation = 5.dp,
                 shape = RoundedCornerShape(50.dp),
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.05f),
-                spotColor = Color.Black.copy(alpha = 0.04f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.05f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.04f)
             ),
             color = HomeGlassScrim,
             shape = RoundedCornerShape(50.dp),
@@ -631,8 +633,8 @@ private fun HomeTopNav(
                 elevation = 5.dp,
                 shape = RoundedCornerShape(50.dp),
                 clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.05f),
-                spotColor = Color.Black.copy(alpha = 0.04f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.05f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.04f)
             ),
             color = HomeGlassScrim,
             shape = RoundedCornerShape(50.dp),
@@ -665,7 +667,7 @@ private fun HomeTopNavButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = Color.White,
+            color = BlankSurface,
             textAlign = TextAlign.Center
         )
     }
@@ -675,7 +677,7 @@ private fun HomeTopNavButton(label: String, onClick: () -> Unit) {
 private fun ConfigIssuesCard(issues: List<ConfigIssue>, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        color = Color.White.copy(alpha = 0.78f),
+        color = BlankSurface.copy(alpha = 0.78f),
         shape = RoundedCornerShape(22.dp)
     ) {
         Column(
@@ -744,8 +746,8 @@ private data class MenuItem(
 
 @Composable
 private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
-    val buttonBackground = if (buttonLight) Color.White else Color.Black
-    val buttonContent = if (buttonLight) Color.Black else Color.White
+    val buttonBackground = if (buttonLight) BlankSurface else BlankBlockBackground
+    val buttonContent = if (buttonLight) BlankBlockBackground else BlankSurface
     val metaColor = buttonContent.copy(alpha = 0.72f)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items.forEach { item ->
@@ -759,7 +761,7 @@ private fun MenuList(buttonLight: Boolean, items: List<MenuItem>) {
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val labelColor = if (item.destructive) Color(0xFFB3261E) else buttonContent
+                    val labelColor = if (item.destructive) BlankBlockBackground else buttonContent
                     Text(text = item.label, color = labelColor, modifier = Modifier.weight(1f))
                     Text(text = item.meta, color = metaColor, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -862,7 +864,7 @@ private fun WellnessDashboardCard(
     val healthSummary by healthConnectStore.summary.collectAsState()
     val scope = rememberCoroutineScope()
     var logStatus by remember { mutableStateOf<String?>(null) }
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -998,7 +1000,7 @@ private fun ProgressMinimalHero(
             )
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black.copy(alpha = 0.72f),
+                color = if (buttonLight) BlankSurface.copy(alpha = 0.86f) else BlankBlockBackground.copy(alpha = 0.72f),
                 shape = RoundedCornerShape(26.dp)
             ) {
                 ProgressLineChart(
@@ -1021,7 +1023,7 @@ private fun WeeklySummaryCard(
     emergencyUnlocksRemaining: Int,
     buttonLight: Boolean
 ) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1046,7 +1048,7 @@ private fun DigitalWellnessReportCard(
     hasPremiumAccess: Boolean,
     buttonLight: Boolean
 ) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1111,7 +1113,7 @@ private fun HealthContextCard(
             )
         }
     }
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1172,7 +1174,7 @@ private fun HealthContextCard(
             Spacer(modifier = Modifier.height(12.dp))
             Surface(
                 color = textColor,
-                contentColor = if (buttonLight) Color.White else Color.Black,
+                contentColor = if (buttonLight) BlankSurface else BlankBlockBackground,
                 shape = RoundedCornerShape(999.dp),
                 onClick = {
                     onTrack(
@@ -1267,7 +1269,7 @@ private fun healthSourceStatus(summary: com.blanknfc.app.data.HealthConnectSumma
 
 @Composable
 private fun NextStepCard(stats: FocusStats, buttonLight: Boolean) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1294,7 +1296,7 @@ private fun ProgressDetailCard(
     expanded: Boolean,
     onToggle: () -> Unit
 ) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
     val textColor = progressTextColor(buttonLight)
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1443,7 +1445,7 @@ private fun SchedulePanel(
         Spacer(modifier = Modifier.height(16.dp))
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = if (buttonLight) Color.White.copy(alpha = 0.86f) else Color.Black,
+            color = if (buttonLight) BlankSurface.copy(alpha = 0.86f) else BlankBlockBackground,
             shape = RoundedCornerShape(22.dp)
         ) {
             Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
@@ -1484,8 +1486,8 @@ private fun ToggleRow(
     buttonLight: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val rowColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
+    val textColor = if (buttonLight) BlankBlockBackground else BlankSurface
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = rowColor,
@@ -1509,8 +1511,8 @@ private fun TimeDropdown(
     onMinuteChange: (Int) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val rowColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
+    val rowColor = if (buttonLight) BlankSurface else BlankBlockBackground
+    val textColor = if (buttonLight) BlankBlockBackground else BlankSurface
     Box {
         Surface(
             modifier = Modifier
@@ -1549,8 +1551,8 @@ private fun DistractionsPanel(
     onBack: () -> Unit,
     onEdit: () -> Unit
 ) {
-    val surfaceColor = if (buttonLight) Color.White else Color.Black
-    val textColor = if (buttonLight) Color.Black else Color.White
+    val surfaceColor = if (buttonLight) BlankSurface else BlankBlockBackground
+    val textColor = if (buttonLight) BlankBlockBackground else BlankSurface
     Column(modifier = Modifier.fillMaxSize()) {
         ScreenHeader(title = "Distractions", onBack = onBack)
         Spacer(modifier = Modifier.height(46.dp))
@@ -1686,7 +1688,7 @@ private fun ForgetConfirmPanel(
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(18.dp))
-                Surface(color = if (buttonLight) Color.White else Color.Black, shape = RoundedCornerShape(22.dp)) {
+                Surface(color = if (buttonLight) BlankSurface else BlankBlockBackground, shape = RoundedCornerShape(22.dp)) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1833,7 +1835,7 @@ private fun HomeBlankearButton(
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
         color = HomeGlassScrim,
-        contentColor = Color.White,
+        contentColor = BlankSurface,
         border = homeCapsuleBorder(),
         modifier = modifier
             .fillMaxWidth()
@@ -1841,8 +1843,8 @@ private fun HomeBlankearButton(
             .shadow(
                 elevation = 5.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.05f),
-                spotColor = Color.Black.copy(alpha = 0.04f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.05f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.04f)
             )
             .background(capsuleReflection, RoundedCornerShape(999.dp))
     ) {
@@ -1870,9 +1872,9 @@ private fun MainActionButton(
         enabled = enabled,
         shape = RoundedCornerShape(999.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (light) Color.White else Color.Black,
-            contentColor = if (light) Color.Black else Color.White,
-            disabledContainerColor = Color(0xFFD8D8D5),
+            containerColor = if (light) BlankSurface else BlankBlockBackground,
+            contentColor = if (light) BlankBlockBackground else BlankSurface,
+            disabledContainerColor = BlankBackground,
             disabledContentColor = BlankGray
         ),
         modifier = modifier
@@ -1881,8 +1883,8 @@ private fun MainActionButton(
             .shadow(
                 elevation = if (enabled) 14.dp else 0.dp,
                 shape = RoundedCornerShape(999.dp),
-                ambientColor = Color.Black.copy(alpha = 0.12f),
-                spotColor = Color.Black.copy(alpha = 0.12f)
+                ambientColor = BlankBlockBackground.copy(alpha = 0.12f),
+                spotColor = BlankBlockBackground.copy(alpha = 0.12f)
             )
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium))
@@ -2057,7 +2059,7 @@ private fun progressInsight(stats: FocusStats, savedMs: Long): String {
 
 @Composable
 private fun progressTextColor(buttonLight: Boolean): Color {
-    return if (buttonLight) Color.Black else Color.White
+    return if (buttonLight) BlankBlockBackground else BlankSurface
 }
 
 private fun formatMinute(minuteOfDay: Int): String {

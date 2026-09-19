@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --bg: #e9e9e7;
-  --bg-deep: #d9d9d5;
-  --bg-deeper: #c7c7c1;
-  --surface: #f5f5f5;
-  --panel: #f1f1ef;
-  --ink: #202124;
-  --muted: #555753;
-  --line: rgba(32, 33, 36, 0.12);
-  --action-bg: #d8ded7;
-  --action-bg-off: #dedbd7;
-  --shadow: 0 28px 70px rgba(32, 33, 36, 0.16);
+  --bg: #c9cac4;
+  --bg-deep: #c9cac4;
+  --bg-deeper: #c9cac4;
+  --surface: #f8f9f4;
+  --panel: #f8f9f4;
+  --ink: #30312a;
+  --muted: #8e8f8a;
+  --line: rgba(48, 49, 42, 0.12);
+  --action-bg: #c9cac4;
+  --action-bg-off: #c9cac4;
+  --shadow: 0 28px 70px rgba(48, 49, 42, 0.16);
 }
 
 * {
@@ -105,7 +105,7 @@ h1 {
 .phone-frame {
   aspect-ratio: 390 / 844;
   background: var(--bg-deep);
-  border: 10px solid #181918;
+  border: 10px solid #30312a;
   border-radius: 48px;
   box-shadow: var(--shadow);
   max-height: calc(100svh - 40px);
@@ -134,7 +134,7 @@ h1 {
 
 .screen {
   background:
-    linear-gradient(180deg, rgba(233, 233, 231, 0.28), rgba(233, 233, 231, 0.12)),
+    linear-gradient(180deg, rgba(201, 202, 196, 0.28), rgba(201, 202, 196, 0.12)),
     var(--bg);
   display: none;
   height: 100%;
@@ -168,10 +168,10 @@ h1 {
 
 .screen:not(.block-screen):not(.emergency-screen)::before {
   background:
-    radial-gradient(circle, rgba(170, 170, 164, 0.2) 0 1px, transparent 1.2px),
-    radial-gradient(circle, rgba(190, 190, 184, 0.16) 0 1px, transparent 1.3px),
-    linear-gradient(180deg, rgba(132, 132, 126, 0.32) 0%, transparent 42%),
-    linear-gradient(145deg, transparent 0%, rgba(150, 150, 144, 0.24) 100%);
+    radial-gradient(circle, rgba(142, 143, 138, 0.2) 0 1px, transparent 1.2px),
+    radial-gradient(circle, rgba(201, 202, 196, 0.16) 0 1px, transparent 1.3px),
+    linear-gradient(180deg, rgba(142, 143, 138, 0.32) 0%, transparent 42%),
+    linear-gradient(145deg, transparent 0%, rgba(142, 143, 138, 0.24) 100%);
   background-position: 0 0, 6px 9px, 0 0, 0 0;
   background-size: 13px 13px, 19px 19px, 100% 100%, 100% 100%;
   content: "";
@@ -185,15 +185,15 @@ h1 {
 
 .home-screen {
   background:
-    linear-gradient(180deg, rgba(233, 233, 231, 0.24), rgba(233, 233, 231, 0.1)),
+    linear-gradient(180deg, rgba(201, 202, 196, 0.24), rgba(201, 202, 196, 0.1)),
     var(--bg);
   transition: background 520ms ease, color 320ms ease;
 }
 
 .home-screen.is-blank-active {
   background:
-    linear-gradient(180deg, rgba(18, 20, 18, 0.36), rgba(18, 20, 18, 0.58) 48%),
-    #565b56;
+    linear-gradient(180deg, rgba(48, 49, 42, 0.36), rgba(48, 49, 42, 0.58) 48%),
+    #8e8f8a;
   color: var(--surface);
 }
 
@@ -341,8 +341,8 @@ h1 {
 .setup-preview-card,
 .nfc-card,
 .permission-stack {
-  background: rgba(245, 245, 245, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  background: rgba(248, 249, 244, 0.62);
+  border: 1px solid rgba(248, 249, 244, 0.58);
   border-radius: 28px;
   flex: 0 0 auto;
   margin-bottom: 18px;
@@ -389,7 +389,7 @@ h1 {
 
 .nfc-disc {
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.96) 0 28%, rgba(255, 255, 255, 0.2) 29% 36%, transparent 37%),
+    radial-gradient(circle at 50% 50%, rgba(248, 249, 244, 0.96) 0 28%, rgba(248, 249, 244, 0.2) 29% 36%, transparent 37%),
     var(--ink);
   border-radius: 50%;
   height: 88px;
@@ -442,14 +442,14 @@ h1 {
 }
 
 .home-screen.is-blank-active .home-progress-link {
-  color: rgba(245, 245, 245, 0.74);
+  color: rgba(248, 249, 244, 0.74);
 }
 
 .main-action {
   background: var(--ink);
   border: 0;
   border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 10px 22px rgba(32, 33, 36, 0.11);
+  box-shadow: inset 0 1px 0 rgba(248, 249, 244, 0.22), 0 10px 22px rgba(48, 49, 42, 0.11);
   color: var(--surface);
   font-size: 15px;
   font-weight: 600;
@@ -536,8 +536,8 @@ h1 {
 
 .report-list div,
 .report-note {
-  background: rgba(245, 245, 245, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  background: rgba(248, 249, 244, 0.62);
+  border: 1px solid rgba(248, 249, 244, 0.58);
   border-radius: 24px;
   padding: 16px;
 }
@@ -572,8 +572,8 @@ h1 {
 .app-picker-list label,
 .text-stack div {
   align-items: center;
-  background: rgba(245, 245, 245, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  background: rgba(248, 249, 244, 0.62);
+  border: 1px solid rgba(248, 249, 244, 0.58);
   border-radius: 24px;
   color: var(--ink);
   display: flex;
@@ -586,7 +586,7 @@ h1 {
 
 .menu-list button.danger-row,
 .menu-list button.danger-row strong {
-  color: #a92f37;
+  color: #30312a;
 }
 
 .menu-list span,
@@ -626,7 +626,7 @@ h1 {
 
 .block-screen {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.36) 50%),
+    linear-gradient(180deg, rgba(248, 249, 244, 0.04), rgba(48, 49, 42, 0.36) 50%),
     #000;
   color: var(--surface);
 }
@@ -635,7 +635,7 @@ h1 {
 .block-screen .center-message p,
 .block-screen small,
 .emergency-screen .center-message p {
-  color: rgba(245, 245, 245, 0.72);
+  color: rgba(248, 249, 244, 0.72);
 }
 
 .block-message small {
@@ -648,7 +648,7 @@ h1 {
 }
 
 .emergency-screen {
-  background: #101010;
+  background: #30312a;
   color: var(--surface);
 }
 
@@ -658,8 +658,8 @@ h1 {
 }
 
 .emergency-message textarea {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(248, 249, 244, 0.08);
+  border: 1px solid rgba(248, 249, 244, 0.2);
   border-radius: 22px;
   color: var(--surface);
   font: inherit;

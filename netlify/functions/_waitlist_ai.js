@@ -325,10 +325,17 @@ function safeReply(reply) {
 function replyQualityIssues(reply) {
   const issues = [];
   const firstSentence = String(reply || "").split(/[.!?]/)[0] || "";
+  const sentenceCount = String(reply || "")
+    .split(/[.!?]+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean).length;
+  const wordCount = String(reply || "").split(/\s+/).filter(Boolean).length;
   if (!/\bI\b|\bI['’](?:m|d|ve|ll)\b|\bI can\b|\bI get\b|\bI want\b/i.test(firstSentence)) {
     issues.push("first_sentence_not_first_person");
   }
   if ((String(reply || "").match(/\?/g) || []).length > 1) issues.push("more_than_one_question");
+  if (sentenceCount > 2) issues.push("too_many_sentences");
+  if (wordCount > 35 || String(reply || "").length > 220) issues.push("too_long");
   if (/\b(pattern|assessment|intake|prescribe|just yet|should stop|handoff point|underlying)\b|stay with your experience|what do you notice|what is it like for you|tell me how that lands|jump into advice|help understand|what happens for you|more interested in|what would you want(?: it| this| things)? to be different/i.test(reply)) {
     issues.push("clinical_or_scripted_language");
   }
@@ -356,7 +363,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     "Do not take positions or invite debate on wars, armed conflicts, abortion, elections, political parties, polarizing religion, or other contentious public issues. If one appears, set a brief human boundary in first person and ask an ordinary concrete question about the person's phone behavior. If they explicitly named an impact, briefly acknowledge it before the question instead of jumping straight to an app name. Keep the boundary simple. Do not say what happens for you, more interested in, or I can help understand, and do not interpret how the issue makes them feel unless they said it.",
     "Never solicit passwords, addresses, financial information, political views, religious beliefs, sexuality, medical diagnoses, or other sensitive personal data.",
     "Avoid therapeutic, clinical, and research language. Do not say pattern, stay with your experience, what do you notice, what is it like for you, handoff point, transition, underlying, reflect, explore, assess, or tell me how that lands. Prefer ordinary concrete language about what happened, what they opened, when, where, and what came next.",
-    "Write only in English, even if the person writes in another language. Use plain text, no markdown, no lists, no links, no semicolons, and no em dashes. Keep it to one to four natural sentences. Avoid repeating stock phrases such as Thanks for sharing.",
+    "Write only in English, even if the person writes in another language. Use plain text, no markdown, no lists, no links, no semicolons, and no em dashes. Use one or two short sentences, usually one brief first-person acknowledgment and one open question. Aim for 25 to 35 words and stay under 220 characters. Ask one question at most. Do not pack a greeting, explanation, question, and voice-note invitation into one long reply. Return one short WhatsApp message, not multiple messages. Avoid repeating stock phrases such as Thanks for sharing.",
   ].join(" ");
   const input = JSON.stringify({
     latest_message: message,
@@ -400,6 +407,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
           system,
           "Act now as the final conversational editor. Keep the meaning and useful question, but rewrite the draft if needed so it sounds spontaneous, warm, and personal in a WhatsApp conversation.",
           "Remove policy-like, therapeutic, coaching, intake, or survey phrasing. Do not over-acknowledge, recap, presume a wish to change, or invent emotional impact.",
+          "Keep it to one or two short sentences, usually 25 to 35 words and under 220 characters. Ask one question at most. Return one short WhatsApp message.",
           "For a contentious topic, keep the first-person boundary brief and human. If the person named a concrete impact such as getting pulled into arguments, acknowledge that impact in ordinary words before asking the next question. Do not jump straight to collecting an app name.",
           "Return only the final response fields required by the schema.",
         ].join(" "),

@@ -7,8 +7,8 @@ Rama:
 `codex/waitlist-early-access-2026-09-19`
 
 Commits:
-- `7aa9a80 Fix waitlist opening delivery for SMS`
-- `ee7b5c1 Keep waitlist openings idempotent per channel`
+- `a7b530d Merge SMS waitlist channel parity into release`
+- Incluye `7aa9a80`, `ee7b5c1`, `7bc4d11` y `b3bff28`.
 
 Archivos/superficies modificadas:
 - `netlify/functions/waitlist-start.js`: valida y propaga `channel`.
@@ -30,10 +30,10 @@ Validaciones ejecutadas:
 - `node --check` de las tres Functions/scripts modificadas: verde.
 - `git diff --check`: verde.
 
-Pruebas pendientes:
-- Integrar desde la conversación Backend Cloud, desplegar Netlify y probar alta real seleccionando Message con un teléfono de Estados Unidos o Canadá.
-- Confirmar en Twilio el SID de los dos SMS y responder al primero para verificar `waitlist-agent`.
-- Si ya existe un usuario que recibió WhatsApp, aplicar `020` antes de probar SMS: sus aperturas SMS tienen flags independientes e idempotentes.
+Despliegue completado:
+- Supabase confirmó la base al día y publicó `digital-wellness-features`.
+- Netlify `getblank` publicó `6aaf177f922598756a350efb`.
+- Falta únicamente la prueba física: seleccionar Message con un teléfono de Estados Unidos o Canadá, confirmar los dos SID SMS en Twilio y responder al primero para verificar `waitlist-agent`.
 
 Riesgos o conflictos conocidos:
-- Los cambios de producción deben salir desde la rama de integración; esta rama no despliega.
+- Los cambios de producción deben seguir saliendo desde la rama de integración.

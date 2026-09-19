@@ -422,8 +422,7 @@ async function sendOpeningMessage(phone, index, channelOrFetch = "whatsapp", may
   const { channel, fetchImpl } = openingArguments(channelOrFetch, maybeFetch);
   if (channel === "sms") return sendTwilioSms(phone, opening, fetchImpl);
   if (channel !== "whatsapp") throw new Error("waitlist_channel_invalid");
-  const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase()
-    || (process.env.WAITLIST_WHATSAPP_OPENING_CONTENT_SID_1 ? "twilio" : "meta");
+  const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase() || "twilio";
   if (!isProduction() && process.env.WAITLIST_ALLOW_FREEFORM_OPENING === "true") {
     if (provider !== "meta") throw new Error("waitlist_freeform_opening_meta_only");
     return sendMetaText(phone, opening, fetchImpl);

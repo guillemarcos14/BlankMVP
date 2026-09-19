@@ -140,6 +140,7 @@ function parseTwilioMessage(event) {
   const params = new URLSearchParams(rawBody(event));
   const from = cleanText(params.get("From"), 90);
   const phone = phoneForStorage(from);
+  const channel = /^whatsapp:/i.test(from) ? "whatsapp" : "sms";
   const text = cleanText(params.get("Body"), 4000);
   const providerMessageId = cleanText(params.get("MessageSid") || params.get("SmsMessageSid"), 160);
   const count = Math.min(Math.max(Number(params.get("NumMedia") || 0), 0), 10);
@@ -153,7 +154,7 @@ function parseTwilioMessage(event) {
     }
   }
   return phone && (text || audio)
-    ? [{ provider: "twilio", providerMessageId, phone, text, audio }]
+    ? [{ provider: "twilio", providerMessageId, phone, channel, text, audio }]
     : [];
 }
 
@@ -321,17 +322,32 @@ async function sendTwilioContent(phone, contentSid, fetchImpl = fetch) {
   return { id: payload.sid || null, provider: "twilio" };
 }
 
-async function sendTwilioText(phone, body, fetchImpl = fetch) {
+async function sendTwilioText(phone, body, channelOrFetch = "whatsapp", maybeFetch = fetch) {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
-  const from = phoneForStorage(process.env.TWILIO_WHATSAPP_FROM_NUMBER || process.env.TWILIO_FROM_NUMBER);
   const message = cleanText(body, 4000);
-  if (!sid || !token || !from || !phone || !message) throw new Error("waitlist_twilio_text_missing");
-  const form = new URLSearchParams({
-    From: `whatsapp:${from}`,
-    To: `whatsapp:${phone}`,
-    Body: message,
-  });
+  const { channel, fetchImpl } = openingArguments(channelOrFetch, maybeFetch);
+  if (!sid || !token || !phone || !message) throw new Error("waitlist_twilio_text_missing");
+
+  let form;
+  if (channel === "sms") {
+    const from = phoneForStorage(process.env.TWILIO_FROM_NUMBER);
+    const messagingServiceSid = cleanText(process.env.TWILIO_MESSAGING_SERVICE_SID, 80);
+    if (!from && !messagingServiceSid) throw new Error("waitlist_sms_credentials_missing");
+    form = new URLSearchParams({ To: phone, Body: message });
+    if (messagingServiceSid) form.set("MessagingServiceSid", messagingServiceSid);
+    else form.set("From", from);
+  } else if (channel === "whatsapp") {
+    const from = phoneForStorage(process.env.TWILIO_WHATSAPP_FROM_NUMBER || process.env.TWILIO_FROM_NUMBER);
+    if (!from) throw new Error("waitlist_twilio_text_missing");
+    form = new URLSearchParams({
+      From: `whatsapp:${from}`,
+      To: `whatsapp:${phone}`,
+      Body: message,
+    });
+  } else {
+    throw new Error("waitlist_channel_invalid");
+  }
 
   const response = await fetchImpl(`https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(sid)}/Messages.json`, {
     method: "POST",
@@ -346,7 +362,7 @@ async function sendTwilioText(phone, body, fetchImpl = fetch) {
   try { payload = raw ? JSON.parse(raw) : {}; } catch (_) { payload = {}; }
   if (!response.ok) throw new Error(`waitlist_twilio_text_send_${response.status}:${cleanText(payload.message || raw, 180)}`);
   if (!payload.sid) throw new Error("waitlist_twilio_text_send_missing_sid");
-  return { id: payload.sid, provider: "twilio", status: payload.status || null };
+  return { id: payload.sid, provider: "twilio", channel, status: payload.status || null };
 }
 
 async function sendTwilioSms(phone, body, fetchImpl = fetch) {

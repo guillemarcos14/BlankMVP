@@ -1458,6 +1458,7 @@ struct HomeView: View {
 
     private func confirmPendingAssistantAction() {
         guard let pendingAction = sessionStore.pendingAssistantAction else { return }
+        screenTimeBlocker.refreshAuthorizationStatus()
         if assistantActionRequiresScreenTime(pendingAction), screenTimeBlocker.authorizationStatus != .approved {
             assistantActionExecutionInFlight = true
             Task {
@@ -1765,7 +1766,6 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
-        let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
         if let receipt = AssistantActionReceiptStore.load() {
             Task {
                 let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
@@ -1798,8 +1798,15 @@ struct HomeView: View {
                 guard let remoteAction,
                       let pendingAction = remoteAction.toPendingAction(),
                       sessionStore.pendingAssistantAction == nil else { return }
+                // Read this after the network round-trip. On a cold launch the
+                // notification response can arrive while the initial poll is
+                // already in flight; reading it before the request loses the tap.
+                let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
                 guard applyNowRequested else { return }
+                let tappedActionID = BlankSharedState.defaults.string(forKey: AssistantRemoteNotification.tappedActionIDKey) ?? ""
+                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else { return }
                 BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
                 pendingAssistantActionId = remoteAction.id
                 pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)

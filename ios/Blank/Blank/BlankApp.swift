@@ -6,6 +6,7 @@ enum AssistantRemoteNotification {
     static let categoryIdentifier = "BM_PENDING_ACTION"
     static let applyActionIdentifier = "BM_APPLY_NOW"
     static let pollAfterOpenKey = "blankAssistantPollAfterOpen"
+    static let tappedActionIDKey = "blankAssistantTappedActionID"
 }
 
 extension Notification.Name {
@@ -395,6 +396,9 @@ final class BlankAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
             || response.actionIdentifier == UNNotificationDefaultActionIdentifier
         if isAssistantAction && shouldApply {
             BlankSharedState.defaults.set(true, forKey: AssistantRemoteNotification.pollAfterOpenKey)
+            if let actionID = userInfo["bm_action_id"] as? String, !actionID.isEmpty {
+                BlankSharedState.defaults.set(actionID, forKey: AssistantRemoteNotification.tappedActionIDKey)
+            }
             DispatchQueue.main.async {
                 NotificationCenter.default.post(name: .blankAssistantApplyNowRequested, object: nil)
             }

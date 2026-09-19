@@ -292,6 +292,14 @@ function whatsappReplyText(plan, delivery = null) {
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
     return `${text}\n\nOpen Blankmind to choose the apps. The plan will apply when you confirm the selection.`;
   }
+  const actionIsReady = plan.semantic_state?.status === "ready" || plan.blocking_ready === true;
+  if (action.type === "start_protection" && actionIsReady) {
+    if (delivery?.push?.sent === false) {
+      return "The block is pending. Tap the Blankmind notification when it arrives.";
+    }
+    const duration = Number.isInteger(action.minutes) ? `${action.minutes}-minute ` : "";
+    return `Tap the Blankmind notification to start your ${duration}block.`;
+  }
   if (delivery?.push?.sent === false) {
     return `${text}\n\nI couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence.`;
   }

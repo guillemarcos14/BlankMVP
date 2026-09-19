@@ -500,6 +500,11 @@ function whatsappReplyText(plan, fallbackText) {
       ? `${clean}\n\nSelect the apps to apply it:\n${link}`
       : `${clean}\n\nOpen Blankmind to select the apps.`;
   }
+  const actionIsReady = plan.semantic_state?.status === "ready" || plan.blocking_ready === true;
+  if (action.type === "start_protection" && actionIsReady) {
+    const duration = Number.isInteger(action.minutes) ? `${action.minutes}-minute ` : "";
+    return `Tap the Blankmind notification to start your ${duration}block.`;
+  }
   return `${clean}\n\nTap the Blankmind notification to apply it.`;
 }
 

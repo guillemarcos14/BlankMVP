@@ -52,6 +52,8 @@ assert.match(assistantChannel, /applied and verified/);
 assert.match(smsAgent, /sendAssistantActionPush/);
 assert.match(whatsappAgent, /sendAssistantActionPush/);
 assert.match(whatsappAgent, /Tap the Blankmind notification to apply it/);
+assert.match(whatsappAgent, /Tap the Blankmind notification to start your/);
+assert.match(whatsappAgent, /Number\.isInteger\(action\.minutes\)/);
 assert.doesNotMatch(smsAgent, /Open Blankmind to review and apply it/);
 assert.doesNotMatch(whatsappAgent, /Open Blankmind to review and apply it/);
 assert.match(blankApp, /didReceiveRemoteNotification/);
@@ -70,6 +72,8 @@ assert.match(home, /confirmPendingAssistantAction\(\)/);
 assert.match(home, /blankAssistantApplyNowRequested/);
 assert.match(home, /applyNowRequested/);
 assert.match(home, /guard applyNowRequested else/);
+assert.match(home, /Read this after the network round-trip/);
+assert.match(blankApp, /tappedActionIDKey/);
 assert.match(home, /native_state_applied_after_selection/);
 assert.match(info, /<string>remote-notification<\/string>/);
 

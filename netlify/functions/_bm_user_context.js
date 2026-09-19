@@ -29,20 +29,16 @@ async function canonicalIdentity(connectCode) {
 async function persistCanonicalSnapshot(connectCode, context, source = "assistant_context_sync") {
   const code = clean(connectCode, 32).toUpperCase();
   if (!code || !safeObject(context).anonymous_user_id) return null;
-  try {
-    const rows = await supabaseFetch("rpc/upsert_bm_user_context", {
-      method: "POST",
-      body: JSON.stringify({
-        p_connect_code: code,
-        p_anonymous_user_id: clean(context.anonymous_user_id, 120),
-        p_context: context,
-        p_source: clean(source, 80) || "app",
-      }),
-    });
-    return Array.isArray(rows) ? rows[0] || null : rows;
-  } catch (_) {
-    return null;
-  }
+  const rows = await supabaseFetch("rpc/upsert_bm_user_context", {
+    method: "POST",
+    body: JSON.stringify({
+      p_connect_code: code,
+      p_anonymous_user_id: clean(context.anonymous_user_id, 120),
+      p_context: context,
+      p_source: clean(source, 80) || "app",
+    }),
+  });
+  return Array.isArray(rows) ? rows[0] || null : rows;
 }
 
 async function enrichAssistantContext(input = {}, connectCode = "") {

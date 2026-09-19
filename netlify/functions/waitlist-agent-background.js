@@ -56,7 +56,7 @@ async function deliverMessage(message) {
   if (!result) throw lastError || new Error("waitlist_background_processing_failed");
   if (result.skipped || !result.reply) return result;
 
-  const delivery = await withRetry(() => sendTwilioText(message.phone, result.reply), 4);
+  const delivery = await withRetry(() => sendTwilioText(message.phone, result.reply, message.channel), 4);
   try {
     if (result.user) {
       await withRetry(() => saveOutbound(result.user, "twilio", result.reply, result.kind === "privacy" ? "privacy" : "text", delivery.id), 3);

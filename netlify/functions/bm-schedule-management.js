@@ -101,7 +101,6 @@ function responseVariant(context, values) {
 }
 
 function basePlan(text, actions = [], responseContract = null) {
-  const requiresScreenTime = actions.some((item) => item?.type === "update_schedule");
   return {
     intent: "schedule_management",
     title: "Blocking schedules",
@@ -114,7 +113,10 @@ function basePlan(text, actions = [], responseContract = null) {
     secondary_label: "",
     actions,
     requires_selected_apps: false,
-    requires_screen_time_authorization: requiresScreenTime,
+    // Schedule CRUD is persisted in the assistant context and does not need
+    // FamilyControls permission. Native permission is only relevant when the
+    // app later enforces the selected distractions during an active window.
+    requires_screen_time_authorization: false,
     blocking_ready: actions.length > 0,
     blocking_user_request: actions.length > 0,
     blocking_missing_fields: [],

@@ -30,6 +30,7 @@ const {
   PENDING_ASSISTANT_ACTION_TYPES: PENDING_ACTION_TYPES,
   firstPendingAction,
   pendingActionFromPlan: buildPendingActionFromPlan,
+  isActivePendingAction,
 } = require("./bm-pending-action");
 
 function cleanText(value, maxLength = 600) {
@@ -185,6 +186,14 @@ function acceptsProactiveUpdate(text) {
   return /^(yes|yes,?\s*(show|please)|show( me)?|tell me|show update|sure|go ahead|okay|ok)$/i.test(cleanText(text, 120));
 }
 
+// A pending action is already the user's confirmed intent. Short acknowledgements
+// must redeliver that exact action instead of sending the prompt through planning
+// again, where a transient app snapshot could replace it with an app-picker action.
+function acceptsPendingActionConfirmation(text) {
+  return /^(?:yes|yeah|yep|yea|ok|okay|sure|go ahead|apply(?: it)?|confirm(?: it)?|yes[, ]+(?:apply|confirm|do it)(?: it)?)\.?$/i
+    .test(cleanText(text, 120));
+}
+
 function requestedAppNames(text) {
   const source = ` ${cleanText(text, 600).toLowerCase()} `;
   const candidates = [
@@ -247,6 +256,15 @@ async function scheduleActionRetry(connection, pending) {
   }
 }
 
+async function deliverPendingAssistantAction(connection, pending, memory = {}) {
+  let pushResult;
+  try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, pending); }
+  catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
+  const push = await recordPushAttempt(connection, pending, pushResult);
+  await scheduleActionRetry(connection, pending);
+  return { action: pending, push, duplicate: true };
+}
+
 async function queuePendingAssistantAction(connection, plan, prompt = "") {
   if (!connection?.connectCode) return null;
   const pending = pendingActionFromPlan(plan, prompt);
@@ -259,12 +277,7 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
   }
   const existing = memory.pending_assistant_action;
   if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
-    let pushResult;
-    try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, existing); }
-    catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
-    const push = await recordPushAttempt(connection, existing, pushResult);
-    await scheduleActionRetry(connection, existing);
-    return { action: existing, push, duplicate: true };
+    return deliverPendingAssistantAction(connection, existing, memory);
   }
   await recordAssistantMemory({
     channel: connection.channel,
@@ -272,12 +285,19 @@ async function queuePendingAssistantAction(connection, plan, prompt = "") {
     memory: { pending_assistant_action: pending },
     source: "assistant_action_pending",
   });
-  let pushResult;
-  try { pushResult = await sendAssistantActionPush(memory.assistant_device_push, pending); }
-  catch (error) { pushResult = { sent: false, reason: `push_exception:${error.message}` }; }
-  const push = await recordPushAttempt(connection, pending, pushResult);
-  await scheduleActionRetry(connection, pending);
-  return { action: pending, push, duplicate: false };
+  const delivery = await deliverPendingAssistantAction(connection, pending, memory);
+  return { ...delivery, duplicate: false };
+}
+
+function pendingActionConfirmationPlan(action) {
+  const summary = cleanText(action?.summary, 320) || "I still have that change ready.";
+  return {
+    message_text: summary,
+    response_text: summary,
+    actions: [action],
+    blocking_ready: true,
+    semantic_state: { status: "ready" },
+  };
 }
 
 function whatsappReplyText(plan, delivery = null) {
@@ -560,6 +580,16 @@ async function processMessage(message) {
     });
     return sendWhatsAppMessage(message.from, pendingMessage);
   }
+  const pendingAction = pendingMemory.pending_assistant_action;
+  if (linkedConnection && isActivePendingAction(pendingAction) && acceptsPendingActionConfirmation(prompt)) {
+    let delivery = null;
+    try {
+      delivery = await deliverPendingAssistantAction(linkedConnection, pendingAction, pendingMemory);
+    } catch (error) {
+      if (semanticPersistenceRequired()) throw error;
+    }
+    return sendPlanReply(message.from, pendingActionConfirmationPlan(pendingAction), delivery);
+  }
   const result = await callBlankedAgent(prompt, message.from, linkedConnection);
   const plan = result.plan;
   try {
@@ -664,3 +694,6 @@ exports.handler = async (event) => {
     return json(500, { error: "whatsapp_agent_failed", detail: error.message });
   }
 };
+
+exports.acceptsPendingActionConfirmation = acceptsPendingActionConfirmation;
+exports.pendingActionConfirmationPlan = pendingActionConfirmationPlan;

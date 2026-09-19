@@ -17,6 +17,8 @@ const bmContext = fs.readFileSync(path.join(ROOT, "netlify/functions/bm-context.
 const whatsapp = fs.readFileSync(path.join(ROOT, "netlify/functions/whatsapp-agent.js"), "utf8");
 const smsAgent = fs.readFileSync(path.join(ROOT, "netlify/functions/sms-agent.js"), "utf8");
 const agent = fs.readFileSync(path.join(ROOT, "netlify/functions/blanked-agent.js"), "utf8");
+const whatsappModule = require("../netlify/functions/whatsapp-agent");
+const { scheduleManagementPlan } = require("../netlify/functions/bm-schedule-management");
 const openPage = fs.readFileSync(path.join(ROOT, "web/landing/open.html"), "utf8");
 const android = fs.readFileSync(
   path.join(ROOT, "app/src/main/java/com/blanknfc/app/data/DigitalWellnessRemoteStore.kt"),
@@ -128,6 +130,32 @@ check("messaging_actions_wait_for_notification_tap", () => {
   assert.doesNotMatch(whatsapp, /reviewActionLink\(action, apps\)/);
 });
 
+check("whatsapp_confirmation_redelivers_existing_action", () => {
+  assert.strictEqual(whatsappModule.acceptsPendingActionConfirmation("Yes, apply it"), true);
+  assert.strictEqual(whatsappModule.acceptsPendingActionConfirmation("yes"), true);
+  assert.strictEqual(whatsappModule.acceptsPendingActionConfirmation("move it one hour later"), false);
+  const plan = whatsappModule.pendingActionConfirmationPlan({
+    type: "update_schedule",
+    summary: "I'll move your 1:00 PM–2:00 PM window to 2:00 PM–3:00 PM every day.",
+  });
+  assert.strictEqual(plan.actions[0].type, "update_schedule");
+  assert.match(plan.message_text, /move your 1:00 PM/);
+  assert.match(whatsapp, /isActivePendingAction\(pendingAction\)/);
+  assert.match(whatsapp, /deliverPendingAssistantAction\(linkedConnection, pendingAction, pendingMemory\)/);
+});
+
+check("schedule_crud_does_not_wait_for_screen_time_permission", () => {
+  const context = {
+    schedule: { windows: [{ id: "w1", name: "Lunch", start_minute: 780, end_minute: 840, weekdays: [1, 2, 3, 4, 5, 6, 7] }] },
+    recent_messages: [{ role: "user", content: "blocking window" }],
+  };
+  const plan = scheduleManagementPlan("move the 1:00 PM to 2:00 PM window one hour later", context);
+  assert.strictEqual(plan.actions[0].type, "update_schedule");
+  assert.strictEqual(plan.requires_screen_time_authorization, false);
+  assert.match(home, /case \.applySchedule, \.updateSchedule, \.deleteSchedule, \.deleteAllSchedules/);
+  assert.match(home, /case \.startProtection, \.setDailyLimit, \.allowOnly, \.adultFilter/);
+});
+
 check("assistant_context_sync_reaches_messaging_identity", () => {
   assert.match(assistantChannel, /action === "sync_context"/);
   assert.match(assistantChannel, /recordAssistantUserContext/);
@@ -184,8 +212,8 @@ check("review_action_survives_landing_redirect", () => {
 });
 
 if (failures.length > 0) {
-  console.error(`\nBM regression suite failed: ${failures.length}/12 checks`);
+  console.error(`\nBM regression suite failed: ${failures.length}/14 checks`);
   process.exitCode = 1;
 } else {
-  console.log("\nBM regression suite passed: 12/12 checks");
+  console.log("\nBM regression suite passed: 14/14 checks");
 }

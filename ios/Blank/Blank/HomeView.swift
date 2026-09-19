@@ -1652,10 +1652,13 @@ struct HomeView: View {
 
     private func assistantActionRequiresScreenTime(_ action: AssistantPendingAction) -> Bool {
         switch action {
-        case .pauseRules, .disablePause, .deleteSchedule, .deleteAllSchedules, .requestScreenTimePermission:
-            return false
-        default:
+        case .startProtection, .setDailyLimit, .allowOnly, .adultFilter:
             return true
+        case .applySchedule, .updateSchedule, .deleteSchedule, .deleteAllSchedules,
+             .pauseRules, .disablePause, .applyAIPlan, .openAppPicker,
+             .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker,
+             .requestScreenTimePermission:
+            return false
         }
     }
 

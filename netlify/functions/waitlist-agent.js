@@ -163,41 +163,84 @@ async function processMessage(message) {
 
     let extracted = [];
     let saved = [];
-    try {
-      extracted = await extractFacts({ message: prompt, history, profile: known.profile });
-      saved = await persistFacts({ user, sourceMessageId: inbound?.id, facts: extracted });
-    } catch (error) {
-      await recordEvent(user.id, "fact_extraction_failed", { reason: cleanText(error.message, 160) });
-    }
-
-    const updated = await currentFacts(user.id);
     let generated;
-    try {
-      generated = await generateReply({
-        message: prompt,
-        history,
-        profile: updated.profile,
-        newlySavedFacts: saved,
-      });
-    } catch (error) {
-      await recordEvent(user.id, "conversation_generation_failed", { reason: cleanText(error.message, 160) });
-      generated = {
-        reply: naturalFallbackReply(prompt, history),
-        focus: "natural_followup",
-        profile_useful: false,
-        restricted: false,
-      };
+    if (message.audio) {
+      // Voice notes become plain text here. Run the two independent model calls together
+      // so the Twilio webhook can return before its delivery window becomes unreliable.
+      const [extractionResult, generationResult] = await Promise.all([
+        extractFacts({ message: prompt, history, profile: known.profile })
+          .then((facts) => ({ facts }))
+          .catch((error) => ({ error })),
+        generateReply({
+          message: prompt,
+          history,
+          profile: known.profile,
+          newlySavedFacts: [],
+        })
+          .then((result) => ({ result }))
+          .catch((error) => ({ error })),
+      ]);
+
+      if (extractionResult.error) {
+        await recordEvent(user.id, "fact_extraction_failed", { reason: cleanText(extractionResult.error.message, 160) });
+      } else {
+        extracted = extractionResult.facts;
+        try {
+          saved = await persistFacts({ user, sourceMessageId: inbound?.id, facts: extracted });
+        } catch (error) {
+          await recordEvent(user.id, "fact_extraction_failed", { reason: cleanText(error.message, 160) });
+        }
+      }
+
+      if (generationResult.error) {
+        await recordEvent(user.id, "conversation_generation_failed", { reason: cleanText(generationResult.error.message, 160) });
+        generated = {
+          reply: naturalFallbackReply(prompt, history),
+          focus: "natural_followup",
+          profile_useful: false,
+          restricted: false,
+        };
+      } else {
+        generated = generationResult.result;
+      }
+    } else {
+      try {
+        extracted = await extractFacts({ message: prompt, history, profile: known.profile });
+        saved = await persistFacts({ user, sourceMessageId: inbound?.id, facts: extracted });
+      } catch (error) {
+        await recordEvent(user.id, "fact_extraction_failed", { reason: cleanText(error.message, 160) });
+      }
+
+      const updated = await currentFacts(user.id);
+      try {
+        generated = await generateReply({
+          message: prompt,
+          history,
+          profile: updated.profile,
+          newlySavedFacts: saved,
+        });
+      } catch (error) {
+        await recordEvent(user.id, "conversation_generation_failed", { reason: cleanText(error.message, 160) });
+        generated = {
+          reply: naturalFallbackReply(prompt, history),
+          focus: "natural_followup",
+          profile_useful: false,
+          restricted: false,
+        };
+      }
     }
 
     await saveOutbound(user, message.provider, generated.reply);
-    await recordEvent(user.id, "waitlist_turn_completed", {
-      provider: message.provider,
-      input_kind: messageKind,
-      facts_saved: saved.length,
-      focus: generated.focus,
-      restricted_topic: generated.restricted === true,
-    });
-    await completeInbound(message.provider, message.providerMessageId);
+    await Promise.all([
+      recordEvent(user.id, "waitlist_turn_completed", {
+        provider: message.provider,
+        input_kind: messageKind,
+        facts_saved: saved.length,
+        focus: generated.focus,
+        restricted_topic: generated.restricted === true,
+      }),
+      completeInbound(message.provider, message.providerMessageId),
+    ]);
     return { reply: generated.reply, user, kind: "text", factsSaved: saved.length };
   } catch (error) {
     await releaseInbound(message.provider, message.providerMessageId).catch(() => null);

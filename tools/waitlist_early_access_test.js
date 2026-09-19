@@ -157,34 +157,49 @@ async function fullTurnContract() {
     facts: [],
     events: [],
     responseCalls: 0,
+    responseInFlight: 0,
+    maxResponseConcurrency: 0,
   };
   const previousFetch = global.fetch;
   global.fetch = async (url, options = {}) => {
     const value = String(url);
+    if (value === "https://media.test/audio.ogg") {
+      return response(200, "audio", { "content-type": "audio/ogg", "content-length": "5" });
+    }
+    if (value === "https://api.openai.com/v1/audio/transcriptions") {
+      return response(200, { text: "I work as an architect and I open Instagram after client calls." });
+    }
     if (value === "https://api.openai.com/v1/responses") {
       state.responseCalls += 1;
+      state.responseInFlight += 1;
+      state.maxResponseConcurrency = Math.max(state.maxResponseConcurrency, state.responseInFlight);
       const request = JSON.parse(options.body);
       const schemaName = request.text.format.name;
-      if (schemaName === "waitlist_fact_extraction") {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        if (schemaName === "waitlist_fact_extraction") {
+          return response(200, {
+            output_text: JSON.stringify({ facts: [
+              { key: "occupation", value_text: "architect", value_items: [], evidence: "I work as an architect", confidence: "high", explicit: true, operation: "set" },
+              { key: "apps", value_text: "", value_items: ["Instagram"], evidence: "Instagram", confidence: "high", explicit: true, operation: "add" },
+              { key: "scroll_moments", value_text: "", value_items: ["after client calls"], evidence: "after client calls", confidence: "high", explicit: true, operation: "add" },
+            ] }),
+          });
+        }
+        if (schemaName === "waitlist_conversation_reply") {
+          assert.match(request.input[0].content[0].text, /work, studies, routines/i);
+          assert.match(request.input[0].content[0].text, /wars, armed conflicts, abortion/i);
+        }
         return response(200, {
-          output_text: JSON.stringify({ facts: [
-            { key: "occupation", value_text: "architect", value_items: [], evidence: "I work as an architect", confidence: "high", explicit: true, operation: "set" },
-            { key: "apps", value_text: "", value_items: ["Instagram"], evidence: "Instagram", confidence: "high", explicit: true, operation: "add" },
-            { key: "scroll_moments", value_text: "", value_items: ["after client calls"], evidence: "after client calls", confidence: "high", explicit: true, operation: "add" },
-          ] }),
+          output_text: JSON.stringify({
+            reply: "I can see how those client calls leave you looking for a quick reset. What tends to keep you on Instagram once you open it?",
+            focus: "scroll_context",
+            profile_useful: false,
+          }),
         });
+      } finally {
+        state.responseInFlight -= 1;
       }
-      if (schemaName === "waitlist_conversation_reply") {
-        assert.match(request.input[0].content[0].text, /work, studies, routines/i);
-        assert.match(request.input[0].content[0].text, /wars, armed conflicts, abortion/i);
-      }
-      return response(200, {
-        output_text: JSON.stringify({
-          reply: "I can see how those client calls leave you looking for a quick reset. What tends to keep you on Instagram once you open it?",
-          focus: "scroll_context",
-          profile_useful: false,
-        }),
-      });
     }
     if (!value.startsWith("https://supabase.test/rest/v1/")) throw new Error(`unexpected fetch ${value}`);
     const parsed = new URL(value);
@@ -242,6 +257,26 @@ async function fullTurnContract() {
     assert.ok(state.messages.some((message) => message.direction === "inbound"));
     assert.ok(state.messages.some((message) => message.direction === "outbound"));
     assert.ok(state.events.some((event) => event.event_name === "waitlist_turn_completed"));
+
+    const audioBody = new URLSearchParams({
+      From: "whatsapp:+34600111222",
+      Body: "",
+      MessageSid: "MM-audio-1",
+      NumMedia: "1",
+      MediaUrl0: "https://media.test/audio.ogg",
+      MediaContentType0: "audio/ogg",
+    }).toString();
+    const audioResult = await handler({
+      httpMethod: "POST",
+      path: "/.netlify/functions/waitlist-agent",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: audioBody,
+    });
+    assert.strictEqual(audioResult.statusCode, 200);
+    assert.match(audioResult.body, /client calls leave you looking for a quick reset/i);
+    assert.ok(state.messages.some((message) => message.message_kind === "audio_transcript"));
+    assert.ok(state.events.some((event) => event.event_name === "audio_transcribed"));
+    assert.ok(state.maxResponseConcurrency >= 2, "audio extraction and reply generation should run together");
   } finally {
     global.fetch = previousFetch;
   }

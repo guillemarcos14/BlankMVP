@@ -15,7 +15,7 @@ const {
 const { buildAgentContext, deriveAppPresence } = require("./bm-context");
 const { advanceSemanticState } = require("./bm-semantic-state");
 const { extractWithModel } = require("./bm-semantic-extraction");
-const { scheduleManagementPlan } = require("./bm-schedule-management");
+const { personalizedRecommendationPlan, scheduleManagementPlan } = require("./bm-schedule-management");
 const {
   incompleteBlockingPlan,
   isBlockingActionType,
@@ -3376,20 +3376,23 @@ exports.handler = async (event, runtime = {}) => {
       language,
     });
     const schedulePlan = scheduleManagementPlan(prompt, context);
-    if (schedulePlan) {
-      harnessRun.route = "schedule_management";
+    const personalizedPlan = schedulePlan ? null : personalizedRecommendationPlan(prompt, context);
+    const contextPlan = schedulePlan || personalizedPlan;
+    if (contextPlan) {
+      const contextSource = schedulePlan ? "schedule_management_v1" : "personal_context_v1";
+      harnessRun.route = schedulePlan ? "schedule_management" : "personal_context";
       recordStage(harnessRun, "action_gate", {
-        decision: schedulePlan.actions.length ? "proposal" : "read",
-        action_types: schedulePlan.actions.map((item) => item.type),
-        action_count: schedulePlan.actions.length,
+        decision: contextPlan.actions.length ? "proposal" : "read",
+        action_types: contextPlan.actions.map((item) => item.type),
+        action_count: contextPlan.actions.length,
       });
       const loop = createLoop({
-        prompt, context, plan:schedulePlan, runId:harnessRun.run_id,
+        prompt, context, plan:contextPlan, runId:harnessRun.run_id,
         promptHash:harnessRun.prompt_hash, contextFingerprint:harnessRun.context_fingerprint,
       });
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
-      finishRun(harnessRun, { plan:schedulePlan, source:"schedule_management_v1" });
-      return json(200, { ok:true, plan:schedulePlan, source:"schedule_management_v1", harness:publicMeta(harnessRun), loop:publicLoop(loop) });
+      finishRun(harnessRun, { plan:contextPlan, source:contextSource });
+      return json(200, { ok:true, plan:contextPlan, source:contextSource, harness:publicMeta(harnessRun), loop:publicLoop(loop) });
     }
     const semanticOptions = {
       previousState: context.semantic_state || context.memory?.conversation_state?.semantic_state,

@@ -166,4 +166,50 @@ function scheduleManagementPlan(prompt, context = {}) {
   return null;
 }
 
-module.exports = { scheduleManagementPlan, mentionedRanges, responseVariant };
+function personalizedRecommendationPlan(prompt, context = {}) {
+  const text = fold(prompt);
+  const asksForRecommendation = /\b(?:what.*(?:best|better|suit)|recommend.*(?:week|me)|que.*(?:conviene|recomiendas).*semana|qué.*(?:conviene|recomiendas).*semana)\b/.test(text);
+  if (!asksForRecommendation) return null;
+  const items = windows(context);
+  const outcomes = Array.isArray(context.recent_plan_outcomes) ? context.recent_plan_outcomes : [];
+  const held = outcomes.find((item) => fold(item?.outcome) === "held");
+  const broke = outcomes.find((item) => /^(?:broke|failed)$/.test(fold(item?.outcome)));
+  const insight = clean(context.latest_insight?.summary || context.latest_insight?.pattern || context.personal_profile?.weak_moment, 160);
+  const breakCount = Number.isFinite(Number(context.weekly_break_count)) ? Number(context.weekly_break_count) : null;
+  const adherence = Number.isFinite(Number(context.adherence_score)) ? Number(context.adherence_score) : null;
+
+  if (items.length) {
+    const current = items[0];
+    const range = `${clockLabel(current.start_minute)}–${clockLabel(current.end_minute)}`;
+    const reason = insight ? ` Your recent context still points to ${insight.charAt(0).toLowerCase()}${insight.slice(1)}.` : "";
+    const measure = breakCount != null
+      ? ` Aim to bring breaks from ${breakCount} to ${Math.max(0, breakCount - 1)} before making it stricter.`
+      : adherence != null ? ` Keep it stable until adherence is consistently above ${Math.max(80, Math.round(adherence))}%.` : " Review it after seven days before increasing intensity.";
+    if (held) {
+      return basePlan(responseVariant(context, [
+        `This week, keep your ${range} blocking window.${reason}${measure}`,
+        `I wouldn't make the plan stricter yet. Your ${range} window has held, so repeat it this week.${reason}${measure}`,
+        `The best move this week is consistency: keep ${range} unchanged.${reason}${measure}`,
+      ]));
+    }
+    if (broke) {
+      const earlierStart = (current.start_minute + 1425) % 1440;
+      return basePlan(responseVariant(context, [
+        `This week, make the current window easier to hold: start at ${clockLabel(earlierStart)} and keep the same end time.${reason}`,
+        `Your last plan broke, so I would change one thing only: move the ${range} window 15 minutes earlier.${reason}`,
+        `A lighter adjustment fits this week better than more restriction. Shift ${range} 15 minutes earlier and review it after seven days.${reason}`,
+      ]));
+    }
+    return basePlan(responseVariant(context, [
+      `This week, keep the ${range} window and judge it by whether breaks fall.${reason}${measure}`,
+      `Your clearest experiment is the existing ${range} protection for seven days.${reason}${measure}`,
+      `I would hold ${range} steady this week instead of adding another rule.${reason}${measure}`,
+    ]));
+  }
+
+  const weakMoment = clean(context.personal_profile?.weak_moment || context.latest_insight?.summary, 120);
+  if (weakMoment) return basePlan(`This week, start with one small protection around ${weakMoment.charAt(0).toLowerCase()}${weakMoment.slice(1)}. Tell me the exact start and end time and I'll prepare it.`);
+  return basePlan("I don't have enough recent phone context to choose a good weekly change yet. Which moment is costing you the most attention right now?");
+}
+
+module.exports = { scheduleManagementPlan, personalizedRecommendationPlan, mentionedRanges, responseVariant };

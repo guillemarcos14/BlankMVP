@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { buildAgentContext, normalizeUserContext } = require("../netlify/functions/bm-context");
-const { scheduleManagementPlan } = require("../netlify/functions/bm-schedule-management");
+const { personalizedRecommendationPlan, scheduleManagementPlan } = require("../netlify/functions/bm-schedule-management");
 const { pendingActionFromPlan } = require("../netlify/functions/bm-pending-action");
 const { enforceSemanticBoundary } = require("../netlify/functions/blanked-agent");
 
@@ -80,5 +80,15 @@ const recommendation = enforceSemanticBoundary({
 assert.deepEqual(recommendation.actions, []);
 assert.match(recommendation.response_text, /keep the lunch window/i);
 assert.doesNotMatch(recommendation.response_text, /couldn't validate/i);
+
+const weekly = personalizedRecommendationPlan("What would suit me better this week for my phone habits?", {
+  ...context,
+  weekly_break_count: 2,
+  latest_insight: { summary: "Social use rises after lunch" },
+  recent_plan_outcomes: [{ outcome: "held", outcome_score: 0.9 }],
+});
+assert.match(weekly.response_text, /keep your 1:00 PM–2:00 PM blocking window/i);
+assert.match(weekly.response_text, /breaks from 2 to 1/i);
+assert.deepEqual(weekly.actions, []);
 
 console.log("BM global context: isolated identity, personal context and schedule CRUD passed");

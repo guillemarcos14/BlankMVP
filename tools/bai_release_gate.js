@@ -144,7 +144,7 @@ run("Messaging compatibility smoke", ["tools/whatsapp_agent_smoke_test.js"]);
 run("SMS/audio-input compatibility smoke", ["tools/sms_agent_voice_smoke_test.js"]);
 run("Assistant conversation memory", ["tools/assistant_conversation_memory_test.js"]);
 if (production) {
-  run("Deployed planner semantic replay", [...replayArgs, "--url", argValue("--url", "https://getblank.netlify.app/.netlify/functions/blanked-agent"), "--out", "tmp/bm-semantic/deployed-gate.json"]);
+  run(qualityJudge ? "Deployed planner semantic replay pending independent review" : "Deployed planner semantic replay", [...replayArgs, "--url", argValue("--url", "https://getblank.netlify.app/.netlify/functions/blanked-agent"), "--out", "tmp/bm-semantic/deployed-gate.json"], qualityJudge ? { nonBlocking: true } : {});
   if (qualityJudge) {
     run("Independent deployed GPT-5.6 Sol Low quality review", [
       "tools/bm_sol_quality_judge.js",

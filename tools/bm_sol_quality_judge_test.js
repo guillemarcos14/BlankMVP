@@ -55,6 +55,12 @@ async function run() {
   assert.strictEqual(oracleReviews([{ review: unsafe, review_binding: binding, language: "en" }])[0].verdict, "not_equivalent");
   const appInput = buildJudgeInput({ trace: { context: { has_selected_apps: true, selected_app_names: ["Instagram"] } } });
   assert.deepStrictEqual(appInput.app_context.selected_app_names, ["Instagram"]);
+  const remoteInput = buildJudgeInput({ actual: { visible: "Tap the notification.", actions: [] } });
+  assert.strictEqual(remoteInput.app_context.has_selected_apps, null);
+  assert.strictEqual(remoteInput.app_context.selected_app_names, null);
+  const replayInput = buildJudgeInput({ evaluation_context: { has_selected_apps: true, selected_app_names: ["Instagram"] } });
+  assert.strictEqual(replayInput.app_context.has_selected_apps, true);
+  assert.deepStrictEqual(replayInput.app_context.selected_app_names, ["Instagram"]);
   const flattened = flattenReport({ runs: [{ id: "replay", channel: "sms", turns: [
     { turn: 1, input: "Do it", actual: { visible: "Tap the notification.", actions: [{ type: "start_protection" }] } },
     { turn: 2, input: "Yes", actual: { visible: "It is already waiting.", actions: [] } },

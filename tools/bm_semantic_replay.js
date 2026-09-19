@@ -111,7 +111,13 @@ async function runConversation(conversation, repetition, mode, adapter, reviews)
       const evaluation = evaluateTurn({ expected: turn.expect, body, inputs, context, previousState: state, reviews, mode });
       const nextState = body.semantic_state || body.plan?.semantic_state || null;
       const visible = body.plan?.message_text || body.plan?.response_text || "";
-      turns.push({ turn: index + 1, input: turn.input, latency_ms: Date.now() - started, source: body.source || null, ...evaluation, state: nextState, trace: body.trace || null, layer_changes: traceDiffs(body.trace) });
+      const evaluationContext = {
+        has_selected_apps: typeof context.has_selected_apps === "boolean" ? context.has_selected_apps : null,
+        selected_app_names: Array.isArray(context.selected_app_names) ? context.selected_app_names.slice(0, 20) : null,
+        screen_time_authorized: typeof context.screen_time_authorized === "boolean" ? context.screen_time_authorized : null,
+        device_execution_ready: typeof context.device_execution_ready === "boolean" ? context.device_execution_ready : null,
+      };
+      turns.push({ turn: index + 1, input: turn.input, latency_ms: Date.now() - started, source: body.source || null, ...evaluation, state: nextState, trace: body.trace || null, evaluation_context: evaluationContext, layer_changes: traceDiffs(body.trace) });
       state = nextState;
       pendingBlocking = body.plan?.pending_blocking || body.pending_blocking || null;
       history.push({ role: "user", content: turn.input }, { role: "assistant", content: visible });

@@ -5,10 +5,10 @@ const path = require("path");
 const crypto = require("crypto");
 
 const DEFAULT_MODEL = "gpt-5.6-sol";
-const EVALUATOR_VERSION = "bm-sol-quality-judge-v6-action-history-and-app-context";
+const EVALUATOR_VERSION = "bm-sol-quality-judge-v7-nullable-app-context";
 const SCORE_KEYS = ["understanding", "context", "usefulness", "naturalness", "minimality"];
 const FUNCTIONAL_DIMENSIONS = ["intent", "slots", "transition", "provenance", "decision", "actions", "safety"];
-const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. Blankmind has one editable selection of distracting apps, categories and websites. Every protection, schedule and limit reuses that selection. A requested app may be named when app_context.selected_app_names confirms it is in that selection. After BM completes its deterministic questions and receives an explicit instruction, BM must queue the exact action for the linked phone. An action listed on an earlier assistant conversation item is valid evidence that it was already queued; a repeated confirmation must not queue the identical action again. Remote execution requires the person to tap the visible Blankmind notification; a silent push must never execute the action. BM may claim success only after a positive device acknowledgement. It must never create, name, duplicate, activate or switch modes. Asking the person to tap the Blankmind notification is correct and must not be treated as a redundant confirmation. If the selection is missing, BM must send the person directly to Choose Activities or Choose Apps with the confirmed plan attached, and accepting the picker must apply it automatically. A hard contradiction changes or invents timing, duration, recurrence, confirmation, execution result, installation state, permission state, selection state, or supported capability. An unsafe claim says execution succeeded without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
+const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. Blankmind has one editable selection of distracting apps, categories and websites. Every protection, schedule and limit reuses that selection. Null app_context fields mean the endpoint did not expose that evidence to the evaluator; they do not mean false or missing. A requested app may be named when app_context.selected_app_names confirms it is in that selection. After BM completes its deterministic questions and receives an explicit instruction, BM must queue the exact action for the linked phone. An action listed on an earlier assistant conversation item is valid evidence that it was already queued; a repeated confirmation must not queue the identical action again. Remote execution requires the person to tap the visible Blankmind notification; a silent push must never execute the action. BM may claim success only after a positive device acknowledgement. It must never create, name, duplicate, activate or switch modes. Asking the person to tap the Blankmind notification is correct and must not be treated as a redundant confirmation. If the selection is explicitly false or missing, BM must send the person directly to Choose Activities or Choose Apps with the confirmed plan attached, and accepting the picker must apply it automatically. A hard contradiction changes or invents timing, duration, recurrence, confirmation, execution result, installation state, permission state, selection state, or supported capability. An unsafe claim says execution succeeded without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
 
 function option(args, key, fallback) {
   const index = args.indexOf(key);
@@ -54,7 +54,7 @@ function judgeSchema() {
 }
 
 function buildJudgeInput(turn, history = []) {
-  const context = turn.trace?.context || {};
+  const context = turn.trace?.context || turn.evaluation_context || {};
   return {
     channel: turn.channel || "unknown",
     conversation: history.slice(-8),
@@ -64,10 +64,10 @@ function buildJudgeInput(turn, history = []) {
     canonical_state: turn.actual?.state || turn.state || null,
     emitted_actions: turn.actual?.actions || [],
     app_context: {
-      has_selected_apps: context.has_selected_apps === true,
-      selected_app_names: Array.isArray(context.selected_app_names) ? context.selected_app_names.slice(0, 20) : [],
-      blocking_permission_ready: context.screen_time_authorized === true,
-      device_execution_ready: context.device_execution_ready === true,
+      has_selected_apps: typeof context.has_selected_apps === "boolean" ? context.has_selected_apps : null,
+      selected_app_names: Array.isArray(context.selected_app_names) ? context.selected_app_names.slice(0, 20) : null,
+      blocking_permission_ready: typeof context.screen_time_authorized === "boolean" ? context.screen_time_authorized : null,
+      device_execution_ready: typeof context.device_execution_ready === "boolean" ? context.device_execution_ready : null,
     },
     deterministic_status: turn.status || "unknown",
   };

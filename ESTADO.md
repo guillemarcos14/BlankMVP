@@ -1,12 +1,13 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-19
+Ultima actualizacion: 2026-09-20
 
 ## Hecho hoy
 - 2026-09-19: Aplicado feedback real de tono y desplegado `7171e3a` en Netlify `6aaeddc8353144ad7e69e4cf`. Las respuestas ya rechazan frases formales/stock (`glad`, `pleased`, `delighted`, `I’d love to`) y fuerzan inglés cotidiano. Los turnos de audio observados quedaron transcritos y respondidos; la falta aparente fue retraso/orden de entrega, no pérdida confirmada.
 - 2026-09-19: Auditadas dos notas de voz reales de WhatsApp en producción. Twilio entregó `NumMedia=1` en ambos casos y `waitlist-agent` llegó hasta `/v1/audio/transcriptions`; las dos respuestas fueron HTTP `429` por créditos agotados. El parseo, la descarga y el multipart local pasan; tests waitlist y product harness `44/44`. No hay corrección de código segura que sustituya la facturación del proveedor; BM Final no se tocó.
 
 ## Resumen actual
+- 2026-09-20: Corregido localmente el transporte de la apertura Early Access para `sms`: `waitlist-start` recibe `channel`, envía los dos mensajes deterministas por Twilio SMS y conserva WhatsApp por plantilla. La migración `020` separa los flags SMS para permitir cambiar de canal sin duplicar reintentos. La regresión cubre apertura y un turno completo por WhatsApp y SMS, con extracción/persistencia idéntica. Harness `44/44`; pendiente integración Backend Cloud, aplicar `020`, deploy y prueba real.
 - 2026-09-19: Implementada en la rama aislada `codex/waitlist-early-access-2026-09-19` la capa temporal Blankmind Early Access: alta con teléfono verificado y consentimiento, dos aperturas deterministas por plantilla, conversación posterior abierta, audio transcrito sin conservar el archivo, extracción de hechos con evidencia/correcciones, privacidad y borrado. El producto agéntico no se importa ni modifica. Product harness `44/44`; evaluación conversacional independiente `9/10` y el único giro rechazado quedó bloqueado por el validador posterior. Pendiente integración Backend Cloud, migración `019`, aprobación de dos plantillas y smoke real; sin despliegue desde esta rama.
 - 2026-09-19: Auditoría integral de BM publicada en producción: migración Supabase `018` aplicada, Edge Function `digital-wellness-features` desplegada y Netlify activo en `6aae8a934eab6f6bc93bd1c2`. La verificación productiva cierra `20/20` grupos; juez independiente remoto `48/48`, `100 %`, cero respuestas pobres y cero fallos duros. El commit `c0a79bf` se archivó como iOS `1.9 (78)` en MacinCloud y Xcode confirmó `Uploaded to Apple` a las 15:59. Solo queda el procesamiento de Apple y ejecutar `20/20` pruebas físicas en iPhone.
 - 2026-09-18: Corregida una regresión de despliegue de BM. No hubo commit nuevo: `6aace883e99a5a6d81ea96d8` reutilizó Functions antiguas del 17-sep 08:45, anteriores al bloqueo único. Producción vuelve a `6aac177a571ea02c1129cb62`; el smoke público usa siempre `selected_distractions`, no pregunta apps y ejecuta `start_protection` cuando la orden incluye inicio y recurrencia.
@@ -643,6 +644,7 @@ Ultima actualizacion: 2026-09-19
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-20: El canal seleccionado en la landing se propaga hasta `waitlist-start`; WhatsApp usa sus plantillas aprobadas y SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER` para los mismos dos textos deterministas.
 - [cerrada] 2026-09-15: BM usa estado semántico como autoridad para bloqueos; el modelo aporta evidencia, nunca autorización. Correcciones invalidan confirmación. Sin defaults de horas, duración, apps ni horizonte. La migración 015 y persistencia requerida deben preceder a una futura publicación del backend. Evaluación dura sin compensación por medias; texto nuevo exige revisión independiente. No desplegar desde esta tarea.
 - [cerrada] 2026-07-31: En el programa de embajadores, las comisiones se pagaran semanalmente para reforzar incentivo y velocidad; metodos de pago aceptados: transferencia bancaria o Bizum.
 - [cerrada] 2026-07-31: La atribucion de ventas para embajadores de Blank sera de 60 dias.

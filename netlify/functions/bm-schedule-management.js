@@ -181,7 +181,7 @@ function personalizedRecommendationPlan(prompt, context = {}) {
   if (items.length) {
     const current = items[0];
     const range = `${clockLabel(current.start_minute)}–${clockLabel(current.end_minute)}`;
-    const reason = insight ? ` Your recent context still points to ${insight.charAt(0).toLowerCase()}${insight.slice(1)}.` : "";
+    const reason = insight ? ` Your recent pattern is clear: ${insight.charAt(0).toLowerCase()}${insight.slice(1)}.` : "";
     const measure = breakCount != null
       ? ` Aim to bring breaks from ${breakCount} to ${Math.max(0, breakCount - 1)} before making it stricter.`
       : adherence != null ? ` Keep it stable until adherence is consistently above ${Math.max(80, Math.round(adherence))}%.` : " Review it after seven days before increasing intensity.";

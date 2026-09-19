@@ -88,6 +88,7 @@ const weekly = personalizedRecommendationPlan("What would suit me better this we
   recent_plan_outcomes: [{ outcome: "held", outcome_score: 0.9 }],
 });
 assert.match(weekly.response_text, /keep your 1:00 PM–2:00 PM blocking window/i);
+assert.match(weekly.response_text, /recent pattern is clear: social use rises after lunch/i);
 assert.match(weekly.response_text, /breaks from 2 to 1/i);
 assert.deepEqual(weekly.actions, []);
 

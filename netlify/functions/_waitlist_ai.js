@@ -281,7 +281,7 @@ async function extractFacts({ message, history, profile, fetchImpl = fetch }) {
     "Do not turn interpretation into fact. An emotional impact is valid only if the person says it.",
   ].join(" ");
   const input = JSON.stringify({ latest_message: message, recent_history: history.slice(-10), known_profile: profile });
-  const model = process.env.WAITLIST_EXTRACTION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
+  const model = process.env.WAITLIST_EXTRACTION_MODEL || "gpt-5.6-luna";
   try {
     const extracted = await structuredResponse({
       model,
@@ -366,7 +366,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     coverage: knownCoverage,
     restricted_topic_present: restricted,
   });
-  const model = process.env.WAITLIST_CONVERSATION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
+  const model = process.env.WAITLIST_CONVERSATION_MODEL || "gpt-5.6-sol";
   let result = await structuredResponse({
     model,
     schemaName: "waitlist_conversation_reply",

@@ -33,7 +33,7 @@ const DELETE_CONFIRMATION = /^DELETE$/i;
 const STOP_COMMAND = /^(STOP|UNSUBSCRIBE|CANCEL|END|QUIT)$/i;
 
 function publicJoinUrl() {
-  return cleanText(process.env.WAITLIST_PUBLIC_URL, 800) || "https://blankmind.ai/early-access";
+  return cleanText(process.env.WAITLIST_PUBLIC_URL, 800) || "https://blankmind.ai/signup?channel=whatsapp";
 }
 
 function noConsentReply() {

@@ -91,6 +91,7 @@ function parseMetaMessages(body) {
 function twilioWebhookUrl(event) {
   const configured = cleanText(process.env.WAITLIST_TWILIO_WEBHOOK_URL, 800);
   if (configured) return configured;
+  if (isProduction()) return "https://getblank.netlify.app/.netlify/functions/waitlist-agent";
   const protocol = header(event, "x-forwarded-proto") || "https";
   const host = header(event, "x-forwarded-host") || header(event, "host");
   const path = event.path || "/.netlify/functions/waitlist-agent";

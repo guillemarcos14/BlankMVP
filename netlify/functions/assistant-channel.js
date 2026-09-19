@@ -461,14 +461,17 @@ exports.handler = async (event) => {
   try {
     const body = parseJsonBody(event);
     const action = cleanText(body.action, 60).toLowerCase();
-    if (action === "register_preference") return registerPreference(body);
-    if (action === "sync_context") return syncContext(body);
-    if (action === "register_device_push") return registerDevicePush(body);
-    if (action === "send_proactive") return sendProactive(body);
-    if (action === "poll_pending_action") return pollPendingAction(body);
-    if (action === "ack_pending_action") return acknowledgePendingAction(body);
+    if (action === "register_preference") return await registerPreference(body);
+    if (action === "sync_context") return await syncContext(body);
+    if (action === "register_device_push") return await registerDevicePush(body);
+    if (action === "send_proactive") return await sendProactive(body);
+    if (action === "poll_pending_action") return await pollPendingAction(body);
+    if (action === "ack_pending_action") return await acknowledgePendingAction(body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {
+    if (String(error.message || "").includes("bm_anonymous_identity_conflict")) {
+      return json(409, { error: "assistant_identity_conflict" });
+    }
     return json(500, { error: "assistant_channel_failed", detail: error.message });
   }
 };

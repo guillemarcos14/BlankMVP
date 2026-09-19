@@ -10,8 +10,11 @@ const { pendingActionFromPlan } = require("../netlify/functions/bm-pending-actio
 const root = path.join(__dirname, "..");
 const upsertFix = fs.readFileSync(path.join(root, "supabase/migrations/017_fix_bm_context_upsert.sql"), "utf8");
 const persistenceSource = fs.readFileSync(path.join(root, "netlify/functions/_bm_user_context.js"), "utf8");
+const assistantChannelSource = fs.readFileSync(path.join(root, "netlify/functions/assistant-channel.js"), "utf8");
 assert.match(upsertFix, /on conflict on constraint bm_user_context_snapshots_pkey/i);
 assert.doesNotMatch(persistenceSource, /catch\s*\(_\)\s*\{\s*return null;\s*\}/);
+assert.match(assistantChannelSource, /return await syncContext\(body\)/);
+assert.match(assistantChannelSource, /assistant_identity_conflict/);
 
 const windowId = "2D7B82F5-3F07-48F2-8D20-D4E7EA02967E";
 const source = {

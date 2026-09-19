@@ -6,8 +6,9 @@ Corregir la apertura Early Access para que los dos mensajes deterministas se ent
 Rama:
 `codex/waitlist-early-access-2026-09-19`
 
-Commit:
-`7aa9a80 Fix waitlist opening delivery for SMS`
+Commits:
+- `7aa9a80 Fix waitlist opening delivery for SMS`
+- `ee7b5c1 Keep waitlist openings idempotent per channel`
 
 Archivos/superficies modificadas:
 - `netlify/functions/waitlist-start.js`: valida y propaga `channel`.
@@ -16,7 +17,7 @@ Archivos/superficies modificadas:
 - `tools/waitlist_early_access_test.js`: regresión de alta SMS y sender.
 
 Migraciones Supabase:
-- Ninguna.
+- `019_waitlist_early_access.sql` y `020_waitlist_channel_openings.sql`, en ese orden.
 
 Variables de entorno:
 - SMS usa las existentes `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` y `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER`.
@@ -31,6 +32,7 @@ Validaciones ejecutadas:
 Pruebas pendientes:
 - Integrar desde la conversación Backend Cloud, desplegar Netlify y probar alta real seleccionando Message con un teléfono de Estados Unidos o Canadá.
 - Confirmar en Twilio el SID de los dos SMS y responder al primero para verificar `waitlist-agent`.
+- Si ya existe un usuario que recibió WhatsApp, aplicar `020` antes de probar SMS: sus aperturas SMS tienen flags independientes e idempotentes.
 
 Riesgos o conflictos conocidos:
 - Los cambios de producción deben salir desde la rama de integración; esta rama no despliega.

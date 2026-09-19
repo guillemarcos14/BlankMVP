@@ -227,7 +227,7 @@ function providerParsingContract() {
   assert.strictEqual(twilio[0].providerMessageId, "SM1");
 }
 
-async function fullTurnContract() {
+async function fullTurnContract(from = "whatsapp:+34600111222") {
   const state = {
     user: {
       id: "11111111-1111-4111-8111-111111111111",
@@ -311,7 +311,7 @@ async function fullTurnContract() {
 
   try {
     const body = new URLSearchParams({
-      From: "whatsapp:+34600111222",
+      From: from,
       Body: "I work as an architect and I open Instagram after client calls.",
       MessageSid: "SM-turn-1",
     }).toString();
@@ -322,6 +322,7 @@ async function fullTurnContract() {
       body,
     });
     assert.strictEqual(result.statusCode, 200);
+    assert.match(result.body, /<Response><Message>/);
     assert.match(result.body, /client calls leave you looking for a quick reset/i);
     assert.strictEqual(state.responseCalls, 3, "extraction, conversation, and natural-language polish are required");
     assert.deepStrictEqual(state.facts.map((fact) => fact.field_key).sort(), ["apps", "occupation", "scroll_moments"]);
@@ -358,7 +359,8 @@ async function main() {
   safetyContract();
   providerParsingContract();
   isolationContract();
-  await fullTurnContract();
+  await fullTurnContract("whatsapp:+34600111222");
+  await fullTurnContract("+34600111222");
   console.log("waitlist early access tests passed");
 }
 

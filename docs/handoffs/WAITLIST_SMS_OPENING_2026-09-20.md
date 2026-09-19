@@ -25,6 +25,7 @@ Variables de entorno:
 
 Validaciones ejecutadas:
 - `node tools/waitlist_early_access_test.js`: verde.
+- La misma regresión ejecuta un turno completo por WhatsApp y otro por SMS: ambos pasan por `waitlist-agent`, extraen los mismos tres hechos, persisten evidencia y devuelven respuesta TwiML.
 - `node tools/product_harness.js --contract tools/product_harness_contract.json --baseline tmp/product-harness/baseline.json --mode validate --enforce-scope`: `44/44`.
 - `node --check` de las tres Functions/scripts modificadas: verde.
 - `git diff --check`: verde.

@@ -35,6 +35,12 @@ Blankmind sends only aggregated wellness features after the user chooses to pers
 
 Blankmind may use onboarding answers, aggregated app and habit signals, and optional Health-derived features to generate AI-powered digital wellness insights, recommendations, and plan updates. AI output must stay non-medical and must not claim diagnosis, therapy, or treatment.
 
+## Early Access Conversations
+
+When a person joins Blankmind Early Access, Blankmind may store the verified phone number, consent, WhatsApp messages, voice-note transcripts, and personal facts explicitly shared in the conversation. Extracted facts remain linked to their source message and confidence status. Voice notes are downloaded only for transcription and are not intentionally retained after transcription.
+
+Early Access does not execute app blocks, create plans, make predictions, or access the final Blankmind product state. A participant may stop the conversation, request an export, correct information, or delete the Early Access profile and its associated messages and facts.
+
 ## Purchases
 
 iPhone subscriptions are processed by Apple through the App Store. Apple handles payment details, billing, renewals, refunds, and payment methods. Blankmind may check active entitlement state.

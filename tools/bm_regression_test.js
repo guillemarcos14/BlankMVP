@@ -60,6 +60,10 @@ check("ios_pending_action_lifecycle_is_durable", () => {
     "a notification tap must bypass an obsolete receipt before polling the current action",
   );
   assert.match(home, /response\.reason == "action_mismatch" \|\| response\.reason == "no_pending_action"/);
+  assert.match(home, /enum AssistantInboxPollResult/);
+  assert.match(pollBlock, /guard case \.success\(let remoteAction\) = pollResult else \{ return \}/);
+  assert.match(pollBlock, /guard let remoteAction else \{\s*if currentApplyRequest \{ clearAssistantNotificationRequest\(\) \}/);
+  assert.match(pollBlock, /guard tappedActionID\.isEmpty \|\| tappedActionID == remoteAction\.id else \{\s*clearAssistantNotificationRequest\(\)/);
 });
 
 check("context_preserves_autonomy_and_native_control_fields", () => {
@@ -165,7 +169,7 @@ check("schedule_crud_does_not_wait_for_screen_time_permission", () => {
 });
 
 check("stale_schedule_actions_are_invalidated_by_current_app_context", () => {
-  const pending = { type: "update_schedule", window_id: "window-1" };
+  const pending = { type: "update_schedule", status: "queued", window_id: "window-1" };
   assert.strictEqual(
     assistantChannelModule.pendingScheduleTargetIsMissing(pending, { schedule: { windows: [] } }),
     true,
@@ -176,7 +180,35 @@ check("stale_schedule_actions_are_invalidated_by_current_app_context", () => {
     }),
     false,
   );
+  assert.strictEqual(
+    assistantChannelModule.pendingScheduleTargetIsMissing(
+      { type: "delete_schedule", status: "delivered", window_id: "window-1" },
+      { schedule: { windows: [] } },
+    ),
+    false,
+    "a delivered delete may have removed the target locally before acknowledgement",
+  );
   assert.match(assistantChannel, /assistant_action_invalidated_by_app_context/);
+  const sessionStore = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/SessionStore.swift"), "utf8");
+  assert.match(sessionStore, /let candidateExpiry = Calendar\.current\.date/);
+  assert.match(sessionStore, /expiresAt: candidateExpiry/);
+  assert.match(sessionStore, /filter \{ \$0\.expiresAt\.map \{ \$0 > Date\(\) \} \?\? true \}/);
+  assert.match(sessionStore, /adaptiveScheduleExpiresAt = schedule\.windows\.compactMap\(\\\.expiresAt\)\.max\(\)/);
+});
+
+check("ios_recurring_windows_keep_independent_protection", () => {
+  const model = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/BlankDomainModels.swift"), "utf8");
+  const scheduler = fs.readFileSync(path.join(ROOT, "ios/Blank/Blank/DeviceActivityTimerScheduler.swift"), "utf8");
+  const monitor = fs.readFileSync(path.join(ROOT, "ios/Blank/BlankDeviceActivityMonitor/DeviceActivityMonitorExtension.swift"), "utf8");
+  assert.match(model, /var expiresAt: Date\?/);
+  assert.match(model, /guard enabled, expiresAt\.map\(\{ \$0 > date \}\) \?\? true/);
+  assert.match(scheduler, /schedule\.activeWindows\s*\.filter \{ \$0\.expiresAt/);
+  assert.match(scheduler, /intervals\.count \+ expirations\.count <= maxScheduleActivities/);
+  assert.match(scheduler, /DeviceActivityName\(rawValue: "\\\(recurringExpiryPrefix\)\\\(index\)"\)/);
+  assert.doesNotMatch(scheduler, /where window\.runsEveryDay/);
+  assert.match(monitor, /ManagedSettingsStore\(named: ManagedSettingsStore\.Name\("BlankRecurringProtection"\)\)/);
+  assert.match(monitor, /if Self\.recurringScheduleIsActive\(\)/);
+  assert.match(monitor, /guard enabled, expiresAt\.map\(\{ \$0 > date \}\) \?\? true/);
 });
 
 check("assistant_context_sync_reaches_messaging_identity", () => {

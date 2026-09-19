@@ -30,6 +30,11 @@ enum AssistantLifecycleAcknowledgement: Equatable {
     case retry
 }
 
+enum AssistantInboxPollResult {
+    case success(AssistantInboxAction?)
+    case retry
+}
+
 struct AssistantInboxAction: Decodable {
     let id: String
     let type: String
@@ -258,16 +263,16 @@ enum AssistantActionReceiptStore {
 }
 
 struct AssistantActionInboxClient {
-    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
+    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxPollResult {
         guard let data = try? await request(
             action: "poll_pending_action",
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber
         ), let response = try? JSONDecoder().decode(AssistantInboxResponse.self, from: data) else {
-            return nil
+            return .retry
         }
-        return response.pendingAction
+        return .success(response.pendingAction)
     }
 
     private func acknowledge(
@@ -1867,31 +1872,42 @@ struct HomeView: View {
             return
         }
         Task {
-            let remoteAction = await AssistantActionInboxClient().poll(
+            let pollResult = await AssistantActionInboxClient().poll(
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phoneNumber
             )
             await MainActor.run {
                 assistantActionPollInFlight = false
-                guard let remoteAction,
-                      let pendingAction = remoteAction.toPendingAction(),
-                      sessionStore.pendingAssistantAction == nil else { return }
                 // Read this after the network round-trip. On a cold launch the
                 // notification response can arrive while the initial poll is
                 // already in flight; reading it before the request loses the tap.
                 let currentApplyRequest = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                guard case .success(let remoteAction) = pollResult else { return }
+                guard let remoteAction else {
+                    if currentApplyRequest { clearAssistantNotificationRequest() }
+                    return
+                }
+                guard let pendingAction = remoteAction.toPendingAction(),
+                      sessionStore.pendingAssistantAction == nil else { return }
                 guard currentApplyRequest else { return }
                 let tappedActionID = BlankSharedState.defaults.string(forKey: AssistantRemoteNotification.tappedActionIDKey) ?? ""
-                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else { return }
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
+                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else {
+                    clearAssistantNotificationRequest()
+                    return
+                }
+                clearAssistantNotificationRequest()
                 pendingAssistantActionId = remoteAction.id
                 pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)
                 confirmPendingAssistantAction()
             }
         }
+    }
+
+    private func clearAssistantNotificationRequest() {
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -2450,7 +2466,8 @@ private struct ScheduleEditorContent: View {
                 enabled: window.enabled,
                 startMinute: window.startMinute,
                 endMinute: window.endMinute,
-                weekdays: window.weekdays
+                weekdays: window.weekdays,
+                expiresAt: window.expiresAt
             )
         }
         let first = normalized.first ?? BlankHabitWindow(enabled: false)

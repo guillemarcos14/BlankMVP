@@ -283,7 +283,10 @@ function normalizePendingAction(value) {
 }
 
 function pendingScheduleTargetIsMissing(pending, context = {}) {
-  if (!pending || !["update_schedule", "delete_schedule"].includes(pending.type)) return false;
+  // Once iOS has polled the action it becomes `delivered`. A successful delete
+  // can then sync the missing window before its acknowledgement reaches us.
+  // Only queued actions are safe to invalidate from context alone.
+  if (!pending || pending.status !== "queued" || !["update_schedule", "delete_schedule"].includes(pending.type)) return false;
   const windows = Array.isArray(context.schedule?.windows) ? context.schedule.windows : [];
   return !windows.some((window) => cleanText(window?.id, 80) === cleanText(pending.window_id, 80));
 }

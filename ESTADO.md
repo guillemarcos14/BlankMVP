@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-19
 
 ## Hecho hoy
+- 2026-09-19: Aplicado feedback real de tono y desplegado `7171e3a` en Netlify `6aaeddc8353144ad7e69e4cf`. Las respuestas ya rechazan frases formales/stock (`glad`, `pleased`, `delighted`, `I’d love to`) y fuerzan inglés cotidiano. Los turnos de audio observados quedaron transcritos y respondidos; la falta aparente fue retraso/orden de entrega, no pérdida confirmada.
 - 2026-09-19: Auditadas dos notas de voz reales de WhatsApp en producción. Twilio entregó `NumMedia=1` en ambos casos y `waitlist-agent` llegó hasta `/v1/audio/transcriptions`; las dos respuestas fueron HTTP `429` por créditos agotados. El parseo, la descarga y el multipart local pasan; tests waitlist y product harness `44/44`. No hay corrección de código segura que sustituya la facturación del proveedor; BM Final no se tocó.
 
 ## Resumen actual

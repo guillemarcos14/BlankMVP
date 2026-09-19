@@ -15,6 +15,18 @@ function now() {
   return new Date().toISOString();
 }
 
+function openingFields(channel) {
+  return channel === "sms"
+    ? {
+      first: "opening_sms_first_sent_at",
+      second: "opening_sms_second_sent_at",
+    }
+    : {
+      first: "opening_first_sent_at",
+      second: "opening_second_sent_at",
+    };
+}
+
 async function startWaitlist(event) {
   const authUser = await getSupabaseUser(event);
   if (!authUser?.id || !authUser?.phone) return json(401, { error: "waitlist_auth_required" });
@@ -33,8 +45,9 @@ async function startWaitlist(event) {
     whatsappConsent: true,
   });
 
+  const fields = openingFields(channel);
   const sent = [];
-  if (!user.opening_first_sent_at) {
+  if (!user[fields.first]) {
     const result = await sendOpeningMessage(user.phone_e164, 1, channel);
     await recordMessage({
       userId: user.id,
@@ -44,11 +57,11 @@ async function startWaitlist(event) {
       messageKind: "opening",
       body: OPENING_MESSAGE_1,
     });
-    user = await patchUser(user.id, { opening_first_sent_at: now() });
+    user = await patchUser(user.id, { [fields.first]: now() });
     sent.push(1);
   }
 
-  if (!user.opening_second_sent_at) {
+  if (!user[fields.second]) {
     const result = await sendOpeningMessage(user.phone_e164, 2, channel);
     await recordMessage({
       userId: user.id,
@@ -58,7 +71,7 @@ async function startWaitlist(event) {
       messageKind: "opening",
       body: OPENING_MESSAGE_2,
     });
-    user = await patchUser(user.id, { opening_second_sent_at: now(), opening_sent_at: now() });
+    user = await patchUser(user.id, { [fields.second]: now(), opening_sent_at: now() });
     sent.push(2);
   } else if (!user.opening_sent_at) {
     user = await patchUser(user.id, { opening_sent_at: now() });

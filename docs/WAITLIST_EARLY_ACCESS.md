@@ -30,7 +30,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
 
 ## Datos
 
-La migración `019_waitlist_early_access.sql` crea tablas separadas del producto final:
+Las migraciones `019_waitlist_early_access.sql` y `020_waitlist_channel_openings.sql` crean tablas y flags de entrega separados del producto final:
 
 - `waitlist_users`: identidad verificada, consentimientos y estado del recorrido.
 - `waitlist_messages`: texto entrante, transcripciones y respuestas.
@@ -42,7 +42,7 @@ Todas tienen RLS y solo son accesibles desde el backend con service role. La vis
 
 ## Activación
 
-1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar la migración `019`.
+1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019` y `020`.
 2. Crear y conseguir aprobación de las dos plantillas con el texto exacto anterior.
 3. Configurar las variables `WAITLIST_*` documentadas en `.env.membership.example`, además de las credenciales existentes de Supabase, OpenAI y Twilio. SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER`; WhatsApp conserva sus plantillas aprobadas.
 4. Desplegar Netlify y apuntar temporalmente el webhook entrante del número existente a `/.netlify/functions/waitlist-agent`.

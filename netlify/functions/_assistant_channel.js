@@ -621,6 +621,7 @@ async function sendAssistantMessage(connection, body, options = {}) {
 }
 
 module.exports = {
+  assistantChannelUserId,
   attachAssistantUserContext,
   cleanChannel,
   cleanText,

@@ -5,6 +5,9 @@ import WidgetKit
 enum AssistantPendingAction: Equatable {
     case startProtection(minutes: Int?, hardMode: Bool, appNames: [String])
     case applySchedule(name: String, startMinute: Int, endMinute: Int, weekdays: [Int], durationDays: Int, appNames: [String])
+    case updateSchedule(windowId: String, name: String, startMinute: Int, endMinute: Int, weekdays: [Int])
+    case deleteSchedule(windowId: String)
+    case deleteAllSchedules
     case setDailyLimit(minutes: Int?, appNames: [String])
     case allowOnly
     case adultFilter
@@ -1017,6 +1020,60 @@ final class SessionStore: ObservableObject {
 
     private static func hasSelection(_ selection: FamilyActivitySelection) -> Bool {
         !selection.applicationTokens.isEmpty || !selection.categoryTokens.isEmpty || !selection.webDomainTokens.isEmpty
+    }
+
+    @discardableResult
+    func updateScheduleWindow(id: String, name: String, startMinute: Int, endMinute: Int, weekdays: [Int]) -> Bool {
+        guard let uuid = UUID(uuidString: id),
+              let index = schedule.windows.firstIndex(where: { $0.id == uuid }) else { return false }
+        var values = schedule.windows
+        let existing = values[index]
+        values[index] = BlankHabitWindow(
+            id: existing.id,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? existing.name : name,
+            enabled: existing.enabled,
+            startMinute: min(max(startMinute, 0), 1439),
+            endMinute: min(max(endMinute, 0), 1439),
+            weekdays: weekdays
+        )
+        schedule = BlankFocusSchedule(
+            enabled: values.contains(where: { $0.enabled }),
+            startMinute: schedule.startMinute,
+            endMinute: schedule.endMinute,
+            windows: values
+        )
+        schedulePausedUntil = nil
+        syncRecurringSchedule()
+        applyScheduleWindow()
+        return true
+    }
+
+    @discardableResult
+    func deleteScheduleWindow(id: String) -> Bool {
+        guard let uuid = UUID(uuidString: id), schedule.windows.contains(where: { $0.id == uuid }) else { return false }
+        let values = schedule.windows.filter { $0.id != uuid }
+        schedule = BlankFocusSchedule(
+            enabled: values.contains(where: { $0.enabled }),
+            startMinute: schedule.startMinute,
+            endMinute: schedule.endMinute,
+            windows: values
+        )
+        if values.isEmpty { adaptiveScheduleExpiresAt = nil }
+        schedulePausedUntil = nil
+        syncRecurringSchedule()
+        applyScheduleWindow()
+        return true
+    }
+
+    @discardableResult
+    func deleteAllScheduleWindows() -> Int {
+        let removed = schedule.windows.count
+        schedule = BlankFocusSchedule()
+        adaptiveScheduleExpiresAt = nil
+        schedulePausedUntil = nil
+        syncRecurringSchedule()
+        applyScheduleWindow()
+        return removed
     }
 
     private func resetEmergencyUnlocksIfNeeded(for date: Date = Date()) {

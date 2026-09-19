@@ -8,6 +8,7 @@ const {
 } = require("./_membership");
 const { decryptToken, revokeToken } = require("./_wearable_oauth");
 const { ensureIdentityForAuthUser, identityForAuthUser } = require("./_identity");
+const { assistantChannelUserId } = require("./_assistant_channel");
 
 const DATA_TABLES = [
   "digital_wellness_feature_payloads",
@@ -21,6 +22,7 @@ const DATA_TABLES = [
   "bai_recommendation_feedback",
   "bai_user_memory_signals",
   "bai_learning_changes",
+  "assistant_semantic_conversations",
 ];
 
 function cleanText(value, maxLength = 120) {
@@ -59,6 +61,11 @@ async function linkIdentity(event) {
       updated_at: new Date().toISOString(),
     }),
   });
+  await supabaseFetch(`blankmind_identity_links?auth_user_id=eq.${encodeURIComponent(userId(user))}`, {
+    method: "PATCH",
+    headers: { prefer: "return=minimal" },
+    body: JSON.stringify({ anonymous_user_id: anonymousUserId, updated_at: new Date().toISOString() }),
+  });
   return json(200, { ok: true });
 }
 
@@ -95,9 +102,16 @@ async function deleteData(event) {
   const ids = await linkedAnonymousIds(authUserId);
   const identity = await identityForAuthUser(authUserId);
   if (identity?.assistant_connect_code) ids.push(`connect:${identity.assistant_connect_code}`);
+  if (identity?.anonymous_user_id) ids.push(identity.anonymous_user_id);
+  if (identity?.phone_e164) {
+    ids.push(assistantChannelUserId("whatsapp", identity.phone_e164));
+    ids.push(assistantChannelUserId("sms", identity.phone_e164));
+  }
 
-  await revokeWearableTokens(ids);
-  for (const anonymousUserId of ids) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+
+  await revokeWearableTokens(uniqueIds);
+  for (const anonymousUserId of uniqueIds) {
     for (const table of DATA_TABLES) {
       await supabaseFetch(`${table}?anonymous_user_id=eq.${encodeURIComponent(anonymousUserId)}`, {
         method: "DELETE",
@@ -115,6 +129,10 @@ async function deleteData(event) {
     headers: { prefer: "return=minimal" },
   });
   await supabaseFetch(`app_handoffs?auth_user_id=eq.${encodeURIComponent(authUserId)}`, {
+    method: "DELETE",
+    headers: { prefer: "return=minimal" },
+  });
+  await supabaseFetch(`bm_user_context_snapshots?user_id=eq.${encodeURIComponent(authUserId)}`, {
     method: "DELETE",
     headers: { prefer: "return=minimal" },
   });

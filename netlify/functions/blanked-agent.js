@@ -15,6 +15,7 @@ const {
 const { buildAgentContext, deriveAppPresence } = require("./bm-context");
 const { advanceSemanticState } = require("./bm-semantic-state");
 const { extractWithModel } = require("./bm-semantic-extraction");
+const { scheduleManagementPlan } = require("./bm-schedule-management");
 const {
   incompleteBlockingPlan,
   isBlockingActionType,
@@ -1675,6 +1676,7 @@ function hourWindow(hourValue) {
 function action(type, values = {}) {
   return {
     type,
+    window_id: values.window_id ?? null,
     minutes: values.minutes ?? null,
     hard_mode: values.hard_mode ?? null,
     name: values.name ?? null,
@@ -2706,9 +2708,10 @@ function fallbackPlan(prompt, context = {}) {
 const actionSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "minutes", "hard_mode", "name", "start_minute", "end_minute", "weekdays", "duration_days", "hours"],
+  required: ["type", "window_id", "minutes", "hard_mode", "name", "start_minute", "end_minute", "weekdays", "duration_days", "hours"],
   properties: {
-    type: { type: "string", enum: ["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
+    type: { type: "string", enum: ["start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"] },
+    window_id: { type: ["string", "null"], maxLength: 80 },
     minutes: { type: ["integer", "null"], minimum: 5, maximum: 240 },
     hard_mode: { type: ["boolean", "null"] },
     name: { type: ["string", "null"], maxLength: 40 },
@@ -2754,6 +2757,9 @@ function appCapabilities(context = {}) {
     actions: [
       "start_protection",
       "apply_schedule",
+      "update_schedule",
+      "delete_schedule",
+      "delete_all_schedules",
       "set_daily_limit",
       "enable_allow_only",
       "enable_adult_filter",
@@ -2890,7 +2896,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
       input: [
         {
           role: "system",
-          content: "You are BM, Blankmind's digital wellness assistant. Stay strictly inside digital wellness: phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and phone-control actions. Do not provide generic wellness, training, running, nutrition, stress-management, recovery, or sleep plans unless the user's question clearly connects the problem to phones, screens, apps, or digital behavior. If the user asks about general wellness or anything outside digital wellness, briefly say you can only help with digital wellness and invite them to share the phone/screen part of the problem. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough digital context, ask one clear question and do not add advice yet. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blankmind can block apps or create a plan for that exact problem. Prefer Blankmind blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blankmind-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blankmind executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blankmind that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blankmind, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain only how those signals improve digital wellness decisions and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blankmind can use connected wearable/Health signals, phone-use patterns, pickup pressure, app-category chains, quick check-ins, plan outcomes, personal baseline, recent routines, global behavioral patterns, and AI forecasts to estimate digital risk windows; be clear this is probabilistic behavioral forecasting, not medical diagnosis or exact app/location surveillance. If the message is small talk, just reply naturally and do not mention Blankmind, the app, blocks, plans, reports, setup, links, or capabilities. Every visible surface must be English.",
+          content: "You are BM, Blankmind's digital wellness assistant. Stay strictly inside digital wellness: phone behavior, screens, apps, scrolling, focus, attention, notifications, digital habits, screen-related sleep disruption, and phone-control actions. Treat the supplied personal_context as this person's private, canonical context. Use it naturally to answer questions about their current configuration, history and likely best next move. Never expose raw context or confuse it with another person. Do not provide generic wellness, training, running, nutrition, stress-management, recovery, or sleep plans unless the user's question clearly connects the problem to phones, screens, apps, or digital behavior. If the user asks about general wellness or anything outside digital wellness, briefly say you can only help with digital wellness and invite them to share the phone/screen part of the problem. Naturalness is the top priority: reply like a normal, useful person in chat, not a support assistant, sales funnel, or setup wizard. Never use semicolons. Never use markdown or numbered lists unless asked. Never mention internal context, old app context, patterns, backend, schemas, Screen Time, Digital Wellbeing, or competing phone controls. Keep answers as long as the situation needs, but never add text just to sound complete. If the user has not given enough digital context, ask one clear question and do not add advice yet. If the user corrects an app, moment, or assumption, use the corrected app or moment in the next answer instead of drifting back to older context. When the problem is apps, scrolling, focus blocks, distraction control, notifications, or phone boundaries, naturally mention that Blankmind can block apps or create a plan for that exact problem. Prefer Blankmind blocks and plans over generic advice like putting the phone away when the issue is a specific app or scroll loop. On web preview, add a short Blankmind-specific note only when phone control, scrolling, distractions, apps, or blocking are relevant: web can plan it, but Blankmind executes blocking because permissions live in the app. For productivity/focus requests, it is relevant to suggest a work block in Blankmind that blocks social, reels, shorts, or other scroll apps during the chosen window. If the user asks about Blankmind, prediction, screen habits, behavior, wearables, Health, recovery, or how the product knows something, explain only how those signals improve digital wellness decisions and honest limits before mentioning any app download. For prediction/data questions, say it is not guessed from thin air: Blankmind can use connected wearable/Health signals, phone-use patterns, pickup pressure, app-category chains, quick check-ins, plan outcomes, personal baseline, recent routines, global behavioral patterns, and AI forecasts to estimate digital risk windows; be clear this is probabilistic behavioral forecasting, not medical diagnosis or exact app/location surveillance. If the message is small talk, just reply naturally and do not mention Blankmind, the app, blocks, plans, reports, setup, links, or capabilities. Every visible surface must be English.",
         },
         {
           role: "system",
@@ -2902,10 +2908,11 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
             prompt: cleanText(prompt, 600),
             response_language: language,
             recent_context: context.recent_messages || context.conversation || null,
+            personal_context: context,
           }),
         },
       ],
-      max_output_tokens: 160,
+      max_output_tokens: 220,
     }),
   });
   if (!response.ok) {
@@ -2929,7 +2936,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
 }
 
 function actionNeedsScreenTime(actionType) {
-  return ["start_protection", "apply_schedule", "set_daily_limit", "enable_allow_only", "enable_adult_filter", "apply_ai_plan"].includes(actionType);
+  return ["start_protection", "apply_schedule", "update_schedule", "set_daily_limit", "enable_allow_only", "enable_adult_filter", "apply_ai_plan"].includes(actionType);
 }
 
 function actionNeedsSelection(actionType) {
@@ -3212,7 +3219,7 @@ function normalizeAction(candidate) {
   if (!candidate || typeof candidate !== "object") return null;
   const legacyType = cleanText(candidate.type, 60);
   const type = legacyType === "activate_mode" ? "start_protection" : legacyType === "switch_mode" ? "open_app_picker" : legacyType;
-  const allowed = new Set(["start_protection", "apply_schedule", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
+  const allowed = new Set(["start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "enable_allow_only", "enable_adult_filter", "set_daily_limit", "pause_rules", "disable_pause", "open_app_picker", "request_screen_time_permission", "apply_ai_plan", "none"]);
   if (!allowed.has(type)) return null;
   if (type === "none") return action("none");
   const candidateStart = candidate.start_minute == null ? null : cleanNumber(candidate.start_minute, 1320, 0, 1439);
@@ -3227,6 +3234,7 @@ function normalizeAction(candidate) {
     });
   }
   const normalized = action(type, {
+    window_id: candidate.window_id == null ? null : cleanText(candidate.window_id, 80),
     minutes: candidate.minutes == null ? null : cleanNumber(candidate.minutes, 30, 5, 240),
     hard_mode: candidate.hard_mode === true ? true : candidate.hard_mode === false ? false : null,
     name: candidate.name == null ? null : cleanText(candidate.name, 40),
@@ -3249,6 +3257,18 @@ function normalizeAction(candidate) {
   });
   if (type === "start_protection") return action(type, { minutes: normalized.minutes, hard_mode: normalized.hard_mode ?? false });
   if (type === "pause_rules") return action(type, { hours: normalized.hours });
+  if (type === "delete_all_schedules") return action(type);
+  if (type === "delete_schedule") return normalized.window_id ? action(type, { window_id: normalized.window_id }) : null;
+  if (type === "update_schedule") {
+    if (!normalized.window_id) return null;
+    return action(type, {
+      window_id: normalized.window_id,
+      name: normalized.name,
+      start_minute: normalized.start_minute,
+      end_minute: normalized.end_minute,
+      weekdays: normalized.weekdays,
+    });
+  }
   if (type === "apply_schedule") {
     return action(type, {
       name: normalized.name,
@@ -3355,6 +3375,22 @@ exports.handler = async (event, runtime = {}) => {
       route: harnessRun.route,
       language,
     });
+    const schedulePlan = scheduleManagementPlan(prompt, context);
+    if (schedulePlan) {
+      harnessRun.route = "schedule_management";
+      recordStage(harnessRun, "action_gate", {
+        decision: schedulePlan.actions.length ? "proposal" : "read",
+        action_types: schedulePlan.actions.map((item) => item.type),
+        action_count: schedulePlan.actions.length,
+      });
+      const loop = createLoop({
+        prompt, context, plan:schedulePlan, runId:harnessRun.run_id,
+        promptHash:harnessRun.prompt_hash, contextFingerprint:harnessRun.context_fingerprint,
+      });
+      recordStage(harnessRun, "loop_planned", loopSummary(loop));
+      finishRun(harnessRun, { plan:schedulePlan, source:"schedule_management_v1" });
+      return json(200, { ok:true, plan:schedulePlan, source:"schedule_management_v1", harness:publicMeta(harnessRun), loop:publicLoop(loop) });
+    }
     const semanticOptions = {
       previousState: context.semantic_state || context.memory?.conversation_state?.semantic_state,
       prompt, context, language,

@@ -17,6 +17,7 @@ const {
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState } = require("./bm-context");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
+const { enrichAssistantContext } = require("./_bm_user_context");
 const {
   hasSelectedDistractions,
   onboardingMessages,
@@ -366,7 +367,7 @@ function memoryFactsFromText(text, savedMemory = {}) {
   return facts;
 }
 
-async function agentContext(from, prompt) {
+async function agentContext(from, prompt, linkedConnection = null) {
   let savedMemory = {};
   try {
     savedMemory = await getAssistantMemory("whatsapp", from);
@@ -385,9 +386,13 @@ async function agentContext(from, prompt) {
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
     conversation_state: conversationState,
   };
-  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+  const storedUserContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
     ? savedMemory.user_context
     : {};
+  const userContext = await enrichAssistantContext(
+    storedUserContext,
+    linkedConnection?.connectCode || savedMemory.assistant_connect_code,
+  );
   if (Object.keys(newFacts).length) {
     try {
       await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
@@ -415,8 +420,8 @@ async function agentContext(from, prompt) {
   };
 }
 
-async function callBlankedAgent(prompt, from) {
-  const context = await agentContext(from, prompt);
+async function callBlankedAgent(prompt, from, linkedConnection = null) {
+  const context = await agentContext(from, prompt, linkedConnection);
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     body: JSON.stringify({ prompt, context }),
@@ -555,7 +560,7 @@ async function processMessage(message) {
     });
     return sendWhatsAppMessage(message.from, pendingMessage);
   }
-  const result = await callBlankedAgent(prompt, message.from);
+  const result = await callBlankedAgent(prompt, message.from, linkedConnection);
   const plan = result.plan;
   try {
     await recordAssistantConversationTurn({

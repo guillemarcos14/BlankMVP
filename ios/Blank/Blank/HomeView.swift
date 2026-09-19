@@ -27,6 +27,7 @@ struct AssistantInboxAction: Decodable {
     let id: String
     let type: String
     let name: String?
+    let windowId: String?
     let minutes: Int?
     let hardMode: Bool?
     let startMinute: Int?
@@ -42,6 +43,7 @@ struct AssistantInboxAction: Decodable {
         case id
         case type
         case name
+        case windowId = "window_id"
         case minutes
         case hardMode = "hard_mode"
         case startMinute = "start_minute"
@@ -71,6 +73,20 @@ struct AssistantInboxAction: Decodable {
                 durationDays: min(max(durationDays ?? 7, 1), 14),
                 appNames: apps
             )
+        case "update_schedule":
+            guard let windowId, let startMinute, let endMinute else { return nil }
+            return .updateSchedule(
+                windowId: windowId,
+                name: name ?? "Protection",
+                startMinute: min(max(startMinute, 0), 1439),
+                endMinute: min(max(endMinute, 0), 1439),
+                weekdays: (weekdays ?? Array(1...7)).filter { (1...7).contains($0) }
+            )
+        case "delete_schedule":
+            guard let windowId else { return nil }
+            return .deleteSchedule(windowId: windowId)
+        case "delete_all_schedules":
+            return .deleteAllSchedules
         case "set_daily_limit":
             return .setDailyLimit(minutes: minutes, appNames: apps)
         case "enable_allow_only":
@@ -1430,6 +1446,12 @@ struct HomeView: View {
             return minutes.map { "Protect all your selected distractions for \($0) minutes?" } ?? "Protect all your selected distractions now, with no duration added?"
         case .applySchedule(_, let start, let end, _, let days, _):
             return "Protect your distractions from \(formatMinute(start)) to \(formatMinute(end)) for \(days) days?"
+        case .updateSchedule(_, _, let start, let end, _):
+            return "Move this blocking window to \(formatMinute(start))–\(formatMinute(end))?"
+        case .deleteSchedule:
+            return "Remove this blocking window?"
+        case .deleteAllSchedules:
+            return "Remove every blocking window?"
         case .setDailyLimit(let minutes, _):
             return minutes.map { "Set a daily limit of \($0) minutes?" } ?? "Set a daily limit after you choose its duration?"
         case .allowOnly:
@@ -1536,6 +1558,30 @@ struct HomeView: View {
             message = "Protection schedule added for your distractions."
             messageAction = nil
             finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
+        case .updateSchedule(let windowId, let name, let start, let end, let weekdays):
+            let updated = sessionStore.updateScheduleWindow(
+                id: windowId,
+                name: name,
+                startMinute: start,
+                endMinute: end,
+                weekdays: weekdays
+            )
+            applyScreenTimeControls()
+            message = updated ? "Blocking window updated." : "That blocking window no longer exists."
+            messageAction = nil
+            finishPendingAssistantAction(status: updated ? "verified" : "failed", detail: updated ? "schedule_updated" : "schedule_not_found")
+        case .deleteSchedule(let windowId):
+            let deleted = sessionStore.deleteScheduleWindow(id: windowId)
+            applyScreenTimeControls()
+            message = deleted ? "Blocking window removed." : "That blocking window no longer exists."
+            messageAction = nil
+            finishPendingAssistantAction(status: deleted ? "verified" : "failed", detail: deleted ? "schedule_deleted" : "schedule_not_found")
+        case .deleteAllSchedules:
+            let removed = sessionStore.deleteAllScheduleWindows()
+            applyScreenTimeControls()
+            message = removed == 0 ? "There were no blocking windows to remove." : "All blocking windows removed."
+            messageAction = nil
+            finishPendingAssistantAction(status: "verified", detail: "all_schedules_deleted")
         case .setDailyLimit(let minutes, let appNames):
             guard let minutes else {
                 message = "Tell BM how many minutes per day you want to allow before activating this limit."
@@ -1606,7 +1652,7 @@ struct HomeView: View {
 
     private func assistantActionRequiresScreenTime(_ action: AssistantPendingAction) -> Bool {
         switch action {
-        case .pauseRules, .disablePause, .requestScreenTimePermission:
+        case .pauseRules, .disablePause, .deleteSchedule, .deleteAllSchedules, .requestScreenTimePermission:
             return false
         default:
             return true
@@ -1708,6 +1754,9 @@ struct HomeView: View {
     private func assistantContextPayload() -> [String: Any] {
         let system = aiSystem
         var payload: [String: Any] = [
+            "anonymous_user_id": BlankSharedState.defaults.string(forKey: "blankOnboardingAnonymousUserId") ?? "",
+            "profile_name": BlankSharedState.defaults.string(forKey: "blankOnboardingName") ?? "",
+            "age_range": BlankSharedState.defaults.string(forKey: "blankOnboardingAgeRange") ?? "",
             "is_blank_active": sessionStore.isBlankActive,
             "has_selected_apps": sessionStore.hasSelectedApps,
             "selection_count": sessionStore.selectionCount,

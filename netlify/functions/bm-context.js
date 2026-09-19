@@ -73,11 +73,16 @@ const SCALAR_KEYS = [
   "app_presence_state",
   "app_presence_recent",
   "app_ready",
+  "anonymous_user_id",
+  "canonical_user_id",
+  "profile_name",
+  "age_range",
 ];
 
 const ARRAY_KEYS = ["authorized_action_types", "selected_app_names"];
-const OBJECT_ARRAY_KEYS = [];
+const OBJECT_ARRAY_KEYS = ["recent_plan_outcomes", "learned_memory_signals", "recent_wellness_signals"];
 const OBJECT_KEYS = ["schedule", "app_presence"];
+const GENERIC_OBJECT_KEYS = ["personal_profile", "latest_insight"];
 
 const APP_PRESENCE_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const SHORT_TERM_CONVERSATION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -209,6 +214,14 @@ function normalizeUserContext(value) {
   if (Array.isArray(value.selected_app_names)) result.selected_app_names = normalizeStringArray(value.selected_app_names, 8, 60);
   if (value.schedule) result.schedule = normalizeSchedule(value.schedule);
   if (value.app_presence) result.app_presence = normalizeAppPresence(value.app_presence);
+  for (const key of GENERIC_OBJECT_KEYS) {
+    const normalized = normalizeObject(value[key]);
+    if (Object.keys(normalized).length) result[key] = normalized;
+  }
+  for (const key of OBJECT_ARRAY_KEYS) {
+    const normalized = normalizeObjectArray(value[key]);
+    if (normalized.length) result[key] = normalized;
+  }
   if (Array.isArray(value.recent_messages)) result.recent_messages = normalizeConversation(value.recent_messages);
   if (value.memory && typeof value.memory === "object" && !Array.isArray(value.memory)) {
     const nestedMemory = normalizeMemory({ ...value.memory, user_context: undefined });
@@ -283,6 +296,11 @@ function normalizeObject(value, maxKeys = 24) {
   }, {});
 }
 
+function normalizeObjectArray(value, maxItems = 20) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, maxItems).map((item) => normalizeObject(item, 16)).filter((item) => Object.keys(item).length);
+}
+
 function buildAgentContext(input = {}) {
   const source = input && typeof input === "object" ? input : {};
   const shared = normalizeUserContext(source.user_context);
@@ -295,12 +313,15 @@ function buildAgentContext(input = {}) {
     if (merged[key] !== undefined) result[key] = normalizeStringArray(merged[key]);
   }
   for (const key of OBJECT_ARRAY_KEYS) {
-    if (merged[key] !== undefined) result[key] = merged[key];
+    if (merged[key] !== undefined) result[key] = normalizeObjectArray(merged[key]);
   }
   for (const key of OBJECT_KEYS) {
     if (merged[key] !== undefined) {
       result[key] = key === "app_presence" ? normalizeAppPresence(merged[key]) : normalizeSchedule(merged[key]);
     }
+  }
+  for (const key of GENERIC_OBJECT_KEYS) {
+    if (merged[key] !== undefined) result[key] = normalizeObject(merged[key], 32);
   }
   const pendingBlocking = normalizePendingBlocking(merged.pending_blocking);
   if (pendingBlocking) result.pending_blocking = pendingBlocking;

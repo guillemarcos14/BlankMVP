@@ -1,13 +1,14 @@
 // Links are only for setup that requires the user to select apps or grant permission.
 const REVIEW_TYPES = new Set([
-  "start_protection", "apply_schedule", "set_daily_limit",
+  "start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause",
   "open_app_picker", "request_screen_time_permission", "apply_ai_plan",
 ]);
 
 function reviewActionLink(action, appNames = []) {
   if (!action || !REVIEW_TYPES.has(action.type)) return "";
-  if (action.type === "apply_schedule" && (
+  if (["update_schedule", "delete_schedule"].includes(action.type) && !action.window_id) return "";
+  if (["apply_schedule", "update_schedule"].includes(action.type) && (
     !Number.isInteger(action.start_minute) || action.start_minute < 0 || action.start_minute > 1439
     || !Number.isInteger(action.end_minute) || action.end_minute < 0 || action.end_minute > 1439
     || action.start_minute === action.end_minute
@@ -22,6 +23,7 @@ function reviewActionLink(action, appNames = []) {
   const params = {
     apps: apps.length ? apps.join(",") : null,
     name: action.name || null,
+    window_id: action.window_id || null,
     minutes: Number.isFinite(action.minutes) ? action.minutes : null,
     hard: action.hard_mode === true ? "true" : null,
     start: Number.isFinite(action.start_minute) ? action.start_minute : null,

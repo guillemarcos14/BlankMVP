@@ -5,6 +5,9 @@ const crypto = require("crypto");
 const ACTION_TYPES = Object.freeze([
   "start_protection",
   "apply_schedule",
+  "update_schedule",
+  "delete_schedule",
+  "delete_all_schedules",
   "enable_allow_only",
   "enable_adult_filter",
   "set_daily_limit",
@@ -65,6 +68,7 @@ function normalizeAction(candidate) {
     minutes: numberOrNull(source.minutes, 5, 240),
     hard_mode: source.hard_mode === true ? true : source.hard_mode === false ? false : null,
     name: clean(source.name, 48) || null,
+    window_id: clean(source.window_id, 80) || null,
     start_minute: numberOrNull(source.start_minute, 0, 1439),
     end_minute: numberOrNull(source.end_minute, 0, 1439),
     weekdays: normalizeWeekdays(source.weekdays),
@@ -120,6 +124,8 @@ function validatePlan(plan) {
 function actionNeedsSetup(action, context = {}) {
   if (!action || action.type === "none") return false;
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) return false;
+  if (["delete_schedule", "delete_all_schedules"].includes(action.type)) return false;
+  if (action.type === "update_schedule") return context.screen_time_authorized !== true;
   if (action.type === "apply_ai_plan") return context.has_selected_apps !== true || context.screen_time_authorized !== true;
   return context.has_selected_apps !== true || context.screen_time_authorized !== true;
 }

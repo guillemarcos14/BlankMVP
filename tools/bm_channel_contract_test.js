@@ -6,6 +6,9 @@ const { actionDeepLink } = require("../netlify/functions/sms-agent");
 for (const action of [
   { type: "start_protection", minutes: 17, hard_mode: false },
   { type: "apply_schedule", start_minute: 0, end_minute: 57, weekdays: [2, 4], duration_days: 1 },
+  { type: "update_schedule", window_id: "window-1", start_minute: 60, end_minute: 120, weekdays: [1, 2] },
+  { type: "delete_schedule", window_id: "window-1" },
+  { type: "delete_all_schedules" },
   { type: "set_daily_limit", minutes: 43 },
   { type: "open_app_picker" },
   { type: "request_screen_time_permission" },
@@ -17,10 +20,13 @@ for (const action of [
   assert.equal(meta.searchParams.get("type"), action.type);
   assert.equal(meta.searchParams.get("apps"), "Reddit");
   assert.equal(meta.searchParams.get("minutes"), action.minutes == null ? null : String(action.minutes));
-  if (action.weekdays) assert.equal(meta.searchParams.get("weekdays"), "2,4");
+  if (action.weekdays) assert.equal(meta.searchParams.get("weekdays"), action.weekdays.join(","));
+  if (action.window_id) assert.equal(meta.searchParams.get("window_id"), action.window_id);
 }
 assert.equal(reviewActionLink({ type: "apply_schedule", start_minute: 500 }), "");
 assert.equal(reviewActionLink({ type: "apply_schedule", start_minute: 0, end_minute: 0 }), "");
+assert.equal(reviewActionLink({ type: "delete_schedule" }), "");
+assert.equal(reviewActionLink({ type: "update_schedule", start_minute: 60, end_minute: 120 }), "");
 const nineApps = ["Instagram", "TikTok", "Reddit", "YouTube", "Netflix", "Facebook", "X", "Snapchat", "Twitch"];
 const namedAction = { type: "start_protection", minutes: 24, hard_mode: false };
 for (const link of [reviewActionLink(namedAction, nineApps), actionDeepLink([namedAction], [], { apps: nineApps })]) {

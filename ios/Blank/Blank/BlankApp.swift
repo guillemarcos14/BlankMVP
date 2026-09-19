@@ -249,6 +249,22 @@ struct BlankApp: App {
                 durationDays: min(max(components?.intQueryItem("days") ?? 7, 1), 14),
                 appNames: appNames
             ))
+        case "update_schedule":
+            guard let windowId = components?.stringQueryItem("window_id"),
+                  let start = components?.minuteQueryItem("start") ?? components?.intQueryItem("start_minute"),
+                  let end = components?.minuteQueryItem("end") ?? components?.intQueryItem("end_minute") else { return }
+            sessionStore.requestAssistantActionConfirmation(.updateSchedule(
+                windowId: windowId,
+                name: components?.stringQueryItem("name") ?? "Protection",
+                startMinute: min(max(start, 0), 1439),
+                endMinute: min(max(end, 0), 1439),
+                weekdays: components?.listQueryItem("weekdays").compactMap(Int.init) ?? Array(1...7)
+            ))
+        case "delete_schedule":
+            guard let windowId = components?.stringQueryItem("window_id") else { return }
+            sessionStore.requestAssistantActionConfirmation(.deleteSchedule(windowId: windowId))
+        case "delete_all_schedules":
+            sessionStore.requestAssistantActionConfirmation(.deleteAllSchedules)
         case "set_daily_limit":
             sessionStore.requestAssistantActionConfirmation(.setDailyLimit(minutes: minutes, appNames: appNames))
         case "enable_allow_only":

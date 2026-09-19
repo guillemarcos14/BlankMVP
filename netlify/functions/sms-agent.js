@@ -5,6 +5,7 @@ const { freshConversationState, deriveAppPresence, buildAgentContext } = require
 const { reviewActionLink } = require("./_bm_action_link");
 const { sendAssistantActionPush } = require("./_assistant_push");
 const { semanticPersistenceRequired } = require("./_bm_semantic_store");
+const { enrichAssistantContext } = require("./_bm_user_context");
 const { proposalFingerprint, buildSemanticActions, buildSemanticReviewAction } = require("./bm-semantic-state");
 const {
   hasSelectedDistractions,
@@ -638,9 +639,13 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
     weak_hours: newFacts.weak_hours || savedMemory.weak_hours,
     conversation_state: conversationState,
   };
-  const userContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
+  const storedUserContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
     ? savedMemory.user_context
     : {};
+  const userContext = await enrichAssistantContext(
+    storedUserContext,
+    linkedConnection?.connectCode || savedMemory.assistant_connect_code,
+  );
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },

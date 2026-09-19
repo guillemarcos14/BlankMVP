@@ -13,6 +13,7 @@ const {
   sendAssistantMessage,
 } = require("./_assistant_channel");
 const { identityForAppInstall, identityForPhone } = require("./_identity");
+const { persistCanonicalSnapshot } = require("./_bm_user_context");
 const { normalizeDevicePush } = require("./_assistant_push");
 const { PENDING_ASSISTANT_ACTION_TYPES: PENDING_ACTION_TYPES } = require("./bm-pending-action");
 
@@ -125,6 +126,7 @@ async function syncContext(body) {
     channel: preferredChannel,
     userPhone: body.user_phone || body.phone_number || "",
   });
+  await persistCanonicalSnapshot(connectCode, normalizedContext || context);
   const connection = await findAssistantConnection(connectCode, preferredChannel);
   if (connection && normalizedContext) {
     await recordAssistantMemory({
@@ -218,6 +220,7 @@ function normalizePendingAction(value) {
     id,
     type,
     name: cleanText(value.name, 80) || null,
+    window_id: cleanText(value.window_id, 80) || null,
     minutes: Number.isInteger(value.minutes) ? Math.min(Math.max(value.minutes, 5), 240) : null,
     hard_mode: value.hard_mode === true,
     start_minute: Number.isInteger(value.start_minute) ? Math.min(Math.max(value.start_minute, 0), 1439) : null,
@@ -239,7 +242,8 @@ function normalizePendingAction(value) {
     confirmed_at: cleanText(value.confirmed_at, 40),
     execution_started_at: cleanText(value.execution_started_at, 40),
   };
-  if (type === "apply_schedule" && (
+  if (["update_schedule", "delete_schedule"].includes(type) && !action.window_id) return null;
+  if (["apply_schedule", "update_schedule"].includes(type) && (
     !Number.isInteger(action.start_minute)
     || !Number.isInteger(action.end_minute)
     || action.start_minute === action.end_minute
@@ -428,6 +432,12 @@ async function acknowledgePendingAction(body) {
         message = `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
       } else if (pending.type === "apply_schedule") {
         message = "The new blocking schedule is applied.";
+      } else if (pending.type === "update_schedule") {
+        message = "The blocking window was updated.";
+      } else if (pending.type === "delete_schedule") {
+        message = "The blocking window was removed.";
+      } else if (pending.type === "delete_all_schedules") {
+        message = "All blocking windows were removed.";
       } else {
         message = "Done. The change is applied and verified.";
       }

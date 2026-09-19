@@ -3,7 +3,7 @@
 const crypto = require("crypto");
 
 const PENDING_ASSISTANT_ACTION_TYPES = new Set([
-  "start_protection", "apply_schedule", "set_daily_limit",
+  "start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "set_daily_limit",
   "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause", "apply_ai_plan",
   "open_app_picker", "request_screen_time_permission",
 ]);
@@ -20,7 +20,8 @@ function firstPendingAction(plan = {}) {
 function pendingActionFromPlan(plan = {}, options = {}) {
   const action = firstPendingAction(plan);
   if (!action) return null;
-  if (action.type === "apply_schedule" && (
+  if (["update_schedule", "delete_schedule"].includes(action.type) && !cleanText(action.window_id, 80)) return null;
+  if (["apply_schedule", "update_schedule"].includes(action.type) && (
     !Number.isInteger(action.start_minute)
     || !Number.isInteger(action.end_minute)
     || action.start_minute === action.end_minute
@@ -30,6 +31,7 @@ function pendingActionFromPlan(plan = {}, options = {}) {
   const payload = {
     type: action.type,
     name: action.name || null,
+    window_id: action.window_id || null,
     minutes: Number.isInteger(action.minutes) ? action.minutes : null,
     hard_mode: action.hard_mode === true,
     start_minute: Number.isInteger(action.start_minute) ? action.start_minute : null,

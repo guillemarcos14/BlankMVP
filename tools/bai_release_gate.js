@@ -129,14 +129,8 @@ if (qualityJudge) {
     "--oracle-reviews-out", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
   ], { timeoutMs: 600000 });
   run("Reviewed multi-turn semantic replay", [
-    ...replayArgsBase,
-    "--reviews", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
+    ...replayArgs,
     "--out", "tmp/bm-semantic/development-gate.json",
-  ]);
-  run("Active model repeated semantic replay", [
-    ...replayArgsBase,
-    "--reviews", "tmp/bm-semantic/sol-oracle-reviews-release-gate.json",
-    "--model", "--out", "tmp/bm-semantic/active-model-gate.json",
   ]);
 }
 

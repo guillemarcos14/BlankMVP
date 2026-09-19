@@ -77,6 +77,8 @@ const SCALAR_KEYS = [
   "canonical_user_id",
   "profile_name",
   "age_range",
+  "context_generated_at",
+  "context_revision",
 ];
 
 const ARRAY_KEYS = ["authorized_action_types", "selected_app_names"];
@@ -200,8 +202,10 @@ function normalizeUserContext(value) {
   const result = {};
   for (const key of SCALAR_KEYS) {
     if (value[key] !== undefined) {
-      if (key === "selection_count" || key.endsWith("_score") || key.endsWith("_minutes") || key.endsWith("_hour")) {
+      if (key === "selection_count" || key.endsWith("_minutes") || key.endsWith("_hour")) {
         if (Number.isFinite(value[key])) result[key] = Math.round(value[key]);
+      } else if (key.endsWith("_score")) {
+        if (Number.isFinite(value[key])) result[key] = Math.round(value[key] * 1000) / 1000;
       } else if (typeof value[key] === "boolean") {
         result[key] = value[key];
       } else if (typeof value[key] === "number" && Number.isFinite(value[key])) {
@@ -285,13 +289,25 @@ function freshConversationState(value, now = Date.now()) {
   return state;
 }
 
-function normalizeObject(value, maxKeys = 24) {
+function normalizeObject(value, maxKeys = 24, depth = 0) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  if (depth > 3) return {};
   return Object.keys(value).slice(0, maxKeys).reduce((result, key) => {
     const item = value[key];
     if (typeof item === "number" && Number.isFinite(item)) result[key] = item;
     else if (typeof item === "boolean") result[key] = item;
-    else if (typeof item === "string") result[key] = clean(item, 120);
+    else if (typeof item === "string") result[key] = clean(item, 240);
+    else if (Array.isArray(item)) {
+      result[key] = item.slice(0, 20).map((entry) => {
+        if (typeof entry === "string") return clean(entry, 240);
+        if (typeof entry === "number" && Number.isFinite(entry)) return entry;
+        if (typeof entry === "boolean") return entry;
+        return normalizeObject(entry, 20, depth + 1);
+      }).filter((entry) => entry !== "" && (typeof entry !== "object" || Object.keys(entry).length));
+    } else if (item && typeof item === "object") {
+      const nested = normalizeObject(item, 20, depth + 1);
+      if (Object.keys(nested).length) result[key] = nested;
+    }
     return result;
   }, {});
 }

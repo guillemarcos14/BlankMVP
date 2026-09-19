@@ -232,5 +232,53 @@
     "rationale": "The acknowledgment emits no duplicate schedule action. The visible response accurately retains the authorized 10:00-12:00 daily schedule for seven days and defers success to device verification.",
     "verdict": "equivalent",
     "language": "en"
+  },
+  {
+    "response_sha256": "634b00eb8369c2234cf239f4963289d98ccf23bc984a84d89ae839fa4594c4fb",
+    "expectation_sha256": "d6056096814e3cd2acc89fc6548f35f32fb45a18c462ffd59ce00d4d14913269",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM recognizes that the confirmed one-time protection was already queued, avoids a duplicate action, asks for the required Blankmind notification tap, and withholds success until device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "634b00eb8369c2234cf239f4963289d98ccf23bc984a84d89ae839fa4594c4fb",
+    "expectation_sha256": "7a79705f1cf6a897cddbced194418de583b2ae47c7f5c58b3c2259961b490565",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM recognizes that the revised daily schedule was already queued, avoids a duplicate action, asks for the required Blankmind notification tap, and withholds success until device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "32227ed3445f017b9a4c694e2d3d7c5bfe891a1cbed306afaee3b479935409ee",
+    "expectation_sha256": "31b00d34486729f47864aa9709d4ba7208ab3d1b74549e59ee0199a13315e3f9",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM preserves the corrected 10:00 AM-noon daily schedule and seven-day horizon, queues the update, requires the Blankmind notification tap, and waits for device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "347df5f7853be4386b088d25a71f82a874957578fe718c84f0ba50571dfdea2e",
+    "expectation_sha256": "2c5eea869b398326a63217c233a59c090deb5a241b3166e804fa4cfb640c1d4b",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM preserves the one-time immediate plan, updates it to 45 minutes, queues the corrected action, requires the Blankmind notification tap, and waits for device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "ad999f660dc53fa236c66a6b9db1f6a12ce6d02b65c881c9a36f49112051fb50",
+    "expectation_sha256": "47bc6f9040d95b4627b684b92ee103e096c00e204ac1b51d7726eb836c8ea835",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM preserves the immediate 30-minute one-time plan, queues the exact action, requires the Blankmind notification tap, and waits for device verification.",
+    "verdict": "equivalent",
+    "language": "en"
+  },
+  {
+    "response_sha256": "f0f3bff25f504220fb40c5200fd3d8d0dc84149bce2070ef3f236b363218de2f",
+    "expectation_sha256": "e63761503433ecc47fe38ba4dbfe7ac8294214363f89edaef3e6ae88ea338be4",
+    "reviewer": "gpt-5.6-sol:low",
+    "rationale": "BM resolves the one-hour duration into the 10:00-11:00 daily schedule for seven days, queues it, requires the Blankmind notification tap, and waits for device verification.",
+    "verdict": "equivalent",
+    "language": "en"
   }
 ]

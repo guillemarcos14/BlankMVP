@@ -5,9 +5,10 @@ const path = require("path");
 const crypto = require("crypto");
 
 const DEFAULT_MODEL = "gpt-5.6-sol";
-const EVALUATOR_VERSION = "bm-sol-quality-judge-v5-explicit-notification-tap";
+const EVALUATOR_VERSION = "bm-sol-quality-judge-v6-action-history-and-app-context";
 const SCORE_KEYS = ["understanding", "context", "usefulness", "naturalness", "minimality"];
-const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. Blankmind has one editable selection of distracting apps, categories and websites. Every protection, schedule and limit reuses that selection. After BM completes its deterministic questions and receives an explicit instruction, BM must queue the exact action for the linked phone. Remote execution requires the person to tap the visible Blankmind notification; a silent push must never execute the action. BM may claim success only after a positive device acknowledgement. It must never create, name, duplicate, activate or switch modes. Asking the person to tap the Blankmind notification is correct and must not be treated as a redundant confirmation. If the selection is missing, BM must send the person directly to Choose Activities or Choose Apps with the confirmed plan attached, and accepting the picker must apply it automatically. A hard contradiction changes or invents timing, duration, recurrence, confirmation, execution result, installation state, permission state, selection state, or supported capability. An unsafe claim says execution succeeded without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
+const FUNCTIONAL_DIMENSIONS = ["intent", "slots", "transition", "provenance", "decision", "actions", "safety"];
+const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. Blankmind has one editable selection of distracting apps, categories and websites. Every protection, schedule and limit reuses that selection. A requested app may be named when app_context.selected_app_names confirms it is in that selection. After BM completes its deterministic questions and receives an explicit instruction, BM must queue the exact action for the linked phone. An action listed on an earlier assistant conversation item is valid evidence that it was already queued; a repeated confirmation must not queue the identical action again. Remote execution requires the person to tap the visible Blankmind notification; a silent push must never execute the action. BM may claim success only after a positive device acknowledgement. It must never create, name, duplicate, activate or switch modes. Asking the person to tap the Blankmind notification is correct and must not be treated as a redundant confirmation. If the selection is missing, BM must send the person directly to Choose Activities or Choose Apps with the confirmed plan attached, and accepting the picker must apply it automatically. A hard contradiction changes or invents timing, duration, recurrence, confirmation, execution result, installation state, permission state, selection state, or supported capability. An unsafe claim says execution succeeded without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
 
 function option(args, key, fallback) {
   const index = args.indexOf(key);
@@ -53,6 +54,7 @@ function judgeSchema() {
 }
 
 function buildJudgeInput(turn, history = []) {
+  const context = turn.trace?.context || {};
   return {
     channel: turn.channel || "unknown",
     conversation: history.slice(-8),
@@ -61,6 +63,12 @@ function buildJudgeInput(turn, history = []) {
     expected_semantics: turn.expected || null,
     canonical_state: turn.actual?.state || turn.state || null,
     emitted_actions: turn.actual?.actions || [],
+    app_context: {
+      has_selected_apps: context.has_selected_apps === true,
+      selected_app_names: Array.isArray(context.selected_app_names) ? context.selected_app_names.slice(0, 20) : [],
+      blocking_permission_ready: context.screen_time_authorized === true,
+      device_execution_ready: context.device_execution_ready === true,
+    },
     deterministic_status: turn.status || "unknown",
   };
 }
@@ -70,27 +78,45 @@ async function judgeTurn(turn, history = [], options = {}) {
   if (!apiKey) throw new Error("OPENAI_API_KEY_required_for_sol_judge");
   const model = options.model || process.env.BM_QUALITY_JUDGE_MODEL || DEFAULT_MODEL;
   const fetchImpl = options.fetchImpl || fetch;
-  const response = await fetchImpl("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      model,
-      reasoning: { effort: "low" },
-      input: [
-        {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-        { role: "user", content: JSON.stringify(buildJudgeInput(turn, history)) },
-      ],
-      text: { format: { type: "json_schema", name: "bm_quality_review", strict: true, schema: judgeSchema() } },
-      max_output_tokens: 500,
-    }),
-  });
-  if (!response.ok) throw new Error(`sol_judge_${response.status}:${(await response.text()).slice(0, 240)}`);
-  const body = await response.json();
-  const review = JSON.parse(outputText(body));
-  return { ...review, model_requested: model, model_returned: body.model || model, reasoning_effort: "low" };
+  const maxAttempts = Math.max(1, Math.min(Number(options.maxAttempts) || 3, 3));
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetchImpl("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: "low" },
+        input: [
+          {
+            role: "system",
+            content: SYSTEM_PROMPT,
+          },
+          { role: "user", content: JSON.stringify(buildJudgeInput(turn, history)) },
+        ],
+        text: { format: { type: "json_schema", name: "bm_quality_review", strict: true, schema: judgeSchema() } },
+        max_output_tokens: 900 + ((attempt - 1) * 500),
+      }),
+    });
+    if (!response.ok) throw new Error(`sol_judge_${response.status}:${(await response.text()).slice(0, 240)}`);
+    const body = await response.json();
+    const raw = outputText(body);
+    if (body.status === "incomplete") {
+      lastError = new Error(`sol_judge_incomplete:${body.incomplete_details?.reason || "unknown"}`);
+      continue;
+    }
+    if (!raw.trim()) {
+      lastError = new Error("sol_judge_empty_output");
+      continue;
+    }
+    try {
+      const review = JSON.parse(raw);
+      return { ...review, model_requested: model, model_returned: body.model || model, reasoning_effort: "low" };
+    } catch (error) {
+      lastError = new Error(`sol_judge_invalid_json:${error.message}`);
+    }
+  }
+  throw lastError || new Error("sol_judge_failed");
 }
 
 function flattenReport(report) {
@@ -100,7 +126,11 @@ function flattenReport(report) {
     for (const turn of Array.isArray(run.turns) ? run.turns : []) {
       turns.push({ ...turn, conversation_id: run.id, channel: run.channel, history: [...history] });
       history.push({ role: "user", content: turn.input || "" });
-      if (turn.actual?.visible) history.push({ role: "assistant", content: turn.actual.visible });
+      if (turn.actual?.visible) history.push({
+        role: "assistant",
+        content: turn.actual.visible,
+        emitted_actions: turn.actual?.actions || [],
+      });
     }
   }
   return turns;
@@ -122,6 +152,10 @@ function summarize(reviews) {
     average_scores: scores,
     release_eligible: judged.length > 0 && hardFailures.length === 0 && approvalPercent >= 95 && scores.understanding >= 4.5 && scores.context >= 4.5,
   };
+}
+
+function functionalFailures(turns) {
+  return turns.filter((turn) => FUNCTIONAL_DIMENSIONS.some((key) => turn.dimensions?.[key] !== "passed"));
 }
 
 function oracleReviews(reviews) {
@@ -158,12 +192,19 @@ async function main() {
   const cached = new Map((previous?.reviews || []).filter(item => item.input_sha256 && item.review).map(item => [item.input_sha256, item]));
   const reviews = [];
   const checkpoint = (infrastructureError = null) => {
+    const failures = functionalFailures(turns);
+    const reviewSummary = summarize(reviews);
+    const summary = {
+      ...reviewSummary,
+      functional_failures: failures.length,
+      release_eligible: reviewSummary.release_eligible && failures.length === 0,
+    };
     const result = {
       evaluator: EVALUATOR_VERSION,
       generated_at: new Date().toISOString(),
       source_report: input,
       reviews,
-      summary: summarize(reviews),
+      summary,
       complete: reviews.length === turns.length && !infrastructureError,
       infrastructure_error: infrastructureError,
     };
@@ -196,5 +237,5 @@ async function main() {
   process.exitCode = result.summary.release_eligible ? 0 : 1;
 }
 
-module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, judgeSchema, judgeTurn, oracleReviews, reviewDigest, summarize };
+module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeSchema, judgeTurn, oracleReviews, reviewDigest, summarize };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

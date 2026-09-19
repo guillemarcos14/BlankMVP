@@ -1753,7 +1753,15 @@ struct HomeView: View {
 
     private func assistantContextPayload() -> [String: Any] {
         let system = aiSystem
+        let generatedAt = Date()
+        let currentRevision = Int64(generatedAt.timeIntervalSince1970 * 1_000_000)
+        let previousRevision = (BlankSharedState.defaults.object(forKey: "blankAssistantContextRevision") as? NSNumber)?.int64Value ?? 0
+        let nextRevision = previousRevision < Int64.max ? previousRevision + 1 : previousRevision
+        let contextRevision = max(currentRevision, nextRevision)
+        BlankSharedState.defaults.set(contextRevision, forKey: "blankAssistantContextRevision")
         var payload: [String: Any] = [
+            "context_revision": contextRevision,
+            "context_generated_at": ISO8601DateFormatter().string(from: generatedAt),
             "anonymous_user_id": BlankSharedState.defaults.string(forKey: "blankOnboardingAnonymousUserId") ?? "",
             "profile_name": BlankSharedState.defaults.string(forKey: "blankOnboardingName") ?? "",
             "age_range": BlankSharedState.defaults.string(forKey: "blankOnboardingAgeRange") ?? "",
@@ -1794,7 +1802,7 @@ struct HomeView: View {
         guard !code.isEmpty, channel == "whatsapp" || channel == "sms" else { return }
         let payload = assistantContextPayload()
         Task {
-            await AssistantContextSyncClient().sync(
+            _ = await AssistantContextSyncClient().sync(
                 connectCode: code,
                 channel: channel,
                 phoneNumber: assistantPhoneNumber,

@@ -575,7 +575,7 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   if (decision.type === "cancelled") return es ? "He descartado la propuesta." : "I've discarded the proposal.";
   if (decision.type === "none") return null;
   if (decision.type === "confirm") return `${semanticSummary(state,context)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
-  if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado; te avisaré solo cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device; I'll only report success after the device verifies the block."}`;
+  if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado. Pulsa la notificación de Blankmind para terminar; solo confirmaré el éxito cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device. Tap the Blankmind notification to finish; I'll only report success after the device verifies the block."}`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
@@ -654,9 +654,13 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
         }]
       : [{type:"open_app_picker",name:"Distractions"}];
   }
-  if (decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state)) actions = [];
+  const actionReplaySuppressed = decision.type === "ready" && state.last_action_fingerprint === proposalFingerprint(state);
+  if (actionReplaySuppressed) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
-  return { state, handled, decision, actions, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText:renderSemanticResponse(state,decision,context,prompt), patch, extractionValidation };
+  const responseText = actionReplaySuppressed
+    ? "That same request is already waiting in Blankmind. Tap its notification to continue, and I'll only confirm success after your device verifies it."
+    : renderSemanticResponse(state,decision,context,prompt);
+  return { state, handled, decision, actions, actionReplaySuppressed, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText, patch, extractionValidation };
 }
 
 module.exports = { VERSION, TTL_MS, SLOT_NAMES, emptyState, normalizeSemanticState, proposalFingerprint, extractSemanticPatch, validateSemanticPatch, reduceSemanticState, requiredFields, decideSemanticState, buildSemanticActions, buildSemanticReviewAction, renderSemanticResponse, semanticSummary, advanceSemanticState };

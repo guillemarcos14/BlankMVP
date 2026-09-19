@@ -22,7 +22,10 @@ async function safeRows(path) {
 async function canonicalIdentity(connectCode) {
   const code = clean(connectCode, 32).toUpperCase();
   if (!code) return null;
-  const rows = await safeRows(`blankmind_identity_links?assistant_connect_code=eq.${encodeURIComponent(code)}&select=auth_user_id,anonymous_user_id,assistant_connect_code&limit=1`);
+  // Local contract tests intentionally run without a Supabase environment.
+  // A partially configured or failing production environment still throws.
+  if (!process.env.SUPABASE_URL && !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  const rows = await supabaseFetch(`blankmind_identity_links?assistant_connect_code=eq.${encodeURIComponent(code)}&select=auth_user_id,anonymous_user_id,assistant_connect_code&limit=1`, { method: "GET" });
   return rows[0] || null;
 }
 
@@ -45,11 +48,13 @@ async function enrichAssistantContext(input = {}, connectCode = "") {
   const base = safeObject(input);
   const identity = await canonicalIdentity(connectCode);
   const snapshotRows = identity?.auth_user_id
-    ? await safeRows(`bm_user_context_snapshots?user_id=eq.${encodeURIComponent(identity.auth_user_id)}&select=anonymous_user_id,context,context_version,updated_at&limit=1`)
+    ? await supabaseFetch(`bm_user_context_snapshots?user_id=eq.${encodeURIComponent(identity.auth_user_id)}&select=anonymous_user_id,context,context_version,updated_at&limit=1`, { method: "GET" })
     : [];
   const snapshot = snapshotRows[0] || {};
   const durableContext = safeObject(snapshot.context);
-  const mergedBase = { ...durableContext, ...base };
+  // The canonical app snapshot is authoritative. Channel memory may lag when
+  // several iOS syncs complete out of order and must never overwrite it.
+  const mergedBase = { ...base, ...durableContext };
   const anonymousUserId = clean(mergedBase.anonymous_user_id || identity?.anonymous_user_id || snapshot.anonymous_user_id, 120);
   if (!anonymousUserId) return mergedBase;
 
@@ -65,8 +70,8 @@ async function enrichAssistantContext(input = {}, connectCode = "") {
     ...mergedBase,
     anonymous_user_id: anonymousUserId,
     canonical_user_id: clean(identity?.auth_user_id, 80),
-    profile_name: clean(base.profile_name || profile.name, 80),
-    age_range: clean(base.age_range || profile.age_range, 40),
+    profile_name: clean(mergedBase.profile_name || profile.name, 80),
+    age_range: clean(mergedBase.age_range || profile.age_range, 40),
     personal_profile: {
       goal: clean(profile.goal, 120),
       profile: clean(profile.profile, 120),

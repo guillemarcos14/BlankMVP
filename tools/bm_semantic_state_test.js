@@ -373,5 +373,13 @@ test("repeating an already activated request starts a fresh incomplete activatio
   assert.match(repeated.responseText, /once or recurring/i);
   none(repeated);
 });
+test("an unrelated follow-up cannot requeue or claim to resend the same ready action", () => {
+  const completed = chat(["Block Instagram now for 5 minutes", "Just once"])[1];
+  const followup = turn("Yes, do it", completed.state, DEVICE);
+  assert.equal(followup.actionReplaySuppressed, true);
+  none(followup);
+  assert.match(followup.responseText, /already waiting in Blankmind/i);
+  assert.doesNotMatch(followup.responseText, /I'm sending it/i);
+});
 
 console.log(`BM semantic state: ${checks}/${checks} independent transition and invariant checks passed`);

@@ -28,9 +28,14 @@ struct ContentView: View {
 }
 
 struct AssistantContextSyncClient {
-    func sync(connectCode: String, channel: String, phoneNumber: String, payload: [String: Any]) async {
+    private let defaults = BlankSharedState.defaults
+    private let lastSuccessKey = "blankAssistantContextLastSyncedAt"
+    private let lastErrorKey = "blankAssistantContextLastSyncError"
+
+    @discardableResult
+    func sync(connectCode: String, channel: String, phoneNumber: String, payload: [String: Any]) async -> Bool {
         guard let baseURL = configuredBaseURL(),
-              !connectCode.isEmpty else { return }
+              !connectCode.isEmpty else { return false }
         var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -42,9 +47,32 @@ struct AssistantContextSyncClient {
             "user_phone": phoneNumber,
             "context": payload,
         ]
-        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return false }
         request.httpBody = data
-        _ = try? await URLSession.shared.data(for: request)
+        var lastError = "context_sync_failed"
+        for attempt in 0..<3 {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse else {
+                    lastError = "context_sync_invalid_response"
+                    continue
+                }
+                if (200..<300).contains(http.statusCode) {
+                    defaults.set(Date().timeIntervalSince1970, forKey: lastSuccessKey)
+                    defaults.removeObject(forKey: lastErrorKey)
+                    return true
+                }
+                lastError = "context_sync_http_\(http.statusCode)"
+                if (400..<500).contains(http.statusCode) { break }
+            } catch {
+                lastError = "context_sync_network_error"
+            }
+            if attempt < 2 {
+                try? await Task.sleep(nanoseconds: UInt64(attempt + 1) * 500_000_000)
+            }
+        }
+        defaults.set(lastError, forKey: lastErrorKey)
+        return false
     }
 
     private func configuredBaseURL() -> URL? {

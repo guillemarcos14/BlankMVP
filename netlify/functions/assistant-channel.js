@@ -13,7 +13,7 @@ const {
   sendAssistantMessage,
 } = require("./_assistant_channel");
 const { identityForAppInstall, identityForPhone } = require("./_identity");
-const { persistCanonicalSnapshot } = require("./_bm_user_context");
+const { enrichAssistantContext, persistCanonicalSnapshot } = require("./_bm_user_context");
 const { normalizeDevicePush } = require("./_assistant_push");
 const { PENDING_ASSISTANT_ACTION_TYPES: PENDING_ACTION_TYPES } = require("./bm-pending-action");
 
@@ -129,10 +129,11 @@ async function syncContext(body) {
   await persistCanonicalSnapshot(connectCode, normalizedContext || context);
   const connection = await findAssistantConnection(connectCode, preferredChannel);
   if (connection && normalizedContext) {
+    const canonicalContext = await enrichAssistantContext({}, connectCode);
     await recordAssistantMemory({
       channel: connection.channel,
       channelUser: connection.channelUser,
-      memory: { user_context: normalizedContext },
+      memory: { user_context: canonicalContext },
       source: "assistant_user_context_sync",
     });
   }

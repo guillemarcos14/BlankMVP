@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-18
+Ultima actualizacion: 2026-09-19
 
 ## Resumen actual
+- 2026-09-19: Auditoría integral de BM pre-TestFlight completada en código: contexto canónico privado por usuario y sin identificadores en prompts; lectura, recomendación, edición y eliminación natural de ventanas desde WhatsApp; respuestas variadas pero validadas contra hechos/acciones; supresión idempotente de reenvíos; sync iOS con revisión monotónica, reintentos y protección contra snapshots fuera de orden; migración `018` preparada. Build iOS incrementada a `1.9 (78)`. Sin deploy ni migración productiva desde esta conversación.
 - 2026-09-18: Corregida una regresión de despliegue de BM. No hubo commit nuevo: `6aace883e99a5a6d81ea96d8` reutilizó Functions antiguas del 17-sep 08:45, anteriores al bloqueo único. Producción vuelve a `6aac177a571ea02c1129cb62`; el smoke público usa siempre `selected_distractions`, no pregunta apps y ejecuta `start_protection` cuando la orden incluye inicio y recurrencia.
 - 2026-09-17: Fiabilidad de bloqueo inmediato BM cerrada por código y backend: APNs de prioridad alta con expiración exacta, resultado registrado, reintentos en background y aviso a los 60 s si no hay acuse; iOS verifica `action_id`, inicio real, duración, origen y fin efectivo, clasifica retrasos y fusiona intervalos sin acortar horarios. Backend en producción `6aac177a571ea02c1129cb62`; iOS Build CI `35247396488` en verde. Requiere nueva build/TestFlight y prueba física.
 - 2026-09-17: MacinCloud FF368 compiló el checkout actual `/Users/user301201/blankmvp/ios/Blank` con `xcodebuild -project blank.xcodeproj -sdk iphonesimulator -configuration debug build`; resultado `** BUILD SUCCEEDED **`. No se operó Xcode. La revisión visual de la nueva pantalla de distracciones sigue pendiente.
@@ -23,6 +24,7 @@ Ultima actualizacion: 2026-09-18
 - La release conjunta `codex/release-2026-09-15` está subida a GitHub; producción queda bloqueada hasta resolver el gate BM amplio.
 
 ## Hecho hoy
+- 2026-09-19: Corregidos los fallos hallados durante el repaso: memoria de canal ya no pisa el snapshot canónico; las respuestas modelo no reciben IDs internos ni pueden cambiar horarios, duración, días o estado de ejecución; todos los fallbacks accionables piden pulsar la notificación; el juez independiente reintenta salidas incompletas y conoce acciones previas/contexto de selección. Release gate final con modelo activo: `19/19`; juez Sol `48/48`, `100 %`, cero respuestas pobres y cero fallos duros. Replay determinista: `48/48`.
 - 2026-09-18: Comparados por API los grupos de Functions de los deploys `6aace883`, `6aac177a` y `6aabf079`: el primero tenía digests antiguos y reproducía `Which apps do you want to block?`. Restaurado `6aac177a`; smoke productivo sin pregunta de apps y con acción inmediata correcta.
 - 2026-09-17: MacinCloud FF368 confirmó `** BUILD SUCCEEDED **` para el build de simulador desde `/Users/user301201/blankmvp/ios/Blank`. La Terminal quedó en el prompt y no se operó Xcode.
 - 2026-09-17: Reemplazada la pantalla antigua de `Sessions` por `DistractionsScreen`: filas de apps con `Label(ApplicationToken)` y tipografía de Home, horarios desde `schedule.activeWindows`, y botón circular negro con `+` blanco que abre el selector nativo de Apple. La navegación visible queda `blank / progress / distractions / settings`. Validado con product harness `33/33` y `git diff --check`; pendiente build/revisión visual en MacinCloud.

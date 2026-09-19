@@ -16,6 +16,8 @@ const { buildAgentContext, deriveAppPresence } = require("./bm-context");
 const { advanceSemanticState } = require("./bm-semantic-state");
 const { extractWithModel } = require("./bm-semantic-extraction");
 const { personalizedRecommendationPlan, scheduleManagementPlan } = require("./bm-schedule-management");
+const { naturalizeGroundedPlan } = require("./bm-contextual-response");
+const { personalContextView } = require("./bm-personal-context-view");
 const {
   incompleteBlockingPlan,
   isBlockingActionType,
@@ -2908,7 +2910,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
             prompt: cleanText(prompt, 600),
             response_language: language,
             recent_context: context.recent_messages || context.conversation || null,
-            personal_context: context,
+            personal_context: personalContextView(context),
           }),
         },
       ],
@@ -3317,7 +3319,7 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
           role: "user",
           content: JSON.stringify({
             prompt: cleanText(prompt, 600),
-            context,
+            context: personalContextView(context),
             response_language: language,
             trigger: cleanText(context.trigger || context.mode || "reactive", 40),
             app_capabilities: appCapabilities(context),
@@ -3377,10 +3379,22 @@ exports.handler = async (event, runtime = {}) => {
     });
     const schedulePlan = scheduleManagementPlan(prompt, context);
     const personalizedPlan = schedulePlan ? null : personalizedRecommendationPlan(prompt, context);
-    const contextPlan = schedulePlan || personalizedPlan;
+    let contextPlan = schedulePlan || personalizedPlan;
     if (contextPlan) {
-      const contextSource = schedulePlan ? "schedule_management_v1" : "personal_context_v1";
+      const deterministicSource = schedulePlan ? "schedule_management_v2" : "personal_context_v2";
+      let contextSource = deterministicSource;
       harnessRun.route = schedulePlan ? "schedule_management" : "personal_context";
+      try {
+        recordStage(harnessRun, "planner_started", { mode: "grounded_contextual_response" });
+        const rendered = await naturalizeGroundedPlan({ prompt, context, plan: contextPlan });
+        contextPlan = rendered.plan;
+        contextSource = `${deterministicSource}+${rendered.source}`;
+        recordStage(harnessRun, "planner_completed", { source: contextSource });
+      } catch (error) {
+        const { response_contract: _responseContract, ...fallbackPlan } = contextPlan;
+        contextPlan = fallbackPlan;
+        recordStage(harnessRun, "planner_fallback", { error_code: error.name || "contextual_response_error" });
+      }
       recordStage(harnessRun, "action_gate", {
         decision: contextPlan.actions.length ? "proposal" : "read",
         action_types: contextPlan.actions.map((item) => item.type),
@@ -3416,7 +3430,20 @@ exports.handler = async (event, runtime = {}) => {
     });
     if (semantic.handled) {
       harnessRun.route = "semantic";
-      const plan = semanticPlan(semantic, language, prompt);
+      let plan = semanticPlan(semantic, language, prompt);
+      let contextualResponseSource = "grounded_deterministic";
+      try {
+        recordStage(harnessRun, "planner_started", { mode: "semantic_contextual_response" });
+        const rendered = await naturalizeGroundedPlan({ prompt, context, plan });
+        plan = rendered.plan;
+        contextualResponseSource = rendered.source;
+        recordStage(harnessRun, "planner_completed", { source: rendered.source });
+      } catch (error) {
+        const { response_contract: _responseContract, ...fallbackPlan } = plan;
+        plan = fallbackPlan;
+        contextualResponseSource = "grounded_deterministic_after_model_error";
+        recordStage(harnessRun, "planner_fallback", { error_code: error.name || "semantic_contextual_response_error" });
+      }
       if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
         context, previous_state: semanticOptions.previousState || null,
         extraction: semanticExtraction?.trace || null, deterministic_patch: semantic.patch,
@@ -3434,7 +3461,7 @@ exports.handler = async (event, runtime = {}) => {
           : null,
       });
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
-      const source = semanticExtraction?.source || "semantic_state_v1";
+      const source = `${semanticExtraction?.source || "semantic_state_v1"}+${contextualResponseSource}`;
       finishRun(harnessRun, { plan, source });
       return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
     }
@@ -3565,8 +3592,67 @@ function semanticPlan(result, language, prompt) {
     semantic_state: result.state,
     semantic_decision: result.decision,
     recommendation_id: `bm_sem_${crypto.randomUUID()}`,
+    response_contract: semanticResponseContract(result),
   };
   return plan;
+}
+
+function semanticResponseContract(result) {
+  const decision = result.decision || {};
+  const state = result.state || {};
+  const slot = decision.slot || state.next_question || "";
+  const groups = {
+    confirmation: [["confirm", "want me to", "should I"]],
+    recurrence: [["once", "one time"], ["recurring", "repeat", "every"]],
+    start: [["when", "what time", "start", "now"]],
+    end: [["end", "finish", "how long", "duration"]],
+    end_or_duration: [["end", "finish", "how long", "duration"]],
+    duration_minutes: [["minutes", "duration", "how long"]],
+    schedule_horizon_days: [["days", "how long"]],
+    action_type: [["block", "blocking window"], ["limit", "daily limit"]],
+    app_presence: [["open"], ["Blankmind"]],
+    permissions: [["permission"], ["Blankmind"]],
+    app_selection: [["choose", "select"], ["Blankmind"]],
+  };
+  const actions = Array.isArray(result.actions) ? result.actions.filter((item) => item?.type && item.type !== "none") : [];
+  const allowedMinutes = actions.flatMap((item) => [item.start_minute, item.end_minute]).filter(Number.isInteger);
+  const knownStart = state.slots?.start?.value?.minute;
+  const knownEnd = state.slots?.end?.value;
+  if (Number.isInteger(knownStart)) allowedMinutes.push(knownStart);
+  if (Number.isInteger(knownEnd)) allowedMinutes.push(knownEnd);
+  const asksUnknownClock = ["start", "end", "end_or_duration"].includes(slot) && allowedMinutes.length === 0;
+  const requiredAnyGroups = [...(groups[slot] || (decision.type === "confirm" ? groups.confirmation : []))];
+  const requiresPlanFacts = !result.actionReplaySuppressed && ["confirm", "ready"].includes(decision.type);
+  const startValue = state.slots?.start?.value;
+  const recurrenceValue = state.slots?.recurrence?.value;
+  if (requiresPlanFacts && recurrenceValue?.type === "once") requiredAnyGroups.push(["just once", "one time", "one-time"]);
+  if (requiresPlanFacts && recurrenceValue?.type === "daily") requiredAnyGroups.push(["every day", "daily", "per day"]);
+  if (requiresPlanFacts && recurrenceValue?.type === "weekly") {
+    const names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    for (const day of recurrenceValue.weekdays || []) if (names[day - 1]) requiredAnyGroups.push([names[day - 1]]);
+  }
+  return {
+    operation: `semantic_${decision.type || "none"}${slot ? `_${slot}` : ""}`,
+    facts: {
+      validated_reply: result.responseText,
+      decision: decision.type || "none",
+      missing_detail: slot || null,
+      actions,
+    },
+    required_phrases: actions.length || result.actionReplaySuppressed ? ["Blankmind notification"] : [],
+    required_any_groups: requiredAnyGroups,
+    allowed_minutes: Array.from(new Set(allowedMinutes)),
+    required_clock_minutes: requiresPlanFacts && startValue?.type === "time"
+      ? [startValue.minute, state.slots?.end?.value].filter(Number.isInteger)
+      : [],
+    required_duration_minutes: requiresPlanFacts && (startValue?.type === "now" || state.slots?.action_type?.value === "daily_limit")
+      ? state.slots?.duration_minutes?.value
+      : null,
+    required_horizon_days: requiresPlanFacts && startValue?.type === "time"
+      ? state.slots?.schedule_horizon_days?.value
+      : null,
+    forbid_clock_times: asksUnknownClock,
+  };
 }
 
 function enforceSemanticBoundary(plan, semantic, language) {

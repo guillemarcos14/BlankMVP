@@ -3,7 +3,7 @@
 Ultima actualizacion: 2026-09-20
 
 ## Hecho hoy
-- 2026-09-20: Integrada y desplegada la paridad SMS/WhatsApp de Early Access desde `codex/backend-release-waitlist-2026-09-19` en `a7b530d`. Supabase confirmó la base al día y desplegó `digital-wellness-features`; Netlify publicó `getblank` en `6aaf177f922598756a350efb`. Los endpoints productivos `waitlist-start`, `sms-agent` y `waitlist-agent` responden; falta únicamente prueba física SMS con número de EE. UU./Canadá.
+- 2026-09-20: Integrada y desplegada la paridad SMS/WhatsApp de Early Access desde `codex/backend-release-waitlist-2026-09-19` en `86f83c3`. Supabase confirmó la base al día y desplegó `digital-wellness-features`; Netlify publicó `getblank` en `6aaf1a28941aa8f199985d53`. WhatsApp conserva su fallback anterior y SMS usa su rama independiente. Los endpoints productivos `waitlist-start`, `sms-agent` y `waitlist-agent` responden; falta únicamente prueba física SMS con número de EE. UU./Canadá.
 - 2026-09-19: Aplicado feedback real de tono y desplegado `7171e3a` en Netlify `6aaeddc8353144ad7e69e4cf`. Las respuestas ya rechazan frases formales/stock (`glad`, `pleased`, `delighted`, `I’d love to`) y fuerzan inglés cotidiano. Los turnos de audio observados quedaron transcritos y respondidos; la falta aparente fue retraso/orden de entrega, no pérdida confirmada.
 - 2026-09-19: Auditadas dos notas de voz reales de WhatsApp en producción. Twilio entregó `NumMedia=1` en ambos casos y `waitlist-agent` llegó hasta `/v1/audio/transcriptions`; las dos respuestas fueron HTTP `429` por créditos agotados. El parseo, la descarga y el multipart local pasan; tests waitlist y product harness `44/44`. No hay corrección de código segura que sustituya la facturación del proveedor; BM Final no se tocó.
 

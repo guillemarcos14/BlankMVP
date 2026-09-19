@@ -7,6 +7,7 @@ Rama:
 `codex/waitlist-early-access-2026-09-19`
 
 Commits:
+- `86f83c3 Preserve WhatsApp provider fallback`
 - `a7b530d Merge SMS waitlist channel parity into release`
 - Incluye `7aa9a80`, `ee7b5c1`, `7bc4d11` y `b3bff28`.
 
@@ -32,7 +33,7 @@ Validaciones ejecutadas:
 
 Despliegue completado:
 - Supabase confirmó la base al día y publicó `digital-wellness-features`.
-- Netlify `getblank` publicó `6aaf177f922598756a350efb`.
+- Netlify `getblank` publicó `6aaf1a28941aa8f199985d53`.
 - Falta únicamente la prueba física: seleccionar Message con un teléfono de Estados Unidos o Canadá, confirmar los dos SID SMS en Twilio y responder al primero para verificar `waitlist-agent`.
 
 Riesgos o conflictos conocidos:

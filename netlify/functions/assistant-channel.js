@@ -126,20 +126,50 @@ async function syncContext(body) {
     channel: preferredChannel,
     userPhone: body.user_phone || body.phone_number || "",
   });
-  await persistCanonicalSnapshot(connectCode, normalizedContext || context);
+  let canonicalSnapshot = null;
+  try {
+    canonicalSnapshot = await persistCanonicalSnapshot(connectCode, normalizedContext || context);
+  } catch (error) {
+    // Connections created before account-backed identities are still valid.
+    // Their latest app snapshot remains authoritative in the event store and
+    // must reach WhatsApp/SMS instead of turning every iOS sync into a 500.
+    if (!String(error.message || "").includes("bm_identity_not_found")) throw error;
+  }
   const connection = await findAssistantConnection(connectCode, preferredChannel);
   if (connection && normalizedContext) {
-    const canonicalContext = await enrichAssistantContext({}, connectCode);
+    const canonicalContext = canonicalSnapshot
+      ? await enrichAssistantContext(normalizedContext, connectCode)
+      : normalizedContext;
     await recordAssistantMemory({
       channel: connection.channel,
       channelUser: connection.channelUser,
       memory: { user_context: canonicalContext },
       source: "assistant_user_context_sync",
     });
+    const memory = await getAssistantMemory(connection.channel, connection.channelUser);
+    const pending = normalizePendingAction(memory.pending_assistant_action);
+    if (pending && pendingScheduleTargetIsMissing(pending, canonicalContext)) {
+      await recordAssistantMemory({
+        channel: connection.channel,
+        channelUser: connection.channelUser,
+        memory: {
+          pending_assistant_action: null,
+          last_assistant_action_outcome: {
+            id: pending.id,
+            type: pending.type,
+            status: "failed",
+            resolved_at: new Date().toISOString(),
+            detail: "schedule_target_missing_after_app_sync",
+          },
+        },
+        source: "assistant_action_invalidated_by_app_context",
+      });
+    }
   }
   return json(200, {
     ok: true,
     synced: Boolean(normalizedContext),
+    canonical_snapshot: Boolean(canonicalSnapshot),
     selection_count: Number(normalizedContext?.selection_count) || 0,
     attached_channel: connection?.channel || "",
   });
@@ -250,6 +280,12 @@ function normalizePendingAction(value) {
     || action.start_minute === action.end_minute
   )) return null;
   return action;
+}
+
+function pendingScheduleTargetIsMissing(pending, context = {}) {
+  if (!pending || !["update_schedule", "delete_schedule"].includes(pending.type)) return false;
+  const windows = Array.isArray(context.schedule?.windows) ? context.schedule.windows : [];
+  return !windows.some((window) => cleanText(window?.id, 80) === cleanText(pending.window_id, 80));
 }
 
 function normalizeExecutionEvidence(body, pending) {
@@ -480,3 +516,4 @@ exports.handler = async (event) => {
 exports.normalizePendingAction = normalizePendingAction;
 exports.pendingActionTransition = pendingActionTransition;
 exports.normalizeExecutionEvidence = normalizeExecutionEvidence;
+exports.pendingScheduleTargetIsMissing = pendingScheduleTargetIsMissing;

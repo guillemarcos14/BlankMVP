@@ -21,6 +21,13 @@ struct AssistantInboxResponse: Decodable {
 
 private struct AssistantAcknowledgementResponse: Decodable {
     let acknowledged: Bool
+    let reason: String?
+}
+
+enum AssistantLifecycleAcknowledgement: Equatable {
+    case acknowledged
+    case stale
+    case retry
 }
 
 struct AssistantInboxAction: Decodable {
@@ -263,7 +270,7 @@ struct AssistantActionInboxClient {
         return response.pendingAction
     }
 
-    func acknowledge(
+    private func acknowledge(
         actionId: String,
         status: String,
         connectCode: String,
@@ -271,7 +278,7 @@ struct AssistantActionInboxClient {
         phoneNumber: String,
         detail: String = "",
         evidence: AssistantActionReceipt? = nil
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         guard let data = try? await request(
             action: "ack_pending_action",
             connectCode: connectCode,
@@ -282,9 +289,13 @@ struct AssistantActionInboxClient {
             detail: detail,
             evidence: evidence
         ), let response = try? JSONDecoder().decode(AssistantAcknowledgementResponse.self, from: data) else {
-            return false
+            return .retry
         }
-        return response.acknowledged
+        if response.acknowledged { return .acknowledged }
+        if response.reason == "action_mismatch" || response.reason == "no_pending_action" {
+            return .stale
+        }
+        return .retry
     }
 
     func acknowledgeLifecycle(
@@ -292,22 +303,24 @@ struct AssistantActionInboxClient {
         connectCode: String,
         channel: String,
         phoneNumber: String
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         if receipt.executionStarted {
-            guard await acknowledge(
+            let confirmed = await acknowledge(
                 actionId: receipt.actionId,
                 status: "confirmed",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
-            guard await acknowledge(
+            )
+            guard confirmed == .acknowledged else { return confirmed }
+            let started = await acknowledge(
                 actionId: receipt.actionId,
                 status: "execution_started",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
+            )
+            guard started == .acknowledged else { return started }
         }
         return await acknowledge(
             actionId: receipt.actionId,
@@ -1705,7 +1718,7 @@ struct HomeView: View {
             mergedWithExisting: receipt.mergedWithExisting
         )
         Task {
-            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+            let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                 receipt: receipt,
                 connectCode: code,
                 channel: channel,
@@ -1713,9 +1726,11 @@ struct HomeView: View {
             )
             await MainActor.run {
                 assistantActionExecutionInFlight = false
-                if acknowledged {
+                if acknowledgement == .acknowledged || acknowledgement == .stale {
                     AssistantActionReceiptStore.clear(actionId: actionId)
-                    pendingAssistantActionId = ""
+                    if pendingAssistantActionId == actionId {
+                        pendingAssistantActionId = ""
+                    }
                 }
             }
         }
@@ -1826,9 +1841,13 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
-        if let receipt = AssistantActionReceiptStore.load() {
+        let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        // A fresh notification tap must win over replaying an older receipt.
+        // Otherwise one obsolete acknowledgement can permanently starve every
+        // newer action while the app appears to open normally.
+        if !applyNowRequested, let receipt = AssistantActionReceiptStore.load() {
             Task {
-                let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                     receipt: receipt,
                     connectCode: code,
                     channel: channel,
@@ -1836,7 +1855,7 @@ struct HomeView: View {
                 )
                 await MainActor.run {
                     assistantActionPollInFlight = false
-                    if acknowledged {
+                    if acknowledgement == .acknowledged || acknowledgement == .stale {
                         AssistantActionReceiptStore.clear(actionId: receipt.actionId)
                         if pendingAssistantActionId == receipt.actionId {
                             pendingAssistantActionId = ""
@@ -1861,8 +1880,8 @@ struct HomeView: View {
                 // Read this after the network round-trip. On a cold launch the
                 // notification response can arrive while the initial poll is
                 // already in flight; reading it before the request loses the tap.
-                let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                guard applyNowRequested else { return }
+                let currentApplyRequest = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                guard currentApplyRequest else { return }
                 let tappedActionID = BlankSharedState.defaults.string(forKey: AssistantRemoteNotification.tappedActionIDKey) ?? ""
                 guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else { return }
                 BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)

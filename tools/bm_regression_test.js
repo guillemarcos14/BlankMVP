@@ -18,6 +18,7 @@ const whatsapp = fs.readFileSync(path.join(ROOT, "netlify/functions/whatsapp-age
 const smsAgent = fs.readFileSync(path.join(ROOT, "netlify/functions/sms-agent.js"), "utf8");
 const agent = fs.readFileSync(path.join(ROOT, "netlify/functions/blanked-agent.js"), "utf8");
 const whatsappModule = require("../netlify/functions/whatsapp-agent");
+const assistantChannelModule = require("../netlify/functions/assistant-channel");
 const { scheduleManagementPlan } = require("../netlify/functions/bm-schedule-management");
 const openPage = fs.readFileSync(path.join(ROOT, "web/landing/open.html"), "utf8");
 const android = fs.readFileSync(
@@ -52,6 +53,13 @@ check("ios_pending_action_lifecycle_is_durable", () => {
   assert.match(receiptBlock, /static func load/);
   assert.match(finishBlock, /AssistantActionReceiptStore\.save/);
   assert.match(finishBlock, /acknowledgeLifecycle/);
+  const pollBlock = blockBetween(home, "private func pollPendingAssistantActionIfNeeded", "private var relapseIntervention");
+  assert.match(pollBlock, /if !applyNowRequested, let receipt = AssistantActionReceiptStore\.load\(\)/);
+  assert.ok(
+    pollBlock.indexOf("if !applyNowRequested, let receipt") < pollBlock.indexOf("AssistantActionInboxClient().poll"),
+    "a notification tap must bypass an obsolete receipt before polling the current action",
+  );
+  assert.match(home, /response\.reason == "action_mismatch" \|\| response\.reason == "no_pending_action"/);
 });
 
 check("context_preserves_autonomy_and_native_control_fields", () => {
@@ -156,12 +164,29 @@ check("schedule_crud_does_not_wait_for_screen_time_permission", () => {
   assert.match(home, /case \.startProtection, \.setDailyLimit, \.allowOnly, \.adultFilter/);
 });
 
+check("stale_schedule_actions_are_invalidated_by_current_app_context", () => {
+  const pending = { type: "update_schedule", window_id: "window-1" };
+  assert.strictEqual(
+    assistantChannelModule.pendingScheduleTargetIsMissing(pending, { schedule: { windows: [] } }),
+    true,
+  );
+  assert.strictEqual(
+    assistantChannelModule.pendingScheduleTargetIsMissing(pending, {
+      schedule: { windows: [{ id: "window-1", enabled: true }] },
+    }),
+    false,
+  );
+  assert.match(assistantChannel, /assistant_action_invalidated_by_app_context/);
+});
+
 check("assistant_context_sync_reaches_messaging_identity", () => {
   assert.match(assistantChannel, /action === "sync_context"/);
   assert.match(assistantChannel, /recordAssistantUserContext/);
   assert.match(assistantChannelShared, /assistant_user_context_synced/);
   assert.match(assistantChannelShared, /attachAssistantUserContext/);
   assert.match(assistantChannel, /const connection = await findAssistantConnection\(connectCode, preferredChannel\)/);
+  assert.match(assistantChannel, /bm_identity_not_found/);
+  assert.match(assistantChannel, /canonicalSnapshot\s*\?\s*await enrichAssistantContext\(normalizedContext, connectCode\)\s*:\s*normalizedContext/);
   assert.match(bmContext, /single_distraction_block/);
   assert.match(bmContext, /deriveAppPresence/);
   assert.match(bmContext, /app_presence_state/);
@@ -212,8 +237,8 @@ check("review_action_survives_landing_redirect", () => {
 });
 
 if (failures.length > 0) {
-  console.error(`\nBM regression suite failed: ${failures.length}/14 checks`);
+  console.error(`\nBM regression suite failed: ${failures.length}/15 checks`);
   process.exitCode = 1;
 } else {
-  console.log("\nBM regression suite passed: 14/14 checks");
+  console.log("\nBM regression suite passed: 15/15 checks");
 }

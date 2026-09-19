@@ -112,8 +112,9 @@ function twilioBackgroundUrl(event) {
 }
 
 function shouldUseAsyncTwilio() {
-  if (process.env.WAITLIST_TWILIO_ASYNC === "false") return false;
-  return process.env.WAITLIST_TWILIO_ASYNC === "true" || isProduction();
+  // Async delivery is the safe default. Only local/test callers may explicitly
+  // opt back into the legacy inline TwiML path.
+  return process.env.WAITLIST_TWILIO_ASYNC !== "false";
 }
 
 function verifyTwilioSignature(event) {

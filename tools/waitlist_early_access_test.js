@@ -8,6 +8,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role";
 process.env.OPENAI_API_KEY = "openai-test";
 process.env.OPENAI_MODEL = "gpt-5.6-luna";
 process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
+process.env.WAITLIST_TWILIO_ASYNC = "false";
 
 const {
   OPENING_MESSAGE_1,

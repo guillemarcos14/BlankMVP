@@ -22,7 +22,10 @@ const {
 } = require("../netlify/functions/_waitlist_whatsapp");
 const {
   ageBand,
+  generateReply,
   isRestrictedTopic,
+  questionMemory,
+  questionTopic,
   replyQualityIssues,
   safeReply,
   validateExtractedFacts,
@@ -130,6 +133,76 @@ function safetyContract() {
   assert.deepStrictEqual(replyQualityIssues("I’m curious about your work. What are you building?"), []);
 }
 
+async function conversationMemoryContract() {
+  const history = [
+    {
+      direction: "outbound",
+      body: "After you put your phone down in the morning, what usually happens next?",
+      created_at: "2026-09-20T00:13:52.000Z",
+    },
+    {
+      direction: "inbound",
+      body: "I go to eat breakfast and then I start working around 9am.",
+      created_at: "2026-09-20T00:41:50.000Z",
+    },
+  ];
+  assert.strictEqual(questionTopic(history[0].body), "after_scroll");
+  assert.deepStrictEqual(questionMemory(history), [{
+    topic: "after_scroll",
+    question: history[0].body,
+    answered: true,
+    created_at: history[0].created_at,
+  }]);
+  assert.ok(replyQualityIssues("I’m curious what finally makes you put your phone down?", { history })
+    .includes("repeated_question:after_scroll"));
+  assert.deepStrictEqual(replyQualityIssues("I’m curious how that morning affects the rest of your day?", { history }), []);
+
+  const previousPolish = process.env.WAITLIST_CONVERSATION_POLISH;
+  process.env.WAITLIST_CONVERSATION_POLISH = "false";
+  let calls = 0;
+  try {
+    const result = await generateReply({
+      message: "The alarm goes off and I start scrolling straight away.",
+      history: [...history, {
+        direction: "inbound",
+        body: "The alarm goes off and I start scrolling straight away.",
+        created_at: "2026-09-20T00:44:16.000Z",
+      }],
+      profile: {},
+      newlySavedFacts: [],
+      fetchImpl: async (url, options) => {
+        assert.strictEqual(url, "https://api.openai.com/v1/responses");
+        calls += 1;
+        const request = JSON.parse(options.body);
+        const input = request.input[1].content[0].text;
+        assert.match(input, /question_memory/);
+        if (calls === 1) {
+          return response(200, {
+            output_text: JSON.stringify({
+              reply: "I’m curious what finally makes you put your phone down after that scroll?",
+              focus: "scroll_context",
+              profile_useful: false,
+            }),
+          });
+        }
+        assert.strictEqual(request.text.format.name, "waitlist_conversation_reply_repair");
+        return response(200, {
+          output_text: JSON.stringify({
+            reply: "I’m curious how that first scroll changes the rest of your morning?",
+            focus: "impact",
+            profile_useful: false,
+          }),
+        });
+      },
+    });
+    assert.strictEqual(calls, 2, "a repeated question must be repaired before delivery");
+    assert.doesNotMatch(result.reply, /put your phone down/i);
+  } finally {
+    if (previousPolish === undefined) delete process.env.WAITLIST_CONVERSATION_POLISH;
+    else process.env.WAITLIST_CONVERSATION_POLISH = previousPolish;
+  }
+}
+
 function providerParsingContract() {
   const meta = parseMetaMessages({
     entry: [{ changes: [{ value: { messages: [{ id: "wamid.1", from: "34600111222", text: { body: "Hello" } }] } }] }],
@@ -198,6 +271,15 @@ async function fullTurnContract() {
         if (schemaName === "waitlist_conversation_reply") {
           assert.match(request.input[0].content[0].text, /work, studies, routines/i);
           assert.match(request.input[0].content[0].text, /wars, armed conflicts, abortion/i);
+        }
+        if (schemaName === "waitlist_conversation_reply_repair") {
+          return response(200, {
+            output_text: JSON.stringify({
+              reply: "I can see how those client calls leave you looking for a quick reset. How does that morning scrolling affect the start of your workday?",
+              focus: "impact",
+              profile_useful: false,
+            }),
+          });
         }
         return response(200, {
           output_text: JSON.stringify({
@@ -439,6 +521,7 @@ async function main() {
   safetyContract();
   providerParsingContract();
   isolationContract();
+  await conversationMemoryContract();
   await fullTurnContract();
   await twilioAsyncDeliveryContract();
   await twilioTextDeliveryContract();

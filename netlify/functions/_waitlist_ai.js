@@ -47,6 +47,67 @@ const EVENTUAL_GOALS = [
   "desired_change",
 ];
 
+const QUESTION_STOP_WORDS = new Set([
+  "a", "about", "after", "all", "an", "and", "are", "at", "be", "before", "between", "by", "do", "does", "for", "from", "get", "how", "i", "if", "in", "is", "it", "me", "my", "of", "on", "or", "that", "the", "their", "them", "there", "these", "this", "to", "up", "was", "what", "when", "where", "which", "who", "why", "with", "you", "your",
+]);
+
+const QUESTION_TOPIC_PATTERNS = [
+  {
+    topic: "after_scroll",
+    patterns: [
+      /\b(?:put|set|leave|drop)\b.{0,55}\bphone\b.{0,30}\b(?:down|away)\b/i,
+      /\bphone\b.{0,25}\b(?:down|away)\b.{0,45}\b(?:next|after|usually|finally)\b/i,
+      /\b(?:happens|do you do|makes you)\b.{0,80}\b(?:after|once|finally)\b.{0,80}\b(?:scroll|feed|phone)\b/i,
+    ],
+  },
+  {
+    topic: "morning_start",
+    patterns: [
+      /\b(?:wake|woke|alarm|opening your eyes|first few seconds)\b.{0,90}\b(?:start|open|scroll|phone)\b/i,
+      /\b(?:start|begin)\b.{0,35}\bscroll(?:ing)?\b/i,
+    ],
+  },
+  {
+    topic: "phone_location",
+    patterns: [/\bphone\b.{0,70}\b(?:overnight|at night|bedside|bed|leave|charge)\b/i],
+  },
+  {
+    topic: "desired_change",
+    patterns: [
+      /\b(?:would you want|want to|wish|change|different|instead)\b.{0,100}\b(?:morning|time|spend|phone|scroll|day|work)\b/i,
+      /\b(?:how would you want|what would you change)\b/i,
+    ],
+  },
+  {
+    topic: "impact",
+    patterns: [
+      /\b(?:affect|impact|effect|worry|hard|difficult|feel)\b.{0,90}\b(?:morning|day|scroll|phone|you|work)\b/i,
+      /\b(?:morning|day|scroll|phone)\b.{0,80}\b(?:affect|impact|effect|worry|hard|difficult|feel)\b/i,
+    ],
+  },
+  {
+    topic: "apps_and_content",
+    patterns: [
+      /\b(?:look at|watch|open|see|use)\b.{0,75}\b(?:social media|reels|feed|content|app|instagram|tiktok|youtube|x)\b/i,
+      /\b(?:which|what)\b.{0,60}\b(?:app|content|reels|videos|feed)\b/i,
+    ],
+  },
+  {
+    topic: "work_and_daily_life",
+    patterns: [
+      /\b(?:work|job|study|class|school)\b.{0,70}\b(?:day|morning|usually|start|finish|do)\b/i,
+      /\b(?:day|morning)\b.{0,70}\b(?:work|job|study|class|school)\b/i,
+    ],
+  },
+  {
+    topic: "scroll_context",
+    patterns: [
+      /\b(?:reach for|start|begin|end up|pulled into|hardest to stop|keep you)\b.{0,90}\b(?:phone|scroll|feed|social media)\b/i,
+      /\b(?:when|where|what time)\b.{0,70}\b(?:scroll|phone|social media)\b/i,
+    ],
+  },
+];
+
 const RESTRICTED_TOPIC_PATTERNS = [
   /\b(abortion|anti[- ]?abortion|pro[- ]?life|pro[- ]?choice)\b/i,
   /\b(war|warfare|armed conflict|invasion|genocide|ceasefire)\b/i,
@@ -309,6 +370,78 @@ function coverage(profile) {
   return Object.fromEntries(EVENTUAL_GOALS.map((key) => [key, profile[key] !== undefined && profile[key] !== null]));
 }
 
+function questionText(value) {
+  const text = cleanText(value, 700);
+  return text.match(/([^.!?]{3,}\?)\s*$/)?.[1] || text;
+}
+
+function questionTokens(value) {
+  return new Set(
+    normalizedComparable(questionText(value))
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 2 && !QUESTION_STOP_WORDS.has(token)),
+  );
+}
+
+function questionTopic(value) {
+  const text = questionText(value);
+  if (!text.includes("?")) return null;
+  for (const entry of QUESTION_TOPIC_PATTERNS) {
+    if (entry.patterns.some((pattern) => pattern.test(text))) return entry.topic;
+  }
+  return "other";
+}
+
+function questionMemory(history = []) {
+  const memory = [];
+  let pending = null;
+  for (const message of Array.isArray(history) ? history : []) {
+    if (message?.direction === "outbound") {
+      const body = cleanText(message.body, 700);
+      if (body.includes("?")) {
+        pending = {
+          topic: questionTopic(body),
+          question: body,
+          answered: false,
+          created_at: message.created_at || null,
+        };
+        memory.push(pending);
+      }
+      continue;
+    }
+    if (message?.direction === "inbound") {
+      const body = cleanText(message.body, 700);
+      if (body.split(/\s+/).filter(Boolean).length >= 3 && !/^(?:hi|hello|hey|thanks|thank you|ok|okay)\b[!.?]*$/i.test(body)) {
+        if (pending) pending.answered = true;
+      }
+    }
+  }
+  return memory.slice(-8).map((item) => ({ ...item }));
+}
+
+function questionsOverlap(candidate, previous) {
+  const candidateTopic = questionTopic(candidate);
+  const previousTopic = questionTopic(previous);
+  if (candidateTopic && candidateTopic !== "other" && candidateTopic === previousTopic) return candidateTopic;
+
+  const left = questionTokens(candidate);
+  const right = questionTokens(previous);
+  if (left.size < 3 || right.size < 3) return null;
+  const overlap = Array.from(left).filter((token) => right.has(token)).length;
+  const smaller = Math.min(left.size, right.size);
+  if (overlap >= 3 && overlap / smaller >= 0.55) return candidateTopic || previousTopic || "other";
+  return null;
+}
+
+function repeatedQuestionTopic(reply, history) {
+  for (const item of questionMemory(history)) {
+    const topic = questionsOverlap(reply, item.question);
+    if (topic) return topic;
+  }
+  return null;
+}
+
 function safeReply(reply) {
   const text = cleanText(reply, 700)
     .replace(/```[\s\S]*?```/g, "")
@@ -322,7 +455,7 @@ function safeReply(reply) {
   return text;
 }
 
-function replyQualityIssues(reply) {
+function replyQualityIssues(reply, context = {}) {
   const issues = [];
   const firstSentence = String(reply || "").split(/[.!?]/)[0] || "";
   const sentenceCount = String(reply || "")
@@ -342,6 +475,8 @@ function replyQualityIssues(reply) {
   if (/\b(pattern|assessment|intake|prescribe|just yet|should stop|handoff point|underlying)\b|stay with your experience|what do you notice|what is it like for you|tell me how that lands|jump into advice|help understand|what happens for you|more interested in|what would you want(?: it| this| things)? to be different/i.test(reply)) {
     issues.push("clinical_or_scripted_language");
   }
+  const repeatedTopic = repeatedQuestionTopic(reply, context.history || []);
+  if (repeatedTopic) issues.push(`repeated_question:${repeatedTopic}`);
   if (/https?:\/\/|[*#`]|[;—–]/i.test(reply)) issues.push("formatting_or_link");
   return issues;
 }
@@ -358,7 +493,9 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     "Reflect only details and feelings the person explicitly expressed. Never add a likely motive, emotion, energy level, benefit, or consequence just to sound insightful.",
     "Do not recap or paraphrase the person's whole message. Use no more than one contextual detail in the acknowledgment or question. Specific does not mean repeating facts back to them.",
     "You may explore a wide personal context when it fits naturally, including their work, studies, routines, environment, interests, responsibilities, energy, relationships with their phone, apps, scrolling moments, impact, and what they would like to change.",
-    "There is no fixed order. Do not ask for information they already gave. Usually ask one clear question at most. Make it open-ended. Do not offer a menu of possible answers, either-or choices, example motives, or example feelings unless the person explicitly asks for options. It is fine to stay with an interesting detail instead of filling a missing field.",
+    "The conversation has a purpose: understand the concrete phone habit and the person's desired change well enough to help later. Keep moving toward a missing piece of context, not asking questions just to keep the chat going.",
+    "There is no fixed order. Do not ask for information they already gave. The question_memory in the input is a hard memory of topics already asked. Never ask the same underlying question twice with different wording. If a topic is already there, move to an adjacent unanswered detail or briefly acknowledge it without asking another version of it.",
+    "Usually ask one clear question at most. Make it open-ended. Do not offer a menu of possible answers, either-or choices, example motives, or example feelings unless the person explicitly asks for options. It is fine to stay with an interesting detail instead of filling a missing field. When the important context is already clear, let the conversation settle instead of inventing another question.",
     "Name, age range, email, work context, apps, scroll moments, impact, and desired change are eventual internal goals, never a checklist. Ask for name and email only when it feels socially natural.",
     "Do not assume they want to change a behavior merely because they described it. Ask what they would want to be different only after they have expressed dissatisfaction or a wish to change.",
     "If they volunteer a name or email, acknowledge it simply. Never say you will use, save, register, or submit it, and do not jump to an unrelated old profile detail in the same reply.",
@@ -375,6 +512,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     known_profile: profile,
     newly_saved_facts: newlySavedFacts.map((fact) => ({ key: fact.field_key || fact.key, value: fact.value })),
     coverage: knownCoverage,
+    question_memory: questionMemory(history),
     restricted_topic_present: restricted,
   });
   const model = process.env.WAITLIST_CONVERSATION_MODEL || "gpt-5.6-sol";
@@ -387,7 +525,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     fetchImpl,
   });
   let reply = safeReply(result.reply);
-  const issues = replyQualityIssues(reply);
+  const issues = replyQualityIssues(reply, { history });
   if (issues.length) {
     result = await structuredResponse({
       model,
@@ -398,7 +536,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
       fetchImpl,
     });
     reply = safeReply(result.reply);
-    const repairedIssues = replyQualityIssues(reply);
+    const repairedIssues = replyQualityIssues(reply, { history });
     if (repairedIssues.length) throw new Error(`waitlist_reply_style_failed:${repairedIssues.join(",")}`);
   }
   if (process.env.WAITLIST_CONVERSATION_POLISH !== "false") {
@@ -419,7 +557,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
         fetchImpl,
       });
       const polishedReply = safeReply(polished.reply);
-      if (!replyQualityIssues(polishedReply).length) {
+      if (!replyQualityIssues(polishedReply, { history }).length) {
         result = polished;
         reply = polishedReply;
       }
@@ -440,7 +578,11 @@ module.exports = {
   generateReply,
   hasEvidence,
   isRestrictedTopic,
+  questionMemory,
+  questionTopic,
+  questionsOverlap,
   replyQualityIssues,
+  repeatedQuestionTopic,
   safeReply,
   validateExtractedFacts,
 };

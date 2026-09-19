@@ -5,6 +5,10 @@ const { phoneForStorage } = require("./_waitlist_store");
 
 const OPENING_MESSAGE_1 = "Hi, welcome to Blankmind Early Access. I’m really glad you’re here. Before I invite you in, I’d love to understand how your phone fits into your life.";
 const OPENING_MESSAGE_2 = "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.";
+const TWILIO_OPENING_CONTENT_SIDS = {
+  1: "HX1eb512ffa15d0c0d7eae340f1f75a347",
+  2: "HXcfb5c936bcfc920b4c6aeae0f509d505",
+};
 
 function header(event, name) {
   const target = name.toLowerCase();
@@ -302,14 +306,13 @@ async function sendTwilioContent(phone, contentSid, fetchImpl = fetch) {
 
 async function sendOpeningMessage(phone, index, fetchImpl = fetch) {
   if (![1, 2].includes(index)) throw new Error("waitlist_opening_index_invalid");
-  const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase()
-    || (process.env.WAITLIST_WHATSAPP_OPENING_CONTENT_SID_1 ? "twilio" : "meta");
+  const provider = cleanText(process.env.WAITLIST_WHATSAPP_PROVIDER, 20).toLowerCase() || "twilio";
   if (!isProduction() && process.env.WAITLIST_ALLOW_FREEFORM_OPENING === "true") {
     if (provider !== "meta") throw new Error("waitlist_freeform_opening_meta_only");
     return sendMetaText(phone, index === 1 ? OPENING_MESSAGE_1 : OPENING_MESSAGE_2, fetchImpl);
   }
   if (provider === "twilio") {
-    const contentSid = process.env[`WAITLIST_WHATSAPP_OPENING_CONTENT_SID_${index}`];
+    const contentSid = process.env[`WAITLIST_WHATSAPP_OPENING_CONTENT_SID_${index}`] || TWILIO_OPENING_CONTENT_SIDS[index];
     if (!contentSid) throw new Error("waitlist_twilio_opening_templates_missing");
     return sendTwilioContent(phone, contentSid, fetchImpl);
   }

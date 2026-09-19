@@ -18,6 +18,7 @@ const {
 const {
   ageBand,
   isRestrictedTopic,
+  replyQualityIssues,
   safeReply,
   validateExtractedFacts,
 } = require("../netlify/functions/_waitlist_ai");
@@ -119,6 +120,8 @@ function safetyContract() {
   assert.strictEqual(isRestrictedTopic("I work in design and scroll after meetings"), false);
   const cleaned = safeReply("**I hear you.** — Tell me more at https://example.com");
   assert.doesNotMatch(cleaned, /\*\*|—|https?:\/\//);
+  assert.ok(replyQualityIssues("I’m glad to meet you. What are you working on?").includes("formal_or_stock_tone"));
+  assert.deepStrictEqual(replyQualityIssues("I’m curious about your work. What are you building?"), []);
 }
 
 function providerParsingContract() {

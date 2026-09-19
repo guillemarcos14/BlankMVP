@@ -112,6 +112,7 @@ function deterministicChecks(reply) {
   if (/[*#`]|https?:\/\//i.test(reply)) failures.push("formatting_or_link");
   if (/[;—–]/.test(reply)) failures.push("forbidden_punctuation");
   if (/\bas an ai\b|\bsurvey\b|\bquestionnaire\b|\bform\b/i.test(reply)) failures.push("robotic_language");
+  if (/\b(glad|pleased|delighted)\b|\bI(?:['’]d| would) love to\b/i.test(reply)) failures.push("formal_or_stock_tone");
   if (/\b(i('ve| have)? (blocked|scheduled|created|set up)|open the app|download)\b/i.test(reply)) failures.push("product_action");
   return failures;
 }

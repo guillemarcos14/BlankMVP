@@ -2,6 +2,9 @@
 
 Ultima actualizacion: 2026-09-19
 
+## Hecho hoy
+- 2026-09-19: Auditadas dos notas de voz reales de WhatsApp en producción. Twilio entregó `NumMedia=1` en ambos casos y `waitlist-agent` llegó hasta `/v1/audio/transcriptions`; las dos respuestas fueron HTTP `429` por créditos agotados. El parseo, la descarga y el multipart local pasan; tests waitlist y product harness `44/44`. No hay corrección de código segura que sustituya la facturación del proveedor; BM Final no se tocó.
+
 ## Resumen actual
 - 2026-09-19: Implementada en la rama aislada `codex/waitlist-early-access-2026-09-19` la capa temporal Blankmind Early Access: alta con teléfono verificado y consentimiento, dos aperturas deterministas por plantilla, conversación posterior abierta, audio transcrito sin conservar el archivo, extracción de hechos con evidencia/correcciones, privacidad y borrado. El producto agéntico no se importa ni modifica. Product harness `44/44`; evaluación conversacional independiente `9/10` y el único giro rechazado quedó bloqueado por el validador posterior. Pendiente integración Backend Cloud, migración `019`, aprobación de dos plantillas y smoke real; sin despliegue desde esta rama.
 - 2026-09-19: Auditoría integral de BM publicada en producción: migración Supabase `018` aplicada, Edge Function `digital-wellness-features` desplegada y Netlify activo en `6aae8a934eab6f6bc93bd1c2`. La verificación productiva cierra `20/20` grupos; juez independiente remoto `48/48`, `100 %`, cero respuestas pobres y cero fallos duros. El commit `c0a79bf` se archivó como iOS `1.9 (78)` en MacinCloud y Xcode confirmó `Uploaded to Apple` a las 15:59. Solo queda el procesamiento de Apple y ejecutar `20/20` pruebas físicas en iPhone.

@@ -44,7 +44,7 @@ function naturalFallbackReply(prompt, history) {
   );
   const isOpening = /^(hi|hello|hey|hola)\b/.test(text) && !hasSubstantiveInbound;
   if (isOpening) {
-    return "Hi, I’m really glad you’re here. What usually happens when you start scrolling? You can write it out or send a voice note.";
+    return "Hey, good to have you here. What usually happens when you start scrolling? You can write it out or send a voice note.";
   }
   return "I’m here with you. Tell me a little more about what you just shared, in whatever way feels easiest.";
 }

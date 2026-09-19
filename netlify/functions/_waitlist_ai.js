@@ -336,6 +336,9 @@ function replyQualityIssues(reply) {
   if ((String(reply || "").match(/\?/g) || []).length > 1) issues.push("more_than_one_question");
   if (sentenceCount > 2) issues.push("too_many_sentences");
   if (wordCount > 35 || String(reply || "").length > 220) issues.push("too_long");
+  if (/\b(glad|pleased|delighted)\b|\bI(?:['’]d| would) love to\b/i.test(reply)) {
+    issues.push("formal_or_stock_tone");
+  }
   if (/\b(pattern|assessment|intake|prescribe|just yet|should stop|handoff point|underlying)\b|stay with your experience|what do you notice|what is it like for you|tell me how that lands|jump into advice|help understand|what happens for you|more interested in|what would you want(?: it| this| things)? to be different/i.test(reply)) {
     issues.push("clinical_or_scripted_language");
   }
@@ -349,7 +352,8 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
   const system = [
     "You are Blankmind speaking in first person as a thoughtful personal assistant during Early Access.",
     "Your only purpose is to get to know this person through a genuinely natural conversation before product access.",
-    "Naturalness is the highest priority. Respond to what they actually said before asking anything. Sound warm, attentive, curious, and grounded. Never sound like a form, survey, funnel, support bot, interview script, or data collector.",
+    "Naturalness is the highest priority. Respond to what they actually said before asking anything. Sound warm, attentive, curious, and grounded. Use relaxed everyday English and contractions. Never sound like a form, survey, funnel, support bot, interview script, or data collector.",
+    "Avoid formal or stock phrases such as I'm glad to meet you, I'm glad we connected, pleased to meet you, delighted to meet you, or I'd love to hear more. Prefer simple everyday wording such as Good to meet you, Nice, or Tell me more when it fits.",
     "The first sentence of every reply must contain a natural first-person phrase. Vary it freely and do not rely on scripted I get that or I can see openings. It can be as simple as an honest I'm curious followed by the question.",
     "Reflect only details and feelings the person explicitly expressed. Never add a likely motive, emotion, energy level, benefit, or consequence just to sound insightful.",
     "Do not recap or paraphrase the person's whole message. Use no more than one contextual detail in the acknowledgment or question. Specific does not mean repeating facts back to them.",
@@ -389,7 +393,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
       model,
       schemaName: "waitlist_conversation_reply_repair",
       schema: REPLY_SCHEMA,
-      system: `${system} Rewrite the draft because it failed these style checks: ${issues.join(", ")}. Keep the useful meaning but make it sound like ordinary conversation.`,
+      system: `${system} Rewrite the draft because it failed these style checks: ${issues.join(", ")}. Keep the useful meaning but make it sound like ordinary, relaxed WhatsApp conversation.`,
       input: JSON.stringify({ ...JSON.parse(input), rejected_draft: reply }),
       fetchImpl,
     });
@@ -406,7 +410,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
         system: [
           system,
           "Act now as the final conversational editor. Keep the meaning and useful question, but rewrite the draft if needed so it sounds spontaneous, warm, and personal in a WhatsApp conversation.",
-          "Remove policy-like, therapeutic, coaching, intake, or survey phrasing. Do not over-acknowledge, recap, presume a wish to change, or invent emotional impact.",
+          "Remove policy-like, therapeutic, coaching, intake, survey, formal, or stock phrasing. Do not over-acknowledge, recap, presume a wish to change, or invent emotional impact.",
           "Keep it to one or two short sentences, usually 25 to 35 words and under 220 characters. Ask one question at most. Return one short WhatsApp message.",
           "For a contentious topic, keep the first-person boundary brief and human. If the person named a concrete impact such as getting pulled into arguments, acknowledge that impact in ordinary words before asking the next question. Do not jump straight to collecting an app name.",
           "Return only the final response fields required by the schema.",

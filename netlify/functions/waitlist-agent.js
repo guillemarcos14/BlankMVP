@@ -36,6 +36,19 @@ function publicJoinUrl() {
   return cleanText(process.env.WAITLIST_PUBLIC_URL, 800) || "https://blankmind.ai/signup?channel=whatsapp";
 }
 
+function naturalFallbackReply(prompt, history) {
+  const text = cleanText(prompt, 4000).toLowerCase();
+  const hasSubstantiveInbound = history.some((message) =>
+    message.direction === "inbound"
+    && !/^(hi|hello|hey|hola)\b/i.test(cleanText(message.body, 4000))
+  );
+  const isOpening = /^(hi|hello|hey|hola)\b/.test(text) && !hasSubstantiveInbound;
+  if (isOpening) {
+    return "Hi, I’m really glad you’re here. I’d love to understand how your phone fits into your life. What usually happens when you start scrolling? You can tell me in your own words or send me a voice note, whatever feels easier.";
+  }
+  return "I’m here with you. Tell me a little more about what you just shared, in whatever way feels easiest.";
+}
+
 function noConsentReply() {
   return `I can continue once you join Blankmind Early Access and confirm that I can save this conversation. You can do that here: ${publicJoinUrl()}`;
 }
@@ -169,7 +182,7 @@ async function processMessage(message) {
     } catch (error) {
       await recordEvent(user.id, "conversation_generation_failed", { reason: cleanText(error.message, 160) });
       generated = {
-        reply: "I lost part of that for a moment. Could you tell me that again in your own words?",
+        reply: naturalFallbackReply(prompt, history),
         focus: "natural_followup",
         profile_useful: false,
         restricted: false,

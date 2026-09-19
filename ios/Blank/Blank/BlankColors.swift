@@ -49,14 +49,14 @@ enum BlankColors {
     static let premiumBlue = seafoam
     static let controlSurface = pureWhite.opacity(0.16)
     static let activeControlSurface = pureWhite.opacity(0.09)
-    static let minimalBackground = paleSteelBlue
+    static let minimalBackground = pureWhite
     static let minimalInk = charcoal
     static let minimalSecondary = secondaryText
     static let minimalFaded = paleSteelBlue.opacity(0.72)
     // One background per app state; every screen inherits these same surfaces.
-    static let appLightBackground = paleSteelBlue
+    static let appLightBackground = pureWhite
     static let appDarkBackground = charcoal
-    static let appLightCardSurface = pureWhite
+    static let appLightCardSurface = paleSteelBlue
     static let appDarkCardSurface = paleSteelBlue.opacity(0.18)
     static let minimalCardSurface = appLightCardSurface
     static let darkCardSurface = appDarkCardSurface

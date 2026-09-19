@@ -108,7 +108,9 @@ function twilioBackgroundUrl(event) {
   if (isProduction()) return "https://getblank.netlify.app/.netlify/functions/waitlist-agent-background";
   const protocol = header(event, "x-forwarded-proto") || "https";
   const host = header(event, "x-forwarded-host") || header(event, "host");
-  return host ? `${protocol}://${host}/.netlify/functions/waitlist-agent-background` : "";
+  return host
+    ? `${protocol}://${host}/.netlify/functions/waitlist-agent-background`
+    : "https://getblank.netlify.app/.netlify/functions/waitlist-agent-background";
 }
 
 function shouldUseAsyncTwilio() {

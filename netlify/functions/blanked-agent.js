@@ -3567,12 +3567,17 @@ function semanticPlan(result, language, prompt) {
 }
 
 function enforceSemanticBoundary(plan, semantic, language) {
-  const protectionTypes = new Set(["start_protection", "apply_schedule", "set_daily_limit", "apply_ai_plan", "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause"]);
+  const protectionTypes = new Set(["start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "set_daily_limit", "apply_ai_plan", "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause"]);
   const setupCarriesAction = item => ["open_app_picker", "request_screen_time_permission"].includes(item.type)
     && ["minutes", "start_minute", "end_minute", "duration_days", "weekdays", "hard_mode", "name"].some(key => item[key] != null);
   if ((plan.actions || []).some(item => protectionTypes.has(item.type) || setupCarriesAction(item))) {
     // The legacy planner cannot create a new blocking intention or pending slot.
     // Preserve the reducer's decision, including its absence of an authorized plan.
+    if (semantic?.decision?.type === "none" && semantic?.state?.status === "idle") {
+      const text = naturalChannelText(plan.response_text || plan.message_text, 700)
+        || "I can recommend a better phone plan once I have enough recent context.";
+      return { ...plan, actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
+    }
     const text = language === "es" ? "No he podido validar una propuesta ejecutable a partir de esa petición. No he aplicado ningún cambio." : "I couldn't validate an executable proposal from that request. I haven't applied any changes.";
     return { ...plan, title: language === "es" ? "Petición pendiente" : "Request not applied", actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", bullets: [], semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
   }
@@ -3628,3 +3633,4 @@ async function traceEvaluationTurn({ prompt, context = {}, mode = "bm_final" }) 
 }
 
 exports._evaluation = { traceTurn: traceEvaluationTurn };
+exports.enforceSemanticBoundary = enforceSemanticBoundary;

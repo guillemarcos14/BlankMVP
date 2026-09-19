@@ -6,6 +6,7 @@ const path = require("node:path");
 const { buildAgentContext, normalizeUserContext } = require("../netlify/functions/bm-context");
 const { scheduleManagementPlan } = require("../netlify/functions/bm-schedule-management");
 const { pendingActionFromPlan } = require("../netlify/functions/bm-pending-action");
+const { enforceSemanticBoundary } = require("../netlify/functions/blanked-agent");
 
 const root = path.join(__dirname, "..");
 const upsertFix = fs.readFileSync(path.join(root, "supabase/migrations/017_fix_bm_context_upsert.sql"), "utf8");
@@ -71,5 +72,13 @@ assert.equal(deleted.actions[0].type, "delete_all_schedules");
 const removeOne = scheduleManagementPlan("Delete the 1 PM to 2 PM blocking window", context);
 assert.equal(removeOne.actions[0].type, "delete_schedule");
 assert.equal(removeOne.actions[0].window_id, windowId);
+
+const recommendation = enforceSemanticBoundary({
+  response_text: "Based on your stronger adherence, keep the lunch window and move it 15 minutes earlier on difficult days.",
+  actions: [{ type: "apply_schedule", start_minute: 765, end_minute: 840 }],
+}, { state: { status: "idle", intent: "advice" }, decision: { type: "none", slot: null } }, "en");
+assert.deepEqual(recommendation.actions, []);
+assert.match(recommendation.response_text, /keep the lunch window/i);
+assert.doesNotMatch(recommendation.response_text, /couldn't validate/i);
 
 console.log("BM global context: isolated identity, personal context and schedule CRUD passed");

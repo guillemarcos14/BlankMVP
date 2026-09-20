@@ -6,8 +6,8 @@ const { phoneForStorage } = require("./_waitlist_store");
 const OPENING_MESSAGE_1 = "Hey, I’m Blankmind. Tell me a bit about yourself.";
 const OPENING_MESSAGE_2 = "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.";
 const TWILIO_OPENING_CONTENT_SIDS = {
-  1: "HX1eb512ffa15d0c0d7eae340f1f75a347",
-  2: "HXcfb5c936bcfc920b4c6aeae0f509d505",
+  1: "HX8d2a6ae19f26e983695d248284b74c40",
+  2: "HX99b42fe21aaa483720b97bcbb57020d2",
 };
 
 function header(event, name) {

@@ -64,11 +64,10 @@ Validaciones ejecutadas:
 - `node tools/backend_release.js --mode validate --baseline tmp/product-harness/baseline-waitlist-sms-fix.json`: pasado, product harness `44/44`.
 
 Pruebas pendientes:
-- Integrar/desplegar desde la conversación de integración Backend Cloud.
 - Confirmar en Twilio los dos SID SMS y responder al primer mensaje con el teléfono real.
 
 Riesgos o conflictos conocidos:
-- No se ha desplegado desde esta conversación, conforme al proceso de desarrollo.
+- Deploy realizado tras petición explícita de Guillem: Netlify `6aafc95347501727fa71d1e7`, URL `https://getblank.netlify.app`, commit `243a45c3e447afb3a8ceb81929a5b8977436af80`.
 
 Riesgos o conflictos conocidos:
 - Los cambios de producción deben seguir saliendo desde la rama de integración.

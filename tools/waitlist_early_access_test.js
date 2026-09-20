@@ -25,6 +25,7 @@ const {
   deterministicFacts,
   generateReply,
   isRestrictedTopic,
+  naturalGoalPlan,
   questionMemory,
   questionTopic,
   replyQualityIssues,
@@ -507,6 +508,78 @@ function safetyContract() {
   assert.deepStrictEqual(replyQualityIssues("I’m curious about your work. What are you building?"), []);
 }
 
+function naturalGoalRoutingContract() {
+  const storyPlan = naturalGoalPlan({
+    message: "I work from home and start scrolling Instagram before breakfast.",
+    profile: { occupation: "designer", daily_routine: "I work from home" },
+    newlySavedFacts: [
+      { key: "apps", value: ["Instagram"] },
+      { key: "scroll_moments", value: ["before breakfast"] },
+    ],
+  });
+  assert.strictEqual(storyPlan.state, "continue");
+  assert.strictEqual(storyPlan.anchor_goal, "phone_story");
+  assert.strictEqual(storyPlan.next_goal, "impact", "a completed phone story should move to impact, not jump to identity");
+
+  const completePlan = naturalGoalPlan({
+    message: "That’s all for now.",
+    profile: {
+      preferred_name: "Alex",
+      age: 29,
+      occupation: "designer",
+      daily_routine: "I work from home",
+      apps: ["Instagram"],
+      scroll_moments: ["before breakfast"],
+      impact: "I lose time",
+      desired_change: "I want calmer mornings",
+    },
+  });
+  assert.strictEqual(completePlan.state, "complete");
+  assert.strictEqual(completePlan.next_goal, null);
+}
+
+async function naturalGoalCompletionContract() {
+  const previousPolish = process.env.WAITLIST_CONVERSATION_POLISH;
+  process.env.WAITLIST_CONVERSATION_POLISH = "false";
+  let calls = 0;
+  try {
+    const result = await generateReply({
+      message: "All good, thanks.",
+      history: [],
+      profile: {
+        preferred_name: "Alex",
+        age: 29,
+        occupation: "designer",
+        daily_routine: "I work from home",
+        apps: ["Instagram"],
+        scroll_moments: ["before breakfast"],
+        impact: "I lose time",
+        desired_change: "I want calmer mornings",
+      },
+      newlySavedFacts: [],
+      fetchImpl: async (url, options) => {
+        calls += 1;
+        const request = JSON.parse(options.body);
+        if (calls === 1) {
+          return response(200, {
+            output_text: JSON.stringify({ reply: "I’m curious what you’ll do next?", focus: "complete", profile_useful: false }),
+          });
+        }
+        assert.strictEqual(request.text.format.name, "waitlist_conversation_reply_repair");
+        return response(200, {
+          output_text: JSON.stringify({ reply: "I see. Thanks for telling me.", focus: "complete", profile_useful: false }),
+        });
+      },
+    });
+    assert.strictEqual(calls, 2);
+    assert.doesNotMatch(result.reply, /\?/);
+    assert.strictEqual(result.goal_plan.state, "complete");
+  } finally {
+    if (previousPolish === undefined) delete process.env.WAITLIST_CONVERSATION_POLISH;
+    else process.env.WAITLIST_CONVERSATION_POLISH = previousPolish;
+  }
+}
+
 async function conversationMemoryContract() {
   const history = [
     {
@@ -657,6 +730,7 @@ async function fullTurnContract(from = "whatsapp:+34600111222", channel = "whats
         if (schemaName === "waitlist_conversation_reply") {
           assert.match(request.input[0].content[0].text, /work, studies, routines/i);
           assert.match(request.input[0].content[0].text, /wars, armed conflicts, abortion/i);
+          assert.match(request.input[1].content[0].text, /natural_goal_plan/);
         }
         if (schemaName === "waitlist_conversation_reply_repair") {
           return response(200, {
@@ -970,6 +1044,8 @@ async function main() {
   extractionContract();
   broadFactCaptureContract();
   safetyContract();
+  naturalGoalRoutingContract();
+  await naturalGoalCompletionContract();
   providerParsingContract();
   isolationContract();
   await conversationMemoryContract();

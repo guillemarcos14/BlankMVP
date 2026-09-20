@@ -172,10 +172,10 @@ async function connectGreeting() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.strictEqual(outboundTexts.length, 2);
-    assert.match(outboundTexts[0], /Welcome to Blankmind/i);
-    assert.match(outboundTexts[0], /better relationship with your phone/i);
-    assert.match(outboundTexts[1], /choose the apps you consider distractions/i);
-    assert.match(outboundTexts[1], /talk to me normally/i);
+  assert.match(outboundTexts[0], /Hey, I’m Blankmind/i);
+  assert.match(outboundTexts[0], /pulling you into your phone/i);
+    assert.match(outboundTexts[1], /Pick the apps that pull you in most/i);
+    assert.match(outboundTexts[1], /come back here/i);
     assert.doesNotMatch(outboundTexts[0], /connected|thread|digital wellness assistant/i);
   } finally {
     global.fetch = originalFetch;

@@ -3,8 +3,8 @@ const { json } = require("./_membership");
 const { cleanText } = require("./_identity");
 const { phoneForStorage } = require("./_waitlist_store");
 
-const OPENING_MESSAGE_1 = "Hi, welcome to Blankmind Early Access. I’m really glad you’re here. Before I invite you in, I’d love to understand how your phone fits into your life.";
-const OPENING_MESSAGE_2 = "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.";
+const OPENING_MESSAGE_1 = "Hey, I’m Blankmind. Tell me a bit about yourself.";
+const OPENING_MESSAGE_2 = "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.";
 
 function header(event, name) {
   const target = name.toLowerCase();

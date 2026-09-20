@@ -48,8 +48,8 @@ function baseContext(overrides = {}) {
 
 (async () => {
   const onboarding = onboardingMessages({ language: "es", locale: "es-ES" });
-  assert.match(onboarding.welcome, /Welcome to Blankmind/);
-  assert.match(onboarding.setup, /choose the apps you consider distractions/);
+  assert.match(onboarding.welcome, /Hey, I’m Blankmind/);
+  assert.match(onboarding.setup, /Pick the apps that pull you in most/);
   assert.doesNotMatch(Object.values(onboarding).join(" "), /Bienvenido|Para empezar|Ya tienes/i);
 
   const smallTalk = await call("how you doing?", baseContext({ channel: "whatsapp", assistant_channel: "whatsapp" }));

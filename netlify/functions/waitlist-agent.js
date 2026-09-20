@@ -181,6 +181,8 @@ async function processMessage(message) {
       provider: message.provider,
       input_kind: messageKind,
       facts_saved: saved.length,
+      fact_keys: saved.map((fact) => fact.field_key),
+      profile_fields: Object.keys(updated.profile),
       focus: generated.focus,
       restricted_topic: generated.restricted === true,
     });

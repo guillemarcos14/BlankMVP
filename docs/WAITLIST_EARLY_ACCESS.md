@@ -40,6 +40,10 @@ Las migraciones `019_waitlist_early_access.sql` y `020_waitlist_channel_openings
 
 Todas tienen RLS y solo son accesibles desde el backend con service role. La vista `waitlist_current_profile` expone el perfil vigente para análisis interno.
 
+En cada turno se conserva el mensaje entrante completo y, en paralelo, se extraen todos los hechos explícitos que contenga, no solo el dato utilizado para la respuesta. El perfil contempla identidad primaria (`preferred_name`, `age`, `age_band`, `email`), trabajo/estudios/rutina, entorno, intereses, responsabilidades, relaciones, energía, relación con el teléfono, aplicaciones, contenido, momentos, disparadores, frecuencia, impacto, sentimientos, intentos previos, objetivos y cambio deseado. Cada hecho conserva evidencia, mensaje de origen, confianza, fecha y versión anterior cuando se corrige. Las listas se acumulan sin perder valores previos salvo que el usuario las corrija o retire explícitamente.
+
+La memoria de temas preguntados y la prevención de preguntas repetidas se aplican solo internamente. No se muestran resúmenes, checklists, menús ni frases de redirección meta; cualquier cambio de foco debe surgir de forma natural de la respuesta anterior.
+
 ## Activación
 
 1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019` y `020`.

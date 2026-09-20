@@ -47,43 +47,85 @@ async function startWaitlist(event) {
 
   const fields = openingFields(channel);
   const sent = [];
-  if (!user[fields.first]) {
-    const result = await sendOpeningMessage(user.phone_e164, 1, channel);
-    await recordMessage({
-      userId: user.id,
-      provider: result.provider,
-      providerMessageId: result.id,
-      direction: "outbound",
-      messageKind: "opening",
-      body: OPENING_MESSAGE_1,
-    });
-    user = await patchUser(user.id, { [fields.first]: now() });
-    sent.push(1);
+  const deliveries = [];
+  const persistenceErrors = [];
+  let deliveryError = null;
+
+  // Deliver both messages before persisting either delivery. A Supabase write
+  // must never prevent the second opening message from reaching the phone.
+  for (const index of [1, 2]) {
+    const field = index === 1 ? fields.first : fields.second;
+    if (user[field]) continue;
+    try {
+      const result = await sendOpeningMessage(user.phone_e164, index, channel);
+      deliveries.push({ index, result });
+      sent.push(index);
+    } catch (error) {
+      deliveryError = error;
+      break;
+    }
   }
 
-  if (!user[fields.second]) {
-    const result = await sendOpeningMessage(user.phone_e164, 2, channel);
-    await recordMessage({
-      userId: user.id,
-      provider: result.provider,
-      providerMessageId: result.id,
-      direction: "outbound",
-      messageKind: "opening",
-      body: OPENING_MESSAGE_2,
-    });
-    user = await patchUser(user.id, { [fields.second]: now(), opening_sent_at: now() });
-    sent.push(2);
-  } else if (!user.opening_sent_at) {
-    user = await patchUser(user.id, { opening_sent_at: now() });
+  for (const delivery of deliveries) {
+    const { index, result } = delivery;
+    const body = index === 1 ? OPENING_MESSAGE_1 : OPENING_MESSAGE_2;
+    try {
+      await recordMessage({
+        userId: user.id,
+        provider: result.provider,
+        providerMessageId: result.id,
+        direction: "outbound",
+        messageKind: "opening",
+        body,
+      });
+    } catch (error) {
+      persistenceErrors.push({ index, stage: "message", error });
+    }
+
+    const updates = index === 1
+      ? { [fields.first]: now() }
+      : { [fields.second]: now(), opening_sent_at: now() };
+    try {
+      user = await patchUser(user.id, updates) || { ...user, ...updates };
+    } catch (error) {
+      persistenceErrors.push({ index, stage: "user", error });
+    }
   }
 
-  if (sent.length) await recordEvent(user.id, "waitlist_started", { channel, opening_messages_sent: sent });
+  if (user[fields.second] && !user.opening_sent_at && !deliveryError) {
+    // Keep the legacy aggregate marker populated for older records that have
+    // both channel-specific timestamps but no opening_sent_at value.
+    try {
+      user = await patchUser(user.id, { opening_sent_at: now() }) || user;
+    } catch (error) {
+      persistenceErrors.push({ index: 2, stage: "user", error });
+    }
+  }
+
+  if (sent.length) {
+    try {
+      await recordEvent(user.id, "waitlist_started", {
+        channel,
+        opening_messages_sent: sent,
+        persistence_warning: persistenceErrors.length > 0,
+      });
+    } catch (error) {
+      persistenceErrors.push({ index: 0, stage: "event", error });
+    }
+  }
+
+  if (deliveryError) {
+    throw deliveryError;
+  }
+
+  const openingSent = Boolean(user.opening_sent_at) || sent.includes(2);
   return json(200, {
     ok: true,
     waitlist_status: user.status,
     channel,
-    opening_sent: Boolean(user.opening_sent_at),
+    opening_sent: openingSent,
     sent,
+    persistence_warning: persistenceErrors.length > 0,
   });
 }
 

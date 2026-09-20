@@ -30,9 +30,13 @@ const {
   safeReply,
   validateExtractedFacts,
 } = require("../netlify/functions/_waitlist_ai");
-const { handler } = require("../netlify/functions/waitlist-agent");
+const {
+  handler,
+  naturalFallbackReply,
+} = require("../netlify/functions/waitlist-agent");
 const { handler: backgroundHandler } = require("../netlify/functions/waitlist-agent-background");
 const { handler: waitlistStartHandler } = require("../netlify/functions/waitlist-start");
+const { handler: smsAgentHandler } = require("../netlify/functions/sms-agent");
 
 function response(status, body, headers = {}) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -56,6 +60,12 @@ function openingContract() {
     OPENING_MESSAGE_2,
     "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.",
   );
+  const fallback = naturalFallbackReply(
+    "I usually wake up at 8 AM and scroll for 40 to 45 minutes before breakfast. I want to stop doing that. Can you help me?",
+    [],
+  );
+  assert.match(fallback, /scrolling|breakfast/i);
+  assert.doesNotMatch(fallback, /I'm here\. Tell me what's going on/i);
 }
 
 async function openingDeliveryContract() {
@@ -182,6 +192,183 @@ async function smsOpeningDeliveryContract() {
       TWILIO_AUTH_TOKEN: previous.token,
       TWILIO_FROM_NUMBER: previous.from,
       TWILIO_MESSAGING_SERVICE_SID: previous.messagingServiceSid,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
+async function openingDeliverySurvivesPersistenceErrorContract() {
+  const previous = {
+    sid: process.env.TWILIO_ACCOUNT_SID,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    from: process.env.TWILIO_FROM_NUMBER,
+    messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+  };
+  process.env.TWILIO_ACCOUNT_SID = "ACtest";
+  process.env.TWILIO_AUTH_TOKEN = "token";
+  process.env.TWILIO_FROM_NUMBER = "+13478366767";
+  process.env.TWILIO_MESSAGING_SERVICE_SID = "MGtest";
+  const state = {
+    user: {
+      id: "11111111-1111-4111-8111-111111111111",
+      auth_user_id: "22222222-2222-4222-8222-222222222222",
+      phone_e164: "+13475550123",
+      status: "active",
+      data_consent: true,
+      whatsapp_consent: true,
+      opening_sms_first_sent_at: null,
+      opening_sms_second_sent_at: null,
+      opening_sent_at: null,
+    },
+    twilio: [],
+    events: [],
+    failFirstOpeningPatch: true,
+  };
+  const previousFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    const value = String(url);
+    if (value === "https://supabase.test/auth/v1/user") {
+      return response(200, { id: state.user.auth_user_id, phone: state.user.phone_e164 });
+    }
+    if (value.includes("api.twilio.com/2010-04-01/Accounts/")) {
+      state.twilio.push(new URLSearchParams(options.body));
+      return response(201, { sid: `SM-opening-retry-${state.twilio.length}` });
+    }
+    if (!value.startsWith("https://supabase.test/rest/v1/")) throw new Error(`unexpected fetch ${value}`);
+    const parsed = new URL(value);
+    const resource = parsed.pathname.replace("/rest/v1/", "");
+    const method = options.method || "GET";
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (resource === "waitlist_users" && method === "GET") return response(200, [state.user]);
+    if (resource === "waitlist_users" && method === "PATCH") {
+      if (body.opening_sms_first_sent_at && state.failFirstOpeningPatch) {
+        state.failFirstOpeningPatch = false;
+        return response(500, { message: "temporary persistence failure" });
+      }
+      state.user = { ...state.user, ...body };
+      return response(200, [state.user]);
+    }
+    if (resource === "waitlist_messages" && method === "POST") return response(201, [{ id: "message" }]);
+    if (resource === "waitlist_events" && method === "POST") {
+      state.events.push(body);
+      return response(201, []);
+    }
+    throw new Error(`unexpected supabase operation ${method} ${resource}`);
+  };
+
+  try {
+    const result = await waitlistStartHandler({
+      httpMethod: "POST",
+      headers: { authorization: "Bearer access-token" },
+      body: JSON.stringify({ data_consent: true, messaging_consent: true, channel: "sms" }),
+    });
+    assert.strictEqual(result.statusCode, 200);
+    const payload = JSON.parse(result.body);
+    assert.deepStrictEqual(payload.sent, [1, 2]);
+    assert.strictEqual(payload.persistence_warning, true);
+    assert.strictEqual(state.twilio.length, 2, "the second opening must be sent after a persistence failure");
+    assert.strictEqual(state.twilio[0].get("Body"), OPENING_MESSAGE_1);
+    assert.strictEqual(state.twilio[1].get("Body"), OPENING_MESSAGE_2);
+  } finally {
+    global.fetch = previousFetch;
+    const mapping = {
+      TWILIO_ACCOUNT_SID: previous.sid,
+      TWILIO_AUTH_TOKEN: previous.token,
+      TWILIO_FROM_NUMBER: previous.from,
+      TWILIO_MESSAGING_SERVICE_SID: previous.messagingServiceSid,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
+async function legacySmsRouteWaitlistParityContract() {
+  const previous = {
+    asyncMode: process.env.WAITLIST_TWILIO_ASYNC,
+    polish: process.env.WAITLIST_CONVERSATION_POLISH,
+    signature: process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE,
+  };
+  process.env.WAITLIST_TWILIO_ASYNC = "false";
+  process.env.WAITLIST_CONVERSATION_POLISH = "false";
+  process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
+  const state = {
+    user: {
+      id: "11111111-1111-4111-8111-111111111111",
+      phone_e164: "+13475550123",
+      status: "active",
+      data_consent: true,
+      whatsapp_consent: true,
+      first_reply_at: null,
+    },
+    messages: [],
+    events: [],
+  };
+  const previousFetch = global.fetch;
+  global.fetch = async (url, options = {}) => {
+    const value = String(url);
+    if (value === "https://api.openai.com/v1/responses") {
+      const request = JSON.parse(options.body);
+      if (request.text.format.name === "waitlist_fact_extraction") {
+        return response(200, { output_text: JSON.stringify({ facts: [] }) });
+      }
+      return response(200, {
+        output_text: JSON.stringify({
+          reply: "I’m curious what usually keeps you scrolling during those first 40 or 45 minutes before breakfast?",
+          focus: "scroll_context",
+          profile_useful: false,
+        }),
+      });
+    }
+    if (!value.startsWith("https://supabase.test/rest/v1/")) throw new Error(`unexpected fetch ${value}`);
+    const parsed = new URL(value);
+    const resource = parsed.pathname.replace("/rest/v1/", "");
+    const method = options.method || "GET";
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (resource === "rpc/claim_waitlist_inbound") return response(200, [{ claimed: true, status: "claimed" }]);
+    if (resource === "rpc/complete_waitlist_inbound") return response(200, true);
+    if (resource === "waitlist_users" && method === "GET") return response(200, [state.user]);
+    if (resource === "waitlist_users" && method === "PATCH") {
+      state.user = { ...state.user, ...body };
+      return response(200, [state.user]);
+    }
+    if (resource === "waitlist_messages" && method === "POST") {
+      const row = { id: `message-${state.messages.length + 1}`, ...body };
+      state.messages.push(row);
+      return response(201, [row]);
+    }
+    if (resource === "waitlist_messages" && method === "GET") return response(200, [...state.messages].reverse());
+    if (resource === "waitlist_facts" && method === "GET") return response(200, []);
+    if (resource === "waitlist_events" && method === "POST") {
+      state.events.push(body);
+      return response(201, []);
+    }
+    throw new Error(`unexpected supabase operation ${method} ${resource}`);
+  };
+
+  try {
+    const result = await smsAgentHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        From: "+13475550123",
+        Body: "I usually wake up at 8 AM and scroll for 40 to 45 minutes before breakfast. I want to stop doing that. Can you help me?",
+        MessageSid: "SM-waitlist-legacy-route",
+      }).toString(),
+    });
+    assert.strictEqual(result.statusCode, 200);
+    assert.match(result.body, /40 or 45 minutes before breakfast/i);
+    assert.doesNotMatch(result.body, /I'm here\. Tell me what's going on/i);
+    assert.ok(state.messages.some((message) => message.direction === "inbound"));
+    assert.ok(state.messages.some((message) => message.direction === "outbound"));
+  } finally {
+    global.fetch = previousFetch;
+    const mapping = {
+      WAITLIST_TWILIO_ASYNC: previous.asyncMode,
+      WAITLIST_CONVERSATION_POLISH: previous.polish,
+      TWILIO_VALIDATE_WEBHOOK_SIGNATURE: previous.signature,
     };
     for (const [key, value] of Object.entries(mapping)) {
       if (value === undefined) delete process.env[key]; else process.env[key] = value;
@@ -681,6 +868,7 @@ async function main() {
   openingContract();
   await openingDeliveryContract();
   await smsOpeningDeliveryContract();
+  await openingDeliverySurvivesPersistenceErrorContract();
   extractionContract();
   safetyContract();
   providerParsingContract();
@@ -688,6 +876,7 @@ async function main() {
   await conversationMemoryContract();
   await fullTurnContract();
   await fullTurnContract("+34600111222", "sms");
+  await legacySmsRouteWaitlistParityContract();
   await twilioAsyncDeliveryContract();
   await twilioTextDeliveryContract();
   await twilioSmsTextDeliveryContract();

@@ -1,5 +1,11 @@
 const crypto = require("crypto");
 const { json, requireMethod } = require("./_membership");
+const { userByPhone } = require("./_waitlist_store");
+const {
+  enqueueTwilioMessage,
+  shouldUseAsyncTwilio,
+} = require("./_waitlist_whatsapp");
+const { processMessage: processWaitlistMessage } = require("./waitlist-agent");
 const { handler: blankedAgentHandler } = require("./blanked-agent");
 const { freshConversationState, deriveAppPresence, buildAgentContext } = require("./bm-context");
 const { reviewActionLink } = require("./_bm_action_link");
@@ -199,6 +205,35 @@ function twiml(message) {
   const messages = Array.isArray(message) ? message : [message];
   const body = messages.filter(Boolean).map((item) => `<Message><Body>${escapeXml(item)}</Body></Message>`).join("");
   return `<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`;
+}
+
+async function handleWaitlistMessage(event, parsedBody) {
+  let user;
+  try {
+    user = await userByPhone(parsedBody.from);
+  } catch (_) {
+    return null;
+  }
+  if (!user || user.status !== "active" || user.data_consent !== true || user.whatsapp_consent !== true) {
+    return null;
+  }
+
+  const message = {
+    provider: "twilio",
+    providerMessageId: parsedBody.messageSid || null,
+    phone: parsedBody.from.replace(/^whatsapp:/i, ""),
+    channel: channelFromSender(parsedBody.from),
+    text: parsedBody.body,
+    audio: audioMedia(parsedBody.media) || null,
+  };
+
+  if (shouldUseAsyncTwilio()) {
+    await enqueueTwilioMessage(message, event);
+    return text(200, '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', "application/xml; charset=utf-8");
+  }
+
+  const result = await processWaitlistMessage(message);
+  return text(200, twiml(result.reply || ""), "application/xml; charset=utf-8");
 }
 
 function escapeXml(value) {
@@ -877,6 +912,11 @@ exports.handler = async (event) => {
   const parsedBody = parseSmsBody(event);
   const { from, body, media, messageSid } = parsedBody;
   if (!from) return json(400, { error: "missing_sms_sender" });
+  // Twilio may still point at this legacy endpoint while the waitlist webhook
+  // is being rolled over. Route active waitlist users into the same handler so
+  // their first reply keeps the waitlist history and facts.
+  const waitlistResponse = await handleWaitlistMessage(event, parsedBody);
+  if (waitlistResponse) return waitlistResponse;
   if (messageSid) {
     try {
       const claim = await claimAssistantInboundMessage(channelFromSender(from), from, messageSid);

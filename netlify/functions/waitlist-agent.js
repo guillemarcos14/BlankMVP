@@ -48,7 +48,13 @@ function naturalFallbackReply(prompt, history) {
   if (isOpening) {
     return "Hey, good to have you here. What usually happens when you start scrolling? You can write it out or send a voice note.";
   }
-  return "I’m here with you. Tell me a little more about what you just shared, in whatever way feels easiest.";
+  if (/(wake|woke|morning|breakfast|first thing|8\s*am|40\s*(?:to|-)\s*45)/i.test(text)) {
+    return "I’m curious what usually keeps you scrolling during those first 40 or 45 minutes before breakfast.";
+  }
+  if (/(scroll|phone|instagram|tiktok|youtube|help me|want to stop)/i.test(text)) {
+    return "I’m curious what you usually end up looking at once you start scrolling.";
+  }
+  return "I’m curious what part of that moment keeps bringing you back to your phone.";
 }
 
 function noConsentReply() {
@@ -316,3 +322,4 @@ exports.handler = async (event) => {
 
 module.exports.processMessage = processMessage;
 module.exports.saveOutbound = saveOutbound;
+module.exports.naturalFallbackReply = naturalFallbackReply;

@@ -44,6 +44,8 @@ En cada turno se conserva el mensaje entrante completo y, en paralelo, se extrae
 
 La memoria de temas preguntados y la prevención de preguntas repetidas se aplican solo internamente. No se muestran resúmenes, checklists, menús ni frases de redirección meta; cualquier cambio de foco debe surgir de forma natural de la respuesta anterior.
 
+La conversación usa objetivos internos suaves, no un cuestionario visible. Cada turno responde primero a la historia que la persona acaba de contar y, solo si encaja, continúa hacia el siguiente objetivo relevante: identidad, vida diaria, relación con el móvil, impacto o cambio deseado. Nombre y edad tienen prioridad de cobertura, pero nunca desplazan abruptamente una historia útil sobre la rutina o el teléfono. Cuando el contexto esencial ya está cubierto, o tras una conversación suficientemente rica, BM deja de generar preguntas nuevas y responde de forma natural; no anuncia que ha terminado ni muestra un resumen. Si la persona sigue escribiendo, la conversación puede continuar sin reiniciarse.
+
 ## Activación
 
 1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019` y `020`.

@@ -254,6 +254,9 @@ async function processMessage(message, options = {}) {
       fact_keys: saved.map((fact) => fact.field_key),
       profile_fields: Object.keys(updated.profile),
       focus: generated.focus,
+      conversation_goal_state: generated.goal_plan?.state || null,
+      conversation_anchor_goal: generated.goal_plan?.anchor_goal || null,
+      conversation_next_goal: generated.goal_plan?.next_goal || null,
       restricted_topic: generated.restricted === true,
     };
     if (!deferDelivery) {

@@ -68,6 +68,63 @@ const EVENTUAL_GOALS = [
   "desired_change",
 ];
 
+const NATURAL_GOAL_DEFINITIONS = [
+  {
+    key: "identity",
+    fields: ["preferred_name", "age"],
+    minimum: 2,
+    focus: "identity",
+    signals: [
+      /\b(?:name|call me|go by|age|years old)\b|\b(?:i(?:'|’)m|i am)\s+\d{2}\b/i,
+    ],
+  },
+  {
+    key: "daily_life",
+    fields: ["occupation", "work_context", "studies", "daily_routine", "environment"],
+    minimum: 1,
+    focus: "work_and_daily_life",
+    signals: [
+      /\b(?:work|job|office|study|studies|school|class|routine|morning|evening|day|wake|breakfast|home)\b/i,
+    ],
+  },
+  {
+    key: "phone_story",
+    fields: ["phone_relationship", "scroll_moments", "scroll_contexts", "apps", "content_types", "triggers", "frequency_duration"],
+    minimum: 2,
+    focus: "scroll_context",
+    signals: [
+      /\b(?:phone|scroll|scrolling|feed|reels|shorts|instagram|tiktok|youtube|reddit|notification|app|screen)\b/i,
+    ],
+  },
+  {
+    key: "impact",
+    fields: ["impact", "feelings", "energy"],
+    minimum: 1,
+    focus: "impact",
+    signals: [
+      /\b(?:affect|impact|effect|lose|hard|difficult|tired|stress|feel|feeling|worry|late|sleep|focus)\b/i,
+    ],
+  },
+  {
+    key: "desired_change",
+    fields: ["desired_change", "goals", "motivation", "attempted_solutions"],
+    minimum: 1,
+    focus: "desired_change",
+    signals: [
+      /\b(?:want|wish|change|different|stop|less|better|improve|try|tried|goal)\b/i,
+    ],
+  },
+];
+
+const NATURAL_GOAL_ORDER = ["identity", "daily_life", "phone_story", "impact", "desired_change"];
+const NATURAL_GOAL_ADJACENCY = {
+  identity: ["daily_life", "phone_story", "impact", "desired_change"],
+  daily_life: ["phone_story", "impact", "identity", "desired_change"],
+  phone_story: ["impact", "desired_change", "daily_life", "identity"],
+  impact: ["desired_change", "phone_story", "daily_life", "identity"],
+  desired_change: ["identity", "phone_story", "daily_life", "impact"],
+};
+
 const QUESTION_STOP_WORDS = new Set([
   "a", "about", "after", "all", "an", "and", "are", "at", "be", "before", "between", "by", "do", "does", "for", "from", "get", "how", "i", "if", "in", "is", "it", "me", "my", "of", "on", "or", "that", "the", "their", "them", "there", "these", "this", "to", "up", "was", "what", "when", "where", "which", "who", "why", "with", "you", "your",
 ]);
@@ -477,8 +534,113 @@ function isRestrictedTopic(message) {
   return RESTRICTED_TOPIC_PATTERNS.some((pattern) => pattern.test(String(message || "")));
 }
 
-function coverage(profile) {
-  return Object.fromEntries(EVENTUAL_GOALS.map((key) => [key, profile[key] !== undefined && profile[key] !== null]));
+function meaningfulValue(value) {
+  if (Array.isArray(value)) return value.some((item) => meaningfulValue(item));
+  if (value && typeof value === "object") return Object.keys(value).length > 0;
+  return value !== undefined && value !== null && String(value).trim().length > 0;
+}
+
+function coverage(profile = {}) {
+  return Object.fromEntries(EVENTUAL_GOALS.map((key) => [key, meaningfulValue(profile[key])]));
+}
+
+function naturalGoalSnapshots(profile = {}) {
+  const factsCoverage = coverage(profile);
+  return Object.fromEntries(NATURAL_GOAL_DEFINITIONS.map((goal) => {
+    const coveredFields = goal.fields.filter((field) => factsCoverage[field]);
+    const status = coveredFields.length >= goal.minimum
+      ? "covered"
+      : coveredFields.length
+        ? "partial"
+        : "missing";
+    return [goal.key, {
+      status,
+      covered_fields: coveredFields,
+      missing_fields: goal.fields.filter((field) => !factsCoverage[field]),
+      minimum_fields: goal.minimum,
+    }];
+  }));
+}
+
+function goalForField(field) {
+  return NATURAL_GOAL_DEFINITIONS.find((goal) => goal.fields.includes(field))?.key || null;
+}
+
+function signalGoal(message) {
+  const text = cleanText(message, 1200);
+  let best = null;
+  for (const goal of NATURAL_GOAL_DEFINITIONS) {
+    for (const pattern of goal.signals) {
+      const match = text.match(pattern);
+      if (match && (!best || match.index >= best.index)) best = { key: goal.key, index: match.index };
+    }
+  }
+  return best?.key || null;
+}
+
+function latestFactGoal(facts = []) {
+  for (const fact of [...(Array.isArray(facts) ? facts : [])].reverse()) {
+    const goal = goalForField(fact?.field_key || fact?.key);
+    if (goal) return goal;
+  }
+  return null;
+}
+
+function substantiveTurnCount(history = [], currentMessage = "") {
+  const previous = (Array.isArray(history) ? history : []).filter((item) => item?.direction === "inbound"
+    && cleanText(item.body, 700).split(/\s+/).filter(Boolean).length >= 3).length;
+  return previous + (cleanText(currentMessage, 700).split(/\s+/).filter(Boolean).length >= 3 ? 1 : 0);
+}
+
+function profileWithNewFacts(profile = {}, facts = []) {
+  const merged = { ...profile };
+  for (const fact of Array.isArray(facts) ? facts : []) {
+    const field = fact?.field_key || fact?.key;
+    if (!field || !EVENTUAL_GOALS.includes(field)) continue;
+    if (fact.operation === "remove") {
+      delete merged[field];
+      continue;
+    }
+    const value = fact.value ?? (Array.isArray(fact.value_items) && fact.value_items.length ? fact.value_items : fact.value_text);
+    if (!meaningfulValue(value)) continue;
+    if (fact.operation === "add" && Array.isArray(value)) {
+      const existing = Array.isArray(merged[field]) ? merged[field] : [];
+      merged[field] = [...new Set([...existing, ...value])];
+    } else {
+      merged[field] = value;
+    }
+  }
+  return merged;
+}
+
+function naturalGoalPlan({ message, history = [], profile = {}, newlySavedFacts = [] } = {}) {
+  const snapshots = naturalGoalSnapshots(profileWithNewFacts(profile, newlySavedFacts));
+  const activeGoal = signalGoal(message) || latestFactGoal(newlySavedFacts);
+  const coveredGoals = NATURAL_GOAL_DEFINITIONS.filter((goal) => snapshots[goal.key].status === "covered").map((goal) => goal.key);
+  const turns = substantiveTurnCount(history, message);
+  const explicitClosure = /\b(?:that(?:'|’)s all|nothing else|no more|that(?:'|’)s it|i(?:'|’)m done|stop here)\b/i.test(cleanText(message, 700));
+  const complete = coveredGoals.length === NATURAL_GOAL_DEFINITIONS.length;
+  const softComplete = turns >= 8 && coveredGoals.length >= 3;
+  const shouldClose = explicitClosure || complete || softComplete;
+  const unresolved = NATURAL_GOAL_ORDER.filter((key) => snapshots[key].status !== "covered");
+  const adjacency = NATURAL_GOAL_ADJACENCY[activeGoal] || NATURAL_GOAL_ORDER;
+  const nextGoal = shouldClose
+    ? null
+    : (activeGoal && snapshots[activeGoal].status !== "covered"
+      ? activeGoal
+      : adjacency.find((key) => snapshots[key].status !== "covered") || unresolved[0] || null);
+  const candidateGoals = (nextGoal ? [nextGoal] : [])
+    .concat(NATURAL_GOAL_ORDER.filter((key) => key !== nextGoal && snapshots[key].status !== "covered"))
+    .slice(0, 3);
+  return {
+    state: shouldClose ? "complete" : "continue",
+    turns,
+    anchor_goal: activeGoal,
+    next_goal: nextGoal,
+    candidate_goals: candidateGoals,
+    covered_goals: coveredGoals,
+    goals: snapshots,
+  };
 }
 
 function questionText(value) {
@@ -586,6 +748,9 @@ function replyQualityIssues(reply, context = {}) {
   if (/\b(pattern|assessment|intake|prescribe|just yet|should stop|handoff point|underlying)\b|stay with your experience|what do you notice|what is it like for you|tell me how that lands|jump into advice|help understand|what happens for you|more interested in|what would you want(?: it| this| things)? to be different/i.test(reply)) {
     issues.push("clinical_or_scripted_language");
   }
+  if (context.goalPlan?.state === "complete" && /\?/.test(reply)) {
+    issues.push("completed_conversation_should_not_ask");
+  }
   const repeatedTopic = repeatedQuestionTopic(reply, context.history || []);
   if (repeatedTopic) issues.push(`repeated_question:${repeatedTopic}`);
   if (/https?:\/\/|[*#`]|[;—–]/i.test(reply)) issues.push("formatting_or_link");
@@ -595,6 +760,7 @@ function replyQualityIssues(reply, context = {}) {
 async function generateReply({ message, history, profile, newlySavedFacts, fetchImpl = fetch }) {
   const restricted = isRestrictedTopic(message);
   const knownCoverage = coverage(profile);
+  const goalPlan = naturalGoalPlan({ message, history, profile, newlySavedFacts });
   const system = [
     BM_CONVERSATIONAL_TONE,
     "You are Blankmind speaking in first person as a thoughtful personal assistant during Early Access.",
@@ -606,6 +772,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     "Do not recap or paraphrase the person's whole message. Use no more than one contextual detail in the acknowledgment or question. Specific does not mean repeating facts back to them.",
     "You may explore a wide personal context when it fits naturally, including their work, studies, routines, environment, interests, responsibilities, energy, relationships with their phone, apps, scrolling moments, impact, and what they would like to change.",
     "The conversation has no fixed order, but it should keep moving toward useful understanding rather than asking questions just to keep the chat going. Do not ask for information already given. The question_memory in the input is an internal memory of topics already asked. Never ask the same underlying question twice with different wording. If a topic is already there, move naturally to an adjacent unanswered detail or simply respond without another question.",
+    "The natural_goal_plan is an internal soft routing hint, not a script. Respond to the latest message first. Then, only if it fits the flow, ask one question connected to next_goal. Never jump to a missing identity detail just because it has higher priority when the latest message is clearly about another part of the person's life. If the plan state is complete, answer naturally without adding a new question.",
     "Name and age are primary identity facts, not secondary details. When they are missing, bring them into the conversation early when there is a natural opening, without sounding like a form. Email, work context, studies, routines, environment, interests, responsibilities, relationships, phone use, apps, scroll moments, impact, and desired change are also useful internal data, but none is a visible checklist.",
     "The extraction and coverage process is invisible. Never mention data, profile fields, memory, coverage, questions already asked, research, intake, or that you are trying to learn something from the person.",
     "Do not assume they want to change a behavior merely because they described it. Ask what they would want to be different only after they have expressed dissatisfaction or a wish to change.",
@@ -623,6 +790,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     known_profile: profile,
     newly_saved_facts: newlySavedFacts.map((fact) => ({ key: fact.field_key || fact.key, value: fact.value })),
     coverage: knownCoverage,
+    natural_goal_plan: goalPlan,
     question_memory: questionMemory(history),
     restricted_topic_present: restricted,
   });
@@ -636,7 +804,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     fetchImpl,
   });
   let reply = safeReply(result.reply);
-  const issues = replyQualityIssues(reply, { history });
+  const issues = replyQualityIssues(reply, { history, goalPlan });
   if (issues.length) {
     result = await structuredResponse({
       model,
@@ -647,7 +815,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
       fetchImpl,
     });
     reply = safeReply(result.reply);
-    const repairedIssues = replyQualityIssues(reply, { history });
+    const repairedIssues = replyQualityIssues(reply, { history, goalPlan });
     if (repairedIssues.length) throw new Error(`waitlist_reply_style_failed:${repairedIssues.join(",")}`);
   }
   if (process.env.WAITLIST_CONVERSATION_POLISH !== "false") {
@@ -668,7 +836,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
         fetchImpl,
       });
       const polishedReply = safeReply(polished.reply);
-      if (!replyQualityIssues(polishedReply, { history }).length) {
+      if (!replyQualityIssues(polishedReply, { history, goalPlan }).length) {
         result = polished;
         reply = polishedReply;
       }
@@ -676,7 +844,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
       // The validated draft remains safe when optional polishing is unavailable.
     }
   }
-  return { ...result, reply, restricted };
+  return { ...result, reply, restricted, goal_plan: goalPlan };
 }
 
 module.exports = {
@@ -689,6 +857,8 @@ module.exports = {
   generateReply,
   hasEvidence,
   isRestrictedTopic,
+  naturalGoalPlan,
+  naturalGoalSnapshots,
   questionMemory,
   questionTopic,
   questionsOverlap,

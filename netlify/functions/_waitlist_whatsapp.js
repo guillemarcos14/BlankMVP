@@ -4,7 +4,7 @@ const { cleanText } = require("./_identity");
 const { phoneForStorage } = require("./_waitlist_store");
 
 const OPENING_MESSAGE_1 = "Hi, welcome to Blankmind Early Access. I’m really glad you’re here. Before I invite you in, I’d love to understand how your phone fits into your life.";
-const OPENING_MESSAGE_2 = "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.";
+const OPENING_MESSAGE_2 = "I’d love to get to know you a little better. What should I call you, how old are you, and what does a normal day look like? You can answer in your own words or send a voice note, whatever feels easier.";
 
 function header(event, name) {
   const target = name.toLowerCase();

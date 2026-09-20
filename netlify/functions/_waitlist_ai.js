@@ -1,4 +1,5 @@
 const { cleanText } = require("./_identity");
+const { BM_CONVERSATIONAL_TONE } = require("./_bm_tone");
 
 const FACT_KEYS = [
   "preferred_name",
@@ -595,6 +596,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
   const restricted = isRestrictedTopic(message);
   const knownCoverage = coverage(profile);
   const system = [
+    BM_CONVERSATIONAL_TONE,
     "You are Blankmind speaking in first person as a thoughtful personal assistant during Early Access.",
     "Your only purpose is to get to know this person through a genuinely natural conversation before product access.",
     "Naturalness is the highest priority. Respond to what they actually said before asking anything. Sound warm, attentive, curious, and grounded. Use relaxed everyday English and contractions. Never sound like a form, survey, funnel, support bot, interview script, or data collector.",

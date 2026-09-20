@@ -56,11 +56,11 @@ function response(status, body, headers = {}) {
 function openingContract() {
   assert.strictEqual(
     OPENING_MESSAGE_1,
-    "Hi, welcome to Blankmind Early Access. I’m really glad you’re here. Before I invite you in, I’d love to understand how your phone fits into your life.",
+    "Hey, I’m Blankmind. Tell me a bit about yourself.",
   );
   assert.strictEqual(
     OPENING_MESSAGE_2,
-    "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.",
+    "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.",
   );
   const fallback = naturalFallbackReply(
     "I usually wake up at 8 AM and scroll for 40 to 45 minutes before breakfast. I want to stop doing that. Can you help me?",

@@ -323,9 +323,9 @@ async function connectOnboardingIsNaturalAndQueuesPicker() {
     });
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.strictEqual((response.body.match(/<Message>/g) || []).length, 2);
-    assert.match(response.body, /Welcome to Blankmind/i);
-    assert.match(response.body, /choose the apps you consider distractions/i);
-    assert.match(response.body, /talk to me normally/i);
+    assert.match(response.body, /Hey, I’m Blankmind/i);
+    assert.match(response.body, /Pick the apps that pull you in most/i);
+    assert.match(response.body, /come back here/i);
     assert.doesNotMatch(response.body, /Hey! Blankmind here|Connected\. This WhatsApp thread/i);
 
     const polled = await assistantChannelHandler({

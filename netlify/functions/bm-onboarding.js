@@ -19,9 +19,9 @@ function hasSelectedDistractions(context = {}) {
 
 function onboardingMessages(context = {}) {
   return {
-    welcome: "Welcome to Blankmind. I'm here to help you build a better relationship with your phone, one small change at a time. You can tell me what's pulling you in, ask for a digital detox plan, or say when you need a little help staying off an app.",
-    setup: "To get started, choose the apps you consider distractions. That becomes your one distraction list, and every block or plan will work from it. Tap the Blankmind notification to choose them, then come back here and talk to me normally.",
-    ready: "Blankmind is already set up. From here, just talk to me normally: tell me what's been pulling you in, when you keep reaching for your phone, or what you'd like to change.",
+    welcome: "Hey, I’m Blankmind. Tell me what’s been pulling you into your phone, or what you’d like to make easier.",
+    setup: "Pick the apps that pull you in most. That list is what I’ll use when you ask for a block or a plan. Tap the notification to choose them, then come back here.",
+    ready: "You’re all set. Tell me what’s been pulling you in, when you reach for your phone, or what you want to change.",
   };
 }
 

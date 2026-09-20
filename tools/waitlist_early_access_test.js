@@ -376,6 +376,68 @@ async function legacySmsRouteWaitlistParityContract() {
   }
 }
 
+async function legacySmsRouteAsyncQueueContract() {
+  const previous = {
+    asyncMode: process.env.WAITLIST_TWILIO_ASYNC,
+    backgroundUrl: process.env.WAITLIST_TWILIO_BACKGROUND_URL,
+    token: process.env.TWILIO_AUTH_TOKEN,
+    signature: process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE,
+  };
+  process.env.WAITLIST_TWILIO_ASYNC = "true";
+  process.env.WAITLIST_TWILIO_BACKGROUND_URL = "https://background.test/waitlist-agent-background";
+  process.env.TWILIO_AUTH_TOKEN = "background-token";
+  process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
+  const user = {
+    id: "11111111-1111-4111-8111-111111111111",
+    phone_e164: "+13475550123",
+    status: "active",
+    data_consent: true,
+    whatsapp_consent: true,
+  };
+  const previousFetch = global.fetch;
+  let queued = null;
+  global.fetch = async (url, options = {}) => {
+    const value = String(url);
+    if (value === "https://background.test/waitlist-agent-background") {
+      queued = { body: JSON.parse(options.body), signature: options.headers["x-waitlist-background-signature"] };
+      return response(202, { accepted: true });
+    }
+    if (!value.startsWith("https://supabase.test/rest/v1/")) throw new Error(`unexpected fetch ${value}`);
+    const parsed = new URL(value);
+    const resource = parsed.pathname.replace("/rest/v1/", "");
+    if (resource === "waitlist_users") return response(200, [user]);
+    throw new Error(`unexpected supabase operation ${resource}`);
+  };
+
+  try {
+    const result = await smsAgentHandler({
+      httpMethod: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        From: "+13475550123",
+        Body: "A queued waitlist reply",
+        MessageSid: "SM-waitlist-legacy-async",
+      }).toString(),
+    });
+    assert.strictEqual(result.statusCode, 200);
+    assert.match(result.body, /<Response><\/Response>/);
+    assert.strictEqual(queued.body.message.channel, "sms");
+    assert.strictEqual(queued.body.message.providerMessageId, "SM-waitlist-legacy-async");
+    assert.ok(queued.signature.startsWith("sha256="));
+  } finally {
+    global.fetch = previousFetch;
+    const mapping = {
+      WAITLIST_TWILIO_ASYNC: previous.asyncMode,
+      WAITLIST_TWILIO_BACKGROUND_URL: previous.backgroundUrl,
+      TWILIO_AUTH_TOKEN: previous.token,
+      TWILIO_VALIDATE_WEBHOOK_SIGNATURE: previous.signature,
+    };
+    for (const [key, value] of Object.entries(mapping)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
 function extractionContract() {
   const message = "I'm Marta, I'm 29 and I work as a product designer. I end up on TikTok after work. My email is Marta@example.com.";
   const extracted = {
@@ -877,6 +939,7 @@ async function main() {
   await fullTurnContract();
   await fullTurnContract("+34600111222", "sms");
   await legacySmsRouteWaitlistParityContract();
+  await legacySmsRouteAsyncQueueContract();
   await twilioAsyncDeliveryContract();
   await twilioTextDeliveryContract();
   await twilioSmsTextDeliveryContract();

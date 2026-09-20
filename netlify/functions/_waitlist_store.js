@@ -2,11 +2,29 @@ const { supabaseFetch } = require("./_membership");
 const { cleanText, normalizePhone } = require("./_identity");
 
 const PROFILE_USEFUL_KEYS = new Set([
+  "preferred_name",
+  "age",
+  "occupation",
+  "studies",
   "scroll_moments",
   "scroll_contexts",
   "apps",
   "impact",
   "desired_change",
+]);
+
+const MERGEABLE_LIST_KEYS = new Set([
+  "scroll_moments",
+  "scroll_contexts",
+  "apps",
+  "content_types",
+  "triggers",
+  "feelings",
+  "attempted_solutions",
+  "goals",
+  "interests",
+  "responsibilities",
+  "relationships",
 ]);
 
 function now() {
@@ -155,8 +173,9 @@ async function currentFacts(userId) {
   return { rows, profile };
 }
 
-function mergeValue(previous, next, operation) {
-  if (operation !== "add") return next;
+function mergeValue(previous, next, operation, fieldKey) {
+  if (operation === "correct") return next;
+  if (operation !== "add" && !MERGEABLE_LIST_KEYS.has(fieldKey)) return next;
   const left = Array.isArray(previous) ? previous : previous == null ? [] : [previous];
   const right = Array.isArray(next) ? next : next == null ? [] : [next];
   const seen = new Set();
@@ -176,7 +195,7 @@ async function persistFacts({ user, sourceMessageId, facts }) {
   for (const fact of facts) {
     const previousRows = existing.rows.filter((item) => item.field_key === fact.key && item.status !== "superseded");
     const previous = previousRows.at(-1) || null;
-    const value = mergeValue(previous?.value, fact.value, fact.operation);
+    const value = mergeValue(previous?.value, fact.value, fact.operation, fact.key);
 
     if (fact.operation === "remove") {
       if (previous) {
@@ -218,8 +237,8 @@ async function persistFacts({ user, sourceMessageId, facts }) {
   }
 
   const usefulCount = Array.from(PROFILE_USEFUL_KEYS).filter((key) => existing.profile[key] !== undefined).length;
-  const hasIdentity = Boolean(existing.profile.preferred_name || existing.profile.email);
-  if (!user.profile_useful_at && usefulCount >= 3 && hasIdentity) {
+  const hasIdentity = Boolean(existing.profile.preferred_name && (existing.profile.age !== undefined || existing.profile.age_band));
+  if (!user.profile_useful_at && usefulCount >= 4 && hasIdentity) {
     await patchUser(user.id, { profile_useful_at: now() });
     await recordEvent(user.id, "profile_useful", { useful_fields: usefulCount });
   }
@@ -285,6 +304,7 @@ module.exports = {
   deleteUserData,
   ensureUser,
   markFirstReply,
+  mergeValue,
   patchUser,
   persistFacts,
   phoneForStorage,

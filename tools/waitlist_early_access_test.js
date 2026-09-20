@@ -22,6 +22,7 @@ const {
 } = require("../netlify/functions/_waitlist_whatsapp");
 const {
   ageBand,
+  deterministicFacts,
   generateReply,
   isRestrictedTopic,
   questionMemory,
@@ -37,6 +38,7 @@ const {
 const { handler: backgroundHandler } = require("../netlify/functions/waitlist-agent-background");
 const { handler: waitlistStartHandler } = require("../netlify/functions/waitlist-start");
 const { handler: smsAgentHandler } = require("../netlify/functions/sms-agent");
+const { mergeValue } = require("../netlify/functions/_waitlist_store");
 
 function response(status, body, headers = {}) {
   const text = typeof body === "string" ? body : JSON.stringify(body);
@@ -454,12 +456,46 @@ function extractionContract() {
   };
   const facts = validateExtractedFacts(message, extracted);
   assert.strictEqual(facts.find((fact) => fact.key === "preferred_name").value, "Marta");
+  assert.strictEqual(facts.find((fact) => fact.key === "age").value, 29);
   assert.strictEqual(facts.find((fact) => fact.key === "age_band").value, "25_34");
   assert.strictEqual(facts.find((fact) => fact.key === "email").value, "marta@example.com");
   assert.deepStrictEqual(facts.find((fact) => fact.key === "apps").value, ["TikTok"]);
   assert.ok(!facts.some((fact) => fact.key === "impact"), "inferred impact must be rejected");
   assert.ok(!facts.some((fact) => fact.key === "other_personal_context"), "sensitive inferred context must be rejected");
   assert.strictEqual(ageBand("I am 67"), "65_plus");
+  const deterministic = deterministicFacts("My name is Marta and I am 29 years old.");
+  assert.strictEqual(deterministic.find((fact) => fact.key === "preferred_name").value, "Marta");
+  assert.strictEqual(deterministic.find((fact) => fact.key === "age").value, 29);
+  assert.strictEqual(deterministic.find((fact) => fact.key === "age_band").value, "25_34");
+}
+
+function broadFactCaptureContract() {
+  const message = "I study architecture part time, live with my partner, love cooking and running, and work late shifts. I feel tired after work, keep my phone beside me, and have tried leaving it in another room. I want to sleep earlier.";
+  const extracted = {
+    facts: [
+      { key: "studies", value_text: "architecture part time", value_items: [], evidence: "I study architecture part time", confidence: "high", explicit: true, operation: "set" },
+      { key: "relationships", value_text: "", value_items: ["my partner"], evidence: "live with my partner", confidence: "high", explicit: true, operation: "add" },
+      { key: "interests", value_text: "", value_items: ["cooking", "running"], evidence: "love cooking and running", confidence: "high", explicit: true, operation: "add" },
+      { key: "responsibilities", value_text: "late shifts", value_items: [], evidence: "work late shifts", confidence: "high", explicit: true, operation: "set" },
+      { key: "feelings", value_text: "", value_items: ["tired"], evidence: "I feel tired", confidence: "high", explicit: true, operation: "add" },
+      { key: "phone_relationship", value_text: "keeps phone beside them", value_items: [], evidence: "keep my phone beside me", confidence: "high", explicit: true, operation: "set" },
+      { key: "attempted_solutions", value_text: "", value_items: ["leaving it in another room"], evidence: "tried leaving it in another room", confidence: "high", explicit: true, operation: "add" },
+      { key: "desired_change", value_text: "sleep earlier", value_items: [], evidence: "I want to sleep earlier", confidence: "high", explicit: true, operation: "set" },
+    ],
+  };
+  const facts = validateExtractedFacts(message, extracted);
+  assert.deepStrictEqual(facts.map((fact) => fact.key), [
+    "studies",
+    "relationships",
+    "interests",
+    "responsibilities",
+    "feelings",
+    "phone_relationship",
+    "attempted_solutions",
+    "desired_change",
+  ]);
+  assert.deepStrictEqual(mergeValue(["Instagram"], ["TikTok"], "set", "apps"), ["Instagram", "TikTok"]);
+  assert.deepStrictEqual(mergeValue(["Instagram"], ["TikTok"], "correct", "apps"), ["TikTok"]);
 }
 
 function safetyContract() {
@@ -932,6 +968,7 @@ async function main() {
   await smsOpeningDeliveryContract();
   await openingDeliverySurvivesPersistenceErrorContract();
   extractionContract();
+  broadFactCaptureContract();
   safetyContract();
   providerParsingContract();
   isolationContract();

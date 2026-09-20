@@ -6,7 +6,14 @@ const FACT_KEYS = [
   "age",
   "occupation",
   "work_context",
+  "studies",
   "daily_routine",
+  "environment",
+  "interests",
+  "responsibilities",
+  "relationships",
+  "energy",
+  "phone_relationship",
   "scroll_moments",
   "scroll_contexts",
   "apps",
@@ -33,13 +40,26 @@ const MULTI_VALUE_KEYS = new Set([
   "feelings",
   "attempted_solutions",
   "goals",
+  "interests",
+  "responsibilities",
+  "relationships",
 ]);
 
 const EVENTUAL_GOALS = [
   "preferred_name",
   "email",
+  "age",
   "age_band",
   "occupation",
+  "work_context",
+  "studies",
+  "daily_routine",
+  "environment",
+  "interests",
+  "responsibilities",
+  "relationships",
+  "energy",
+  "phone_relationship",
   "scroll_moments",
   "scroll_contexts",
   "apps",
@@ -134,7 +154,7 @@ const EXTRACTION_SCHEMA = {
   properties: {
     facts: {
       type: "array",
-      maxItems: 16,
+      maxItems: 32,
       items: {
         type: "object",
         additionalProperties: false,
@@ -142,7 +162,7 @@ const EXTRACTION_SCHEMA = {
         properties: {
           key: { type: "string", enum: FACT_KEYS },
           value_text: { type: "string", maxLength: 500 },
-          value_items: { type: "array", maxItems: 12, items: { type: "string", maxLength: 120 } },
+          value_items: { type: "array", maxItems: 24, items: { type: "string", maxLength: 120 } },
           evidence: { type: "string", maxLength: 280 },
           confidence: { type: "string", enum: ["high", "medium", "low"] },
           explicit: { type: "boolean" },
@@ -240,6 +260,35 @@ function ageBand(value) {
   return "65_plus";
 }
 
+function explicitAge(value) {
+  const text = cleanText(value, 120);
+  const match = text.match(/\b(\d{1,3})\s*(?:years?\s*old|yo\b)?/i);
+  const age = Number(match?.[1]);
+  return Number.isFinite(age) && age >= 13 && age <= 120 ? age : null;
+}
+
+function ageBandFromText(value) {
+  const text = normalizedComparable(value);
+  const exact = ageBand(text);
+  if (exact) return exact;
+  if (/\b(?:my )?teens\b/.test(text)) return "13_19";
+  if (/\b(?:early )?twenties\b/.test(text)) return "20_24";
+  if (/\bmid[- ]?twenties\b/.test(text)) return "25_27";
+  if (/\blate twenties\b/.test(text)) return "28_29";
+  if (/\b(?:early )?thirties\b/.test(text)) return "30_34";
+  if (/\bmid[- ]?thirties\b/.test(text)) return "35_37";
+  if (/\blate thirties\b/.test(text)) return "38_39";
+  if (/\b(?:early )?forties\b/.test(text)) return "40_44";
+  if (/\bmid[- ]?forties\b/.test(text)) return "45_47";
+  if (/\blate forties\b/.test(text)) return "48_49";
+  if (/\b(?:early )?fifties\b/.test(text)) return "50_54";
+  if (/\bmid[- ]?fifties\b/.test(text)) return "55_57";
+  if (/\blate fifties\b/.test(text)) return "58_59";
+  if (/\b(?:early )?sixties\b/.test(text)) return "60_64";
+  if (/\b(?:mid[- ]?|late )?sixties\b/.test(text)) return "65_plus";
+  return "";
+}
+
 function normalizedName(value) {
   const name = cleanText(value, 80).replace(/[^\p{L}\p{M}' -]/gu, "").replace(/\s+/g, " ").trim();
   if (!name || name.split(" ").length > 5 || name.length < 2) return "";
@@ -266,7 +315,7 @@ function validateExtractedFacts(message, extracted) {
     if (!FACT_KEYS.includes(candidate?.key) || candidate.explicit !== true) continue;
     const evidence = cleanText(candidate.evidence, 280);
     const evidenceExact = hasEvidence(message, evidence);
-    if (!evidenceExact && candidate.confidence !== "low") continue;
+    if (!evidenceExact) continue;
 
     const operation = ["set", "add", "correct", "remove"].includes(candidate.operation)
       ? candidate.operation
@@ -289,9 +338,32 @@ function validateExtractedFacts(message, extracted) {
       if (!value) continue;
     }
     if (key === "age") {
-      value = ageBand(candidate.value_text || evidence);
-      if (!value) continue;
-      key = "age_band";
+      const age = explicitAge(candidate.value_text || evidence);
+      const band = ageBandFromText(candidate.value_text || evidence);
+      if (!age && !band) continue;
+      if (age) {
+        facts.push({
+          key: "age",
+          value: age,
+          normalizedText: String(age),
+          evidence,
+          confidence: candidate.confidence === "high" ? 0.95 : candidate.confidence === "medium" ? 0.72 : 0.4,
+          status: candidate.confidence === "low" ? "uncertain" : "confirmed",
+          operation,
+        });
+      }
+      if (band) {
+        facts.push({
+          key: "age_band",
+          value: band,
+          normalizedText: band,
+          evidence,
+          confidence: candidate.confidence === "high" ? 0.95 : candidate.confidence === "medium" ? 0.72 : 0.4,
+          status: candidate.confidence === "low" ? "uncertain" : "confirmed",
+          operation,
+        });
+      }
+      continue;
     }
     const candidateContent = `${candidate.value_text || ""} ${(candidate.value_items || []).join(" ")} ${evidence}`;
     if (key === "other_personal_context" && (containsSensitiveInference(candidateContent) || isRestrictedTopic(candidateContent))) {
@@ -314,8 +386,9 @@ function validateExtractedFacts(message, extracted) {
 }
 
 function deterministicFacts(message) {
+  const text = String(message || "");
   const facts = [];
-  const email = String(message || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
+  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0];
   if (email) {
     facts.push({
       key: "email",
@@ -327,22 +400,59 @@ function deterministicFacts(message) {
       operation: "set",
     });
   }
+  const nameMatch = text.match(/\b(?:my name is|call me|you can call me)\s+([\p{L}\p{M}'-]+(?:\s+[\p{L}\p{M}'-]+){0,3}?)(?=\s+(?:and|but|from|who|currently|working|i)\b|[,.;!?]|$)/iu)
+    || text.match(/\bI['’]m\s+([A-ZÀ-ÖØ-Þ][\p{L}\p{M}'-]{1,40})(?=\s*(?:[,.;!?]|\band\b|\bbut\b|$))/u);
+  const name = normalizedName(nameMatch?.[1] || "");
+  if (name && !/^(?:a|an|the|from|working|based|currently|usually|at|in|on|just|often|not|trying|using|looking|feeling)\b/i.test(name) && !/^\d/.test(name)) {
+    facts.push({
+      key: "preferred_name",
+      value: name,
+      normalizedText: name,
+      evidence: nameMatch[0],
+      confidence: 1,
+      status: "confirmed",
+      operation: "set",
+    });
+  }
+  const ageMatch = text.match(/\b(?:my age is|i['’]?m|i am|i just turned|i['’]?m turning)\s*(\d{1,3})\b|\b(\d{1,3})\s+years?\s+old\b/i);
+  const age = explicitAge(ageMatch?.[1] || ageMatch?.[2] || "");
+  if (age) {
+    const evidence = ageMatch[0];
+    facts.push({
+      key: "age",
+      value: age,
+      normalizedText: String(age),
+      evidence,
+      confidence: 1,
+      status: "confirmed",
+      operation: "set",
+    });
+    facts.push({
+      key: "age_band",
+      value: ageBand(age),
+      normalizedText: ageBand(age),
+      evidence,
+      confidence: 1,
+      status: "confirmed",
+      operation: "set",
+    });
+  }
   return facts;
 }
 
 async function extractFacts({ message, history, profile, fetchImpl = fetch }) {
   const deterministic = deterministicFacts(message);
   const system = [
-    "Extract only personal facts the person explicitly states in the latest message.",
+    "Extract every useful personal fact the person explicitly states in the latest message. Do not select only one fact or drop details because another detail seems more relevant. One message may produce many facts across identity, work, studies, routine, environment, interests, relationships, phone use, apps, moments, impact, and desired change.",
     "Return verbatim evidence copied from that message. Never infer, diagnose, or invent.",
-    "Use occupation and work_context broadly when the person explains what they do or how their day works.",
+    "Use occupation and work_context broadly when the person explains what they do or how their day works. Use studies, environment, interests, responsibilities, relationships, energy, and phone_relationship for explicit non-sensitive context that does not fit a narrower field.",
     "Do not extract political opinions, views on wars, abortion, elections, religion, race, sexuality, medical diagnoses, legal matters, financial details, passwords, addresses, or other sensitive categories.",
-    "Age may be extracted only when explicitly stated. Email and preferred name must be exact.",
+    "Age may be extracted only when explicitly stated. Store the exact numeric age when available and derive an age band without replacing the exact age. Email and preferred name must be exact.",
     "Use correct when the person explicitly replaces an earlier fact, add for additional list items, remove when they withdraw a fact, and set otherwise.",
     "Do not turn interpretation into fact. An emotional impact is valid only if the person says it.",
   ].join(" ");
   const input = JSON.stringify({ latest_message: message, recent_history: history.slice(-10), known_profile: profile });
-  const model = process.env.WAITLIST_EXTRACTION_MODEL || "gpt-5.6-luna";
+  const model = process.env.WAITLIST_EXTRACTION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
   try {
     const extracted = await structuredResponse({
       model,
@@ -493,10 +603,9 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     "Reflect only details and feelings the person explicitly expressed. Never add a likely motive, emotion, energy level, benefit, or consequence just to sound insightful.",
     "Do not recap or paraphrase the person's whole message. Use no more than one contextual detail in the acknowledgment or question. Specific does not mean repeating facts back to them.",
     "You may explore a wide personal context when it fits naturally, including their work, studies, routines, environment, interests, responsibilities, energy, relationships with their phone, apps, scrolling moments, impact, and what they would like to change.",
-    "The conversation has a purpose: understand the concrete phone habit and the person's desired change well enough to help later. Keep moving toward a missing piece of context, not asking questions just to keep the chat going.",
-    "There is no fixed order. Do not ask for information they already gave. The question_memory in the input is a hard memory of topics already asked. Never ask the same underlying question twice with different wording. If a topic is already there, move to an adjacent unanswered detail or briefly acknowledge it without asking another version of it.",
-    "Usually ask one clear question at most. Make it open-ended. Do not offer a menu of possible answers, either-or choices, example motives, or example feelings unless the person explicitly asks for options. It is fine to stay with an interesting detail instead of filling a missing field. When the important context is already clear, let the conversation settle instead of inventing another question.",
-    "Name, age range, email, work context, apps, scroll moments, impact, and desired change are eventual internal goals, never a checklist. Ask for name and email only when it feels socially natural.",
+    "The conversation has no fixed order, but it should keep moving toward useful understanding rather than asking questions just to keep the chat going. Do not ask for information already given. The question_memory in the input is an internal memory of topics already asked. Never ask the same underlying question twice with different wording. If a topic is already there, move naturally to an adjacent unanswered detail or simply respond without another question.",
+    "Name and age are primary identity facts, not secondary details. When they are missing, bring them into the conversation early when there is a natural opening, without sounding like a form. Email, work context, studies, routines, environment, interests, responsibilities, relationships, phone use, apps, scroll moments, impact, and desired change are also useful internal data, but none is a visible checklist.",
+    "The extraction and coverage process is invisible. Never mention data, profile fields, memory, coverage, questions already asked, research, intake, or that you are trying to learn something from the person.",
     "Do not assume they want to change a behavior merely because they described it. Ask what they would want to be different only after they have expressed dissatisfaction or a wish to change.",
     "If they volunteer a name or email, acknowledge it simply. Never say you will use, save, register, or submit it, and do not jump to an unrelated old profile detail in the same reply.",
     "Do not give advice, plans, coaching, diagnoses, recommendations, blocks, schedules, product instructions, or promises of future capabilities. Do not claim to be human and do not announce that you are an AI.",
@@ -515,7 +624,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
     question_memory: questionMemory(history),
     restricted_topic_present: restricted,
   });
-  const model = process.env.WAITLIST_CONVERSATION_MODEL || "gpt-5.6-sol";
+  const model = process.env.WAITLIST_CONVERSATION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
   let result = await structuredResponse({
     model,
     schemaName: "waitlist_conversation_reply",
@@ -531,7 +640,7 @@ async function generateReply({ message, history, profile, newlySavedFacts, fetch
       model,
       schemaName: "waitlist_conversation_reply_repair",
       schema: REPLY_SCHEMA,
-      system: `${system} Rewrite the draft because it failed these style checks: ${issues.join(", ")}. Keep the useful meaning but make it sound like ordinary, relaxed WhatsApp conversation.`,
+      system: `${system} Rewrite the draft because it failed these style checks: ${issues.join(", ")}. Keep the useful meaning but make it sound like ordinary conversation.`,
       input: JSON.stringify({ ...JSON.parse(input), rejected_draft: reply }),
       fetchImpl,
     });

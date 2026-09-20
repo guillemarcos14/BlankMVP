@@ -178,6 +178,7 @@ async function processMessage(message, options = {}) {
     let extracted = [];
     let saved = [];
     let generated;
+    let updated = known;
     if (message.audio) {
       // Voice notes become plain text here. Run the two independent model calls together
       // so the Twilio webhook can return before its delivery window becomes unreliable.
@@ -225,7 +226,7 @@ async function processMessage(message, options = {}) {
         await recordEvent(user.id, "fact_extraction_failed", { reason: cleanText(error.message, 160) });
       }
 
-      const updated = await currentFacts(user.id);
+      updated = await currentFacts(user.id);
       try {
         generated = await generateReply({
           message: prompt,
@@ -244,10 +245,14 @@ async function processMessage(message, options = {}) {
       }
     }
 
+    if (message.audio) updated = await currentFacts(user.id);
+
     const completion = {
       provider: message.provider,
       input_kind: messageKind,
       facts_saved: saved.length,
+      fact_keys: saved.map((fact) => fact.field_key),
+      profile_fields: Object.keys(updated.profile),
       focus: generated.focus,
       restricted_topic: generated.restricted === true,
     };

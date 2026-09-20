@@ -33,10 +33,42 @@ Validaciones ejecutadas:
 - `node --check` de las tres Functions/scripts modificadas: verde.
 - `git diff --check`: verde.
 
-Despliegue completado:
+Despliegue previo completado:
 - La base desplegada previamente ya incluye la migración `020`, `digital-wellness-features` y el flujo de apertura SMS.
-- Este candidato añade la corrección de las respuestas posteriores por SMS y ya está publicado en Netlify `6aafa9c6762d7bcc14d714ea` desde la rama de integración.
+- El candidato anterior añadió la corrección de las respuestas posteriores por SMS y quedó publicado en Netlify `6aafa9c6762d7bcc14d714ea` desde la rama de integración.
 - Después del deploy queda la prueba física: seleccionar Message con un teléfono de Estados Unidos o Canadá, confirmar los dos SID SMS en Twilio y responder al primero para verificar `waitlist-agent`.
+
+## Incidencia física de SMS y corrección — 2026-09-20
+
+Objetivo:
+Corregir la entrega parcial de la apertura SMS y evitar que una respuesta recibida por el webhook legacy pierda el contexto waitlist.
+
+Rama:
+`codex/backend-release-waitlist-message-parity-2026-09-20`
+
+Commit:
+`bce2fa3 Fix waitlist SMS opening and conversation routing`
+
+Archivos/superficies modificadas:
+- `netlify/functions/waitlist-start.js`: intenta enviar los dos mensajes deterministas antes de persistir flags; los fallos de persistencia ya no bloquean el segundo envío y se devuelven como advertencia no bloqueante.
+- `netlify/functions/sms-agent.js`: deriva usuarios waitlist activos al mismo procesador con historial, incluso mientras el sender siga apuntando al webhook antiguo.
+- `netlify/functions/waitlist-agent.js`: fallback contextual para no responder con la frase genérica de BM Final.
+- `tools/waitlist_early_access_test.js`: regresión de persistencia fallida, fallback y ruta legacy.
+
+Migraciones Supabase:
+- Ninguna nueva; `020_waitlist_channel_openings.sql` sigue siendo necesaria en producción.
+
+Validaciones ejecutadas:
+- `node tools/waitlist_early_access_test.js`: pasado.
+- Tests de memoria/canales/SMS pendientes de BM: pasados.
+- `node tools/backend_release.js --mode validate --baseline tmp/product-harness/baseline-waitlist-sms-fix.json`: pasado, product harness `44/44`.
+
+Pruebas pendientes:
+- Integrar/desplegar desde la conversación de integración Backend Cloud.
+- Confirmar en Twilio los dos SID SMS y responder al primer mensaje con el teléfono real.
+
+Riesgos o conflictos conocidos:
+- No se ha desplegado desde esta conversación, conforme al proceso de desarrollo.
 
 Riesgos o conflictos conocidos:
 - Los cambios de producción deben seguir saliendo desde la rama de integración.

@@ -17,6 +17,8 @@ const {
   withdrawConsent,
 } = require("./_waitlist_store");
 const {
+  AVAILABILITY_NOTICE_MESSAGE_1,
+  AVAILABILITY_NOTICE_MESSAGE_2,
   isTwilioEvent,
   enqueueTwilioMessage,
   parseMetaMessages,
@@ -36,6 +38,16 @@ const STOP_COMMAND = /^(STOP|UNSUBSCRIBE|CANCEL|END|QUIT)$/i;
 
 function publicJoinUrl() {
   return cleanText(process.env.WAITLIST_PUBLIC_URL, 800) || "https://blankmind.ai/signup?channel=whatsapp";
+}
+
+function availabilityNoticeField(channel) {
+  return channel === "sms"
+    ? "availability_notice_sms_sent_at"
+    : "availability_notice_whatsapp_sent_at";
+}
+
+function availabilityNoticeMessages() {
+  return [AVAILABILITY_NOTICE_MESSAGE_1, AVAILABILITY_NOTICE_MESSAGE_2];
 }
 
 function naturalFallbackReply(prompt, history) {
@@ -77,6 +89,12 @@ async function saveOutbound(user, provider, reply, kind = "text", providerMessag
   });
 }
 
+async function saveOutboundReplies(user, provider, replies) {
+  for (const reply of replies) {
+    await saveOutbound(user, provider, reply);
+  }
+}
+
 async function privacyReply({ user, provider, prompt }) {
   if (STOP_COMMAND.test(prompt)) {
     await withdrawConsent(user);
@@ -112,6 +130,7 @@ async function processMessage(message, options = {}) {
   }
 
   try {
+    const isFirstReply = !user.first_reply_at;
     let prompt = cleanText(message.text, 4000);
     let messageKind = "text";
     if (message.audio) {
@@ -247,6 +266,13 @@ async function processMessage(message, options = {}) {
 
     if (message.audio) updated = await currentFacts(user.id);
 
+    const channel = message.channel === "sms" ? "sms" : "whatsapp";
+    const noticeField = availabilityNoticeField(channel);
+    const noticeReplies = isFirstReply && !user[noticeField]
+      ? availabilityNoticeMessages()
+      : [];
+    const replies = [generated.reply, ...noticeReplies];
+
     const completion = {
       provider: message.provider,
       input_kind: messageKind,
@@ -258,9 +284,17 @@ async function processMessage(message, options = {}) {
       conversation_anchor_goal: generated.goal_plan?.anchor_goal || null,
       conversation_next_goal: generated.goal_plan?.next_goal || null,
       restricted_topic: generated.restricted === true,
+      availability_notice: noticeReplies.length === 2,
     };
     if (!deferDelivery) {
-      await saveOutbound(user, message.provider, generated.reply);
+      await saveOutboundReplies(user, message.provider, replies);
+      if (noticeReplies.length === 2) {
+        await patchUser(user.id, { [noticeField]: new Date().toISOString() });
+        await recordEvent(user.id, "waitlist_availability_notice_sent", {
+          channel,
+          message_count: noticeReplies.length,
+        });
+      }
       await Promise.all([
         recordEvent(user.id, "waitlist_turn_completed", completion),
         completeInbound(message.provider, message.providerMessageId),
@@ -268,6 +302,9 @@ async function processMessage(message, options = {}) {
     }
     return {
       reply: generated.reply,
+      replies,
+      availabilityNotice: noticeReplies,
+      availabilityNoticeField: noticeReplies.length === 2 ? noticeField : null,
       user,
       kind: "text",
       factsSaved: saved.length,
@@ -295,7 +332,7 @@ async function handleTwilio(event) {
     }
   }
   const result = await processMessage(messages[0]);
-  return twimlResponse(result.reply || "");
+  return twimlResponse(result.replies || result.reply || "");
 }
 
 async function handleMeta(event) {
@@ -306,10 +343,13 @@ async function handleMeta(event) {
   const results = [];
   for (const message of messages) {
     const result = await processMessage(message);
-    if (result.reply) {
-      const delivery = await sendMetaText(message.phone, result.reply);
-      if (result.user) {
-        await recordEvent(result.user.id, "waitlist_reply_delivered", { provider: "meta", provider_message_id: delivery.id });
+    const replies = result.replies || (result.reply ? [result.reply] : []);
+    for (const reply of replies) {
+      if (reply) {
+        const delivery = await sendMetaText(message.phone, reply);
+        if (result.user) {
+          await recordEvent(result.user.id, "waitlist_reply_delivered", { provider: "meta", provider_message_id: delivery.id });
+        }
       }
     }
     results.push({ skipped: result.skipped === true, reason: result.reason || null, facts_saved: result.factsSaved || 0 });

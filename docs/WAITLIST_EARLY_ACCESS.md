@@ -15,7 +15,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
    - `Hey, I’m Blankmind. Tell me a bit about yourself.`
    - `What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.`
 
-4. Desde la primera respuesta, `waitlist-agent` conversa sin guion ni orden fijo. Puede conocer trabajo, estudios, rutinas, entorno, intereses, uso del móvil, apps, momentos de scroll, impacto y cambio deseado.
+4. Desde la primera respuesta, `waitlist-agent` responde primero al contenido recibido y conversa sin guion ni orden fijo. Después envía una sola vez, como dos mensajes separados, la aclaración de que la persona está en la early-access waitlist y de que el bloqueo de apps se activa el 1 de octubre. A partir de ahí puede conocer trabajo, estudios, rutinas, entorno, intereses, uso del móvil, apps, momentos de scroll, impacto y cambio deseado.
 5. Si llega un audio, se descarga y transcribe en memoria. No se conserva el archivo; solo el texto transcrito.
 6. Cada turno extrae únicamente hechos explícitos y guarda evidencia, confianza, estado y correcciones. La conversación usa el perfil actual, pero nunca expone que existe un checklist.
 
@@ -30,7 +30,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
 
 ## Datos
 
-Las migraciones `019_waitlist_early_access.sql` y `020_waitlist_channel_openings.sql` crean tablas y flags de entrega separados del producto final:
+Las migraciones `019_waitlist_early_access.sql`, `020_waitlist_channel_openings.sql` y `021_waitlist_availability_notice.sql` crean tablas y flags de entrega separados del producto final:
 
 - `waitlist_users`: identidad verificada, consentimientos y estado del recorrido.
 - `waitlist_messages`: texto entrante, transcripciones y respuestas.
@@ -48,7 +48,7 @@ La conversación usa objetivos internos suaves, no un cuestionario visible. Cada
 
 ## Activación
 
-1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019` y `020`.
+1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019`, `020` y `021`.
 2. Las plantillas actuales de WhatsApp contienen el texto exacto anterior y están enviadas a aprobación; no activar la prueba física de apertura hasta que Twilio marque ambas como `approved`.
 3. Configurar las variables `WAITLIST_*` documentadas en `.env.membership.example`, además de las credenciales existentes de Supabase, OpenAI y Twilio. SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER`; WhatsApp conserva sus plantillas aprobadas.
 4. Desplegar Netlify y apuntar temporalmente el webhook entrante del número existente a `/.netlify/functions/waitlist-agent`.

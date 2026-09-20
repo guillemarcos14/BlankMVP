@@ -11,6 +11,8 @@ process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
 process.env.WAITLIST_TWILIO_ASYNC = "false";
 
 const {
+  AVAILABILITY_NOTICE_MESSAGE_1,
+  AVAILABILITY_NOTICE_MESSAGE_2,
   OPENING_MESSAGE_1,
   OPENING_MESSAGE_2,
   enqueueTwilioMessage,
@@ -62,6 +64,14 @@ function openingContract() {
   assert.strictEqual(
     OPENING_MESSAGE_2,
     "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.",
+  );
+  assert.strictEqual(
+    AVAILABILITY_NOTICE_MESSAGE_1,
+    "By the way, you’re on the early-access waitlist for now, so the full product isn’t available just yet.",
+  );
+  assert.strictEqual(
+    AVAILABILITY_NOTICE_MESSAGE_2,
+    "App blocking goes live on October 1. Until then, I’d love to hear how your phone fits into your day.",
   );
   const fallback = naturalFallbackReply(
     "I usually wake up at 8 AM and scroll for 40 to 45 minutes before breakfast. I want to stop doing that. Can you help me?",
@@ -804,6 +814,8 @@ async function fullTurnContract(from = "whatsapp:+34600111222", channel = "whats
     assert.strictEqual(result.statusCode, 200);
     assert.match(result.body, /<Response><Message>/);
     assert.match(result.body, /client calls leave you looking for a quick reset/i);
+    assert.match(result.body, /client calls leave you looking for a quick reset[\s\S]*By the way, you’re on the early-access waitlist[\s\S]*App blocking goes live on October 1/i);
+    assert.strictEqual(Boolean(state.user[`availability_notice_${channel}_sent_at`]), true);
     assert.strictEqual(state.responseCalls, 3, "extraction, conversation, and natural-language polish are required");
     assert.deepStrictEqual(state.facts.map((fact) => fact.field_key).sort(), ["apps", "occupation", "scroll_moments"]);
     assert.ok(state.messages.some((message) => message.direction === "inbound"));
@@ -868,6 +880,7 @@ async function fullTurnContract(from = "whatsapp:+34600111222", channel = "whats
       assert.match(backgroundResult.body, /SM-background-delivery/);
       assert.ok(state.messages.some((message) => message.provider_message_id === "SM-background-delivery"));
       assert.ok(state.events.some((event) => event.event_name === "waitlist_reply_delivered"));
+      assert.strictEqual(state.twilioRequests.length, 1, "the availability notice must not repeat after the first turn");
       const deliveryRequest = state.twilioRequests.at(-1);
       if (channel === "sms") {
         assert.strictEqual(deliveryRequest.get("To"), "+34600111222");

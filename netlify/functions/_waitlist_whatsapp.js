@@ -5,6 +5,8 @@ const { phoneForStorage } = require("./_waitlist_store");
 
 const OPENING_MESSAGE_1 = "Hey, I’m Blankmind. Tell me a bit about yourself.";
 const OPENING_MESSAGE_2 = "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.";
+const AVAILABILITY_NOTICE_MESSAGE_1 = "By the way, you’re on the early-access waitlist for now, so the full product isn’t available just yet.";
+const AVAILABILITY_NOTICE_MESSAGE_2 = "App blocking goes live on October 1. Until then, I’d love to hear how your phone fits into your day.";
 const TWILIO_OPENING_CONTENT_SIDS = {
   1: "HX8d2a6ae19f26e983695d248284b74c40",
   2: "HX99b42fe21aaa483720b97bcbb57020d2",
@@ -80,6 +82,7 @@ function parseMetaMessages(body) {
           provider: "meta",
           providerMessageId: cleanText(message?.id, 160),
           phone,
+          channel: "whatsapp",
           text,
           audio: mediaId ? {
             mediaId,
@@ -461,6 +464,8 @@ async function sendOpening(phone, fetchImpl = fetch) {
 }
 
 module.exports = {
+  AVAILABILITY_NOTICE_MESSAGE_1,
+  AVAILABILITY_NOTICE_MESSAGE_2,
   OPENING_MESSAGE_1,
   OPENING_MESSAGE_2,
   isTwilioEvent,

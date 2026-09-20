@@ -2,6 +2,7 @@ const { json, parseJsonBody } = require("./_membership");
 const { cleanText } = require("./_identity");
 const {
   completeInbound,
+  patchUser,
   recordEvent,
   releaseInbound,
 } = require("./_waitlist_store");
@@ -56,15 +57,32 @@ async function deliverMessage(message) {
   if (!result) throw lastError || new Error("waitlist_background_processing_failed");
   if (result.skipped || !result.reply) return result;
 
-  const delivery = await withRetry(() => sendTwilioText(message.phone, result.reply, message.channel), 4);
+  const replies = Array.isArray(result.replies) && result.replies.length
+    ? result.replies
+    : [result.reply];
+  const deliveries = [];
+  for (const reply of replies) {
+    deliveries.push(await withRetry(() => sendTwilioText(message.phone, reply, message.channel), 4));
+  }
   try {
     if (result.user) {
-      await withRetry(() => saveOutbound(result.user, "twilio", result.reply, result.kind === "privacy" ? "privacy" : "text", delivery.id), 3);
-      await withRetry(() => recordEvent(result.user.id, "waitlist_reply_delivered", {
-        provider: "twilio",
-        provider_message_id: delivery.id,
-        delivery_status: delivery.status,
-      }), 3);
+      for (const [index, delivery] of deliveries.entries()) {
+        await withRetry(() => saveOutbound(result.user, "twilio", replies[index], result.kind === "privacy" ? "privacy" : "text", delivery.id), 3);
+        await withRetry(() => recordEvent(result.user.id, "waitlist_reply_delivered", {
+          provider: "twilio",
+          provider_message_id: delivery.id,
+          delivery_status: delivery.status,
+        }), 3);
+      }
+      if (result.availabilityNoticeField && result.availabilityNotice?.length === 2) {
+        await withRetry(() => patchUser(result.user.id, {
+          [result.availabilityNoticeField]: new Date().toISOString(),
+        }), 3);
+        await withRetry(() => recordEvent(result.user.id, "waitlist_availability_notice_sent", {
+          channel: message.channel === "sms" ? "sms" : "whatsapp",
+          message_count: result.availabilityNotice.length,
+        }), 3);
+      }
       if (result.inputKind) {
         await withRetry(() => recordEvent(result.user.id, "waitlist_turn_completed", {
           provider: "twilio",
@@ -77,10 +95,10 @@ async function deliverMessage(message) {
     }
     await withRetry(() => completeInbound(message.provider, message.providerMessageId), 3);
   } catch (error) {
-    error.delivery = delivery;
+    error.delivery = deliveries.at(-1);
     throw error;
   }
-  return { ...result, delivery };
+  return { ...result, delivery: deliveries.at(-1) };
 }
 
 exports.handler = async (event) => {

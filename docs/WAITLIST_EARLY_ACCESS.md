@@ -10,7 +10,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
 
 1. La persona abre `/early-access`, elige WhatsApp o Message, verifica su teléfono con el `app-auth` existente y acepta explícitamente guardar la conversación y recibir mensajes en el canal elegido.
 2. `waitlist-start` verifica el JWT y que el teléfono pertenece a ese usuario.
-3. Se envían exactamente dos mensajes deterministas, una vez cada uno. En WhatsApp son plantillas aprobadas; en SMS se envían como mensajes Twilio normales:
+3. Se envían exactamente dos mensajes deterministas, una vez cada uno. En WhatsApp se entregan mediante plantillas Twilio aprobadas; en SMS se envían como mensajes Twilio normales:
 
    - `Hey, I’m Blankmind. Tell me a bit about yourself.`
    - `What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.`
@@ -47,7 +47,7 @@ La memoria de temas preguntados y la prevención de preguntas repetidas se aplic
 ## Activación
 
 1. Integrar esta rama mediante el flujo de Backend Cloud y aplicar las migraciones `019` y `020`.
-2. Crear y conseguir aprobación de las dos plantillas con el texto exacto anterior.
+2. Las plantillas actuales de WhatsApp contienen el texto exacto anterior y están enviadas a aprobación; no activar la prueba física de apertura hasta que Twilio marque ambas como `approved`.
 3. Configurar las variables `WAITLIST_*` documentadas en `.env.membership.example`, además de las credenciales existentes de Supabase, OpenAI y Twilio. SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER`; WhatsApp conserva sus plantillas aprobadas.
 4. Desplegar Netlify y apuntar temporalmente el webhook entrante del número existente a `/.netlify/functions/waitlist-agent`.
 5. Verificar alta, dos mensajes iniciales, texto, audio, duplicados, `STOP`, exportación y borrado con un teléfono interno.

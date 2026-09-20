@@ -13,7 +13,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
 3. Se envían exactamente dos mensajes deterministas, una vez cada uno. En WhatsApp son plantillas aprobadas; en SMS se envían como mensajes Twilio normales:
 
    - `Hi, welcome to Blankmind Early Access. I’m really glad you’re here. Before I invite you in, I’d love to understand how your phone fits into your life.`
-   - `I’d love to get to know you a little better. What should I call you, how old are you, and what does a normal day look like? You can answer in your own words or send a voice note, whatever feels easier.`
+   - `What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.`
 
 4. Desde la primera respuesta, `waitlist-agent` conversa sin guion ni orden fijo. Puede conocer trabajo, estudios, rutinas, entorno, intereses, uso del móvil, apps, momentos de scroll, impacto y cambio deseado.
 5. Si llega un audio, se descarga y transcribe en memoria. No se conserva el archivo; solo el texto transcrito.

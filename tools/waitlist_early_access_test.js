@@ -50,7 +50,7 @@ function openingContract() {
   );
   assert.strictEqual(
     OPENING_MESSAGE_2,
-    "I’d love to get to know you a little better. What should I call you, how old are you, and what does a normal day look like? You can answer in your own words or send a voice note, whatever feels easier.",
+    "What usually happens when you start scrolling? When does it feel hardest to stop? Tell me your story in your own words. You can write to me or send me a voice note, whatever feels easier.",
   );
 }
 

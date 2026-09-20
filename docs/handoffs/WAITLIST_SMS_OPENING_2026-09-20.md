@@ -35,7 +35,7 @@ Validaciones ejecutadas:
 
 Despliegue completado:
 - La base desplegada previamente ya incluye la migración `020`, `digital-wellness-features` y el flujo de apertura SMS.
-- Este candidato añade la corrección de las respuestas posteriores por SMS; todavía debe publicarse desde esta rama de integración para que el cambio llegue a producción.
+- Este candidato añade la corrección de las respuestas posteriores por SMS y ya está publicado en Netlify `6aafa9c6762d7bcc14d714ea` desde la rama de integración.
 - Después del deploy queda la prueba física: seleccionar Message con un teléfono de Estados Unidos o Canadá, confirmar los dos SID SMS en Twilio y responder al primero para verificar `waitlist-agent`.
 
 Riesgos o conflictos conocidos:

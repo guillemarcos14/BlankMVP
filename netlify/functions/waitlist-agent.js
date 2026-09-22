@@ -1,6 +1,6 @@
 const { json, parseJsonBody } = require("./_membership");
 const { cleanText } = require("./_identity");
-const { extractFacts, generateReply } = require("./_waitlist_ai");
+const { canonicalizeConversation, extractFacts, generateReply } = require("./_waitlist_ai");
 const {
   claimInbound,
   completeInbound,
@@ -250,7 +250,6 @@ async function processMessage(message, options = {}) {
     const previousHistory = await recentMessages(user.id);
     const language = detectedLanguage(prompt, previousHistory, user);
     const repeatRequest = isRepeatRequest(prompt);
-    const repeatSourceReply = latestOutboundReply(previousHistory);
     const privacy = await privacyReply({ user, provider: message.provider, prompt, language });
     if (privacy) {
       const currentUser = await userByPhone(message.phone);
@@ -284,6 +283,22 @@ async function processMessage(message, options = {}) {
       recentMessages(user.id),
       currentFacts(user.id),
     ]);
+    let semanticContext = { message: prompt, history };
+    if (language === "es") {
+      try {
+        semanticContext = await canonicalizeConversation({
+          message: prompt,
+          history,
+          language,
+        });
+      } catch (error) {
+        await recordEvent(user.id, "conversation_canonicalization_failed", {
+          reason: cleanText(error.message, 160),
+        });
+      }
+    }
+    const repeatSourceReply = latestOutboundReply(semanticContext.history)
+      || latestOutboundReply(previousHistory);
 
     let extracted = [];
     let saved = [];
@@ -304,6 +319,8 @@ async function processMessage(message, options = {}) {
           language,
           repeatRequest,
           repeatSourceReply,
+          semanticMessage: semanticContext.message,
+          semanticHistory: semanticContext.history,
         })
           .then((result) => ({ result }))
           .catch((error) => ({ error })),
@@ -349,6 +366,8 @@ async function processMessage(message, options = {}) {
           language,
           repeatRequest,
           repeatSourceReply,
+          semanticMessage: semanticContext.message,
+          semanticHistory: semanticContext.history,
         });
       } catch (error) {
         await recordEvent(user.id, "conversation_generation_failed", { reason: cleanText(error.message, 160) });

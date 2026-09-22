@@ -4,7 +4,9 @@ process.env.OPENAI_API_KEY = "openai-test";
 process.env.WAITLIST_CONVERSATION_POLISH = "false";
 
 const {
+  canonicalizeConversation,
   generateReply,
+  naturalGoalPlan,
   replyQualityIssues,
 } = require("../netlify/functions/_waitlist_ai");
 const {
@@ -24,6 +26,29 @@ function response(body) {
 }
 
 async function main() {
+  const canonicalRequests = [];
+  const canonical = await canonicalizeConversation({
+    message: "Me levanto y miro el móvil antes de desayunar.",
+    history: [{ direction: "inbound", body: "Suelo hacerlo durante unos cuarenta minutos." }],
+    language: "es",
+    fetchImpl: async (url, options) => {
+      canonicalRequests.push(JSON.parse(options.body));
+      return response({
+        output_text: JSON.stringify({
+          latest_message_en: "I wake up and look at my phone before breakfast.",
+          history_en: [{ direction: "inbound", body: "I usually do it for about forty minutes." }],
+        }),
+      });
+    },
+  });
+  assert.strictEqual(canonical.message, "I wake up and look at my phone before breakfast.");
+  assert.strictEqual(canonical.history[0].body, "I usually do it for about forty minutes.");
+  assert.match(canonicalRequests[0].input[0].content[0].text, /faithful canonical English/i);
+  assert.deepStrictEqual(
+    naturalGoalPlan({ message: canonical.message, history: canonical.history, profile: {}, newlySavedFacts: [] }),
+    naturalGoalPlan({ message: "I wake up and look at my phone before breakfast.", history: canonical.history, profile: {}, newlySavedFacts: [] }),
+  );
+
   assert.strictEqual(detectedLanguage("A partir de ahora quiero hablar contigo en castellano."), "es");
   assert.strictEqual(detectedLanguage("En castellano, por favor, ¿puedes repetir tu última respuesta?"), "es");
   assert.strictEqual(isRepeatRequest("En castellano, por favor, ¿puedes repetir tu última respuesta?"), true);
@@ -119,6 +144,65 @@ async function main() {
   assert.match(requests[0].input[0].content[0].text, /internal canonical reply in relaxed everyday English/i);
   assert.match(requests[0].input[0].content[0].text, /direct question about what you know/i);
   assert.match(requests[1].input[0].content[0].text, /Translate the canonical assistant reply into Spanish/i);
+
+  const parityBodies = { en: [], es: [] };
+  const sharedSemanticHistory = [{ direction: "inbound", body: "I usually scroll for about forty minutes before breakfast." }];
+  const sharedProfile = { preferred_name: "Guillem", scroll_moments: ["before breakfast"] };
+  const parityReply = {
+    reply: "I understand. I am curious what usually keeps you scrolling before breakfast?",
+    focus: "scroll_context",
+    profile_useful: false,
+  };
+  await generateReply({
+    message: "I usually scroll for about forty minutes before breakfast.",
+    semanticMessage: "I usually scroll for about forty minutes before breakfast.",
+    semanticHistory: sharedSemanticHistory,
+    history: sharedSemanticHistory,
+    profile: sharedProfile,
+    newlySavedFacts: [],
+    language: "en",
+    fetchImpl: async (url, options) => {
+      parityBodies.en.push(JSON.parse(options.body));
+      return response({ output_text: JSON.stringify(parityReply) });
+    },
+  });
+  await generateReply({
+    message: "Suelo mirar el móvil unos cuarenta minutos antes de desayunar.",
+    semanticMessage: "I usually scroll for about forty minutes before breakfast.",
+    semanticHistory: sharedSemanticHistory,
+    history: sharedSemanticHistory,
+    profile: sharedProfile,
+    newlySavedFacts: [],
+    language: "es",
+    fetchImpl: async (url, options) => {
+      parityBodies.es.push(JSON.parse(options.body));
+      const system = JSON.parse(options.body).input[0].content[0].text;
+      return response({
+        output_text: JSON.stringify(system.startsWith("Translate the canonical assistant reply")
+          ? { reply: "Entiendo. Me interesa saber qué suele hacer que sigas mirando el móvil antes de desayunar.", focus: "scroll_context", profile_useful: false }
+          : parityReply),
+      });
+    },
+  });
+  const enInput = JSON.parse(parityBodies.en[0].input[1].content[0].text);
+  const esInput = JSON.parse(parityBodies.es[0].input[1].content[0].text);
+  for (const key of [
+    "latest_message",
+    "recent_history",
+    "known_profile",
+    "newly_saved_facts",
+    "coverage",
+    "natural_goal_plan",
+    "conversation_reentry",
+    "question_memory",
+    "restricted_topic_present",
+    "repeat_request",
+    "canonical_output_language",
+  ]) {
+    assert.deepStrictEqual(esInput[key], enInput[key], `shared context diverged at ${key}`);
+  }
+  assert.strictEqual(enInput.target_language, "English");
+  assert.strictEqual(esInput.target_language, "Spanish");
 
   console.log("waitlist Spanish smoke tests passed");
 }

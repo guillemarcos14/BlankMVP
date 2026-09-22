@@ -261,6 +261,27 @@ const REPLY_SCHEMA = {
   },
 };
 
+const CANONICAL_CONTEXT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["latest_message_en", "history_en"],
+  properties: {
+    latest_message_en: { type: "string", minLength: 1, maxLength: 4000 },
+    history_en: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["direction", "body"],
+        properties: {
+          direction: { type: "string", enum: ["inbound", "outbound"] },
+          body: { type: "string", minLength: 1, maxLength: 1200 },
+        },
+      },
+    },
+  },
+};
+
 function responseOutputText(payload) {
   if (typeof payload?.output_text === "string") return payload.output_text;
   for (const item of Array.isArray(payload?.output) ? payload.output : []) {
@@ -534,6 +555,45 @@ async function extractFacts({ message, history, profile, fetchImpl = fetch }) {
   }
 }
 
+async function canonicalizeConversation({ message, history = [], language = "en", fetchImpl = fetch }) {
+  if (!String(language).toLowerCase().startsWith("es")) {
+    return { message, history };
+  }
+
+  const sourceHistory = (Array.isArray(history) ? history : [])
+    .map((item) => ({
+      direction: item?.direction === "outbound" ? "outbound" : "inbound",
+      body: cleanText(item?.body, 1200),
+    }))
+    .filter((item) => item.body);
+  const model = process.env.WAITLIST_CONVERSATION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
+  const result = await structuredResponse({
+    model,
+    schemaName: "waitlist_canonical_context",
+    schema: CANONICAL_CONTEXT_SCHEMA,
+    system: [
+      "Convert the latest message and recent conversation into faithful canonical English for internal reasoning only.",
+      "Preserve the exact meaning, intent, facts, questions, polarity, tone, and message order. Do not answer, summarize, interpret, or omit anything.",
+      "Return the latest message and every history message in the same order. This canonical context will be used by the same planner and reply generator for every supported user language.",
+    ].join(" "),
+    input: JSON.stringify({
+      latest_message: cleanText(message, 4000),
+      recent_history: sourceHistory,
+    }),
+    fetchImpl,
+  });
+  if (!result.latest_message_en || result.history_en.length !== sourceHistory.length) {
+    throw new Error("waitlist_canonical_context_incomplete");
+  }
+  return {
+    message: cleanText(result.latest_message_en, 4000),
+    history: result.history_en.map((item, index) => ({
+      ...sourceHistory[index],
+      body: cleanText(item.body, 1200),
+    })),
+  };
+}
+
 function isRestrictedTopic(message) {
   return RESTRICTED_TOPIC_PATTERNS.some((pattern) => pattern.test(String(message || "")));
 }
@@ -795,19 +855,23 @@ async function generateReply({
   language = "en",
   repeatRequest = false,
   repeatSourceReply = "",
+  semanticMessage = message,
+  semanticHistory = history,
   fetchImpl = fetch,
 }) {
   const spanish = String(language).toLowerCase().startsWith("es");
   const outputLanguage = "English";
   const targetLanguage = spanish ? "Spanish" : "English";
-  const restricted = isRestrictedTopic(message);
+  const canonicalMessage = cleanText(semanticMessage || message, 4000);
+  const canonicalHistory = Array.isArray(semanticHistory) ? semanticHistory : history;
+  const restricted = isRestrictedTopic(canonicalMessage);
   const knownCoverage = coverage(profile);
-  const goalPlan = naturalGoalPlan({ message, history, profile, newlySavedFacts });
-  const socialOnlyGreeting = isSocialOnlyGreeting(message);
+  const goalPlan = naturalGoalPlan({ message: canonicalMessage, history: canonicalHistory, profile, newlySavedFacts });
+  const socialOnlyGreeting = isSocialOnlyGreeting(canonicalMessage);
   const conversationReentry = {
-    greeting_only: isGreetingOnly(message),
+    greeting_only: isGreetingOnly(canonicalMessage),
     social_only_greeting: socialOnlyGreeting,
-    has_previous_substantive_messages: hasSubstantiveInbound(history),
+    has_previous_substantive_messages: hasSubstantiveInbound(canonicalHistory),
   };
   const system = [
     BM_CONVERSATIONAL_TONE,
@@ -839,8 +903,8 @@ async function generateReply({
     ] : []),
   ].join(" ");
   const input = JSON.stringify({
-    latest_message: message,
-    recent_history: history.slice(-12),
+    latest_message: canonicalMessage,
+    recent_history: canonicalHistory.slice(-12),
     known_profile: profile,
     newly_saved_facts: newlySavedFacts.map((fact) => ({ key: fact.field_key || fact.key, value: fact.value })),
     coverage: knownCoverage,
@@ -852,6 +916,7 @@ async function generateReply({
     target_language: targetLanguage,
     canonical_output_language: "en",
     repeat_request: repeatRequest,
+    original_language: language,
   });
   const model = process.env.WAITLIST_CONVERSATION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
   let result = await structuredResponse({
@@ -863,8 +928,8 @@ async function generateReply({
     fetchImpl,
   });
   let reply = safeReply(result.reply);
-  const canonicalQualityContext = { history, goalPlan, socialOnlyGreeting, language: "en", repeatRequest };
-  const localizedQualityContext = { history, goalPlan, socialOnlyGreeting, language, repeatRequest };
+  const canonicalQualityContext = { history: canonicalHistory, goalPlan, socialOnlyGreeting, language: "en", repeatRequest };
+  const localizedQualityContext = { history: canonicalHistory, goalPlan, socialOnlyGreeting, language, repeatRequest };
   const issues = replyQualityIssues(reply, canonicalQualityContext);
   if (issues.length) {
     result = await structuredResponse({
@@ -977,6 +1042,7 @@ module.exports = {
   EVENTUAL_GOALS,
   FACT_KEYS,
   ageBand,
+  canonicalizeConversation,
   coverage,
   deterministicFacts,
   extractFacts,

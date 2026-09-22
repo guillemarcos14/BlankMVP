@@ -762,7 +762,7 @@ function replyQualityIssues(reply, context = {}) {
     ? /^(?:hola|buenas)[!.]?$/i.test(firstSentence.trim())
     : /^(?:hey|hi|hello)[!.]?$/i.test(firstSentence.trim());
   const firstPerson = spanish
-    ? /\b(?:yo|me|entiendo|entendido|claro|perfecto|de acuerdo|vale|puedo|quiero|estoy|te|vamos|no puedo)\b/i.test(firstSentence)
+    ? /\b(?:yo|me|entiendo|entendido|claro|perfecto|de acuerdo|vale|puedo|quiero|estoy|tengo|ahora|te|vamos|no puedo)\b/i.test(firstSentence)
     : /\bI\b|\bI['’](?:m|d|ve|ll)\b|\bI can\b|\bI get\b|\bI want\b/i.test(firstSentence);
   if (!briefGreeting && !firstPerson) {
     issues.push("first_sentence_not_first_person");
@@ -798,7 +798,8 @@ async function generateReply({
   fetchImpl = fetch,
 }) {
   const spanish = String(language).toLowerCase().startsWith("es");
-  const outputLanguage = spanish ? "Spanish" : "English";
+  const outputLanguage = "English";
+  const targetLanguage = spanish ? "Spanish" : "English";
   const restricted = isRestrictedTopic(message);
   const knownCoverage = coverage(profile);
   const goalPlan = naturalGoalPlan({ message, history, profile, newlySavedFacts });
@@ -812,7 +813,7 @@ async function generateReply({
     BM_CONVERSATIONAL_TONE,
     "You are Blankmind speaking in first person as a thoughtful personal assistant during Early Access.",
     "Your only purpose is to get to know this person through a genuinely natural conversation before product access.",
-    `Naturalness is the highest priority. Respond to what they actually said before asking anything. Sound warm, attentive, curious, and grounded. Use relaxed everyday ${outputLanguage}. Never sound like a form, survey, funnel, support bot, interview script, or data collector.`,
+    `Naturalness is the highest priority. Respond to what they actually said before asking anything. Sound warm, attentive, curious, and grounded. Write the internal canonical reply in relaxed everyday ${outputLanguage}. The application will present that same reply in ${targetLanguage}. Never sound like a form, survey, funnel, support bot, interview script, or data collector.`,
     "Avoid formal or stock phrases such as I'm glad to meet you, I'm glad we connected, pleased to meet you, delighted to meet you, or I'd love to hear more. Prefer simple everyday wording such as Good to meet you, Nice, or Tell me more when it fits.",
     "Most replies should contain a natural first-person phrase. Vary it freely and do not rely on scripted I get that or I can see openings. A short greeting followed by one natural question is also fine, such as Hey! How’s it been with your phone since we last spoke?",
     "Reflect only details and feelings the person explicitly expressed. Never add a likely motive, emotion, energy level, benefit, or consequence just to sound insightful.",
@@ -820,6 +821,7 @@ async function generateReply({
     "You may explore a wide personal context when it fits naturally, including their work, studies, routines, environment, interests, responsibilities, energy, relationships with their phone, apps, scrolling moments, impact, and what they would like to change.",
     "The conversation has no fixed order, but it should keep moving toward useful understanding rather than asking questions just to keep the chat going. Do not ask for information already given. The question_memory in the input is an internal memory of topics already asked. Never ask the same underlying question twice with different wording. If a topic is already there, move naturally to an adjacent unanswered detail or simply respond without another question.",
     "The natural_goal_plan is an internal soft routing hint, not a script. Respond to the latest message first. Then, only if it fits the flow, ask one question connected to next_goal. Never jump to a missing identity detail just because it has higher priority when the latest message is clearly about another part of the person's life. If the plan state is complete, answer naturally without adding a new question.",
+    "Answer the person's actual request before continuing the conversation. This applies equally in every language. If they ask a direct question about what you know, remember, or have available about them, answer from known_profile in human terms, without exposing internal field names or inventing facts. Never replace a direct question with a generic reflective question.",
     "A greeting after substantive earlier messages is a return to the same conversation, not a new opening. Do not repeat the Early Access introduction or restart onboarding. If the person only says hi and the useful context is already covered, greet them warmly and do not force a question. If useful context remains, ask at most one broad natural question about how things have been since you last spoke.",
     "If the person says they are only saying hi, do not ask a question just to keep the conversation going.",
     "Name and age are primary identity facts, not secondary details. When they are missing, bring them into the conversation early when there is a natural opening, without sounding like a form. Email, work context, studies, routines, environment, interests, responsibilities, relationships, phone use, apps, scroll moments, impact, and desired change are also useful internal data, but none is a visible checklist.",
@@ -831,9 +833,9 @@ async function generateReply({
     "Do not take positions or invite debate on wars, armed conflicts, abortion, elections, political parties, polarizing religion, or other contentious public issues. If one appears, set a brief human boundary in first person and ask an ordinary concrete question about the person's phone behavior. If they explicitly named an impact, briefly acknowledge it before the question instead of jumping straight to an app name. Keep the boundary simple. Do not say what happens for you, more interested in, or I can help understand, and do not interpret how the issue makes them feel unless they said it.",
     "Never solicit passwords, addresses, financial information, political views, religious beliefs, sexuality, medical diagnoses, or other sensitive personal data.",
     "Avoid therapeutic, clinical, and research language. Do not say pattern, stay with your experience, what do you notice, what is it like for you, handoff point, transition, underlying, reflect, explore, assess, or tell me how that lands. Prefer ordinary concrete language about what happened, what they opened, when, where, and what came next.",
-    `Write only in ${outputLanguage}, even if the person writes in another language. Use plain text, no markdown, no lists, no links, no semicolons, and no dashes of any kind, including em dashes, en dashes, hyphens, and double hyphens. Use commas or full stops instead. Use one or two short sentences, usually one brief acknowledgment and one open question. Aim for 25 to 35 words and stay under 220 characters. Ask one question at most. Do not pack a greeting, explanation, question, and voice-note invitation into one long reply. Return one short WhatsApp message, not multiple messages. Avoid repeating stock phrases such as Thanks for sharing.`,
+    `Write only the canonical reply in ${outputLanguage}, even if the person writes in another language. Use plain text, no markdown, no lists, no links, no semicolons, and no dashes of any kind, including em dashes, en dashes, hyphens, and double hyphens. Use commas or full stops instead. Use one or two short sentences, usually one brief acknowledgment and one open question. Aim for 25 to 35 words and stay under 220 characters. Ask one question at most. Do not pack a greeting, explanation, question, and voice-note invitation into one long reply. Return one short WhatsApp message, not multiple messages. Avoid repeating stock phrases such as Thanks for sharing.`,
     ...(repeatRequest ? [
-      `This turn is an explicit request to repeat the previous assistant response in ${outputLanguage}. Do not continue the interview, ask a new question, or change the subject. Return only a concise natural repetition or translation of the previous assistant response. Previous assistant response: ${cleanText(repeatSourceReply, 700)}`,
+      `This turn is an explicit request to repeat the previous assistant response. Do not continue the interview, ask a new question, or change the subject. Return only a concise natural canonical English repetition of the previous assistant response. Previous assistant response: ${cleanText(repeatSourceReply, 700)}`,
     ] : []),
   ].join(" ");
   const input = JSON.stringify({
@@ -847,6 +849,8 @@ async function generateReply({
     question_memory: questionMemory(history),
     restricted_topic_present: restricted,
     language,
+    target_language: targetLanguage,
+    canonical_output_language: "en",
     repeat_request: repeatRequest,
   });
   const model = process.env.WAITLIST_CONVERSATION_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-luna";
@@ -859,8 +863,9 @@ async function generateReply({
     fetchImpl,
   });
   let reply = safeReply(result.reply);
-  const qualityContext = { history, goalPlan, socialOnlyGreeting, language, repeatRequest };
-  const issues = replyQualityIssues(reply, qualityContext);
+  const canonicalQualityContext = { history, goalPlan, socialOnlyGreeting, language: "en", repeatRequest };
+  const localizedQualityContext = { history, goalPlan, socialOnlyGreeting, language, repeatRequest };
+  const issues = replyQualityIssues(reply, canonicalQualityContext);
   if (issues.length) {
     result = await structuredResponse({
       model,
@@ -871,7 +876,7 @@ async function generateReply({
       fetchImpl,
     });
     reply = safeReply(result.reply);
-    const repairedIssues = replyQualityIssues(reply, qualityContext);
+    const repairedIssues = replyQualityIssues(reply, canonicalQualityContext);
     if (repairedIssues.length) throw new Error(`waitlist_reply_style_failed:${repairedIssues.join(",")}`);
   }
   if (process.env.WAITLIST_CONVERSATION_POLISH !== "false") {
@@ -900,7 +905,72 @@ async function generateReply({
       // The validated draft remains safe when optional polishing is unavailable.
     }
   }
+  if (spanish) {
+    const translated = await translateReply({
+      draft: reply,
+      targetLanguage,
+      focus: result.focus,
+      profileUseful: result.profile_useful,
+      repeatRequest,
+      fetchImpl,
+      model,
+    });
+    const translatedReply = safeReply(translated.reply);
+    const translatedIssues = replyQualityIssues(translatedReply, localizedQualityContext);
+    if (translatedIssues.length) {
+      const repairedTranslation = await translateReply({
+        draft: reply,
+        targetLanguage,
+        focus: result.focus,
+        profileUseful: result.profile_useful,
+        repeatRequest,
+        feedback: translatedIssues.join(", "),
+        fetchImpl,
+        model,
+      });
+      const repairedReply = safeReply(repairedTranslation.reply);
+      if (replyQualityIssues(repairedReply, localizedQualityContext).length) {
+        throw new Error(`waitlist_reply_translation_failed:${translatedIssues.join(",")}`);
+      }
+      reply = repairedReply;
+    } else {
+      reply = translatedReply;
+    }
+  }
   return { ...result, reply, restricted, goal_plan: goalPlan };
+}
+
+async function translateReply({
+  draft,
+  targetLanguage,
+  focus,
+  profileUseful,
+  repeatRequest,
+  feedback = "",
+  fetchImpl = fetch,
+  model,
+}) {
+  const system = [
+    `Translate the canonical assistant reply into ${targetLanguage}. Preserve exactly the same meaning, answer, tone, number of sentences, and number of questions. Do not add, remove, reinterpret, or redirect anything.`,
+    "This is a localization step, not a new response. Keep plain text, no markdown, no lists, no links, no semicolons, and no dashes. Keep it concise and natural for WhatsApp.",
+    repeatRequest ? "This is a repetition request. Do not introduce a new question or continue the conversation." : "Do not turn an answer into a generic follow-up question.",
+    feedback ? `The previous translation failed these checks: ${feedback}. Repair only those issues while preserving the meaning.` : "",
+  ].filter(Boolean).join(" ");
+  const result = await structuredResponse({
+    model,
+    schemaName: "waitlist_conversation_translation",
+    schema: REPLY_SCHEMA,
+    system,
+    input: JSON.stringify({
+      canonical_reply: draft,
+      target_language: targetLanguage,
+      focus,
+      profile_useful: profileUseful,
+      repeat_request: repeatRequest,
+    }),
+    fetchImpl,
+  });
+  return result;
 }
 
 module.exports = {

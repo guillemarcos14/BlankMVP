@@ -9,6 +9,8 @@ const {
 } = require("../netlify/functions/_waitlist_ai");
 const {
   detectedLanguage,
+  contextSummaryReply,
+  isContextInventoryRequest,
   isRepeatRequest,
   naturalFallbackReply,
 } = require("../netlify/functions/waitlist-agent");
@@ -27,6 +29,8 @@ async function main() {
   assert.strictEqual(detectedLanguage("A partir de ahora quiero hablar contigo en castellano."), "es");
   assert.strictEqual(detectedLanguage("En castellano, por favor, ¿puedes repetir tu última respuesta?"), "es");
   assert.strictEqual(isRepeatRequest("En castellano, por favor, ¿puedes repetir tu última respuesta?"), true);
+  assert.strictEqual(isContextInventoryRequest("¿Qué información tienes acerca de mí para ampliar el contexto?"), true);
+  assert.match(contextSummaryReply({ preferred_name: "Guillem", apps: ["Instagram"] }, "es"), /Guillem|Instagram/i);
   assert.match(naturalFallbackReply("No sé qué hacer.", [], "es"), /interesa|móvil/i);
   assert.deepStrictEqual(
     replyQualityIssues("Entiendo. Te responderé en castellano a partir de ahora.", { language: "es" }),

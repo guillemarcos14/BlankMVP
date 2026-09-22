@@ -80,6 +80,57 @@ function latestOutboundReply(history = []) {
     .find((message) => message?.direction === "outbound")?.body || "";
 }
 
+function isContextInventoryRequest(prompt) {
+  const text = cleanText(prompt, 1600).toLowerCase();
+  return /(?:qu[eé]|qué)\s+(?:informaci[oó]n|datos|contexto)\s+(?:tienes|tiene|hay)|qu[eé]\s+sabes\s+de\s+m[ií]|qu[eé]\s+recuerdas\s+de\s+m[ií]|para\s+ampliar\s+(?:el\s+)?contexto|what\s+(?:information|data|context)\s+do\s+you\s+have|what\s+do\s+you\s+know\s+about\s+me|what\s+do\s+you\s+remember\s+about\s+me|to\s+add\s+more\s+context/i.test(text);
+}
+
+function profileValue(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  if (value && typeof value === "object") return Object.values(value).filter(Boolean).join(", ");
+  return cleanText(value, 120);
+}
+
+function contextSummaryReply(profile = {}, language = "en") {
+  const spanish = spanishLanguage(language);
+  const labels = spanish
+    ? {
+      preferred_name: "tu nombre",
+      age: "tu edad",
+      occupation: "tu trabajo",
+      studies: "tus estudios",
+      daily_routine: "tu rutina",
+      apps: "las apps que usas",
+      scroll_moments: "cuándo miras el móvil",
+      impact: "cómo te afecta",
+      desired_change: "qué te gustaría cambiar",
+    }
+    : {
+      preferred_name: "your name",
+      age: "your age",
+      occupation: "your work",
+      studies: "your studies",
+      daily_routine: "your routine",
+      apps: "the apps you use",
+      scroll_moments: "when you use your phone",
+      impact: "how it affects you",
+      desired_change: "what you would like to change",
+    };
+  const entries = Object.entries(labels)
+    .map(([key, label]) => ({ label, value: profileValue(profile[key]) }))
+    .filter((entry) => entry.value)
+    .slice(0, 4)
+    .map((entry) => `${entry.label}: ${entry.value}`);
+  if (!entries.length) {
+    return spanish
+      ? "Ahora mismo todavía tengo poco contexto sobre ti. Para ampliarlo, cuéntame cómo es un día normal y qué suele llevarte al móvil."
+      : "I do not have much context about you yet. To add more, tell me what a normal day looks like and what usually brings you to your phone.";
+  }
+  return spanish
+    ? `Ahora mismo tengo esto: ${entries.join(", ")}. Para ampliar el contexto, cuéntame algo sobre tu rutina o sobre lo que te gustaría cambiar.`
+    : `Right now I have this: ${entries.join(", ")}. To add more context, tell me about your routine or what you would like to change.`;
+}
+
 function availabilityNoticeField(channel) {
   return channel === "sms"
     ? "availability_notice_sms_sent_at"
@@ -250,6 +301,7 @@ async function processMessage(message, options = {}) {
     const previousHistory = await recentMessages(user.id);
     const language = detectedLanguage(prompt, previousHistory, user);
     const repeatRequest = isRepeatRequest(prompt);
+    const contextInventoryRequest = isContextInventoryRequest(prompt);
     const repeatSourceReply = latestOutboundReply(previousHistory);
     const privacy = await privacyReply({ user, provider: message.provider, prompt, language });
     if (privacy) {
@@ -363,6 +415,15 @@ async function processMessage(message, options = {}) {
 
     if (message.audio) updated = await currentFacts(user.id);
 
+    if (contextInventoryRequest) {
+      generated = {
+        reply: contextSummaryReply(updated.profile, language),
+        focus: "context_summary",
+        profile_useful: false,
+        restricted: false,
+      };
+    }
+
     const channel = message.channel === "sms" ? "sms" : "whatsapp";
     const noticeField = availabilityNoticeField(channel);
     const noticeReplies = availabilityNoticeForPrompt(prompt, isFirstReply, user, noticeField, language);
@@ -472,3 +533,5 @@ module.exports.isCapabilityRequest = isCapabilityRequest;
 module.exports.availabilityNoticeForPrompt = availabilityNoticeForPrompt;
 module.exports.detectedLanguage = detectedLanguage;
 module.exports.isRepeatRequest = isRepeatRequest;
+module.exports.isContextInventoryRequest = isContextInventoryRequest;
+module.exports.contextSummaryReply = contextSummaryReply;

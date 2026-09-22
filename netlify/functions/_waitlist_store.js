@@ -153,7 +153,7 @@ async function markFirstReply(user) {
 async function recentMessages(userId, limit = 16) {
   const safeLimit = Math.min(Math.max(Number(limit) || 16, 1), 30);
   const rows = await supabaseFetch(
-    `waitlist_messages?user_id=eq.${encodeURIComponent(userId)}&select=id,direction,message_kind,body,created_at&order=created_at.desc&limit=${safeLimit}`,
+    `waitlist_messages?user_id=eq.${encodeURIComponent(userId)}&select=id,direction,message_kind,body,source_language,created_at&order=created_at.desc&limit=${safeLimit}`,
     { method: "GET" },
   );
   return rows.reverse();

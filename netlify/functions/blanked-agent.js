@@ -88,9 +88,29 @@ function completeNaturalText(value, maxLength = 420) {
 }
 
 function responseLanguage(prompt, context = {}) {
-  // Blankmind currently ships one product language. Input parsing can still
-  // understand existing Spanish facts, but every user-facing surface is English.
-  return "en";
+  const text = cleanText(prompt, 600).toLowerCase();
+  if (/\b(?:in english|en ingl[eé]s)\b/.test(text)) return "en";
+  if (/\b(?:in spanish|en espa[nñ]ol|en castellano)\b/.test(text)) return "es";
+  const previousLanguage = context.semantic_state?.language
+    || context.memory?.conversation_state?.semantic_state?.language;
+  const explicit = cleanText(previousLanguage || context.language || context.locale || "", 20).toLowerCase();
+  const spanishScore = [
+    "¿", "á", "é", "í", "ó", "ú", "ñ",
+    "como puedo", "cómo puedo", "que deberia", "qué debería", "quiero", "bloquear", "bloquea",
+    "despues", "después", "comer", "cenar", "despertar", "trabajar", "estudiar",
+    "movil", "móvil", "no uso", "lo necesito", "para siempre", "consejo", "ayudame", "ayúdame",
+    "bienestar digital", "redes", "redes sociales", "perdiendo mucho tiempo", "por la noche", "estoy", "me quedo",
+    "scrolleando", "dormir", "fatal", "concentrarme", "asistente personal", "controlar mi móvil", "controlar mi movil", "hazme",
+    "recuérdame", "recuerdame", "esta tarde", "esta noche", "reanuda", "reanudar", "reactiva", "reactivar", "quita la pausa", "pausa las reglas",
+  ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
+  const englishScore = [
+    "how can i", "what should i", "block", "after", "phone", "sleep", "work", "study",
+    "scroll", "focus", "advice", "help me", "minutes", "hours", "instead", "only once",
+  ].reduce((score, token) => score + (text.includes(token) ? 1 : 0), 0);
+  const shortSpanish = /\b(?:vale|minutos|hora|horas|solo|mejor|diario|diariamente|siempre|cada|confirma|confirmo|s[ií]|hoy|ahora)\b/.test(text) ? 2 : 0;
+  if (spanishScore + shortSpanish > englishScore) return "es";
+  if (englishScore > 0) return "en";
+  return explicit.startsWith("es") ? "es" : "en";
 }
 
 function isWebPreview(context = {}) {
@@ -523,11 +543,14 @@ function hasSpanishLanguageLeak(plan) {
   const text = [
     plan.title,
     plan.response_text,
+    plan.message_text,
+    plan.speech_text,
+    plan.followup_text,
     plan.primary_label,
     plan.secondary_label,
     ...(Array.isArray(plan.bullets) ? plan.bullets : []),
   ].filter(Boolean).join(" ");
-  return /\b(Let me|brief|session|support|right now|distracting|start|block|apps and|focus|help you|you want|depends on|when you|then I can|use, then|the same app|full block|could break|work instead)\b/i.test(text);
+  return /\b(?:let me|brief|session|support|right now|distracting|start|block|apps and|focus|help you|you want|depends on|when you|then I can|use, then|the same app|full block|could break|work instead|got it|what time|what(?:'s| is)?|your|you|the|from|every|minutes?|days?|selected|will|would|can|should|once|recurring|notification|open|choose|protection|details|confirm|sending)\b/i.test(text);
 }
 
 function stripBulletPrefix(value) {
@@ -816,20 +839,6 @@ function asksForPlan(prompt) {
     "quiero un plan",
     "hazme un plan",
   ]);
-}
-
-function hasSpanishSurfaceLeak(plan) {
-  const text = [
-    plan?.title,
-    plan?.response_text,
-    plan?.message_text,
-    plan?.speech_text,
-    plan?.followup_text,
-    plan?.primary_label,
-    plan?.secondary_label,
-    ...(Array.isArray(plan?.bullets) ? plan.bullets : []),
-  ].filter(Boolean).join(" ");
-  return /[¿¡áéíóúñ]|\b(?:bienvenido|para empezar|elige|elige las|pulsa|selecciona|distracciones|notificación|bloquea|bloquear|móvil|noche|mañana|franja|límite|cuéntame|ayúdame|hecho|cancelado|ahora)\b/i.test(text);
 }
 
 function asksForDigitalDetoxPlan(prompt) {
@@ -2907,7 +2916,10 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
         },
         {
           role: "system",
-          content: "English only: every visible response, title, label, bullet, and speech text must be written in English, regardless of the input language or locale.",
+          content: `Write every visible response in ${language === "es" ? "Spanish" : "English"}. Keep JSON keys, intent values, and action types in English.`,
+        },
+        {
+          role: "system",
         },
         {
           role: "user",
@@ -2928,9 +2940,6 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
   }
   const reply = completeNaturalText(extractResponseText(await response.json()), 280);
   if (!reply) return { plan: fallback, source: `openai:${model}:conversation_empty` };
-  if (hasSpanishSurfaceLeak({ response_text: reply })) {
-    return { plan: fallback, source: `openai:${model}:english_fallback_after_language_leak` };
-  }
   return {
     plan: {
       ...fallback,
@@ -3178,7 +3187,6 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
           asksForPermanentLockout(prompt) ||
           (promptHasFutureTiming(prompt) && !explicitTimeWindow(prompt, context) && !anchorWindow(prompt))));
   const shouldUseLanguageFallback = language === "es" && hasSpanishLanguageLeak(plan);
-  const shouldUseEnglishFallback = hasSpanishSurfaceLeak(plan);
   const visibleBullets = hasExecutableActions ? bullets : bullets.filter((item) => !/^protection:/i.test(item));
   const structuredBullets = visibleBullets.filter((item) => /^(Read|Pattern|Move|Signal|Feedback|Protection|Lectura|Patrón|Movimiento|Señal|Protección):/i.test(item)).length >= 2;
   const preserveFallbackText = contains(fallback.response_text, [
@@ -3187,15 +3195,15 @@ function normalizePlan(parsed, fallback, context = {}, prompt = "", language = "
     "I can help make access harder, but I will only create",
     "I can use counts and context you choose to share",
   ]);
-  const title = shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.title : userFacingText(plan.title, 70) || fallback.title;
-  const responseText = shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback || preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text;
+  const title = shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.title : userFacingText(plan.title, 70) || fallback.title;
+  const responseText = shouldUseFallbackPresentation || shouldUseLanguageFallback || preserveFallbackText ? fallback.response_text : userFacingText(plan.response_text, 180) || interpretation || fallback.response_text;
   const normalizedPlan = {
     intent: shouldUseFallbackPresentation || shouldUseLanguageFallback || preservesScrollLoopActions ? fallback.intent : planIntent,
     title,
     response_text: responseText,
-    bullets: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallbackBullets : visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
-    primary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.primary_label : cleanText(plan.primary_label, 32) || fallback.primary_label,
-    secondary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback || shouldUseEnglishFallback ? fallback.secondary_label : cleanText(plan.secondary_label, 32) || fallback.secondary_label,
+    bullets: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallbackBullets : visibleBullets.length >= 2 && structuredBullets ? visibleBullets : fallbackBullets,
+    primary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.primary_label : cleanText(plan.primary_label, 32) || fallback.primary_label,
+    secondary_label: shouldUseFallbackPresentation || shouldUseLanguageFallback ? fallback.secondary_label : cleanText(plan.secondary_label, 32) || fallback.secondary_label,
     actions,
     requires_selected_apps: hasExecutableActions ? fallback.requires_selected_apps : false,
     requires_screen_time_authorization: hasExecutableActions ? fallback.requires_screen_time_authorization : false,
@@ -3322,7 +3330,10 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
         },
         {
           role: "system",
-          content: "English only: every visible response, title, label, bullet, and speech text must be written in English, regardless of the input language or locale.",
+          content: `Write every visible response, title, label, bullet, and speech text in ${language === "es" ? "Spanish" : "English"}. Keep JSON keys, intent values, and action types in English.`,
+        },
+        {
+          role: "system",
         },
         {
           role: "user",
@@ -3699,7 +3710,7 @@ async function traceEvaluationTurn({ prompt, context = {}, mode = "bm_final" }) 
     const request = {
       model: process.env.OPENAI_MODEL || "gpt-5.6-luna",
       input: [
-        { role: "system", content: "You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in English only, regardless of the user's language. Do not claim to have performed device actions." },
+        { role: "system", content: `You are a helpful assistant. Understand the conversation, keep corrections, and ask when information is missing. Reply naturally in ${language === "es" ? "Spanish" : "English"}. Do not claim to have performed device actions.` },
         ...(context.recent_messages || []).filter(m => m && ["user", "assistant"].includes(m.role) && typeof m.content === "string").map(m => ({ role: m.role, content: m.content })),
         { role: "user", content: prompt },
       ],

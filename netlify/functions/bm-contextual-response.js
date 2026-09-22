@@ -79,6 +79,8 @@ function isGrounded(text, plan, context) {
 
 async function naturalizeGroundedPlan({ prompt, context = {}, plan, fetchImpl = fetch }) {
   const fallback = stripContract(plan);
+  const language = String(plan?.semantic_state?.language || context.language || "").toLowerCase();
+  if (language.startsWith("es")) return { plan: fallback, source: "grounded_deterministic:spanish" };
   if (!process.env.OPENAI_API_KEY || !plan?.response_contract) return { plan: fallback, source: "grounded_deterministic" };
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const contract = plan.response_contract;

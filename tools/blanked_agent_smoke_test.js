@@ -48,9 +48,9 @@ function baseContext(overrides = {}) {
 
 (async () => {
   const onboarding = onboardingMessages({ language: "es", locale: "es-ES" });
-  assert.match(onboarding.welcome, /Hey, I’m Blankmind/);
-  assert.match(onboarding.setup, /Pick the apps that pull you in most/);
-  assert.doesNotMatch(Object.values(onboarding).join(" "), /Bienvenido|Para empezar|Ya tienes/i);
+  assert.match(onboarding.welcome, /Hola, soy Blankmind/);
+  assert.match(onboarding.setup, /Elige las apps/);
+  assert.doesNotMatch(Object.values(onboarding).join(" "), /Welcome|Pick the apps|You’re all set/i);
 
   const smallTalk = await call("how you doing?", baseContext({ channel: "whatsapp", assistant_channel: "whatsapp" }));
   assert.strictEqual(smallTalk.intent, "general");
@@ -271,12 +271,12 @@ function baseContext(overrides = {}) {
   assert.strictEqual(appSpanishLocale.semantic_state.language,"en");
   noAction(appSpanishLocale);
   const whatsappSpanish = await call("Bloquea Instagram de 10 de la noche a 7 de la mañana cada día.",baseContext({channel:"whatsapp"}));
-  assert.strictEqual(whatsappSpanish.semantic_state.language,"en");
+  assert.strictEqual(whatsappSpanish.semantic_state.language,"es");
   assert.deepStrictEqual(fact(whatsappSpanish,"start"),{type:"time",minute:1320});
   assert.strictEqual(fact(whatsappSpanish,"end"),420);
   noAction(whatsappSpanish);
   const spanishVisible = [whatsappSpanish.title, whatsappSpanish.message_text, whatsappSpanish.response_text, whatsappSpanish.speech_text, ...(whatsappSpanish.bullets || [])].join(" ");
-  assert.doesNotMatch(spanishVisible, /bloquear|bloquea|noche|mañana|cada día|¿/i);
+  assert.match(spanishVisible, /bloquear|bloquea|noche|mañana|cada día|¿/i);
   const sleepGoalWindow = await call("I want to sleep good from 11pm to 7am",baseContext());
   noAction(sleepGoalWindow); // A sleep goal is not authorization for a guessed 22:45 block.
   assert.notStrictEqual(sleepGoalWindow.semantic_state.intent,"block");

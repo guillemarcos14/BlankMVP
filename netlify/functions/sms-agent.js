@@ -96,6 +96,22 @@ function cleanText(value, maxLength = 240) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
+function detectedLanguage(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
+    ? "es"
+    : "en";
+}
+
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^(?:es|en)/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
+}
+
 function mediaItemsFromObject(parsed) {
   const items = [];
   const count = Number(parsed.NumMedia || parsed.numMedia || 0);
@@ -529,19 +545,22 @@ function whatsappReplyText(plan, fallbackText) {
     .trim()
     .slice(0, 320) || "I can help with that in Blankmind.";
   if (!action) return clean;
+  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
     const apps = Array.isArray(plan.blocking_data?.apps) ? plan.blocking_data.apps : [];
     const link = reviewActionLink(action, apps);
     return link
-      ? `${clean}\n\nSelect the apps to apply it:\n${link}`
-      : `${clean}\n\nOpen Blankmind to select the apps.`;
+      ? `${clean}\n\n${spanish ? "Selecciona las apps para aplicarlo" : "Select the apps to apply it"}:\n${link}`
+      : `${clean}\n\n${spanish ? "Abre Blankmind para seleccionar las apps." : "Open Blankmind to select the apps."}`;
   }
   const actionIsReady = plan.semantic_state?.status === "ready" || plan.blocking_ready === true;
   if (action.type === "start_protection" && actionIsReady) {
-    const duration = Number.isInteger(action.minutes) ? `${action.minutes}-minute ` : "";
-    return `Tap the Blankmind notification to start your ${duration}block.`;
+    const duration = Number.isInteger(action.minutes) ? ` de ${action.minutes} minutos` : "";
+    return spanish
+      ? `Pulsa la notificación de Blankmind para iniciar tu bloqueo${duration}.`
+      : `Tap the Blankmind notification to start your${duration ? ` ${action.minutes}-minute ` : " "}block.`;
   }
-  return `${clean}\n\nTap the Blankmind notification to apply it.`;
+  return `${clean}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
 }
 
 function whatsappSetupButton(plan, appNames = []) {
@@ -664,7 +683,7 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt);
-  const language = "en";
+  const language = messageLanguage(prompt, savedMemory.language || savedMemory.conversation_state?.semantic_state?.language);
   const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
@@ -686,12 +705,13 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       prompt,
-      locale: "en-US",
+      locale: language === "es" ? "es-ES" : "en-US",
       context: {
         ...userContext,
         channel,
         assistant_channel: channel,
         language,
+        allow_spanish_response: true,
         has_selected_apps: userContext.has_selected_apps === true,
         screen_time_authorized: userContext.screen_time_authorized === true,
         user_context: userContext,
@@ -701,7 +721,7 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
     }),
   });
 
-  if (Object.keys(newFacts).length) {
+  if (Object.keys(newFacts).length || savedMemory.language !== language) {
     try {
       await recordAssistantMemory({ channel, channelUser: from, memory: { ...newFacts, language }, source: prompt });
     } catch (_) {
@@ -795,7 +815,8 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
       } catch (_) {
         // The conversational clarification remains safe even if cleanup is unavailable.
       }
-      return { text: "Would you like this once or recurring?" };
+      const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
+      return { text: spanish ? "¿Quieres aplicarlo una vez o de forma recurrente?" : "Would you like this once or recurring?" };
     }
     const actionButton = queuedAction ? whatsappSetupButton(plan, responseApps) : null;
     const replyPlan = effectivePendingAction && !primaryPendingAction ? { ...plan, actions: [effectivePendingAction] } : plan;
@@ -803,16 +824,17 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
       .replace(/\n\n(?:Select the apps to apply it|Selecciona las apps para aplicarlo):\nhttps?:\/\/\S+/i, "")
       .trim();
     if (actionButton) return { text: cleanReply, actionButton };
-    const asksRecurrence = /once or recurring|once or every day/i.test(cleanReply);
+    const spanish = String(replyPlan.response_language || replyPlan.semantic_state?.language || "").toLowerCase().startsWith("es");
+    const asksRecurrence = /once or recurring|once or every day|una vez|recurrente|cada d[ií]a/i.test(cleanReply);
     const tapRequired = effectivePendingAction
       && !["open_app_picker", "request_screen_time_permission"].includes(effectivePendingAction.type)
       && !asksRecurrence;
     const replyText = tapRequired && !/tap the blankmind notification|pulsa la notificación de blankmind/i.test(cleanReply)
-      ? `${cleanReply}\n\nTap the Blankmind notification to apply it.`
+      ? `${cleanReply}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`
       : cleanReply;
     return {
       text: primaryPendingAction && ["open_app_picker", "request_screen_time_permission"].includes(primaryPendingAction.type)
-        ? `${replyText}\n\nOpen Blankmind to choose the apps.`
+        ? `${replyText}\n\n${spanish ? "Abre Blankmind para elegir las apps." : "Open Blankmind to choose the apps."}`
         : replyText,
     };
   }

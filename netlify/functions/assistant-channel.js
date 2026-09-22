@@ -330,7 +330,10 @@ async function pollPendingAction(body) {
       source: "assistant_action_expired",
     });
     if (expiredOutcome) {
-      const message = "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
+      const spanish = String(memory.language || "").toLowerCase().startsWith("es");
+      const message = spanish
+        ? "La acción caducó antes de llegar al iPhone. No se aplicó ningún cambio. Puedes pedírmela otra vez."
+        : "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
       try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The explicit outcome remains recorded. */ }
     }
   }
@@ -426,29 +429,34 @@ async function acknowledgePendingAction(body) {
     source: `assistant_action_${status}`,
   });
   if (terminal) {
+    const spanish = String(memory.language || "").toLowerCase().startsWith("es");
     let message;
     if (status === "verified") {
       const target = pending.app_names.length ? pending.app_names.join(", ") : "the selected distractions";
       if (pending.type === "start_protection") {
-        message = `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
+        message = spanish
+          ? `${pending.app_names.length ? pending.app_names.join(", ") : "Tus distracciones seleccionadas"} ${pending.minutes ? `están bloqueadas durante ${pending.minutes} minutos` : "están bloqueadas"}.`
+          : `${target} is blocked${pending.minutes ? ` for ${pending.minutes} minutes` : ""}.`;
       } else if (pending.type === "apply_schedule") {
-        message = "The new blocking schedule is applied.";
+        message = spanish ? "El nuevo horario de bloqueo ya está aplicado." : "The new blocking schedule is applied.";
       } else if (pending.type === "update_schedule") {
-        message = "The blocking window was updated.";
+        message = spanish ? "La franja de bloqueo se ha actualizado." : "The blocking window was updated.";
       } else if (pending.type === "delete_schedule") {
-        message = "The blocking window was removed.";
+        message = spanish ? "La franja de bloqueo se ha eliminado." : "The blocking window was removed.";
       } else if (pending.type === "delete_all_schedules") {
-        message = "All blocking windows were removed.";
+        message = spanish ? "Se han eliminado todas las franjas de bloqueo." : "All blocking windows were removed.";
       } else {
-        message = "Done. The change is applied and verified.";
+        message = spanish ? "Hecho. El cambio se ha aplicado y verificado." : "Done. The change is applied and verified.";
       }
     } else if (status === "delayed") {
       const delay = execution?.start_delay_seconds || 0;
-      message = `The iPhone applied the request ${delay} seconds late. Effective protection ends at ${execution?.effective_until || "the device-recorded time"}; I am not counting it as immediate execution.`;
+      message = spanish
+        ? `El iPhone aplicó la orden con ${delay} segundos de retraso. La protección efectiva termina a las ${execution?.effective_until || "la hora registrada por el dispositivo"}; no la cuento como ejecución inmediata.`
+        : `The iPhone applied the request ${delay} seconds late. Effective protection ends at ${execution?.effective_until || "the device-recorded time"}; I am not counting it as immediate execution.`;
     } else if (status === "dismissed") {
-      message = "Cancelled. Nothing was changed on the iPhone.";
+      message = spanish ? "Cancelado. No se ha cambiado nada en el iPhone." : "Cancelled. Nothing was changed on the iPhone.";
     } else {
-      message = "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
+      message = spanish ? "No he podido aplicar el bloqueo en el iPhone. No se ha marcado como completado." : "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
     }
     try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The verified outcome remains recorded. */ }
   }

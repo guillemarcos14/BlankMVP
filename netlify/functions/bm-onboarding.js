@@ -11,6 +11,11 @@ function cleanText(value, maxLength = 600) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
 }
 
+function spanishContext(context = {}) {
+  const language = cleanText(context.language || context.locale, 24).toLowerCase();
+  return language === "es" || language.startsWith("es-") || language.startsWith("es_");
+}
+
 function hasSelectedDistractions(context = {}) {
   return context.has_selected_apps === true
     || Number(context.selection_count) > 0
@@ -18,6 +23,13 @@ function hasSelectedDistractions(context = {}) {
 }
 
 function onboardingMessages(context = {}) {
+  if (spanishContext(context)) {
+    return {
+      welcome: "Hola, soy Blankmind. Cuéntame qué te está llevando al móvil o qué te gustaría hacer más fácil.",
+      setup: "Elige las apps que más te enganchan. Esa será la lista que usaré cuando me pidas un bloqueo o un plan. Pulsa la notificación para seleccionarlas y vuelve aquí.",
+      ready: "Ya está todo preparado. Cuéntame qué te está llevando al móvil, cuándo lo coges o qué te gustaría cambiar.",
+    };
+  }
   return {
     welcome: "Hey, I’m Blankmind. Tell me what’s been pulling you into your phone, or what you’d like to make easier.",
     setup: "Pick the apps that pull you in most. That list is what I’ll use when you ask for a block or a plan. Tap the notification to choose them, then come back here.",

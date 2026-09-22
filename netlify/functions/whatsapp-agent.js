@@ -215,6 +215,22 @@ function requestedAppNames(text) {
     .map((candidate) => candidate.label);
 }
 
+function detectedLanguage(text) {
+  const value = cleanText(text, 800).toLowerCase();
+  return /[¿áéíóúñ]|\b(quiero|bloquea|bloquear|despues|después|comer|cenar|dormir|ayudame|ayúdame|consejo|redes sociales|hola|buenas|gracias|puedes|s[ií])\b/i.test(value)
+    ? "es"
+    : "en";
+}
+
+function messageLanguage(text, savedLanguage = "") {
+  const value = cleanText(text, 120).toLowerCase();
+  if (/^(?:sí|si|vale|perfecto?|gracias)\.?$/i.test(value)) return "es";
+  if (/^(?:yes|yeah|yep|sure|thanks?)\.?$/i.test(value)) return "en";
+  const neutralFollowup = /^(?:ok|okay|\d{1,2}(?::\d{2})?\s*(?:am|pm)?|usually\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?|sobre\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\.?$/i.test(value);
+  if (neutralFollowup && /^(?:es|en)/i.test(savedLanguage)) return savedLanguage.toLowerCase().startsWith("es") ? "es" : "en";
+  return detectedLanguage(text);
+}
+
 function pendingActionFromPlan(plan, prompt = "") {
   return buildPendingActionFromPlan(plan, { idPrefix: "wa" });
 }
@@ -310,21 +326,24 @@ function whatsappReplyText(plan, delivery = null) {
     .trim()
     .slice(0, 320) || "I can help with that in Blankmind.";
   if (!action) return text;
+  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
   if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
-    return `${text}\n\nOpen Blankmind to choose the apps. The plan will apply when you confirm the selection.`;
+    return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
   }
   const actionIsReady = plan.semantic_state?.status === "ready" || plan.blocking_ready === true;
   if (action.type === "start_protection" && actionIsReady) {
     if (delivery?.push?.sent === false) {
-      return "The block is pending. Tap the Blankmind notification when it arrives.";
+      return spanish ? "El bloqueo está pendiente. Pulsa la notificación de Blankmind cuando llegue." : "The block is pending. Tap the Blankmind notification when it arrives.";
     }
-    const duration = Number.isInteger(action.minutes) ? `${action.minutes}-minute ` : "";
-    return `Tap the Blankmind notification to start your ${duration}block.`;
+    const duration = Number.isInteger(action.minutes) ? ` de ${action.minutes} minutos` : "";
+    return spanish
+      ? `Pulsa la notificación de Blankmind para iniciar tu bloqueo${duration}.`
+      : `Tap the Blankmind notification to start your${duration ? ` ${action.minutes}-minute ` : " "}block.`;
   }
   if (delivery?.push?.sent === false) {
-    return `${text}\n\nI couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence.`;
+    return `${text}\n\n${spanish ? "No he podido despertar el iPhone ahora. La orden queda pendiente hasta que iOS permita ejecutarla; no la confirmaré como aplicada sin evidencia del dispositivo." : "I couldn't wake the iPhone now. The request remains pending until iOS allows it to run; I won't confirm it as applied without device evidence."}`;
   }
-  return `${text}\n\nTap the Blankmind notification to apply it.`;
+  return `${text}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
 }
 
 async function sendPlanReply(to, plan, delivery = null) {
@@ -396,7 +415,7 @@ async function agentContext(from, prompt, linkedConnection = null) {
     savedMemory = {};
   }
   const newFacts = memoryFactsFromText(prompt, savedMemory);
-  const language = "en";
+  const language = messageLanguage(prompt, savedMemory.language || savedMemory.conversation_state?.semantic_state?.language);
   const conversationState = freshConversationState(savedMemory.conversation_state);
   const memory = {
     ...savedMemory,
@@ -413,9 +432,9 @@ async function agentContext(from, prompt, linkedConnection = null) {
     storedUserContext,
     linkedConnection?.connectCode || savedMemory.assistant_connect_code,
   );
-  if (Object.keys(newFacts).length) {
-    try {
-      await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
+    if (Object.keys(newFacts).length || savedMemory.language !== language) {
+      try {
+        await recordAssistantMemory({ channel: "whatsapp", channelUser: from, memory: { ...newFacts, language }, source: prompt });
     } catch (_) {
       // Memory must never block a reply.
     }
@@ -425,6 +444,7 @@ async function agentContext(from, prompt, linkedConnection = null) {
     channel: "whatsapp",
     assistant_channel: "whatsapp",
     language,
+    allow_spanish_response: true,
     is_blank_active: userContext.is_blank_active === undefined ? false : userContext.is_blank_active,
     has_selected_apps: userContext.has_selected_apps === true,
     selection_count: Number.isFinite(userContext.selection_count) ? userContext.selection_count : 0,

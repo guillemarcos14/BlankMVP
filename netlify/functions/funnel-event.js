@@ -69,11 +69,18 @@ const ALLOWED_EVENTS = new Set([
   "web_bai_prompt_submitted",
   "web_bai_response_received",
   "web_bai_response_failed",
+  "web_bai_feedback_submitted",
   "web_bai_voice_started",
   "web_bai_voice_failed",
   "web_cta_clicked",
   "web_chat_started",
   "web_chat_token_limit_reached",
+  "web_signup_viewed",
+  "web_signup_started",
+  "web_signup_otp_failed",
+  "web_signup_waitlist_failed",
+  "web_signup_waitlist_succeeded",
+  "web_signup_verified",
 ]);
 
 function cleanText(value, maxLength = 160) {

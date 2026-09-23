@@ -74,7 +74,7 @@ async function deliverMessage(message) {
           delivery_status: delivery.status,
         }), 3);
       }
-      if (result.availabilityNoticeField && result.availabilityNotice?.length === 2) {
+      if (result.availabilityNoticeField && result.availabilityNotice?.length > 0) {
         await withRetry(() => patchUser(result.user.id, {
           [result.availabilityNoticeField]: new Date().toISOString(),
         }), 3);

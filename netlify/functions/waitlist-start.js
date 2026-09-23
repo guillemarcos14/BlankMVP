@@ -15,6 +15,24 @@ function now() {
   return new Date().toISOString();
 }
 
+function openingGapMs() {
+  const configured = Number(process.env.WAITLIST_OPENING_GAP_MS);
+  if (Number.isFinite(configured) && configured >= 0) return Math.min(configured, 5000);
+  return 1500;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function safeRecordEvent(userId, eventName, properties) {
+  try {
+    await recordEvent(userId, eventName, properties);
+  } catch {
+    // Observability must never turn a successful opening into a failed request.
+  }
+}
+
 function openingFields(channel) {
   return channel === "sms"
     ? {
@@ -24,7 +42,15 @@ function openingFields(channel) {
     : {
       first: "opening_first_sent_at",
       second: "opening_second_sent_at",
-    };
+  };
+}
+
+function deliveryFailureCode(error) {
+  const message = String(error?.message || '').toLowerCase();
+  if (/template|content_sid/.test(message)) return 'template_not_configured_or_rejected';
+  if (/twilio|provider|message/.test(message)) return 'provider_send_failed';
+  if (/timeout|network|fetch/.test(message)) return 'network_or_provider';
+  return 'opening_delivery_failed';
 }
 
 async function startWaitlist(event) {
@@ -45,21 +71,30 @@ async function startWaitlist(event) {
     whatsappConsent: true,
   });
 
+  await safeRecordEvent(user.id, "waitlist_start_requested", { channel });
+
   const fields = openingFields(channel);
   const sent = [];
   const deliveries = [];
   const persistenceErrors = [];
   let deliveryError = null;
+  let previousDeliveryIndex = null;
 
   // Deliver both messages before persisting either delivery. A Supabase write
   // must never prevent the second opening message from reaching the phone.
   for (const index of [1, 2]) {
     const field = index === 1 ? fields.first : fields.second;
     if (user[field]) continue;
+    if (index === 2 && previousDeliveryIndex === 1) {
+      // Give Twilio time to enqueue the first template before creating the
+      // second one, so WhatsApp/SMS cannot present the opening out of order.
+      await wait(openingGapMs());
+    }
     try {
       const result = await sendOpeningMessage(user.phone_e164, index, channel);
       deliveries.push({ index, result });
       sent.push(index);
+      previousDeliveryIndex = index;
     } catch (error) {
       deliveryError = error;
       break;
@@ -115,10 +150,22 @@ async function startWaitlist(event) {
   }
 
   if (deliveryError) {
+    await safeRecordEvent(user.id, "waitlist_start_failed", {
+      channel,
+      stage: "opening_delivery",
+      opening_messages_sent: sent,
+      error_code: deliveryFailureCode(deliveryError),
+    });
     throw deliveryError;
   }
 
   const openingSent = Boolean(user.opening_sent_at) || sent.includes(2);
+  await safeRecordEvent(user.id, "waitlist_start_completed", {
+    channel,
+    opening_messages_sent: sent,
+    opening_already_sent: sent.length === 0,
+    persistence_warning: persistenceErrors.length > 0,
+  });
   return json(200, {
     ok: true,
     waitlist_status: user.status,

@@ -11,6 +11,7 @@ process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE = "false";
 process.env.WAITLIST_TWILIO_ASYNC = "false";
 
 const {
+  CAPABILITY_NOTICE_MESSAGE,
   AVAILABILITY_NOTICE_MESSAGE_1,
   AVAILABILITY_NOTICE_MESSAGE_2,
   OPENING_MESSAGE_1,
@@ -26,7 +27,10 @@ const {
   ageBand,
   deterministicFacts,
   generateReply,
+  hasSubstantiveInbound,
   isRestrictedTopic,
+  isGreetingOnly,
+  isSocialOnlyGreeting,
   naturalGoalPlan,
   questionMemory,
   questionTopic,
@@ -35,7 +39,9 @@ const {
   validateExtractedFacts,
 } = require("../netlify/functions/_waitlist_ai");
 const {
+  availabilityNoticeForPrompt,
   handler,
+  isCapabilityRequest,
   naturalFallbackReply,
 } = require("../netlify/functions/waitlist-agent");
 const { handler: backgroundHandler } = require("../netlify/functions/waitlist-agent-background");
@@ -72,6 +78,20 @@ function openingContract() {
   assert.strictEqual(
     AVAILABILITY_NOTICE_MESSAGE_2,
     "App blocking goes live on October 1. Until then, I’d love to hear how your phone fits into your day.",
+  );
+  assert.match(CAPABILITY_NOTICE_MESSAGE, /early-access demo/i);
+  assert.match(CAPABILITY_NOTICE_MESSAGE, /waitlist/i);
+  assert.match(CAPABILITY_NOTICE_MESSAGE, /download on October 1/i);
+  assert.match(CAPABILITY_NOTICE_MESSAGE, /block apps/i);
+  assert.strictEqual(isCapabilityRequest("Can you block apps for me right now?"), true);
+  assert.strictEqual(isCapabilityRequest("I usually scroll after work."), false);
+  assert.deepStrictEqual(
+    availabilityNoticeForPrompt("Can you block apps for me right now?", false, {}, "availability_notice_whatsapp_sent_at"),
+    [CAPABILITY_NOTICE_MESSAGE],
+  );
+  assert.deepStrictEqual(
+    availabilityNoticeForPrompt("Can you block apps for me right now?", false, { availability_notice_whatsapp_sent_at: "2026-09-20T00:00:00.000Z" }, "availability_notice_whatsapp_sent_at"),
+    [],
   );
   const fallback = naturalFallbackReply(
     "I usually wake up at 8 AM and scroll for 40 to 45 minutes before breakfast. I want to stop doing that. Can you help me?",
@@ -197,7 +217,10 @@ async function smsOpeningDeliveryContract() {
     assert.strictEqual(state.twilio[0].get("MessagingServiceSid"), "MGtest");
     assert.strictEqual(state.twilio[0].get("Body"), OPENING_MESSAGE_1);
     assert.strictEqual(state.twilio[1].get("Body"), OPENING_MESSAGE_2);
-    assert.strictEqual(state.events[0].properties.channel, "sms");
+    assert.ok(state.events.some((event) => event.event_name === "waitlist_start_requested"));
+    const startedEvent = state.events.find((event) => event.event_name === "waitlist_started");
+    assert.ok(startedEvent);
+    assert.strictEqual(startedEvent.properties.channel, "sms");
   } finally {
     global.fetch = previousFetch;
     const mapping = {
@@ -513,9 +536,27 @@ function safetyContract() {
   assert.strictEqual(isRestrictedTopic("What do you think about the war?"), true);
   assert.strictEqual(isRestrictedTopic("I work in design and scroll after meetings"), false);
   const cleaned = safeReply("**I hear you.** — Tell me more at https://example.com");
-  assert.doesNotMatch(cleaned, /\*\*|—|https?:\/\//);
+  assert.doesNotMatch(cleaned, /\*\*|--+|[-\u2010-\u2015\u2212\u2E3A\u2E3B\uFE58\uFE63\uFF0D]|https?:\/\//);
   assert.ok(replyQualityIssues("I’m glad to meet you. What are you working on?").includes("formal_or_stock_tone"));
   assert.deepStrictEqual(replyQualityIssues("I’m curious about your work. What are you building?"), []);
+  assert.deepStrictEqual(replyQualityIssues("Hey! How’s it been with your phone since we last spoke?"), []);
+  assert.ok(replyQualityIssues("I’m curious about your phone - what happens?").includes("formatting_or_link"));
+}
+
+function resumedGreetingFallbackContract() {
+  const reply = naturalFallbackReply("Hey Blankmind", [
+    { direction: "inbound", body: "I scroll for hours after work." },
+  ]);
+  assert.strictEqual(reply, "Hey! How’s it been with your phone since we last spoke?");
+  assert.doesNotMatch(reply, /--+|[-\u2010-\u2015\u2212\u2E3A\u2E3B\uFE58\uFE63\uFF0D]/);
+  assert.strictEqual(isGreetingOnly("Hey Blankmind"), true);
+  assert.strictEqual(isSocialOnlyGreeting("I just wanted to say hi"), true);
+  assert.strictEqual(isSocialOnlyGreeting("Hey Blankmind"), false);
+  assert.strictEqual(hasSubstantiveInbound([
+    { direction: "inbound", body: "I scroll for hours after work." },
+  ]), true);
+  assert.ok(replyQualityIssues("Hey, nice to hear from you. What’s new?", { socialOnlyGreeting: true })
+    .includes("social_greeting_should_not_force_question"));
 }
 
 function naturalGoalRoutingContract() {
@@ -584,6 +625,38 @@ async function naturalGoalCompletionContract() {
     assert.strictEqual(calls, 2);
     assert.doesNotMatch(result.reply, /\?/);
     assert.strictEqual(result.goal_plan.state, "complete");
+  } finally {
+    if (previousPolish === undefined) delete process.env.WAITLIST_CONVERSATION_POLISH;
+    else process.env.WAITLIST_CONVERSATION_POLISH = previousPolish;
+  }
+}
+
+async function socialOnlyGreetingContract() {
+  const previousPolish = process.env.WAITLIST_CONVERSATION_POLISH;
+  process.env.WAITLIST_CONVERSATION_POLISH = "false";
+  let calls = 0;
+  try {
+    const result = await generateReply({
+      message: "I just wanted to say hi",
+      history: [{ direction: "inbound", body: "I scroll for hours after work." }],
+      profile: {},
+      newlySavedFacts: [],
+      fetchImpl: async (url, options) => {
+        calls += 1;
+        const request = JSON.parse(options.body);
+        if (calls === 1) {
+          return response(200, {
+            output_text: JSON.stringify({ reply: "Hey! What have you been up to?", focus: "reentry", profile_useful: false }),
+          });
+        }
+        assert.strictEqual(request.text.format.name, "waitlist_conversation_reply_repair");
+        return response(200, {
+          output_text: JSON.stringify({ reply: "Hey! Nice to hear from you.", focus: "reentry", profile_useful: false }),
+        });
+      },
+    });
+    assert.strictEqual(calls, 2, "a social-only greeting must not force a question");
+    assert.doesNotMatch(result.reply, /\?/);
   } finally {
     if (previousPolish === undefined) delete process.env.WAITLIST_CONVERSATION_POLISH;
     else process.env.WAITLIST_CONVERSATION_POLISH = previousPolish;
@@ -1051,6 +1124,7 @@ function isolationContract() {
 
 async function main() {
   openingContract();
+  resumedGreetingFallbackContract();
   await openingDeliveryContract();
   await smsOpeningDeliveryContract();
   await openingDeliverySurvivesPersistenceErrorContract();
@@ -1059,6 +1133,7 @@ async function main() {
   safetyContract();
   naturalGoalRoutingContract();
   await naturalGoalCompletionContract();
+  await socialOnlyGreetingContract();
   providerParsingContract();
   isolationContract();
   await conversationMemoryContract();

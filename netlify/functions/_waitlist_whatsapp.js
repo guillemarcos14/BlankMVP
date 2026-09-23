@@ -7,6 +7,7 @@ const OPENING_MESSAGE_1 = "Hey, I’m Blankmind. Tell me a bit about yourself.";
 const OPENING_MESSAGE_2 = "What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.";
 const AVAILABILITY_NOTICE_MESSAGE_1 = "By the way, you’re on the early-access waitlist for now, so the full product isn’t available just yet.";
 const AVAILABILITY_NOTICE_MESSAGE_2 = "App blocking goes live on October 1. Until then, I’d love to hear how your phone fits into your day.";
+const CAPABILITY_NOTICE_MESSAGE = "By the way, this is an early-access demo, and you’re on the waitlist for the full app. The full app with all features will be available to download on October 1, and I’ll be able to block apps for you there.";
 const TWILIO_OPENING_CONTENT_SIDS = {
   1: "HX8d2a6ae19f26e983695d248284b74c40",
   2: "HX99b42fe21aaa483720b97bcbb57020d2",
@@ -464,6 +465,7 @@ async function sendOpening(phone, fetchImpl = fetch) {
 }
 
 module.exports = {
+  CAPABILITY_NOTICE_MESSAGE,
   AVAILABILITY_NOTICE_MESSAGE_1,
   AVAILABILITY_NOTICE_MESSAGE_2,
   OPENING_MESSAGE_1,

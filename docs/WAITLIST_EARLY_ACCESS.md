@@ -15,7 +15,7 @@ La web, Supabase, Netlify y los senders existentes de WhatsApp/Twilio siguen sie
    - `Hey, I’m Blankmind. Tell me a bit about yourself.`
    - `What should I call you? How old are you? What’s a normal day like for you? A voice note’s fine too, if that’s easier.`
 
-4. Desde la primera respuesta, `waitlist-agent` responde primero al contenido recibido y conversa sin guion ni orden fijo. Después envía una sola vez, como dos mensajes separados, la aclaración de que la persona está en la early-access waitlist y de que el bloqueo de apps se activa el 1 de octubre. A partir de ahí puede conocer trabajo, estudios, rutinas, entorno, intereses, uso del móvil, apps, momentos de scroll, impacto y cambio deseado.
+4. Desde la primera respuesta, `waitlist-agent` responde primero al contenido recibido y conversa sin guion ni orden fijo. Después envía una sola vez la aclaración de disponibilidad. Si la persona pregunta si puede bloquear apps ahora, la respuesta conserva la negativa correcta y añade una segunda burbuja explicando que esto es una demo de early access, que está en la waitlist y que la app completa estará disponible para descargar el 1 de octubre.
 5. Si llega un audio, se descarga y transcribe en memoria. No se conserva el archivo; solo el texto transcrito.
 6. Cada turno extrae únicamente hechos explícitos y guarda evidencia, confianza, estado y correcciones. La conversación usa el perfil actual, pero nunca expone que existe un checklist.
 

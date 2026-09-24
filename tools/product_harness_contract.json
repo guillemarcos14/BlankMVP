@@ -85,6 +85,7 @@
       { "name": "node_syntax_waitlist_data", "run": "node --check netlify/functions/waitlist-data.js" },
       { "name": "waitlist_early_access", "run": "node tools/waitlist_early_access_test.js" },
       { "name": "bm_final_qa_router", "run": "node tools/bm_final_qa_router_test.js" },
+      { "name": "production_app_activation", "run": "node tools/production_app_activation_test.js" },
       { "name": "bm_final_qa_dispatch", "run": "node tools/bm_final_qa_dispatch_test.js" },
       { "name": "bm_openai_request_contract", "run": "node tools/bm_openai_request_contract_test.js" },
       { "name": "bm_loop_contract", "run": "node tools/bm_loop_contract_test.js" },

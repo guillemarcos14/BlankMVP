@@ -2,6 +2,7 @@ import FamilyControls
 import LocalAuthentication
 import SwiftUI
 import UIKit
+import UserNotifications
 
 enum HomeSection: Hashable {
     case distractions
@@ -21,6 +22,10 @@ struct AssistantInboxResponse: Decodable {
 
 private struct AssistantAcknowledgementResponse: Decodable {
     let acknowledged: Bool
+}
+
+private struct AssistantPushRegistrationResponse: Decodable {
+    let registered: Bool
 }
 
 struct AssistantInboxAction: Decodable {
@@ -321,15 +326,15 @@ struct AssistantActionInboxClient {
     }
 
     func registerDevicePush(token: String, environment: String, connectCode: String, channel: String, phoneNumber: String) async -> Bool {
-        guard (try? await request(
+        guard let data = try? await request(
             action: "register_device_push",
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber,
             deviceToken: token,
             environment: environment
-        )) != nil else { return false }
-        return true
+        ), let response = try? JSONDecoder().decode(AssistantPushRegistrationResponse.self, from: data) else { return false }
+        return response.registered
     }
 
     private func request(
@@ -402,6 +407,7 @@ struct HomeView: View {
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
     @State private var showingAssistantConnect = false
+    @State private var assistantNotificationsAuthorized = false
     @State private var showingContextualAppPicker = false
     @State private var contextualPlanSelection = FamilyActivitySelection()
     @State private var showingRelink = false
@@ -522,6 +528,7 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            refreshAssistantNotificationAuthorization()
             pollPendingAssistantActionIfNeeded(force: true)
         }
         .onChange(of: scenePhase) { phase in
@@ -534,6 +541,7 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            refreshAssistantNotificationAuthorization()
             pollPendingAssistantActionIfNeeded(force: true)
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
@@ -1772,6 +1780,7 @@ struct HomeView: View {
             "has_selected_apps": sessionStore.hasSelectedApps,
             "selection_count": sessionStore.selectionCount,
             "screen_time_authorized": screenTimeBlocker.authorizationStatus == .approved,
+            "notification_authorized": assistantNotificationsAuthorized,
             "emergency_unlocks_remaining": sessionStore.emergencyUnlocksRemaining,
             "vacation_mode_active": sessionStore.isVacationModeActive,
             "adherence_score": system.profile.adherenceScore,
@@ -1785,7 +1794,7 @@ struct HomeView: View {
             "app_presence": BlankmindAppPresence.payload(
                 appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
             ),
-            "device_execution_ready": !(BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? "").isEmpty,
+            "device_execution_ready": BlankSharedState.defaults.bool(forKey: "blankAssistantPushRegistered") && assistantNotificationsAuthorized,
             "schedule": sessionStore.assistantScheduleContext(),
             "allow_only_mode_enabled": sessionStore.allowOnlyModeEnabled,
             "adult_content_blocking_enabled": sessionStore.adultContentBlockingEnabled,
@@ -1811,6 +1820,21 @@ struct HomeView: View {
                 phoneNumber: assistantPhoneNumber,
                 payload: payload
             )
+        }
+    }
+
+    private func refreshAssistantNotificationAuthorization() {
+        Task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let granted = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+                || settings.authorizationStatus == .ephemeral
+            let authorized = granted && (settings.alertSetting == .enabled
+                || settings.notificationCenterSetting == .enabled
+                || settings.lockScreenSetting == .enabled)
+            guard assistantNotificationsAuthorized != authorized else { return }
+            assistantNotificationsAuthorized = authorized
+            syncAssistantContext()
         }
     }
 
@@ -3259,6 +3283,7 @@ private struct AssistantConnectSheet: View {
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
     @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var phoneVerified = false
     @State private var copiedCode = false
     @State private var showingPhoneSignIn = false
 
@@ -3312,14 +3337,12 @@ private struct AssistantConnectSheet: View {
                             Text(minimalAppearance ? "your phone" : "Your phone")
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
-                            TextField("+1 555 000 0000", text: $phoneNumber)
-                                .keyboardType(.phonePad)
-                                .textContentType(.telephoneNumber)
+                            Text(phoneVerified ? phoneNumber : "Verify your phone to continue")
                                 .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                                 .padding(.horizontal, 16)
                                 .frame(height: 52)
                                 .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
-                            Text(minimalAppearance ? "used to match your connect message." : "Used to match your CONNECT message.")
+                            Text("This verified number must match your WhatsApp account.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
 
@@ -3337,7 +3360,7 @@ private struct AssistantConnectSheet: View {
                                 subtitle: "Recommended",
                                 systemImage: "message.fill",
                                 usesWhatsAppLogo: true,
-                                enabled: whatsAppNumber != nil,
+                                enabled: whatsAppNumber != nil && phoneVerified && !connectCode.isEmpty && !phoneNumber.isEmpty,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
                             ) {
@@ -3349,7 +3372,7 @@ private struct AssistantConnectSheet: View {
                                 subtitle: "Same code, same assistant",
                                 systemImage: "message",
                                 usesWhatsAppLogo: false,
-                                enabled: smsNumber != nil,
+                                enabled: smsNumber != nil && phoneVerified && !connectCode.isEmpty && !phoneNumber.isEmpty,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
                             ) {
@@ -3402,9 +3425,6 @@ private struct AssistantConnectSheet: View {
         .foregroundStyle(textColor)
         .environment(\.blankMinimalAppearance, true)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .onAppear {
-            ensureConnectCode()
-        }
         .sheet(isPresented: $showingPhoneSignIn) {
             AppPhoneSignInSheet(initialPhone: phoneNumber)
                 .environmentObject(sessionStore)
@@ -3415,10 +3435,9 @@ private struct AssistantConnectSheet: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     private var statusText: String {
-        guard !connectedAt.isEmpty else {
-            return "Send this code once to verify Assistant."
-        }
-        return "Finish in \(preferredChannelName) by sending the CONNECT code."
+        if !phoneVerified || connectCode.isEmpty { return "Verify your phone before connecting a chat channel." }
+        if !connectedAt.isEmpty { return "Connected to \(preferredChannelName)." }
+        return "Send this code from your verified \(preferredChannelName) number."
     }
 
     private var preferredChannelName: String {
@@ -3426,18 +3445,15 @@ private struct AssistantConnectSheet: View {
     }
 
     private var connectMessage: String {
-        "CONNECT \(connectCode.isEmpty ? "BLANKED" : connectCode)"
-    }
-
-    private func ensureConnectCode() {
-        guard connectCode.isEmpty else { return }
-        connectCode = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6)).uppercased()
+        connectCode.isEmpty ? "Verify phone first" : "CONNECT \(connectCode)"
     }
 
     private func openAssistantChannel(_ channel: AssistantChannel) {
-        ensureConnectCode()
+        guard phoneVerified, !connectCode.isEmpty, !phoneNumber.isEmpty else {
+            showingPhoneSignIn = true
+            return
+        }
         preferredChannel = channel.rawValue
-        connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
         let cleanedUserPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let message = connectMessage
@@ -3504,39 +3520,40 @@ private struct AssistantConnectSheet: View {
     }
 }
 
-private struct AppPhoneSignInSheet: View {
+struct AppPhoneSignInSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
-    @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var phoneVerified = false
     @State private var code = ""
-    @State private var channel = "whatsapp"
+    @State private var inputPhone = ""
     @State private var verificationStarted = false
+    @State private var dataConsent = false
     @State private var isWorking = false
     @State private var errorMessage: String?
 
     let initialPhone: String
+    var onVerified: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Use the same phone number you verified on the web. Blankmind will link this app install to that account and its WhatsApp or SMS thread.")
+                    Text("Verify your phone in this app. We will send a one-time code by SMS. You will connect WhatsApp in the next step.")
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(.secondary)
                 }
 
                 Section("Phone") {
-                    TextField("+1 555 000 0000", text: $phoneNumber)
+                    TextField("+34 600 000 000", text: $inputPhone)
                         .keyboardType(.phonePad)
                         .textContentType(.telephoneNumber)
-                    Picker("Send code by", selection: $channel) {
-                        Text("WhatsApp").tag("whatsapp")
-                        Text("SMS").tag("sms")
-                    }
-                    .pickerStyle(.segmented)
+                }
+
+                Section {
+                    Toggle("Link this phone and iPhone to my Blankmind account so I can use the assistant on WhatsApp.", isOn: $dataConsent)
                 }
 
                 if verificationStarted {
@@ -3544,17 +3561,17 @@ private struct AppPhoneSignInSheet: View {
                         TextField("123456", text: $code)
                             .keyboardType(.numberPad)
                             .textContentType(.oneTimeCode)
-                        Button(isWorking ? "Verifying…" : "Verify and connect") {
+                        Button(isWorking ? "Verifying…" : "Verify phone") {
                             Task { await verifyCode() }
                         }
-                        .disabled(isWorking || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isWorking || !dataConsent || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 } else {
                     Section {
                         Button(isWorking ? "Sending…" : "Send verification code") {
                             Task { await requestCode() }
                         }
-                        .disabled(isWorking || phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(isWorking || inputPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
 
@@ -3565,7 +3582,7 @@ private struct AppPhoneSignInSheet: View {
                     }
                 }
             }
-            .navigationTitle("Connect Blankmind")
+            .navigationTitle("Verify phone")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -3573,7 +3590,7 @@ private struct AppPhoneSignInSheet: View {
                 }
             }
             .onAppear {
-                if phoneNumber.isEmpty { phoneNumber = initialPhone }
+                inputPhone = phoneNumber.isEmpty ? initialPhone : phoneNumber
             }
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
@@ -3581,8 +3598,7 @@ private struct AppPhoneSignInSheet: View {
 
     private func requestCode() async {
         await performRequest(action: "request_otp", payload: [
-            "phone": phoneNumber,
-            "channel": channel,
+            "phone": inputPhone,
         ])
         if errorMessage == nil { verificationStarted = true }
     }
@@ -3593,7 +3609,7 @@ private struct AppPhoneSignInSheet: View {
             errorMessage = nil
             let auth = try await postJSON(path: "app-auth", payload: [
                 "action": "verify_otp",
-                "phone": phoneNumber,
+                "phone": inputPhone,
                 "token": code,
             ])
             guard let accessToken = auth["access_token"] as? String, !accessToken.isEmpty else {
@@ -3604,19 +3620,21 @@ private struct AppPhoneSignInSheet: View {
                 payload: [
                     "action": "claim_identity",
                     "app_install_id": BlankSharedState.appInstallId,
-                    "data_consent": true,
+                    "data_consent": dataConsent,
                 ],
                 bearerToken: accessToken
             )
             guard let linkedCode = linked["assistant_connect_code"] as? String, !linkedCode.isEmpty else {
                 throw AppPhoneSignInError.message("The account was verified but the assistant link was not created.")
             }
-            connectCode = linkedCode
-            preferredChannel = channel
-            if let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty {
-                phoneNumber = linkedPhone
+            guard let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty else {
+                throw AppPhoneSignInError.message("The account was verified but no phone number was returned.")
             }
-            connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
+            phoneNumber = linkedPhone
+            connectCode = linkedCode
+            preferredChannel = "whatsapp"
+            phoneVerified = true
+            onVerified?()
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

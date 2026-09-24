@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-20
+Ultima actualizacion: 2026-09-24
 
 ## Hecho hoy
+- 2026-09-24: Implementado en `codex/production-app-onboarding-2026-09-24` el alta directa desde iOS para BM Final: el onboarding se abre en la primera instalación, exige seleccionar distracciones y permiso de Tiempo de uso, verifica teléfono por SMS, conecta WhatsApp desde ese número, comprueba autorización de notificaciones y registro APNs real, y solo después envía el mensaje de listo. Se eliminó el bloqueo automático al terminar la selección. La ruta pública de usuarios vinculados está tras `BM_FINAL_APP_LINKED_ROUTING_ENABLED=true`; sin activarla, la waitlist pública sigue igual. Product harness `50/50`; falta compilación iOS, integración de Backend Cloud y prueba física completa.
 - 2026-09-24: La primera orden física de bloqueo por WhatsApp no envió push: `semantic_state=needs_setup`, sin acción pendiente ni intento APNs. El teléfono de Guillem carece de identidad de app y token push registrados; solo hay conexión WhatsApp antigua. Corregido el texto que indicaba pulsar una notificación inexistente (`9b2e56c`), Netlify `6ab506f5f541c324210b075f`, harness `49/49`. Pendiente vincular app y repetir hasta `verified`.
 - 2026-09-24: Primera prueba física de BM Final por WhatsApp completada: el mensaje de Guillem (`1584`) entró en Twilio, quedó procesado en `assistant_inbound_messages` y obtuvo respuesta entregada; no pasó por `waitlist_messages`. Corregido el acceso heredado de `sms-agent` observado en callbacks salientes sin marcador de producción, y excluidos mensajes del propio remitente. Release `691edff`, Netlify `6ab50324a46b7707fef848fb`, harness `49/49`. Pendiente probar otro WhatsApp, SMS y bloqueo con acuse nativo.
 - 2026-09-21: Añadida una aclaración específica para peticiones de bloqueo inmediato. Cuando la persona pregunta si Blankmind puede bloquear apps desde el chat, la respuesta mantiene la negativa y añade una segunda burbuja que identifica la demo/waitlist y anuncia la descarga de la app completa el 1 de octubre. La entrega es idempotente por canal y funciona también si el primer turno ya ocurrió sin haber enviado el aviso; tests waitlist pasan. Pendiente integrar/publicar y probar en una conversación real.
@@ -650,6 +651,7 @@ Ultima actualizacion: 2026-09-20
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-24: La producción empieza directamente en la app; la web permanece como waitlist temporal. La selección canónica de distracciones, permisos de Tiempo de uso y notificaciones, teléfono verificado, WhatsApp vinculado y APNs registrado son condiciones separadas. BM no promete bloqueo hasta cumplirlas.
 - [cerrada] 2026-09-24: Se permite una única excepción privada para el teléfono de Guillem por WhatsApp; el público sigue en Waitlist. La configuración ausente o inválida no abre BM Final.
 - [cerrada] 2026-09-20: El canal seleccionado en la landing se propaga hasta `waitlist-start`; WhatsApp usa sus plantillas aprobadas y SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER` para los mismos dos textos deterministas.
 - [cerrada] 2026-09-15: BM usa estado semántico como autoridad para bloqueos; el modelo aporta evidencia, nunca autorización. Correcciones invalidan confirmación. Sin defaults de horas, duración, apps ni horizonte. La migración 015 y persistencia requerida deben preceder a una futura publicación del backend. Evaluación dura sin compensación por medias; texto nuevo exige revisión independiente. No desplegar desde esta tarea.

@@ -2,11 +2,12 @@ import Foundation
 import SwiftUI
 
 struct ContentView: View {
+    @EnvironmentObject private var sessionStore: SessionStore
     @State private var showingOnboardingDemo = false
 
     var body: some View {
         ZStack {
-            if showingOnboardingDemo {
+            if showingOnboardingDemo || !sessionStore.setupComplete {
                 SetupView {
                     withAnimation(.easeInOut(duration: 0.35)) {
                         showingOnboardingDemo = false

@@ -33,10 +33,11 @@ async function authRequest(path, body) {
 
 async function requestOtp(body) {
   const phone = normalizePhone(body.phone);
-  const channel = cleanText(body.channel, 20).toLowerCase();
-  if (!phone || !["whatsapp", "sms"].includes(channel)) return json(400, { error: "missing_phone_or_channel" });
-  await authRequest("otp", { phone, create_user: true, channel });
-  return json(200, { ok: true, phone_e164: phone, channel });
+  if (!phone) return json(400, { error: "missing_phone" });
+  // Authentication is independent of the assistant channel. An unsolicited
+  // WhatsApp OTP requires an approved template and cannot be relied on here.
+  await authRequest("otp", { phone, create_user: true, channel: "sms" });
+  return json(200, { ok: true, phone_e164: phone, channel: "sms" });
 }
 
 async function verifyOtp(body) {

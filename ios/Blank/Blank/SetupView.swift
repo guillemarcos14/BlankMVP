@@ -23,6 +23,8 @@ private enum OnboardingStep: Int, CaseIterable {
     case permission
     case notifications
     case apps
+    case phone
+    case whatsApp
 
     var analyticsName: String {
         switch self {
@@ -44,6 +46,8 @@ private enum OnboardingStep: Int, CaseIterable {
         case .permission: return "screen_time_permission"
         case .notifications: return "notifications"
         case .apps: return "apps_selection"
+        case .phone: return "phone_verification"
+        case .whatsApp: return "whatsapp_connection"
         }
     }
 
@@ -160,9 +164,12 @@ struct SetupView: View {
     @EnvironmentObject private var purchaseStore: StoreKitPurchaseStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @State private var currentStep: OnboardingStep = .awareness
     @State private var showingPicker = false
+    @State private var showingPhoneSignIn = false
+    @State private var assistantConnectionInFlight = false
     @State private var message: String?
     @State private var dailyHours = 4.5
     @State private var selectedPlan: OnboardingPlan = .annual
@@ -192,6 +199,11 @@ struct SetupView: View {
     @AppStorage("blankOnboardingDailyHours", store: BlankSharedState.defaults) private var storedDailyHours = 4.5
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
     @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = false
+    @AppStorage("blankOnboardingStepRaw", store: BlankSharedState.defaults) private var savedStepRaw = 0
+    @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var assistantPhoneNumber = ""
+    @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var assistantConnectCode = ""
+    @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var assistantPhoneVerified = false
+    @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var assistantPreferredChannel = ""
 
     var onFinishForQA: (() -> Void)?
 
@@ -271,6 +283,9 @@ struct SetupView: View {
         .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
+            if !sessionStore.setupComplete, let savedStep = OnboardingStep(rawValue: savedStepRaw) {
+                currentStep = savedStep == .whatsApp && !assistantPhoneVerified ? .phone : savedStep
+            }
             dailyHours = storedDailyHours
             BlankFunnelAnalytics.trackStepOnce(currentStep.analyticsName)
             Task {
@@ -285,9 +300,11 @@ struct SetupView: View {
             Task {
                 await refreshScreenTimeAndContinueIfApproved()
                 await refreshNotificationStatus()
+                if currentStep == .whatsApp { await checkWhatsAppConnection() }
             }
         }
         .onChange(of: currentStep) { step in
+            savedStepRaw = step.rawValue
             if step == .lifetime {
                 startLifetimeAnimation()
             }
@@ -316,6 +333,12 @@ struct SetupView: View {
         }
         .sheet(item: $presentedLegalDocument) { document in
             LegalDocumentView(document: document)
+        }
+        .sheet(isPresented: $showingPhoneSignIn) {
+            AppPhoneSignInSheet(initialPhone: assistantPhoneNumber) {
+                goForward()
+            }
+            .environmentObject(sessionStore)
         }
         .animation(.easeInOut(duration: 0.26), value: currentStep.rawValue)
     }
@@ -365,6 +388,10 @@ struct SetupView: View {
             notificationsStep
         case .apps:
             appsStep
+        case .phone:
+            phoneStep
+        case .whatsApp:
+            whatsAppStep
         }
     }
 
@@ -804,17 +831,40 @@ struct SetupView: View {
     private var appsStep: some View {
         referenceScene(
             lines: [
-                .text(sessionStore.hasSelectedApps ? "Your first block" : "Choose all"),
-                .text(sessionStore.hasSelectedApps ? "is ready with" : "your distractions", icon: "app.badge.fill"),
-                .text(sessionStore.hasSelectedApps ? "your distractions" : "once")
+                .text(sessionStore.hasSelectedApps ? "Distractions" : "Choose all"),
+                .text(sessionStore.hasSelectedApps ? "selected" : "your distractions", icon: "app.badge.fill"),
+                .text(sessionStore.hasSelectedApps ? "for Blankmind" : "once")
             ],
             body: sessionStore.hasSelectedApps
-                ? weakMomentPreview
+                ? "This is the list Blankmind will use when you ask for a block. Connect your phone and WhatsApp next."
                 : "Choose every app, category or website that pulls your attention. This becomes your one reusable protection list.",
-            primaryTitle: sessionStore.hasSelectedApps ? "Start first blank" : "Select apps",
+            primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
             primaryAction: selectAppsOrContinue,
             secondaryTitle: sessionStore.hasSelectedApps ? "Edit selection" : nil,
             secondaryAction: sessionStore.hasSelectedApps ? { showingPicker = true } : nil
+        )
+    }
+
+    private var phoneStep: some View {
+        referenceScene(
+            lines: [.text("Verify your phone"), .text("to meet Blankmind", icon: "iphone")],
+            body: "We send a one-time code by SMS. Your account and this iPhone will be linked before you connect WhatsApp.",
+            primaryTitle: assistantPhoneVerified ? "Continue" : "Verify phone",
+            primaryAction: {
+                if !assistantPhoneVerified { showingPhoneSignIn = true }
+                else { goForward() }
+            }
+        )
+    }
+
+    private var whatsAppStep: some View {
+        referenceScene(
+            lines: [.text("Connect WhatsApp"), .text("to Blankmind", icon: "message.fill")],
+            body: "Send the prepared message from your verified number. Return here to finish the connection and check notifications.",
+            primaryTitle: assistantConnectionInFlight ? "Checking…" : notificationStatus == "On" ? "Connect WhatsApp" : "Enable notifications",
+            primaryAction: { Task { await startWhatsAppConnection() } },
+            secondaryTitle: "I've sent the message",
+            secondaryAction: { Task { await checkWhatsAppConnection() } }
         )
     }
 
@@ -1479,7 +1529,9 @@ struct SetupView: View {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         switch settings.authorizationStatus {
         case .authorized, .provisional, .ephemeral:
-            notificationStatus = "On"
+            notificationStatus = settings.alertSetting == .enabled
+                || settings.notificationCenterSetting == .enabled
+                || settings.lockScreenSetting == .enabled ? "On" : "Off"
         case .denied:
             notificationStatus = "Off"
         case .notDetermined:
@@ -1601,6 +1653,10 @@ struct SetupView: View {
 
     private func selectAppsOrContinue() {
         if sessionStore.hasSelectedApps {
+            guard screenTimeBlocker.authorizationStatus == .approved else {
+                message = "Allow Screen Time before continuing."
+                return
+            }
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
             DigitalWellnessAI.saveInitialDiagnosis(
                 goal: selectedOnboardingGoal,
@@ -1608,24 +1664,160 @@ struct SetupView: View {
                 dailyHours: storedDailyHours,
                 selectionCount: sessionStore.selectionCount
             )
-            _ = sessionStore.activateBlank()
-            screenTimeBlocker.apply(isBlankActive: sessionStore.isBlankActive)
-            Task {
-                await BlankFunnelAnalytics.track(
-                    "first_block_started",
-                    step: currentStep.analyticsName,
-                    properties: selectionAnalyticsProperties
-                )
-            }
-            withAnimation(.easeInOut(duration: 0.85)) {
-                sessionStore.finishSetup()
-            }
-            Task {
-                await purchaseStore.registerReferredActivation(referredUserId: currentOnboardingAnonymousUserId())
-            }
+            goForward()
         } else {
             showingPicker = true
         }
+    }
+
+    @MainActor
+    private func startWhatsAppConnection() async {
+        guard !assistantConnectionInFlight else { return }
+        guard sessionStore.hasSelectedApps, screenTimeBlocker.authorizationStatus == .approved,
+              assistantPhoneVerified, !assistantPhoneNumber.isEmpty, !assistantConnectCode.isEmpty else {
+            message = "Finish selecting distractions, Screen Time and phone verification first."
+            return
+        }
+        if notificationStatus != "On" {
+            let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])) ?? false
+            await refreshNotificationStatus()
+            if !granted || notificationStatus != "On" {
+                message = "Enable Blankmind notifications in iPhone Settings to receive block confirmations."
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                return
+            }
+        }
+        guard let rawNumber = Bundle.main.object(forInfoDictionaryKey: "BlankWhatsAppPhoneNumber") as? String,
+              !rawNumber.filter(\.isNumber).isEmpty else {
+            message = "The Blankmind WhatsApp number is missing from this build."
+            return
+        }
+        assistantConnectionInFlight = true
+        defer { assistantConnectionInFlight = false }
+        do {
+            let code = assistantConnectCode
+            assistantPreferredChannel = "whatsapp"
+            _ = try await postAssistantChannel("register_preference", fields: [
+                "connect_code": code,
+                "preferred_channel": "whatsapp",
+                "user_phone": assistantPhoneNumber,
+            ])
+            guard await syncOnboardingAssistantContext(deviceReady: false) else {
+                message = "Could not save your distraction setup. Try connecting again."
+                return
+            }
+            let text = "CONNECT \(code)"
+            let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
+            let number = rawNumber.filter(\.isNumber)
+            guard let url = URL(string: "https://wa.me/\(number)?text=\(encoded)") else { return }
+            openURL(url)
+            message = "Send the prepared message in WhatsApp, then return here."
+        } catch {
+            message = "Could not prepare WhatsApp connection. Try again."
+        }
+    }
+
+    @MainActor
+    private func checkWhatsAppConnection() async {
+        guard currentStep == .whatsApp, !assistantConnectionInFlight else { return }
+        assistantConnectionInFlight = true
+        defer { assistantConnectionInFlight = false }
+        do {
+            let status = try await postAssistantChannel("connection_status")
+            guard status["linked"] as? Bool == true else {
+                message = "WhatsApp is waiting for your message. Send it from your verified number."
+                return
+            }
+            await refreshNotificationStatus()
+            guard notificationStatus == "On", screenTimeBlocker.authorizationStatus == .approved,
+                  sessionStore.hasSelectedApps else {
+                message = "Finish notifications, Screen Time and your distraction selection to enable blocking."
+                return
+            }
+            UIApplication.shared.registerForRemoteNotifications()
+            var token = BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? ""
+            for _ in 0..<5 where token.isEmpty {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                token = BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? ""
+            }
+            guard !token.isEmpty else {
+                message = "Waiting for iPhone notifications. Keep the app open and tap 'I've sent the message' again."
+                return
+            }
+            #if DEBUG
+            let environment = "sandbox"
+            #else
+            let environment = "production"
+            #endif
+            guard await AssistantActionInboxClient().registerDevicePush(
+                token: token, environment: environment, connectCode: assistantConnectCode,
+                channel: "whatsapp", phoneNumber: assistantPhoneNumber
+            ) else {
+                message = "The iPhone could not register for block notifications. Try again."
+                return
+            }
+            BlankSharedState.defaults.set(true, forKey: "blankAssistantPushRegistered")
+            guard await syncOnboardingAssistantContext(deviceReady: true) else {
+                message = "Could not finish syncing your distraction setup. Try again."
+                return
+            }
+            let completed = try await postAssistantChannel("complete_onboarding")
+            guard completed["ready"] as? Bool == true else {
+                message = "Blankmind is still checking this iPhone. Try again in a moment."
+                return
+            }
+            BlankSharedState.defaults.set(Date.now.formatted(date: .abbreviated, time: .shortened), forKey: "blankAssistantConnectedAt")
+            sessionStore.finishSetup()
+            savedStepRaw = 0
+            onFinishForQA?()
+            await purchaseStore.registerReferredActivation(referredUserId: currentOnboardingAnonymousUserId())
+        } catch {
+            message = "Could not confirm the connection. Check WhatsApp and try again."
+        }
+    }
+
+    @MainActor
+    private func syncOnboardingAssistantContext(deviceReady: Bool) async -> Bool {
+        await AssistantContextSyncClient().sync(
+            connectCode: assistantConnectCode,
+            channel: "whatsapp",
+            phoneNumber: assistantPhoneNumber,
+            payload: [
+                "locale": Locale.current.identifier,
+                "has_selected_apps": sessionStore.hasSelectedApps,
+                "selection_count": sessionStore.selectionCount,
+                "screen_time_authorized": screenTimeBlocker.authorizationStatus == .approved,
+                "notification_authorized": notificationStatus == "On",
+                "device_execution_ready": deviceReady,
+                "protection_target": "selected_distractions",
+                "app_presence": BlankmindAppPresence.payload(appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved),
+            ]
+        )
+    }
+
+    @MainActor
+    private func postAssistantChannel(_ action: String, fields: [String: Any] = [:]) async throws -> [String: Any] {
+        guard let rawBase = Bundle.main.object(forInfoDictionaryKey: "BlankMembershipAPIBaseURL") as? String,
+              !rawBase.contains("$("), let baseURL = URL(string: rawBase) else { throw URLError(.badURL) }
+        var request = URLRequest(url: baseURL.appendingPathComponent("assistant-channel"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 12
+        var body: [String: Any] = [
+            "action": action,
+            "connect_code": assistantConnectCode,
+            "preferred_channel": "whatsapp",
+            "user_phone": assistantPhoneNumber,
+            "app_install_id": BlankSharedState.appInstallId,
+        ]
+        body.merge(fields) { _, new in new }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+              let result = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw URLError(.badServerResponse)
+        }
+        return result
     }
 
     private func continueFree() {

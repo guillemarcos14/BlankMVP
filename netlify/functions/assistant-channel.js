@@ -6,6 +6,7 @@ const {
   attachAssistantUserContext,
   recordAssistantMemory,
   getAssistantMemory,
+  getAssistantUserContext,
   normalizeConnectCode,
   recordAssistantUserContext,
   recordAssistantChannel,
@@ -149,6 +150,11 @@ async function registerDevicePush(body) {
   const result = await connectedChannel(body);
   if (result.error) return json(400, { error: result.error });
   if (!result.connection) return json(200, { ok: true, registered: false, reason: "not_linked" });
+  const identity = await identityForAppInstall(body.app_install_id);
+  if (!identity || normalizeConnectCode(identity.assistant_connect_code) !== result.connectCode
+      || require("./_identity").normalizePhone(result.connection.channelUser) !== identity.phone_e164) {
+    return json(403, { error: "installation_not_verified" });
+  }
   const devicePush = normalizeDevicePush({
     token: body.device_token,
     environment: body.environment,
@@ -163,6 +169,51 @@ async function registerDevicePush(body) {
     source: "assistant_device_push_registered",
   });
   return json(200, { ok: true, registered: true, environment: devicePush.environment });
+}
+
+async function connectionStatus(body) {
+  const result = await connectedChannel(body);
+  if (result.error) return json(400, { error: result.error });
+  const identity = await identityForAppInstall(body.app_install_id);
+  if (!identity || normalizeConnectCode(identity.assistant_connect_code) !== result.connectCode) {
+    return json(403, { error: "installation_not_verified" });
+  }
+  const linked = result.connection?.channel === result.preferredChannel
+    && require("./_identity").normalizePhone(result.connection.channelUser) === identity.phone_e164;
+  return json(200, { ok: true, linked: Boolean(linked), channel: result.preferredChannel });
+}
+
+async function completeOnboarding(body) {
+  const status = await connectedChannel(body);
+  if (status.error) return json(400, { error: status.error });
+  const identity = await identityForAppInstall(body.app_install_id);
+  if (!identity || normalizeConnectCode(identity.assistant_connect_code) !== status.connectCode
+      || status.connection?.channel !== "whatsapp"
+      || require("./_identity").normalizePhone(status.connection.channelUser) !== identity.phone_e164) {
+    return json(403, { error: "whatsapp_not_verified_for_installation" });
+  }
+  const context = await getAssistantUserContext(status.connectCode);
+  const memory = await getAssistantMemory("whatsapp", status.connection.channelUser);
+  const ready = context.has_selected_apps === true
+    && Number(context.selection_count) > 0
+    && context.screen_time_authorized === true
+    && context.notification_authorized === true
+    && Boolean(memory.assistant_device_push?.token);
+  if (!ready) return json(200, { ok: true, ready: false, reason: "device_setup_incomplete" });
+  if (memory.assistant_activation_ready_sent_at) return json(200, { ok: true, ready: true, already_sent: true });
+  const spanish = /^es(?:$|[-_])/i.test(String(context.locale || context.language || ""));
+  const message = spanish
+    ? "Tu app ya está vinculada a este WhatsApp y tus distracciones están listas. Puedes pedirme un bloqueo; lo confirmarás desde una notificación de Blankmind."
+    : "Your app is linked to this WhatsApp and your distractions are ready. You can ask me for a block; you’ll confirm it from a Blankmind notification.";
+  const delivery = await sendAssistantMessage(status.connection, message);
+  if (delivery?.skipped) return json(502, { error: delivery.reason || "activation_message_not_sent" });
+  await recordAssistantMemory({
+    channel: "whatsapp",
+    channelUser: status.connection.channelUser,
+    memory: { assistant_activation_ready_sent_at: new Date().toISOString() },
+    source: "assistant_activation_ready_sent",
+  });
+  return json(200, { ok: true, ready: true, sent: true });
 }
 
 const TERMINAL_ACTION_STATUSES = new Set(["verified", "delayed", "failed", "dismissed"]);
@@ -473,6 +524,8 @@ exports.handler = async (event) => {
     if (action === "register_preference") return await registerPreference(body);
     if (action === "sync_context") return await syncContext(body);
     if (action === "register_device_push") return await registerDevicePush(body);
+    if (action === "connection_status") return await connectionStatus(body);
+    if (action === "complete_onboarding") return await completeOnboarding(body);
     if (action === "send_proactive") return await sendProactive(body);
     if (action === "poll_pending_action") return await pollPendingAction(body);
     if (action === "ack_pending_action") return await acknowledgePendingAction(body);

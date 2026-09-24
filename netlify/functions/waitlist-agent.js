@@ -1,6 +1,6 @@
 const { json, parseJsonBody } = require("./_membership");
 const { cleanText } = require("./_identity");
-const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
+const { isFinalQaWhatsApp, isFinalAppLinkedWhatsApp } = require("./_bm_final_qa_access");
 const { canonicalizeConversation, extractFacts, generateReply } = require("./_waitlist_ai");
 const {
   claimInbound,
@@ -449,7 +449,8 @@ async function handleTwilio(event) {
       return json(503, { error: "waitlist_twilio_queue_failed", detail: cleanText(error.message, 240) });
     }
   }
-  if (isFinalQaWhatsApp(message.channel, message.phone)) {
+  if (isFinalQaWhatsApp(message.channel, message.phone)
+      || await isFinalAppLinkedWhatsApp(message.channel, message.phone, message.text)) {
     await require("./_bm_final_qa_dispatch").processFinalTwilioMessage(message);
     return twimlResponse("");
   }
@@ -464,15 +465,17 @@ async function handleMeta(event) {
   const messages = parseMetaMessages(body).slice(0, 5);
   const results = [];
   for (const message of messages) {
-    if (isFinalQaWhatsApp(message.channel, message.phone)) {
-      const result = await require("./whatsapp-agent").processTrustedQaMessage({
+    const qa = isFinalQaWhatsApp(message.channel, message.phone);
+    if (qa || await isFinalAppLinkedWhatsApp(message.channel, message.phone, message.text)) {
+      const agent = require("./whatsapp-agent");
+      const result = await (qa ? agent.processTrustedQaMessage : agent.processTrustedAppMessage)({
         from: message.phone,
         id: message.providerMessageId,
         text: message.text,
         audio_id: message.audio?.mediaId || "",
         audio_content_type: message.audio?.contentType || "",
       });
-      results.push({ skipped: result?.skipped === true, reason: result?.reason || null, route: "bm_final_qa" });
+      results.push({ skipped: result?.skipped === true, reason: result?.reason || null, route: qa ? "bm_final_qa" : "bm_final_app" });
       continue;
     }
     const result = await processMessage(message);

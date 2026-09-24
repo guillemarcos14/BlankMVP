@@ -1,8 +1,9 @@
-const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
+const { isFinalQaWhatsApp, isFinalAppLinkedWhatsApp } = require("./_bm_final_qa_access");
 const { transcribeAudio } = require("./_waitlist_whatsapp");
 
 async function processFinalTwilioMessage(message) {
-  if (!isFinalQaWhatsApp(message?.channel, message?.phone)) {
+  const qa = isFinalQaWhatsApp(message?.channel, message?.phone);
+  if (!qa && !await isFinalAppLinkedWhatsApp(message?.channel, message?.phone, message?.text)) {
     return { skipped: true, reason: "bm_final_qa_not_allowed" };
   }
   if (!message.providerMessageId) {
@@ -17,8 +18,8 @@ async function processFinalTwilioMessage(message) {
       // The final agent sends its standard unreadable-audio reply when empty.
     }
   }
-  const { processTrustedQaMessage } = require("./whatsapp-agent");
-  return processTrustedQaMessage({
+  const agent = require("./whatsapp-agent");
+  return (qa ? agent.processTrustedQaMessage : agent.processTrustedAppMessage)({
     from: message.phone,
     id: message.providerMessageId,
     text,

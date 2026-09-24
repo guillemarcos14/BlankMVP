@@ -205,7 +205,8 @@ async function ensureAssistantConnectionForPhone({ channel, channelUser }) {
   const existing = await findAssistantConnectionForChannelUser(normalizedChannel, normalizedPhone);
   if (existing) return existing;
   const identity = await identityForPhone(normalizedPhone);
-  if (!identity?.assistant_connect_code) return null;
+  // A web waitlist identity alone must never activate the production agent.
+  if (!identity?.assistant_connect_code || !identity.app_install_id) return null;
   const connectCode = normalizeConnectCode(identity.assistant_connect_code);
   await recordAssistantChannel({
     event: "assistant_channel_auto_connected",

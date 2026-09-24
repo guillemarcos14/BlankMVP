@@ -50,6 +50,7 @@ struct BlankApp: App {
                 }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active {
+                        appDelegate.registerForRemoteActions()
                         screenTimeBlocker.refreshAuthorizationStatus()
                         sessionStore.syncRecurringSchedule()
                         screenTimeBlocker.updateAdvancedControls(
@@ -351,7 +352,10 @@ struct BlankApp: App {
         if let phone = result["phone_e164"] as? String, !phone.isEmpty {
             defaults.set(phone, forKey: "blankAssistantPhoneNumber")
         }
-        defaults.set(Date.now.formatted(date: .abbreviated, time: .shortened), forKey: "blankAssistantConnectedAt")
+        if !(defaults.string(forKey: "blankAssistantConnectCode") ?? "").isEmpty,
+           !(defaults.string(forKey: "blankAssistantPhoneNumber") ?? "").isEmpty {
+            defaults.set(true, forKey: "blankAssistantPhoneVerified")
+        }
     }
 
     private func configuredMembershipBaseURL() -> URL? {
@@ -429,12 +433,16 @@ final class BlankAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
+        if BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") != token {
+            BlankSharedState.defaults.set(false, forKey: "blankAssistantPushRegistered")
+        }
         BlankSharedState.defaults.set(token, forKey: "blankAssistantPushToken")
         registerStoredTokenIfPossible()
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         BlankSharedState.defaults.removeObject(forKey: "blankAssistantPushToken")
+        BlankSharedState.defaults.set(false, forKey: "blankAssistantPushRegistered")
     }
 
     func application(
@@ -462,13 +470,14 @@ final class BlankAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         let environment = "production"
         #endif
         Task {
-            _ = await AssistantActionInboxClient().registerDevicePush(
+            let registered = await AssistantActionInboxClient().registerDevicePush(
                 token: token,
                 environment: environment,
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phone
             )
+            defaults.set(registered, forKey: "blankAssistantPushRegistered")
         }
     }
 }

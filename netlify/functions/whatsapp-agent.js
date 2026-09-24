@@ -1,5 +1,6 @@
 const crypto = require("crypto");
-const { isFinalQaWhatsApp, privateQaGateConfigured } = require("./_bm_final_qa_access");
+const { isFinalQaWhatsApp, isFinalAppLinkedWhatsApp, privateQaGateConfigured } = require("./_bm_final_qa_access");
+const { identityForConnectCode, normalizePhone } = require("./_identity");
 const { sendAssistantActionPush } = require("./_assistant_push");
 const { json, parseJsonBody } = require("./_membership");
 const {
@@ -481,7 +482,7 @@ async function callBlankedAgent(prompt, from, linkedConnection = null) {
   return { plan: body.plan, context };
 }
 
-async function recordAssistantConnection({ channel, connectCode, from }) {
+async function recordAssistantConnection({ channel, connectCode, from, identityLinked = false }) {
   let previousMemory = {};
   try {
     previousMemory = await getAssistantMemory(channel, from);
@@ -502,16 +503,19 @@ async function recordAssistantConnection({ channel, connectCode, from }) {
       memory: {
         proactive_updates_paused: false,
         assistant_connect_code: String(connectCode || "").toUpperCase(),
-        pending_assistant_action: null,
+        ...(identityLinked ? {} : { pending_assistant_action: null }),
       },
       source: "assistant_channel_connected",
     });
     const attachedContext = await attachAssistantUserContext({ connectCode, channel, channelUser: from });
     context = attachedContext && Object.keys(attachedContext).length ? attachedContext : previousMemory.user_context || {};
-  } catch (_) {
+  } catch (error) {
+    if (identityLinked) throw error;
     // Connection delivery must not depend on the context snapshot being available.
   }
   return {
+    identityLinked,
+    alreadyAcknowledged: Boolean(previousMemory.assistant_connection_ack_sent_at),
     firstConnection: shouldSendOnboarding(previousMemory),
     context: context || {},
     onboardingProgress: onboardingProgress(previousMemory),
@@ -557,7 +561,32 @@ async function processMessage(message) {
   if (!prompt) return sendWhatsAppMessage(message.from, "I could not read that message yet. Send it as text or try another audio.");
   const connectCode = connectCodeFromText(prompt);
   if (connectCode) {
-    const connection = await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from });
+    const identity = await identityForConnectCode(connectCode);
+    const identityLinked = Boolean(identity?.app_install_id);
+    if (identity && (!identityLinked || normalizePhone(message.from) !== identity.phone_e164)) {
+      return sendWhatsAppMessage(message.from, "Verify this phone number in the Blankmind app before connecting WhatsApp.");
+    }
+    if (!identity && !isFinalQaWhatsApp("whatsapp", message.from)
+        && (isProductionEnvironment() || process.env.BM_FINAL_APP_LINKED_ROUTING_ENABLED === "true")) {
+      return sendWhatsAppMessage(message.from, "Verify your phone in the Blankmind app first, then connect WhatsApp from there.");
+    }
+    const connection = await recordAssistantConnection({ channel: "whatsapp", connectCode, from: message.from, identityLinked });
+    if (identityLinked) {
+      if (!connection.alreadyAcknowledged) {
+        const spanish = /^es(?:$|[-_])/i.test(String(connection.context.locale || connection.context.language || ""));
+        const acknowledgement = spanish
+          ? "WhatsApp conectado a tu app. Vuelve a Blankmind para comprobar que el iPhone está listo para bloquear."
+          : "WhatsApp is connected to your app. Return to Blankmind to check that your iPhone is ready to block.";
+        const delivery = await sendWhatsAppMessage(message.from, acknowledgement);
+        if (delivery?.skipped) return delivery;
+        await recordAssistantMemory({
+          channel: "whatsapp", channelUser: message.from,
+          memory: { assistant_connection_ack_sent_at: new Date().toISOString() },
+          source: "assistant_connection_ack_sent",
+        });
+      }
+      return { sent: true, onboarding: false };
+    }
     const onboarding = await sendConnectionOnboarding(message.from, connection);
     return onboarding?.skipped
       ? onboarding
@@ -692,6 +721,26 @@ async function processTrustedQaMessage(message) {
   return result;
 }
 
+async function processTrustedAppMessage(message) {
+  if (!await isFinalAppLinkedWhatsApp("whatsapp", message?.from, message?.text)) {
+    return { skipped: true, reason: "bm_final_app_not_linked" };
+  }
+  if (!message?.id) return { skipped: true, reason: "bm_final_message_id_required" };
+  const claim = await claimAssistantInboundMessage("whatsapp", message.from, message.id);
+  if (!claim.claimed) return { skipped: true, reason: "duplicate_inbound" };
+  let result;
+  try {
+    result = await processMessage(message);
+  } catch (error) {
+    await releaseAssistantInboundMessage("whatsapp", message.from, message.id).catch(() => null);
+    throw error;
+  }
+  const deliveryFailed = result?.skipped === true && /credentials|template_requires/i.test(result.reason || "")
+    || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");
+  if (!deliveryFailed) await completeAssistantInboundMessage("whatsapp", message.from, message.id);
+  return result;
+}
+
 exports.handler = async (event) => {
   // In production every public Meta webhook uses the same per-sender gate.
   if (isProductionEnvironment() || privateQaGateConfigured()) return require("./waitlist-agent").handler(event);
@@ -750,4 +799,5 @@ exports.handler = async (event) => {
 exports.acceptsPendingActionConfirmation = acceptsPendingActionConfirmation;
 exports.pendingActionConfirmationPlan = pendingActionConfirmationPlan;
 exports.processTrustedQaMessage = processTrustedQaMessage;
+exports.processTrustedAppMessage = processTrustedAppMessage;
 exports.whatsappReplyText = whatsappReplyText;

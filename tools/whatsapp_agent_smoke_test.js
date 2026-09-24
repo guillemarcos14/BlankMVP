@@ -6,7 +6,7 @@ process.env.WHATSAPP_VERIFY_TOKEN = "test-token";
 delete process.env.WHATSAPP_ACCESS_TOKEN;
 delete process.env.WHATSAPP_PHONE_NUMBER_ID;
 
-const { handler } = require("../netlify/functions/whatsapp-agent");
+const { handler, whatsappReplyText } = require("../netlify/functions/whatsapp-agent");
 const { handler: assistantChannelHandler } = require("../netlify/functions/assistant-channel");
 
 const semanticMemoryRows = new Map();
@@ -234,8 +234,8 @@ async function linkIncludesRequestedApps() {
     assert.strictEqual(response.statusCode, 200, response.body);
     assert.doesNotMatch(outboundText, /Do you confirm|review-action/i);
     assert.doesNotMatch(outboundText, /https?:\/\/|review-action/);
-    assert.match(outboundText, /(applying it now|couldn't wake the iPhone now)/i);
-    assert.doesNotMatch(outboundText, /Open Blankmind/i);
+    assert.match(outboundText, /couldn't send a notification/i);
+    assert.match(outboundText, /Open Blankmind/i);
     const pendingRows = [...semanticMemoryRows.values()].flat()
       .map((row) => row.payload?.properties?.memory?.pending_assistant_action)
       .filter(Boolean);
@@ -355,8 +355,8 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /Tap the Blankmind notification to apply it/i);
-    assert.doesNotMatch(requests[0].Body, /Open Blankmind/i);
+    assert.match(requests[0].Body, /haven't sent a notification yet/i);
+    assert.match(requests[0].Body, /Connect this WhatsApp in Blankmind/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;
@@ -583,7 +583,22 @@ async function duplicateInboundIsIgnoredAcrossRetries() {
   }
 }
 
+function notificationCopyRequiresPush() {
+  const plan = {
+    message_text: "Bloquear tus distracciones ahora durante 10 minutos.",
+    actions: [{ type: "start_protection", minutes: 10 }],
+    response_language: "es",
+    semantic_state: { status: "ready" },
+    blocking_ready: true,
+  };
+  assert.doesNotMatch(whatsappReplyText(plan), /Pulsa la notificaci[oó]n/i);
+  assert.doesNotMatch(whatsappReplyText(plan, { action: plan.actions[0], push: { sent: false, reason: "missing_device_token" } }), /Pulsa la notificaci[oó]n/i);
+  assert.match(whatsappReplyText(plan, { action: plan.actions[0], push: { sent: true } }), /Pulsa la notificaci[oó]n/i);
+  assert.doesNotMatch(whatsappReplyText({ ...plan, semantic_state: { status: "needs_setup" } }, { action: plan.actions[0], push: { sent: true } }), /Pulsa la notificaci[oó]n/i);
+}
+
 (async () => {
+  notificationCopyRequiresPush();
   await verifyWebhook();
   await receiveMessage();
   await connectMessage();

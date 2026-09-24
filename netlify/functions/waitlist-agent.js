@@ -1,5 +1,6 @@
 const { json, parseJsonBody } = require("./_membership");
 const { cleanText } = require("./_identity");
+const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
 const { canonicalizeConversation, extractFacts, generateReply } = require("./_waitlist_ai");
 const {
   claimInbound,
@@ -439,15 +440,20 @@ async function handleTwilio(event) {
   if (!verifyTwilioSignature(event)) return json(403, { error: "invalid_twilio_signature" });
   const messages = parseTwilioMessage(event);
   if (!messages.length) return twimlResponse("");
+  const message = messages[0];
   if (shouldUseAsyncTwilio()) {
     try {
-      await enqueueTwilioMessage(messages[0], event);
+      await enqueueTwilioMessage(message, event);
       return twimlResponse("");
     } catch (error) {
       return json(503, { error: "waitlist_twilio_queue_failed", detail: cleanText(error.message, 240) });
     }
   }
-  const result = await processMessage(messages[0]);
+  if (isFinalQaWhatsApp(message.channel, message.phone)) {
+    await require("./_bm_final_qa_dispatch").processFinalTwilioMessage(message);
+    return twimlResponse("");
+  }
+  const result = await processMessage(message);
   return twimlResponse(result.replies || result.reply || "");
 }
 
@@ -458,6 +464,17 @@ async function handleMeta(event) {
   const messages = parseMetaMessages(body).slice(0, 5);
   const results = [];
   for (const message of messages) {
+    if (isFinalQaWhatsApp(message.channel, message.phone)) {
+      const result = await require("./whatsapp-agent").processTrustedQaMessage({
+        from: message.phone,
+        id: message.providerMessageId,
+        text: message.text,
+        audio_id: message.audio?.mediaId || "",
+        audio_content_type: message.audio?.contentType || "",
+      });
+      results.push({ skipped: result?.skipped === true, reason: result?.reason || null, route: "bm_final_qa" });
+      continue;
+    }
     const result = await processMessage(message);
     const replies = result.replies || (result.reply ? [result.reply] : []);
     for (const reply of replies) {

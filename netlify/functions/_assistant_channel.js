@@ -555,8 +555,8 @@ async function sendSmsMessage(to, body) {
 async function sendWhatsAppMessage(to, body, options = {}) {
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-  const twilioFrom = process.env.TWILIO_WHATSAPP_FROM_NUMBER;
-  if (twilioSid && twilioToken && twilioFrom) {
+  const twilioFrom = process.env.TWILIO_WHATSAPP_FROM_NUMBER || process.env.TWILIO_FROM_NUMBER;
+  if (twilioSid && twilioToken && twilioFrom && String(process.env.WAITLIST_WHATSAPP_PROVIDER || "").toLowerCase() !== "meta") {
     const params = new URLSearchParams();
     const normalizedTo = String(to || "").startsWith("whatsapp:") ? to : `whatsapp:+${String(to || "").replace(/^\+/, "")}`;
     const normalizedFrom = String(twilioFrom).startsWith("whatsapp:") ? twilioFrom : `whatsapp:${twilioFrom}`;

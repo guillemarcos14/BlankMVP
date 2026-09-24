@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { json, requireMethod } = require("./_membership");
 const { userByPhone } = require("./_waitlist_store");
+const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
 const {
   enqueueTwilioMessage,
   shouldUseAsyncTwilio,
@@ -223,15 +224,17 @@ function twiml(message) {
   return `<?xml version="1.0" encoding="UTF-8"?><Response>${body}</Response>`;
 }
 
-async function handleWaitlistMessage(event, parsedBody) {
-  let user;
-  try {
-    user = await userByPhone(parsedBody.from);
-  } catch (_) {
-    return null;
-  }
-  if (!user || user.status !== "active" || user.data_consent !== true || user.whatsapp_consent !== true) {
-    return null;
+async function handleWaitlistMessage(event, parsedBody, options = {}) {
+  if (!options.force) {
+    let user;
+    try {
+      user = await userByPhone(parsedBody.from);
+    } catch (_) {
+      return null;
+    }
+    if (!user || user.status !== "active" || user.data_consent !== true || user.whatsapp_consent !== true) {
+      return null;
+    }
   }
 
   const message = {
@@ -246,6 +249,11 @@ async function handleWaitlistMessage(event, parsedBody) {
   if (shouldUseAsyncTwilio()) {
     await enqueueTwilioMessage(message, event);
     return text(200, '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', "application/xml; charset=utf-8");
+  }
+
+  if (isFinalQaWhatsApp(message.channel, message.phone)) {
+    await require("./_bm_final_qa_dispatch").processFinalTwilioMessage(message);
+    return text(200, twiml(""), "application/xml; charset=utf-8");
   }
 
   const result = await processWaitlistMessage(message);
@@ -291,7 +299,7 @@ function twilioWebhookUrl(event) {
 
 function verifyTwilioSignature(event) {
   const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
-  const shouldValidate = configured === "true" || (isProductionEnvironment() && configured !== "false");
+  const shouldValidate = isProductionEnvironment() || configured === "true";
   if (!shouldValidate) return true;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const signature = header(event, "x-twilio-signature");
@@ -934,6 +942,10 @@ exports.handler = async (event) => {
   const parsedBody = parseSmsBody(event);
   const { from, body, media, messageSid } = parsedBody;
   if (!from) return json(400, { error: "missing_sms_sender" });
+  if (isProductionEnvironment()) {
+    // Legacy Twilio URLs use the same private QA gate and public waitlist path.
+    return handleWaitlistMessage(event, parsedBody, { force: true });
+  }
   // Twilio may still point at this legacy endpoint while the waitlist webhook
   // is being rolled over. Route active waitlist users into the same handler so
   // their first reply keeps the waitlist history and facts.

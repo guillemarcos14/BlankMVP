@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
 const { sendAssistantActionPush } = require("./_assistant_push");
 const { json, parseJsonBody } = require("./_membership");
 const {
@@ -662,7 +663,31 @@ async function processMessage(message) {
   return sendPlanReply(message.from, plan, queued);
 }
 
+// Called only after the provider signature has been checked by the ingress.
+// The access check is repeated here so an internal caller cannot bypass it.
+async function processTrustedQaMessage(message) {
+  if (!isFinalQaWhatsApp("whatsapp", message?.from)) {
+    return { skipped: true, reason: "bm_final_qa_not_allowed" };
+  }
+  if (!message?.id) return { skipped: true, reason: "bm_final_qa_message_id_required" };
+  const claim = await claimAssistantInboundMessage("whatsapp", message.from, message.id);
+  if (!claim.claimed) return { skipped: true, reason: "duplicate_inbound" };
+  let result;
+  try {
+    result = await processMessage(message);
+  } catch (error) {
+    await releaseAssistantInboundMessage("whatsapp", message.from, message.id).catch(() => null);
+    throw error;
+  }
+  const deliveryFailed = result?.skipped === true && /credentials|template_requires/i.test(result.reason || "")
+    || result?.text?.skipped === true && /credentials|template_requires/i.test(result.text.reason || "");
+  if (!deliveryFailed) await completeAssistantInboundMessage("whatsapp", message.from, message.id);
+  return result;
+}
+
 exports.handler = async (event) => {
+  // In production every public Meta webhook uses the same per-sender gate.
+  if (isProductionEnvironment()) return require("./waitlist-agent").handler(event);
   if (event.httpMethod === "GET") return verifyChallenge(event);
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: json(200, {}).headers, body: "" };
   if (event.httpMethod !== "POST") return json(405, { error: "method_not_allowed" });
@@ -717,3 +742,4 @@ exports.handler = async (event) => {
 
 exports.acceptsPendingActionConfirmation = acceptsPendingActionConfirmation;
 exports.pendingActionConfirmationPlan = pendingActionConfirmationPlan;
+exports.processTrustedQaMessage = processTrustedQaMessage;

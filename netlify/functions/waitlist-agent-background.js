@@ -1,5 +1,6 @@
 const { json, parseJsonBody } = require("./_membership");
 const { cleanText } = require("./_identity");
+const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
 const {
   completeInbound,
   patchUser,
@@ -111,6 +112,15 @@ exports.handler = async (event) => {
 
   let result = null;
   try {
+    if (isFinalQaWhatsApp(message.channel, message.phone)) {
+      result = await require("./_bm_final_qa_dispatch").processFinalTwilioMessage(message);
+      return json(200, {
+        ok: true,
+        skipped: result?.skipped === true,
+        reason: result?.reason || null,
+        route: "bm_final_qa",
+      });
+    }
     result = await deliverMessage(message);
     return json(200, {
       ok: true,

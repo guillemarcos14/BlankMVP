@@ -125,7 +125,7 @@ function shouldUseAsyncTwilio() {
 
 function verifyTwilioSignature(event) {
   const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
-  const shouldValidate = configured === "true" || (isProduction() && configured !== "false");
+  const shouldValidate = isProduction() || configured === "true";
   if (!shouldValidate) return true;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const signature = header(event, "x-twilio-signature");

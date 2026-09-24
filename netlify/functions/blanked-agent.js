@@ -2919,9 +2919,6 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
           content: `Write every visible response in ${language === "es" ? "Spanish" : "English"}. Keep JSON keys, intent values, and action types in English.`,
         },
         {
-          role: "system",
-        },
-        {
           role: "user",
           content: JSON.stringify({
             prompt: cleanText(prompt, 600),
@@ -3331,9 +3328,6 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
         {
           role: "system",
           content: `Write every visible response, title, label, bullet, and speech text in ${language === "es" ? "Spanish" : "English"}. Keep JSON keys, intent values, and action types in English.`,
-        },
-        {
-          role: "system",
         },
         {
           role: "user",

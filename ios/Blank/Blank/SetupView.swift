@@ -1101,7 +1101,7 @@ struct SetupView: View {
         switch currentStep {
         case .trial:
             return false
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .distractingApps, .profile, .commitment, .personalization, .notifications, .permission, .apps:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .distractingApps, .profile, .commitment, .personalization, .notifications, .permission, .apps, .phone, .whatsApp:
             return true
         }
     }

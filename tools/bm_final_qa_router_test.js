@@ -2,7 +2,8 @@ const assert = require("assert");
 const crypto = require("crypto");
 
 const envNames = [
-  "CONTEXT", "BM_FINAL_QA_WHATSAPP_PHONE", "TWILIO_AUTH_TOKEN",
+  "CONTEXT", "NODE_ENV", "NETLIFY", "BM_FINAL_QA_WHATSAPP_PHONE", "TWILIO_AUTH_TOKEN",
+  "TWILIO_WHATSAPP_FROM_NUMBER", "TWILIO_FROM_NUMBER",
   "TWILIO_VALIDATE_WEBHOOK_SIGNATURE", "WAITLIST_TWILIO_ASYNC",
   "WAITLIST_TWILIO_WEBHOOK_URL", "TWILIO_WEBHOOK_URL",
   "WHATSAPP_APP_SECRET",
@@ -56,6 +57,7 @@ async function main() {
   process.env.WAITLIST_TWILIO_WEBHOOK_URL = "https://getblank.netlify.app/.netlify/functions/waitlist-agent";
   process.env.TWILIO_WEBHOOK_URL = "https://getblank.netlify.app/.netlify/functions/sms-agent";
   process.env.WHATSAPP_APP_SECRET = "qa-test-meta-secret";
+  process.env.TWILIO_WHATSAPP_FROM_NUMBER = "whatsapp:+13478366767";
 
   replaceModule(storePath, {
     ...realStore,
@@ -180,6 +182,31 @@ async function main() {
     body: queued.body,
   });
   assert.strictEqual(response.statusCode, 403);
+  assert.strictEqual(finalCalls.length, 4);
+
+  // Netlify functions may not expose a production marker at runtime. The
+  // configured private gate must still close both legacy public endpoints.
+  delete process.env.CONTEXT;
+  delete process.env.NODE_ENV;
+  delete process.env.NETLIFY;
+  process.env.WAITLIST_TWILIO_ASYNC = "false";
+  response = await sms.handler(signedTwilio(process.env.TWILIO_WEBHOOK_URL, "whatsapp:+34658991585", "SM-no-context-other"));
+  assert.strictEqual(response.statusCode, 200);
+  assert.strictEqual(finalCalls.length, 4);
+  assert.strictEqual(waitlistPhones.at(-1), "+34658991585");
+  response = await sms.handler(signedTwilio(process.env.TWILIO_WEBHOOK_URL, "whatsapp:+13478366767", "SM-outbound-status"));
+  assert.strictEqual(response.statusCode, 200);
+  assert.doesNotMatch(response.body, /<Message>/);
+  assert.strictEqual(finalCalls.length, 4);
+  response = await waitlist.handler(signedTwilio(waitlistUrl, "whatsapp:+13478366767", "SM-outbound-status-waitlist"));
+  assert.strictEqual(response.statusCode, 200);
+  assert.doesNotMatch(response.body, /<Message>/);
+  const unsignedLegacy = signedTwilio(process.env.TWILIO_WEBHOOK_URL, "whatsapp:+34658991584", "SM-no-context-unsigned");
+  delete unsignedLegacy.headers["x-twilio-signature"];
+  assert.strictEqual((await sms.handler(unsignedLegacy)).statusCode, 403);
+  assert.strictEqual((await directWhatsapp.handler(signedMeta([
+    { from: "34658991585", id: "wamid.no-context.other", text: { body: "Hola" } },
+  ]))).statusCode, 200);
   assert.strictEqual(finalCalls.length, 4);
 
   process.stdout.write("BM Final private WhatsApp router tests passed\n");

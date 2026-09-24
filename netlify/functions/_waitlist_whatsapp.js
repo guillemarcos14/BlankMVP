@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { json } = require("./_membership");
 const { cleanText } = require("./_identity");
+const { privateQaGateConfigured } = require("./_bm_final_qa_access");
 const { phoneForStorage } = require("./_waitlist_store");
 
 const OPENING_MESSAGE_1 = "Hey, I’m Blankmind. Tell me a bit about yourself.";
@@ -39,7 +40,7 @@ function timingSafeEqual(left, right) {
 
 function verifyMetaSignature(event) {
   const secret = process.env.WHATSAPP_APP_SECRET;
-  if (!secret) return !isProduction() && process.env.WHATSAPP_REQUIRE_SIGNATURE !== "true";
+  if (!secret) return !isProduction() && !privateQaGateConfigured() && process.env.WHATSAPP_REQUIRE_SIGNATURE !== "true";
   const signature = header(event, "x-hub-signature-256");
   if (!signature.startsWith("sha256=")) return false;
   const expected = `sha256=${crypto.createHmac("sha256", secret).update(rawBody(event), "utf8").digest("hex")}`;
@@ -125,7 +126,7 @@ function shouldUseAsyncTwilio() {
 
 function verifyTwilioSignature(event) {
   const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
-  const shouldValidate = isProduction() || configured === "true";
+  const shouldValidate = isProduction() || privateQaGateConfigured() || configured === "true";
   if (!shouldValidate) return true;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const signature = header(event, "x-twilio-signature");
@@ -145,6 +146,10 @@ function parseTwilioMessage(event) {
   const from = cleanText(params.get("From"), 90);
   const phone = phoneForStorage(from);
   const channel = /^whatsapp:/i.test(from) ? "whatsapp" : "sms";
+  const ownSender = phoneForStorage(channel === "whatsapp"
+    ? process.env.TWILIO_WHATSAPP_FROM_NUMBER
+    : process.env.TWILIO_FROM_NUMBER);
+  if (phone && ownSender && phone === ownSender) return [];
   const text = cleanText(params.get("Body"), 4000);
   const providerMessageId = cleanText(params.get("MessageSid") || params.get("SmsMessageSid"), 160);
   const count = Math.min(Math.max(Number(params.get("NumMedia") || 0), 0), 10);

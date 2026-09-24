@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
+const { isFinalQaWhatsApp, privateQaGateConfigured } = require("./_bm_final_qa_access");
 const { sendAssistantActionPush } = require("./_assistant_push");
 const { json, parseJsonBody } = require("./_membership");
 const {
@@ -687,7 +687,7 @@ async function processTrustedQaMessage(message) {
 
 exports.handler = async (event) => {
   // In production every public Meta webhook uses the same per-sender gate.
-  if (isProductionEnvironment()) return require("./waitlist-agent").handler(event);
+  if (isProductionEnvironment() || privateQaGateConfigured()) return require("./waitlist-agent").handler(event);
   if (event.httpMethod === "GET") return verifyChallenge(event);
   if (event.httpMethod === "OPTIONS") return { statusCode: 204, headers: json(200, {}).headers, body: "" };
   if (event.httpMethod !== "POST") return json(405, { error: "method_not_allowed" });

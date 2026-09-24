@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { json, requireMethod } = require("./_membership");
-const { userByPhone } = require("./_waitlist_store");
-const { isFinalQaWhatsApp } = require("./_bm_final_qa_access");
+const { userByPhone, phoneForStorage } = require("./_waitlist_store");
+const { isFinalQaWhatsApp, privateQaGateConfigured } = require("./_bm_final_qa_access");
 const {
   enqueueTwilioMessage,
   shouldUseAsyncTwilio,
@@ -299,7 +299,7 @@ function twilioWebhookUrl(event) {
 
 function verifyTwilioSignature(event) {
   const configured = process.env.TWILIO_VALIDATE_WEBHOOK_SIGNATURE;
-  const shouldValidate = isProductionEnvironment() || configured === "true";
+  const shouldValidate = isProductionEnvironment() || privateQaGateConfigured() || configured === "true";
   if (!shouldValidate) return true;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const signature = header(event, "x-twilio-signature");
@@ -942,7 +942,13 @@ exports.handler = async (event) => {
   const parsedBody = parseSmsBody(event);
   const { from, body, media, messageSid } = parsedBody;
   if (!from) return json(400, { error: "missing_sms_sender" });
-  if (isProductionEnvironment()) {
+  const sender = phoneForStorage(from);
+  const ownSenders = [process.env.TWILIO_WHATSAPP_FROM_NUMBER, process.env.TWILIO_FROM_NUMBER]
+    .filter(Boolean).map(phoneForStorage);
+  if (sender && ownSenders.includes(sender)) {
+    return text(200, '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', "application/xml; charset=utf-8");
+  }
+  if (isProductionEnvironment() || privateQaGateConfigured()) {
     // Legacy Twilio URLs use the same private QA gate and public waitlist path.
     return handleWaitlistMessage(event, parsedBody, { force: true });
   }

@@ -3,6 +3,7 @@
 Ultima actualizacion: 2026-09-20
 
 ## Hecho hoy
+- 2026-09-24: Implementada y subida en `codex/bm-final-private-whatsapp-2026-09-24` la ruta privada de BM Final por WhatsApp para un único E.164 configurado en Netlify. `waitlist-agent`, background y endpoints heredados quedan cubiertos; SMS y otros números siguen en Early Access. Harness `48/48`, pruebas de rutas y firmas aprobadas. Pendiente integración, variable de producción, deploy y prueba física.
 - 2026-09-21: Añadida una aclaración específica para peticiones de bloqueo inmediato. Cuando la persona pregunta si Blankmind puede bloquear apps desde el chat, la respuesta mantiene la negativa y añade una segunda burbuja que identifica la demo/waitlist y anuncia la descarga de la app completa el 1 de octubre. La entrega es idempotente por canal y funciona también si el primer turno ya ocurrió sin haber enviado el aviso; tests waitlist pasan. Pendiente integrar/publicar y probar en una conversación real.
 - 2026-09-20: Implementada y publicada la aclaración determinista de Early Access tras la primera respuesta real. BM responde primero al contenido del usuario y después envía dos mensajes separados; los marcadores `availability_notice_whatsapp_sent_at` y `availability_notice_sms_sent_at` evitan repeticiones. Commit `1a38a22`, migración Supabase `021` aplicada, Netlify deploy `6ab00163987f7a8fe90b2ac1`, product harness `44/44`. Pendiente prueba física en una conversación nueva.
 - 2026-09-20: Corregida y publicada la paridad de respuestas posteriores por canal. `parseTwilioMessage` conserva `sms` o `whatsapp` y `waitlist-agent-background` entrega por SMS/MMS cuando la entrada fue SMS, manteniendo WhatsApp con sus prefijos. Texto y audio pasan en ambos canales; rama `codex/backend-release-waitlist-message-parity-2026-09-20`, commit `2685355`, harness `44/44`, Netlify `6aafa9c6762d7bcc14d714ea`. Pendiente únicamente la prueba física SMS.
@@ -648,6 +649,7 @@ Ultima actualizacion: 2026-09-20
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-24: Se permite una única excepción privada para el teléfono de Guillem por WhatsApp; el público sigue en Waitlist. La configuración ausente o inválida no abre BM Final.
 - [cerrada] 2026-09-20: El canal seleccionado en la landing se propaga hasta `waitlist-start`; WhatsApp usa sus plantillas aprobadas y SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER` para los mismos dos textos deterministas.
 - [cerrada] 2026-09-15: BM usa estado semántico como autoridad para bloqueos; el modelo aporta evidencia, nunca autorización. Correcciones invalidan confirmación. Sin defaults de horas, duración, apps ni horizonte. La migración 015 y persistencia requerida deben preceder a una futura publicación del backend. Evaluación dura sin compensación por medias; texto nuevo exige revisión independiente. No desplegar desde esta tarea.
 - [cerrada] 2026-07-31: En el programa de embajadores, las comisiones se pagaran semanalmente para reforzar incentivo y velocidad; metodos de pago aceptados: transferencia bancaria o Bizum.

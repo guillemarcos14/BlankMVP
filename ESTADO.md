@@ -1,8 +1,9 @@
 # Estado del proyecto
 
-Ultima actualizacion: 2026-09-24
+Ultima actualizacion: 2026-09-25
 
 ## Hecho hoy
+- 2026-09-25: Onboarding iOS conversacional en `6c102c3`: flujo activo de 8 pasos con demostración de valor, OTP, permisos, selector nativo y conexión WhatsApp/SMS verificada; encuesta y cálculos personales sin datos retirados del recorrido. Tipografía interior alineada con Inter 32 semibold del onboarding; memoria de BM Final captura nombre, edad explícita y objetivo, y la sincronización conserva esos datos. Product harness `50/50`, smokes SMS/WhatsApp y CI iOS simulador `36129968556` correctos. No desplegado ni distribuido; pendiente integración, revisión visual, build firmada y prueba física.
 - 2026-09-24: Implementado en `codex/production-app-onboarding-2026-09-24` el alta directa desde iOS para BM Final: el onboarding se abre en la primera instalación, exige seleccionar distracciones y permiso de Tiempo de uso, verifica teléfono por SMS, conecta WhatsApp desde ese número, comprueba autorización de notificaciones y registro APNs real, y solo después envía el mensaje de listo. Se eliminó el bloqueo automático al terminar la selección. La ruta pública de usuarios vinculados está tras `BM_FINAL_APP_LINKED_ROUTING_ENABLED=true`; sin activarla, la waitlist pública sigue igual. Product harness `50/50`; build iOS de simulador en CI `36021559674` correcto. Pendientes integración de Backend Cloud, build firmada y prueba física completa.
 - 2026-09-24: La primera orden física de bloqueo por WhatsApp no envió push: `semantic_state=needs_setup`, sin acción pendiente ni intento APNs. El teléfono de Guillem carece de identidad de app y token push registrados; solo hay conexión WhatsApp antigua. Corregido el texto que indicaba pulsar una notificación inexistente (`9b2e56c`), Netlify `6ab506f5f541c324210b075f`, harness `49/49`. Pendiente vincular app y repetir hasta `verified`.
 - 2026-09-24: Primera prueba física de BM Final por WhatsApp completada: el mensaje de Guillem (`1584`) entró en Twilio, quedó procesado en `assistant_inbound_messages` y obtuvo respuesta entregada; no pasó por `waitlist_messages`. Corregido el acceso heredado de `sms-agent` observado en callbacks salientes sin marcador de producción, y excluidos mensajes del propio remitente. Release `691edff`, Netlify `6ab50324a46b7707fef848fb`, harness `49/49`. Pendiente probar otro WhatsApp, SMS y bloqueo con acuse nativo.
@@ -651,6 +652,7 @@ Ultima actualizacion: 2026-09-24
 - En la proxima sesion, leer este archivo antes de tocar el repo.
 
 ## Decisiones
+- [cerrada] 2026-09-25: El onboarding de producción iOS pregunta solo lo que requiere verificación o acción nativa; el perfil personal se obtiene conversando en el canal vinculado. WhatsApp y SMS usan el mismo gate de identidad, notificaciones y preparación del iPhone.
 - [cerrada] 2026-09-24: La producción empieza directamente en la app; la web permanece como waitlist temporal. La selección canónica de distracciones, permisos de Tiempo de uso y notificaciones, teléfono verificado, WhatsApp vinculado y APNs registrado son condiciones separadas. BM no promete bloqueo hasta cumplirlas.
 - [cerrada] 2026-09-24: Se permite una única excepción privada para el teléfono de Guillem por WhatsApp; el público sigue en Waitlist. La configuración ausente o inválida no abre BM Final.
 - [cerrada] 2026-09-20: El canal seleccionado en la landing se propaga hasta `waitlist-start`; WhatsApp usa sus plantillas aprobadas y SMS usa `TWILIO_MESSAGING_SERVICE_SID` o `TWILIO_FROM_NUMBER` para los mismos dos textos deterministas.

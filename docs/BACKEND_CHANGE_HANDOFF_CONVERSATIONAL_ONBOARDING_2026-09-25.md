@@ -20,7 +20,7 @@ Variables de entorno: ninguna nueva. `BM_FINAL_APP_LINKED_ROUTING_ENABLED` sigue
 Validaciones ejecutadas:
 - `node tools/product_harness.js --contract tools/product_harness_contract.json --baseline tmp/product-harness/baseline.json --enforce-scope`: 50/50.
 - `node tools/bm_global_context_test.js`, `node tools/sms_agent_voice_smoke_test.js`, `node tools/whatsapp_agent_smoke_test.js`: correctos.
-- iOS Debug simulador en GitHub Actions `36129968556`: correcto. Una compilación posterior para `b3318ad` está pendiente al escribir este handoff.
+- iOS Debug simulador en GitHub Actions `36129968556`, `36130665581` y `36130893513`: correctos; el último incluye el copy final.
 - `git diff --check`: correcto.
 
 Pruebas pendientes:

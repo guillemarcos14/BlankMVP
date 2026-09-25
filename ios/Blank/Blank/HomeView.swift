@@ -3541,7 +3541,7 @@ struct AppPhoneSignInSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("We’ll send a one-time code by SMS. After setup, you can talk to Blankmind on WhatsApp or SMS.")
+                    Text("We’ll send a one-time code by SMS. After setup, you can talk to Blankmind in your connected channel.")
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(.secondary)
                 }

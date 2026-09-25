@@ -451,7 +451,7 @@ struct SetupView: View {
             primaryAction: goForward,
             accessory: AnyView(
                 VStack(alignment: .leading, spacing: 10) {
-                    previewControlRow("1", "Ask in WhatsApp or SMS")
+                    previewControlRow("1", "Ask in your connected chat")
                     previewControlRow("2", "Tap the Blankmind notification")
                     previewControlRow("3", "Your chosen distractions are protected")
                     Text("Nothing is blocked until you ask and apply it.")
@@ -946,6 +946,7 @@ struct SetupView: View {
     }
 
     private var smsChannelAvailable: Bool {
+        guard Bundle.main.object(forInfoDictionaryKey: "BlankFinalSMSOnboardingEnabled") as? Bool == true else { return false }
         guard let number = Bundle.main.object(forInfoDictionaryKey: "BlankSMSPhoneNumber") as? String else { return false }
         return !number.filter(\.isNumber).isEmpty
     }

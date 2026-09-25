@@ -1041,7 +1041,7 @@ struct SetupView: View {
                     .font(.blankInter(size: 11, relativeTo: .caption2))
                     .foregroundStyle(BlankColors.mutedInk)
             }
-            Text("Your scroll risk is rising")
+            Text("Your requested block is ready")
                 .font(.blankInter(size: 12, relativeTo: .caption))
                 .lineLimit(2)
         }

@@ -25,6 +25,8 @@ private enum OnboardingStep: Int, CaseIterable {
     case apps
     case phone
     case whatsApp
+    case demonstration
+    case control
 
     var analyticsName: String {
         switch self {
@@ -48,6 +50,8 @@ private enum OnboardingStep: Int, CaseIterable {
         case .apps: return "apps_selection"
         case .phone: return "phone_verification"
         case .whatsApp: return "whatsapp_connection"
+        case .demonstration: return "conversation_preview"
+        case .control: return "device_control_preview"
         }
     }
 
@@ -200,6 +204,7 @@ struct SetupView: View {
     @AppStorage("blankOnboardingTrialStarted", store: BlankSharedState.defaults) private var trialStarted = false
     @AppStorage("blankDigitalWellnessFeatureConsent", store: BlankSharedState.defaults) private var wellnessFeatureConsent = false
     @AppStorage("blankOnboardingStepRaw", store: BlankSharedState.defaults) private var savedStepRaw = 0
+    @AppStorage("blankOnboardingFlowVersion", store: BlankSharedState.defaults) private var onboardingFlowVersion = 0
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var assistantPhoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var assistantConnectCode = ""
     @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var assistantPhoneVerified = false
@@ -283,7 +288,11 @@ struct SetupView: View {
         .foregroundStyle(minimalAppearance ? BlankColors.minimalInk : BlankColors.pureWhite)
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
         .task {
-            if !sessionStore.setupComplete, let savedStep = OnboardingStep(rawValue: savedStepRaw) {
+            if onboardingFlowVersion != 2 {
+                savedStepRaw = OnboardingStep.awareness.rawValue
+                onboardingFlowVersion = 2
+            }
+            if !sessionStore.setupComplete, let savedStep = OnboardingStep(rawValue: savedStepRaw), activeSteps.contains(savedStep) {
                 currentStep = savedStep == .whatsApp && !assistantPhoneVerified ? .phone : savedStep
             }
             dailyHours = storedDailyHours
@@ -392,6 +401,10 @@ struct SetupView: View {
             phoneStep
         case .whatsApp:
             whatsAppStep
+        case .demonstration:
+            demonstrationStep
+        case .control:
+            controlStep
         }
     }
 
@@ -404,14 +417,72 @@ struct SetupView: View {
     ) -> some View {
         referenceScene(
             lines: [
-                .text("Your phone is taking"),
-                .text("more of your life"),
-                .text("than you think", icon: "iphone")
+                .text("Take your time"),
+                .text("back from"),
+                .accent("your phone", icon: "iphone")
             ],
-            body: "Let's calculate it",
-            primaryTitle: button,
+            primaryTitle: "See how it works",
             primaryAction: goForward
         )
+    }
+
+    private var demonstrationStep: some View {
+        referenceScene(
+            lines: [.text("Tell Blankmind"), .text("what pulls you in", icon: "message.fill")],
+            primaryTitle: "Continue",
+            primaryAction: goForward,
+            accessory: AnyView(
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("EXAMPLE CONVERSATION")
+                        .font(.blankInter(size: 11, weight: .semibold, relativeTo: .caption))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.6))
+                    previewBubble("I keep opening Instagram before bed", outgoing: true)
+                    previewBubble("We can protect that time. Tell me when you'd like the block to start.", outgoing: false)
+                }
+                .frame(maxWidth: 318, alignment: .leading)
+            )
+        )
+    }
+
+    private var controlStep: some View {
+        referenceScene(
+            lines: [.text("A conversation"), .text("becomes a boundary", icon: "lock.shield.fill")],
+            primaryTitle: "Set up my iPhone",
+            primaryAction: goForward,
+            accessory: AnyView(
+                VStack(alignment: .leading, spacing: 10) {
+                    previewControlRow("1", "Ask in WhatsApp or SMS")
+                    previewControlRow("2", "Tap the Blankmind notification")
+                    previewControlRow("3", "Your chosen distractions are protected")
+                    Text("Nothing is blocked until you ask and apply it.")
+                        .font(.blankInter(size: 12, relativeTo: .caption))
+                        .foregroundStyle(BlankColors.pureWhite.opacity(0.65))
+                        .padding(.top, 6)
+                }
+                .frame(maxWidth: 318, alignment: .leading)
+            )
+        )
+    }
+
+    private func previewBubble(_ copy: String, outgoing: Bool) -> some View {
+        Text(copy)
+            .font(.blankInter(size: 14, weight: .medium, relativeTo: .subheadline))
+            .foregroundStyle(outgoing ? BlankColors.ink : BlankColors.pureWhite)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
+            .background(outgoing ? BlankColors.pureWhite : BlankColors.pureWhite.opacity(0.14), in: RoundedRectangle(cornerRadius: 17))
+            .frame(maxWidth: .infinity, alignment: outgoing ? .trailing : .leading)
+    }
+
+    private func previewControlRow(_ number: String, _ copy: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(number)
+                .foregroundStyle(BlankColors.pureWhite.opacity(0.55))
+            Text(copy)
+                .foregroundStyle(BlankColors.pureWhite)
+        }
+        .font(.blankInter(size: 15, weight: .medium, relativeTo: .subheadline))
+        .padding(.vertical, 8)
     }
 
     private var nameStep: some View {
@@ -629,13 +700,12 @@ struct SetupView: View {
     private var notificationsStep: some View {
         referenceScene(
             lines: [
-                .text("Let us warn you"),
-                .text("before your weakest moment", icon: "bell.badge.fill")
+                .text("One tap applies"),
+                .text("your next block", icon: "bell.badge.fill")
             ],
-            primaryTitle: "Enable reminders",
+            body: "Notifications let you apply a block from your conversation.",
+            primaryTitle: "Enable notifications",
             primaryAction: requestNotifications,
-            secondaryTitle: "Not now",
-            secondaryAction: goForward,
             accessory: AnyView(notificationPreview),
             accessoryAboveText: true
         )
@@ -836,7 +906,7 @@ struct SetupView: View {
                 .text(sessionStore.hasSelectedApps ? "for Blankmind" : "once")
             ],
             body: sessionStore.hasSelectedApps
-                ? "This is the list Blankmind will use when you ask for a block. Connect your phone and WhatsApp next."
+                ? "This is the list Blankmind will use when you ask for a block."
                 : "Choose every app, category or website that pulls your attention. This becomes your one reusable protection list.",
             primaryTitle: sessionStore.hasSelectedApps ? "Continue" : "Select apps",
             primaryAction: selectAppsOrContinue,
@@ -848,7 +918,7 @@ struct SetupView: View {
     private var phoneStep: some View {
         referenceScene(
             lines: [.text("Verify your phone"), .text("to meet Blankmind", icon: "iphone")],
-            body: "We send a one-time code by SMS. Your account and this iPhone will be linked before you connect WhatsApp.",
+            body: "We send a one-time code by SMS to link your account and this iPhone.",
             primaryTitle: assistantPhoneVerified ? "Continue" : "Verify phone",
             primaryAction: {
                 if !assistantPhoneVerified { showingPhoneSignIn = true }
@@ -859,13 +929,48 @@ struct SetupView: View {
 
     private var whatsAppStep: some View {
         referenceScene(
-            lines: [.text("Connect WhatsApp"), .text("to Blankmind", icon: "message.fill")],
-            body: "Send the prepared message from your verified number. Return here to finish the connection and check notifications.",
-            primaryTitle: assistantConnectionInFlight ? "Checking…" : notificationStatus == "On" ? "Connect WhatsApp" : "Enable notifications",
+            lines: [.text("Start the"), .text("conversation", icon: "message.fill")],
+            body: "Send the prepared message from your verified number. Return here to confirm this iPhone is ready.",
+            primaryTitle: assistantConnectionInFlight ? "Checking…" : "Open \(conversationChannelName)",
             primaryAction: { Task { await startWhatsAppConnection() } },
             secondaryTitle: "I've sent the message",
-            secondaryAction: { Task { await checkWhatsAppConnection() } }
+            secondaryAction: { Task { await checkWhatsAppConnection() } },
+            accessory: AnyView(
+                HStack(spacing: 9) {
+                    channelChoice("WhatsApp", value: "whatsapp", available: true)
+                    channelChoice("SMS", value: "sms", available: smsChannelAvailable)
+                }
+                .frame(maxWidth: 318)
+            )
         )
+    }
+
+    private var smsChannelAvailable: Bool {
+        guard let number = Bundle.main.object(forInfoDictionaryKey: "BlankSMSPhoneNumber") as? String else { return false }
+        return !number.filter(\.isNumber).isEmpty
+    }
+
+    private var conversationChannel: String {
+        assistantPreferredChannel == "sms" && smsChannelAvailable ? "sms" : "whatsapp"
+    }
+
+    private var conversationChannelName: String { conversationChannel == "sms" ? "SMS" : "WhatsApp" }
+
+    private func channelChoice(_ title: String, value: String, available: Bool) -> some View {
+        Button {
+            assistantPreferredChannel = value
+            message = nil
+        } label: {
+            Text(title)
+                .font(.blankInter(size: 14, weight: .semibold, relativeTo: .subheadline))
+                .foregroundStyle(BlankColors.pureWhite)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(BlankColors.pureWhite.opacity(conversationChannel == value ? 0.26 : 0.09), in: RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .opacity(available ? 1 : 0.45)
     }
 
     private func choiceStep(
@@ -1101,7 +1206,7 @@ struct SetupView: View {
         switch currentStep {
         case .trial:
             return false
-        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .distractingApps, .profile, .commitment, .personalization, .notifications, .permission, .apps, .phone, .whatsApp:
+        case .awareness, .lifetime, .dopamine, .name, .dailyUse, .result, .diagnosis, .recovery, .goal, .age, .distractingApps, .profile, .commitment, .personalization, .notifications, .permission, .apps, .phone, .whatsApp, .demonstration, .control:
             return true
         }
     }
@@ -1646,7 +1751,7 @@ struct SetupView: View {
                 step: currentStep.analyticsName,
                 properties: ["status": screenTimeBlocker.authorizationStatusLabel, "granted": true, "source": "refresh"]
             )
-            currentStep = .notifications
+            currentStep = .apps
             message = nil
         }
     }
@@ -1658,12 +1763,6 @@ struct SetupView: View {
                 return
             }
             screenTimeBlocker.updateSelection(sessionStore.selection, isBlankActive: sessionStore.isBlankActive)
-            DigitalWellnessAI.saveInitialDiagnosis(
-                goal: selectedOnboardingGoal,
-                profile: selectedProfile,
-                dailyHours: storedDailyHours,
-                selectionCount: sessionStore.selectionCount
-            )
             goForward()
         } else {
             showingPicker = true
@@ -1687,19 +1786,21 @@ struct SetupView: View {
                 return
             }
         }
-        guard let rawNumber = Bundle.main.object(forInfoDictionaryKey: "BlankWhatsAppPhoneNumber") as? String,
+        let channel = conversationChannel
+        let numberKey = channel == "sms" ? "BlankSMSPhoneNumber" : "BlankWhatsAppPhoneNumber"
+        guard let rawNumber = Bundle.main.object(forInfoDictionaryKey: numberKey) as? String,
               !rawNumber.filter(\.isNumber).isEmpty else {
-            message = "The Blankmind WhatsApp number is missing from this build."
+            message = "The Blankmind \(conversationChannelName) number is missing from this build."
             return
         }
         assistantConnectionInFlight = true
         defer { assistantConnectionInFlight = false }
         do {
             let code = assistantConnectCode
-            assistantPreferredChannel = "whatsapp"
+            assistantPreferredChannel = channel
             _ = try await postAssistantChannel("register_preference", fields: [
                 "connect_code": code,
-                "preferred_channel": "whatsapp",
+                "preferred_channel": channel,
                 "user_phone": assistantPhoneNumber,
             ])
             guard await syncOnboardingAssistantContext(deviceReady: false) else {
@@ -1709,11 +1810,14 @@ struct SetupView: View {
             let text = "CONNECT \(code)"
             let encoded = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? text
             let number = rawNumber.filter(\.isNumber)
-            guard let url = URL(string: "https://wa.me/\(number)?text=\(encoded)") else { return }
+            let destination = channel == "sms"
+                ? "sms:\(number)&body=\(encoded)"
+                : "https://wa.me/\(number)?text=\(encoded)"
+            guard let url = URL(string: destination) else { return }
             openURL(url)
-            message = "Send the prepared message in WhatsApp, then return here."
+            message = "Send the prepared message in \(conversationChannelName), then return here."
         } catch {
-            message = "Could not prepare WhatsApp connection. Try again."
+            message = "Could not prepare the conversation. Try again."
         }
     }
 
@@ -1725,7 +1829,7 @@ struct SetupView: View {
         do {
             let status = try await postAssistantChannel("connection_status")
             guard status["linked"] as? Bool == true else {
-                message = "WhatsApp is waiting for your message. Send it from your verified number."
+                message = "\(conversationChannelName) is waiting for your message. Send it from your verified number."
                 return
             }
             await refreshNotificationStatus()
@@ -1751,7 +1855,7 @@ struct SetupView: View {
             #endif
             guard await AssistantActionInboxClient().registerDevicePush(
                 token: token, environment: environment, connectCode: assistantConnectCode,
-                channel: "whatsapp", phoneNumber: assistantPhoneNumber
+                channel: conversationChannel, phoneNumber: assistantPhoneNumber
             ) else {
                 message = "The iPhone could not register for block notifications. Try again."
                 return
@@ -1771,16 +1875,26 @@ struct SetupView: View {
             savedStepRaw = 0
             onFinishForQA?()
             await purchaseStore.registerReferredActivation(referredUserId: currentOnboardingAnonymousUserId())
+            openConnectedConversation()
         } catch {
-            message = "Could not confirm the connection. Check WhatsApp and try again."
+            message = "Could not confirm the connection. Check \(conversationChannelName) and try again."
         }
+    }
+
+    private func openConnectedConversation() {
+        let numberKey = conversationChannel == "sms" ? "BlankSMSPhoneNumber" : "BlankWhatsAppPhoneNumber"
+        guard let rawNumber = Bundle.main.object(forInfoDictionaryKey: numberKey) as? String else { return }
+        let number = rawNumber.filter(\.isNumber)
+        guard !number.isEmpty else { return }
+        let destination = conversationChannel == "sms" ? "sms:\(number)" : "https://wa.me/\(number)"
+        if let url = URL(string: destination) { openURL(url) }
     }
 
     @MainActor
     private func syncOnboardingAssistantContext(deviceReady: Bool) async -> Bool {
         await AssistantContextSyncClient().sync(
             connectCode: assistantConnectCode,
-            channel: "whatsapp",
+            channel: conversationChannel,
             phoneNumber: assistantPhoneNumber,
             payload: [
                 "locale": Locale.current.identifier,
@@ -1806,7 +1920,7 @@ struct SetupView: View {
         var body: [String: Any] = [
             "action": action,
             "connect_code": assistantConnectCode,
-            "preferred_channel": "whatsapp",
+            "preferred_channel": conversationChannel,
             "user_phone": assistantPhoneNumber,
             "app_install_id": BlankSharedState.appInstallId,
         ]
@@ -1834,13 +1948,8 @@ struct SetupView: View {
 
     private var onboardingAnalyticsProperties: [String: Any] {
         [
-            "goal": selectedOnboardingGoal,
-            "profile": selectedProfile,
-            "declared_distracting_apps": selectedDistractingAppNames.joined(separator: "|"),
-            "age_range": selectedAgeRange,
-            "daily_hours": storedDailyHours,
-            "selected_plan": selectedPlan.rawValue,
-            "trial_started": trialStarted,
+            "flow_version": 2,
+            "channel": conversationChannel,
             "screen_time_status": screenTimeBlocker.authorizationStatusLabel,
             "selection_count": sessionStore.selectionCount
         ]
@@ -1867,8 +1976,13 @@ struct SetupView: View {
         }
     }
 
+    private var activeSteps: [OnboardingStep] {
+        [.awareness, .demonstration, .control, .phone, .permission, .apps, .notifications, .whatsApp]
+    }
+
     private func goForward() {
-        guard let next = OnboardingStep(rawValue: min(currentStep.rawValue + 1, OnboardingStep.allCases.count - 1)) else { return }
+        guard let index = activeSteps.firstIndex(of: currentStep), index + 1 < activeSteps.count else { return }
+        let next = activeSteps[index + 1]
         withAnimation(.easeInOut(duration: 0.38)) {
             currentStep = next
         }
@@ -1876,13 +1990,8 @@ struct SetupView: View {
     }
 
     private func goBack() {
-        guard let previous = OnboardingStep(rawValue: max(currentStep.rawValue - 1, 0)) else { return }
-        if currentStep == .commitment {
-            resetCommitmentHold()
-        }
-        if currentStep == .personalization || previous == .personalization {
-            personalizationShowsDetail = false
-        }
+        guard let index = activeSteps.firstIndex(of: currentStep), index > 0 else { return }
+        let previous = activeSteps[index - 1]
         withAnimation(.easeInOut(duration: 0.38)) {
             currentStep = previous
         }

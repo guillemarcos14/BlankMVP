@@ -36,9 +36,11 @@ const {
   releaseAssistantInboundMessage,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  getAssistantUserContext,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordAssistantUserContext,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 
@@ -671,6 +673,16 @@ function memoryFactsFromText(text) {
   const apps = namedApps(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
+  const name = cleanText(text, 800).match(/\b(?:my name is|call me|me llamo|ll[aá]mame)\s+([A-Za-zÀ-ÖØ-öø-ÿ]{2,32})\b/i);
+  if (name) facts.profile_name = name[1];
+  const age = cleanText(text, 800).match(/\b(?:i(?:'|’)m|i am)\s+(\d{1,2})\s+years?\s+old\b|\btengo\s+(\d{1,2})\s+a[ñn]os\b/i);
+  const exactAge = Number(age?.[1] || age?.[2]);
+  if (Number.isInteger(exactAge) && exactAge >= 13 && exactAge <= 99) {
+    facts.age = exactAge;
+    facts.age_range = exactAge < 18 ? "Under 18" : exactAge < 25 ? "18-24" : exactAge < 35 ? "25-34" : exactAge < 45 ? "35-44" : "45+";
+  }
+  const goal = cleanText(text, 800).match(/\b(?:i want to|i'd like to|quiero|me gustar[ií]a)\s+([^.!?]{5,120})/i);
+  if (goal) facts.declared_goal = cleanText(goal[1], 120);
   if (/(sleep|bed|night|dormir|duermo|cama|noche)/i.test(value)) facts.last_topic = "sleep";
   else if (/(scroll|social|instagram|tiktok|youtube|reddit|reels|shorts|redes)/i.test(value)) facts.last_topic = "social";
   else if (/(focus|work|study|foco|trabaj|estudi)/i.test(value)) facts.last_topic = "focus";
@@ -704,10 +716,34 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   const storedUserContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
     ? savedMemory.user_context
     : {};
-  const userContext = await enrichAssistantContext(
-    storedUserContext,
-    linkedConnection?.connectCode || savedMemory.assistant_connect_code,
+  const connectCode = linkedConnection?.connectCode || savedMemory.assistant_connect_code;
+  let sharedContext = {};
+  if (connectCode) {
+    try { sharedContext = await getAssistantUserContext(connectCode); } catch (_) { /* Conversation remains available. */ }
+  }
+  const enrichedContext = await enrichAssistantContext(
+    { ...storedUserContext, ...sharedContext },
+    connectCode,
   );
+  const userContext = {
+    ...enrichedContext,
+    profile_name: newFacts.profile_name || sharedContext.profile_name || savedMemory.profile_name || enrichedContext.profile_name,
+    age_range: newFacts.age_range || sharedContext.age_range || savedMemory.age_range || enrichedContext.age_range,
+    personal_profile: {
+      ...(enrichedContext.personal_profile || {}),
+      ...(sharedContext.personal_profile || {}),
+      ...(Number.isInteger(newFacts.age || savedMemory.age) ? { age: newFacts.age || savedMemory.age } : {}),
+      ...((newFacts.declared_goal || savedMemory.declared_goal) ? { goal: newFacts.declared_goal || savedMemory.declared_goal } : {}),
+    },
+  };
+  if (connectCode && (newFacts.profile_name || newFacts.age || newFacts.declared_goal)) {
+    try {
+      await recordAssistantUserContext({
+        connectCode, channel, userPhone: from,
+        context: { ...sharedContext, ...userContext },
+      });
+    } catch (_) { /* Profile persistence must not block the reply. */ }
+  }
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -1068,3 +1104,4 @@ exports.actionDeepLink = actionDeepLink;
 exports.pendingActionFromMemory = pendingActionFromMemory;
 exports.pendingAssistantActionFromPlan = pendingAssistantActionFromPlan;
 exports.verifyTwilioSignature = verifyTwilioSignature;
+exports.memoryFactsFromText = memoryFactsFromText;

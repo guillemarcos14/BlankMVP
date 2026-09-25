@@ -121,13 +121,21 @@ async function syncContext(body) {
     : null;
   if (!connectCode || !context) return json(400, { error: "missing_connect_code_or_context" });
 
+  const previousContext = await getAssistantUserContext(connectCode);
+  const mergedContext = {
+    ...previousContext,
+    ...context,
+    profile_name: context.profile_name || previousContext.profile_name,
+    age_range: context.age_range || previousContext.age_range,
+    personal_profile: { ...(previousContext.personal_profile || {}), ...(context.personal_profile || {}) },
+  };
   const normalizedContext = await recordAssistantUserContext({
     connectCode,
-    context,
+    context: mergedContext,
     channel: preferredChannel,
     userPhone: body.user_phone || body.phone_number || "",
   });
-  await persistCanonicalSnapshot(connectCode, normalizedContext || context);
+  await persistCanonicalSnapshot(connectCode, normalizedContext || mergedContext);
   const connection = await findAssistantConnection(connectCode, preferredChannel);
   if (connection && normalizedContext) {
     const canonicalContext = await enrichAssistantContext({}, connectCode);
@@ -188,12 +196,12 @@ async function completeOnboarding(body) {
   if (status.error) return json(400, { error: status.error });
   const identity = await identityForAppInstall(body.app_install_id);
   if (!identity || normalizeConnectCode(identity.assistant_connect_code) !== status.connectCode
-      || status.connection?.channel !== "whatsapp"
+      || status.connection?.channel !== status.preferredChannel
       || require("./_identity").normalizePhone(status.connection.channelUser) !== identity.phone_e164) {
-    return json(403, { error: "whatsapp_not_verified_for_installation" });
+    return json(403, { error: "channel_not_verified_for_installation" });
   }
   const context = await getAssistantUserContext(status.connectCode);
-  const memory = await getAssistantMemory("whatsapp", status.connection.channelUser);
+  const memory = await getAssistantMemory(status.connection.channel, status.connection.channelUser);
   const ready = context.has_selected_apps === true
     && Number(context.selection_count) > 0
     && context.screen_time_authorized === true
@@ -202,13 +210,14 @@ async function completeOnboarding(body) {
   if (!ready) return json(200, { ok: true, ready: false, reason: "device_setup_incomplete" });
   if (memory.assistant_activation_ready_sent_at) return json(200, { ok: true, ready: true, already_sent: true });
   const spanish = /^es(?:$|[-_])/i.test(String(context.locale || context.language || ""));
+  const channelName = status.connection.channel === "sms" ? "SMS" : "WhatsApp";
   const message = spanish
-    ? "Tu app ya está vinculada a este WhatsApp y tus distracciones están listas. Puedes pedirme un bloqueo; lo confirmarás desde una notificación de Blankmind."
-    : "Your app is linked to this WhatsApp and your distractions are ready. You can ask me for a block; you’ll confirm it from a Blankmind notification.";
+    ? `Tu app ya está vinculada a este ${channelName} y tus distracciones están listas. Cuéntame qué te gustaría cambiar con tu móvil; puedes pedirme un bloqueo cuando quieras.`
+    : `Your app is linked to this ${channelName} and your distractions are ready. Tell me what you'd like to change about your phone; you can ask me for a block whenever you want.`;
   const delivery = await sendAssistantMessage(status.connection, message);
   if (delivery?.skipped) return json(502, { error: delivery.reason || "activation_message_not_sent" });
   await recordAssistantMemory({
-    channel: "whatsapp",
+    channel: status.connection.channel,
     channelUser: status.connection.channelUser,
     memory: { assistant_activation_ready_sent_at: new Date().toISOString() },
     source: "assistant_activation_ready_sent",

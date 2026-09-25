@@ -287,7 +287,7 @@ struct ReportView: View {
             Spacer(minLength: 18)
 
             Text(formatDuration(savedTime))
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .tracking(-1.5)
                 .foregroundStyle(reportPrimary)
                 .lineLimit(1)

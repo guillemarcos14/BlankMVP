@@ -8,6 +8,7 @@ const { personalizedRecommendationPlan, scheduleManagementPlan } = require("../n
 const { pendingActionFromPlan } = require("../netlify/functions/bm-pending-action");
 const { enforceSemanticBoundary } = require("../netlify/functions/blanked-agent");
 const { personalContextView } = require("../netlify/functions/bm-personal-context-view");
+const { memoryFactsFromText } = require("../netlify/functions/sms-agent");
 const { isGrounded } = require("../netlify/functions/bm-contextual-response");
 
 const root = path.join(__dirname, "..");
@@ -30,6 +31,13 @@ assert.match(iosContextSource, /for attempt in 0\.\.<3/);
 assert.match(iosContextSource, /200\.\.<300/);
 assert.match(iosHomeSource, /"context_revision"/);
 assert.match(iosHomeSource, /max\(currentRevision, nextRevision\)/);
+assert.deepEqual(
+  (({ profile_name, age, age_range, declared_goal }) => ({ profile_name, age, age_range, declared_goal }))(
+    memoryFactsFromText("Call me Guillem. I'm 32 years old. I want to sleep better."),
+  ),
+  { profile_name: "Guillem", age: 32, age_range: "25-34", declared_goal: "sleep better" },
+);
+assert.equal(memoryFactsFromText("Block Instagram for 30 minutes").age, undefined);
 
 const windowId = "2D7B82F5-3F07-48F2-8D20-D4E7EA02967E";
 const source = {

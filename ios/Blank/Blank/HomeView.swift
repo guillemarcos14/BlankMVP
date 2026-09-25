@@ -908,8 +908,8 @@ struct HomeView: View {
                             Button("unblank") {
                                 beginFullScreenUnblankHold()
                             }
-                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                            .tracking(-0.8)
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                            .tracking(0)
                             .foregroundStyle(BlankColors.homeDarkSecondary)
                             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                             .buttonStyle(.plain)
@@ -984,8 +984,8 @@ struct HomeView: View {
         ZStack(alignment: .leading) {
             if isHoldingToUnblank {
                 Text("hold the screen to unblank")
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.pureWhite)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
@@ -994,8 +994,8 @@ struct HomeView: View {
                     .transition(.opacity)
             } else if let cooldownText {
                 Text(cooldownText)
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.homeDarkSecondary)
                     .monospacedDigit()
                     .lineLimit(2)
@@ -1003,8 +1003,8 @@ struct HomeView: View {
                     .transition(.opacity)
             } else if let timerCountdownText {
                 Text(timerCountdownText)
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.homeDarkSecondary)
                     .monospacedDigit()
                     .lineLimit(2)
@@ -1079,9 +1079,9 @@ struct HomeView: View {
             setMessage(for: result)
         } label: {
             Text(title)
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
                 .foregroundStyle(titleColor)
-                .tracking(-0.6)
+                .tracking(0)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1147,7 +1147,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 28) {
             Text(homeTagline)
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(BlankColors.pureWhite)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -2010,9 +2010,9 @@ struct HomeView: View {
 
 private extension View {
     func blankHomeDisplayTextStyle(color: Color) -> some View {
-        font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+        font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
             .foregroundStyle(color)
-            .tracking(-0.6)
+            .tracking(0)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .lineSpacing(0)
@@ -2216,7 +2216,7 @@ struct SectionBackHeader: View {
         HStack {
             Button(action: action) {
                 Text("back")
-                    .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .headline))
                     .tracking(-0.3)
                     .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
                     .frame(minWidth: 44, minHeight: 44, alignment: .leading)
@@ -2252,8 +2252,8 @@ struct SectionHeader: View {
             SectionBackHeader(action: action)
 
             Text(title.lowercased())
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-0.6)
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                .tracking(0)
                 .foregroundStyle(resolvedTitleColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.86)
@@ -2336,7 +2336,7 @@ private struct SettingsScreen: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(title)
-                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title3))
+                    .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title3))
                     .tracking(-0.4)
 
                 Text(detail)
@@ -2863,8 +2863,8 @@ private struct RelapseReviewSheet: View {
 
                 ZStack(alignment: .bottomLeading) {
                     Text("why now?")
-                        .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                        .tracking(-1.1)
+                        .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                        .tracking(0)
                         .foregroundStyle(BlankColors.pureWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -2884,8 +2884,8 @@ private struct RelapseReviewSheet: View {
                             onDismiss()
                         } label: {
                             Text("skip")
-                                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                .tracking(-0.6)
+                                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                                .tracking(0)
                                 .foregroundStyle(BlankColors.homeDarkSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
@@ -2910,8 +2910,8 @@ private struct RelapseReasonTile: View {
     var body: some View {
         HStack {
             Text(reason.title.lowercased())
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                .tracking(-0.6)
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                .tracking(0)
                 .foregroundStyle(BlankColors.homeDarkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -3118,7 +3118,7 @@ private struct TechnicalSheetTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.86)
@@ -3185,8 +3185,8 @@ private struct DistractionsScreen: View {
 
                     VStack(alignment: .leading, spacing: 0) {
                         Text("distractions")
-                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                            .tracking(-0.6)
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                            .tracking(0)
                             .foregroundStyle(textColor)
                             .lineLimit(1)
 
@@ -3541,7 +3541,7 @@ struct AppPhoneSignInSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Verify your phone in this app. We will send a one-time code by SMS. You will connect WhatsApp in the next step.")
+                    Text("We’ll send a one-time code by SMS. After setup, you can talk to Blankmind on WhatsApp or SMS.")
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(.secondary)
                 }
@@ -3553,7 +3553,7 @@ struct AppPhoneSignInSheet: View {
                 }
 
                 Section {
-                    Toggle("Link this phone and iPhone to my Blankmind account so I can use the assistant on WhatsApp.", isOn: $dataConsent)
+                    Toggle("Link this phone and iPhone to my Blankmind account so I can use the assistant in my chosen conversation channel.", isOn: $dataConsent)
                 }
 
                 if verificationStarted {

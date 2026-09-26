@@ -76,6 +76,24 @@ struct ProtectionTests {
         identity.assistantPhoneNumber = "+34000000000"
         identity.assistantPreferredChannel = "sms"
         expect(!identity.matches(code: "code-A", channel: "whatsapp", phone: "+34000000000"), "Changed channel accepted a stale action")
+        let requestedSchedule = PendingPlanSchedule(name: "Work", startMinute: 540, endMinute: 600, weekdays: [2], durationDays: 7)
+        let activatingActions: [AssistantPendingAction] = [
+            .startProtection(minutes: 30, hardMode: false, appNames: []),
+            .setDailyLimit(minutes: 20, appNames: []), .allowOnly, .adultFilter,
+            .applySchedule(name: "Work", startMinute: 540, endMinute: 600, weekdays: [2], durationDays: 7, appNames: []),
+            .updateSchedule(windowId: "window", name: "Work", startMinute: 540, endMinute: 600, weekdays: [2]),
+            .disablePause, .applyAIPlan, .openAppPicker(appNames: []),
+            .configureAndOpenAppPicker(appNames: [], durationMinutes: 30, hardMode: false, schedule: nil),
+            .configureAndOpenAppPicker(appNames: [], durationMinutes: nil, hardMode: false, schedule: requestedSchedule),
+            .configureAndOpenDailyLimitPicker(appNames: [], minutes: 20)
+        ]
+        for action in activatingActions {
+            expect(identity.requiresPermission(action), "Protection or picker escaped Screen Time permission preflight: \(action)")
+        }
+        let nonActivatingActions: [AssistantPendingAction] = [.deleteSchedule(windowId: "window"), .deleteAllSchedules, .pauseRules(hours: 1), .requestScreenTimePermission]
+        for action in nonActivatingActions {
+            expect(!identity.requiresPermission(action), "Removal or permission-only action must not enter protection preflight twice")
+        }
         print("iOS protection: weekday/overnight/expiry/overlap, 648 app-extension comparisons, legacy persistence and canonical selection locking passed")
     }
 }

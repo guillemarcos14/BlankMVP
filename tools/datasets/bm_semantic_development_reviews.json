@@ -298,5 +298,23 @@
     "verdict": "equivalent",
     "language": "en",
     "review_scope": "Exact message, response, speech, title, primary/secondary labels and bullets, plus empty followup, emitted actions, prior state and app context in final-neutral-copy-review.json. Independent agent review; no human certification or active-model evaluation."
+  },
+  {
+    "response_sha256": "0232e3d0345c42500f397a2952dd4755f748759fd22b39f8a445487fe03cf7b9",
+    "expectation_sha256": "d6056096814e3cd2acc89fc6548f35f32fb45a18c462ffd59ce00d4d14913269",
+    "reviewer": "Codex /root/ios_quality independent agent, 2026-09-26; recorded by /root/release_audit",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent reviewer did not author the deduplication copy. Exact message, response, speech, title, primary/secondary labels, bullets, empty followup, prior turns, canonical state, actions and app context inspected in prepared-title-review-pairs.json and prepared-title-final-review.json. Two hash pairs cover 12 acknowledgements in the 48-turn local development fixture; not active-model, transport, native-device or 925-turn release certification.",
+    "rationale": "The preceding correction replaces 30 with 45 minutes while retaining immediate start, once and the canonical distraction selection. The subsequent Yes is not a new instruction; no duplicate action is emitted. Message, response and speech retain those facts and state only that the request was prepared, without claiming a new send, pending transport or physical success. Request prepared corrects the earlier contradictory Sending protection title. Continue/Not now labels assert no outcome; bullets and followup are empty. The same exact surfaces appear across five channels and two repetitions."
+  },
+  {
+    "response_sha256": "e063a741608b91d439f3dd0f0120d57ab65edad1b4cb073e0d2386539e6e21ed",
+    "expectation_sha256": "7a79705f1cf6a897cddbced194418de583b2ae47c7f5c58b3c2259961b490565",
+    "reviewer": "Codex /root/ios_quality independent agent, 2026-09-26; recorded by /root/release_audit",
+    "verdict": "equivalent",
+    "language": "en",
+    "review_scope": "Independent reviewer did not author the deduplication copy. Exact message, response, speech, title, primary/secondary labels, bullets, empty followup, prior turns, canonical state, actions and app context inspected in prepared-title-review-pairs.json and prepared-title-final-review.json. Two hash pairs cover 12 acknowledgements in the 48-turn local development fixture; not active-model, transport, native-device or 925-turn release certification.",
+    "rationale": "After the end-time correction to noon, the repeated Yes retains 10:00-12:00, the derived 120-minute duration, daily recurrence and seven-day horizon. The prior turn already prepared this exact schedule; empty actions correctly prevent a second command. The three identical prose surfaces and Request prepared title describe preparation only and direct inspection in Blankmind without asserting transmission or application. Generic labels, empty bullets and empty followup add no facts. The iOS fixture has permission and selection; its never_seen presence field is not used as proof of delivery. Reviewed both repetitions."
   }
 ]

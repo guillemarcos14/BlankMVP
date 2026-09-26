@@ -1,9 +1,76 @@
 "use strict";
 const assert = require("node:assert/strict");
-const { isGrounded } = require("../netlify/functions/bm-contextual-response");
-const { handler } = require("../netlify/functions/blanked-agent");
+const { isGrounded, plannerAuthorityViolations } = require("../netlify/functions/bm-contextual-response");
+const { handler, enforceSemanticBoundary } = require("../netlify/functions/blanked-agent");
 const { whatsappReplyText } = require("../netlify/functions/whatsapp-agent");
 const { whatsappReplyText: smsReplyText } = require("../netlify/functions/sms-agent");
+
+// Spanish live failure plus independent authority mutations. These assertions
+// test the receipt boundary even when the parser recognizes no action intent.
+{
+const semantic={decision:{type:"none",slot:null},state:{intent:"general",status:"idle"}};
+const unsafe=[
+  "Listo. Instagram y TikTok quedan limitados a 20 minutos al día durante los próximos 7 días, empezando ahora.",
+  "Entendido. El límite de 20 minutos para Instagram y TikTok se mantendrá solo durante 7 días y se desactivará después.",
+  "Your apps are now blocked for 30 minutes.",
+  "I have scheduled the block from 9pm to 10pm.",
+  "Voy a bloquear tus distracciones ahora.",
+  "El horario está programado y se activará esta noche.",
+  "Your daily limit will expire after seven days.",
+  "A daily limit expires automatically after seven days.",
+  "El límite diario caduca automáticamente después de siete días.",
+  "No worries, your apps are blocked.",
+  "No he aplicado un bloqueo, pero tus apps están bloqueadas.",
+  "If your apps are blocked, I've unblocked them.",
+  "Si tus apps están bloqueadas, las he desbloqueado.",
+  "You said you are ready and I have applied the daily limit.",
+  "Me dices que estás listo y he aplicado el límite diario.",
+  "If you are ready I have blocked your distractions.",
+  "Si estás listo he bloqueado tus distracciones.",
+];
+for(const text of unsafe){
+  const plan={response_text:text,message_text:text,speech_text:text,actions:[],native_receipt:{status:"verified"}};
+  const gated=enforceSemanticBoundary(plan,semantic,text.startsWith("Your")||text.startsWith("I ")||text.startsWith("A ")?"en":"es");
+  assert.equal(gated.execution_boundary?.decision,"rejected",text);
+  assert.deepEqual(gated.actions,[]);assert.equal(gated.response_text,gated.message_text);assert.equal(gated.response_text,gated.speech_text);
+  assert.doesNotMatch(gated.response_text,/quedan limitados|se desactivara|are now blocked|have scheduled|will expire/);
+}
+const natural=[
+  "You said your apps are blocked. What happened next?",
+  "Me dices que tus apps están bloqueadas. ¿Qué ocurrió después?",
+  "I would block distracting apps for 30 minutes while you study.",
+  "Podrías probar un bloqueo de 30 minutos mientras estudias.",
+  "I haven't applied any changes. A daily limit does not expire automatically.",
+  "No he aplicado cambios. El límite diario no caduca automáticamente.",
+  "A daily limit will block distractions after you use your allowance.",
+  "Un límite diario se activará cuando agotas tu tiempo de uso.",
+  "I've withdrawn this instruction. If protection has already started on your iPhone, you'll need to stop it there.",
+  "He retirado esta instrucción. Si la protección ya empezó en tu iPhone, tendrás que detenerla allí.",
+  "Thanks for telling me. What usually pulls you back into scrolling?",
+  "If your apps are blocked, open Blankmind to inspect the current protection.",
+  "Si tus apps están bloqueadas, abre Blankmind para revisar la protección actual.",
+  "If your apps are blocked then open Blankmind to inspect the current protection.",
+  "Si tus apps están bloqueadas entonces abre Blankmind para revisar la protección actual.",
+  "You said your apps are blocked and you are ready to review the settings.",
+  "If your apps are blocked and I have already applied the limit, open Blankmind to check its current state.",
+  "Si tus apps están bloqueadas y he aplicado el límite, abre Blankmind para comprobar el estado actual.",
+];
+for(const text of natural){const plan={response_text:text,message_text:text,actions:[]};assert.equal(enforceSemanticBoundary(plan,semantic,"en").response_text,text,text);assert.deepEqual(plannerAuthorityViolations(plan),[],text);}
+for(const type of ["start_protection","set_daily_limit","enable_adult_filter","enable_allow_only"]){
+  const plan={actions:[{type,minutes:20}],response_text:"We can discuss this.",bullets:["Activation ready"],followup_text:"Apply",blocking_ready:true};
+  const gated=enforceSemanticBoundary(plan,semantic,"en");
+  assert.deepEqual(gated.actions,[]);assert.deepEqual(gated.bullets,[]);assert.equal(gated.followup_text,"");assert.equal(gated.blocking_ready,null);
+  assert.ok(gated.execution_boundary.reasons.includes("unvalidated_model_action"));
+}
+const adviceState={state:{status:"idle",intent:"advice"},decision:{type:"none"}};
+const advice={response_text:"Based on your stronger adherence, keep the lunch window and move it earlier on difficult days.",actions:[{type:"apply_schedule",start_minute:765,end_minute:840}]};
+const boundedAdvice=enforceSemanticBoundary(advice,adviceState,"en");
+assert.equal(boundedAdvice.response_text,advice.response_text);assert.deepEqual(boundedAdvice.actions,[]);
+assert.equal(boundedAdvice.execution_boundary.decision,"advice_only");
+assert.equal(enforceSemanticBoundary({...advice,response_text:"Your apps are blocked."},adviceState,"en").execution_boundary.decision,"rejected");
+assert.equal(isGrounded("I have applied your daily limit of 20 minutes.",{response_contract:{operation:"semantic_ready",action_type:"daily_limit"},actions:[{type:"set_daily_limit",minutes:20}]},{}),false);
+assert.equal(isGrounded("Your daily limit of 20 minutes will expire after 7 days.",{response_contract:{operation:"semantic_ready",action_type:"daily_limit"},actions:[{type:"set_daily_limit",minutes:20}]},{}),false);
+}
 
 // Both public provider adapters must honor the real delivery receipt, even if
 // the planner prematurely told the user to tap a notification.
@@ -102,6 +169,21 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     assert.equal(response.statusCode,200); const body=JSON.parse(response.body); assert.equal(body.ok,true); return body;
   }
   try {
+    rewrite="Listo. Instagram y TikTok quedan limitados a 20 minutos al día durante los próximos 7 días, empezando ahora.";
+    const noAuthority=await call("Hola",null,{language:"es",locale:"es_ES"});
+    assert.equal(noAuthority.plan.execution_boundary?.decision,"rejected","a conversation response has no execution authority, including when its input has no recognized action intent");
+    assert.deepEqual(noAuthority.plan.actions,[]);
+    assert.doesNotMatch(noAuthority.plan.message_text,/quedan limitados|proximos 7|próximos 7/);
+    assert.equal(noAuthority.plan.response_text,noAuthority.plan.speech_text);
+    rewrite="Your selected distractions can be blocked now for 2 minutes, but immediate blocks need to be 5–240 minutes. What duration do you want?";
+    const rejectedDurationBefore=calls.length;
+    const rejectedDuration=await call("Block selected apps now for 2 minutes, once.");
+    assert.equal(calls.length-rejectedDurationBefore,1,"native capability rejection allows extraction but does not rewrite a rejected quantity into executable facts");
+    assert.deepEqual(rejectedDuration.plan.actions,[]);
+    assert.equal(rejectedDuration.plan.semantic_decision.slot,"duration_minutes");
+    assert.match(rejectedDuration.plan.message_text,/5 to 240 minutes/);
+    assert.doesNotMatch(rejectedDuration.plan.message_text,/can be blocked|will be blocked/);
+    rewrite=null;
     const first=await call("Block selected apps now for 30 minutes once.");
     const cancelled=await call("Cancel this request.",first.plan.semantic_state);
     assert.match(cancelled.plan.message_text,/withdrawn this instruction/);
@@ -144,8 +226,22 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     assert.match(visible,/every day.*7 days/); assert.equal(picker.plan.actions[0].type,"open_app_picker");
     assert.match(visible,/device verifies/);
 
+    rewrite="Limit your selected distractions to 50 minutes per day, starting now. Tap the Blankmind notification, choose your distractions, and accept the picker so your phone can apply the plan.";
+    const limitNeedsSelection=await call("Set a 50-minute daily limit for selected apps now.",null,{has_selected_apps:false,selection_count:0});
+    assert.equal(limitNeedsSelection.plan.actions[0].type,"open_app_picker");
+    const selectionRecovered=await call("Ready.",limitNeedsSelection.plan.semantic_state,{has_selected_apps:true,selection_count:3});
+    assert.equal(selectionRecovered.plan.title,"Request prepared","a suppressed replay must not show a sending title");
+    assert.deepEqual(selectionRecovered.plan.actions,[],"the native picker already carried this executable daily limit");
+    assert.match(selectionRecovered.source,/grounded_execution_boundary/);
+    assert.doesNotMatch(selectionRecovered.plan.message_text,/choose your distractions|picker/);
+    assert.match(selectionRecovered.plan.message_text,/50 minutes per day/);
+    assert.match(selectionRecovered.plan.message_text,/already prepared/);
+
     rewrite=null;
+    const unsupportedBefore=calls.length;
     const unsupported=await call("Set a 60-minute daily limit for selected apps at 09:00 for 7 days.");
+    assert.equal(calls.length-unsupportedBefore,1,"a rejected native capability is not rewritten as an executable promise");
+    assert.match(unsupported.source,/grounded_execution_boundary/);
     assert.match(unsupported.plan.message_text,/daily limit.*60 minutes per day/);
     assert.match(unsupported.plan.message_text,/only start now/);
     assert.deepEqual(unsupported.plan.actions,[]);

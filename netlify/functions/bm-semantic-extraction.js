@@ -11,8 +11,11 @@ const values = {
   hard_mode: { type: "boolean" },
   start: { anyOf: [object({ type: { type: "string", enum: ["now"] } }), object({ type: { type: "string", enum: ["time"] }, minute: { type: "integer", minimum: 0, maximum: 1439 } })] },
   end: { type: "integer", minimum: 0, maximum: 1439 },
-  duration_minutes: { type: "integer", minimum: 1, maximum: 1440 },
-  schedule_horizon_days: { type: "integer", minimum: 1, maximum: 14 },
+  // Evidence must be able to represent an unsupported request verbatim. Native
+  // limits belong to validateSemanticPatch/reducer/action gates; constraining
+  // extraction to 1–14 made a request for 40 days impossible to express.
+  duration_minutes: { type: "integer" },
+  schedule_horizon_days: { type: "integer" },
   recurrence: object({ type: { type: "string", enum: ["once", "daily", "weekly"] }, weekdays: { type: "array", maxItems: 7, items: { type: "integer", minimum: 1, maximum: 7 } } }),
 };
 const schema = {
@@ -60,7 +63,7 @@ function parseCandidate(body, prompt) {
 async function extractWithModel({ prompt, previousState, context = {}, fetchImpl = fetch }) {
   if (!process.env.OPENAI_API_KEY) return { enabled: false, extraction: null, source: "deterministic_semantic_extraction" };
   const request = requestFor(prompt, previousState, context);
-  request.input[0].content += " Return each slot at most once. If alternatives conflict, omit that slot and report the ambiguity. Quantities describing a past event are observations, not requested future action parameters.";
+  request.input[0].content += " Return each slot at most once. If alternatives conflict, omit that slot and report the ambiguity. Quantities describing a past event are observations, not requested future action parameters. Copy requested quantities exactly, including unsupported values: never clamp, truncate or replace them to fit device capabilities. The separate action validator decides what the device supports.";
   const deadline = Date.now() + 20000;
   const attemptErrors = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -69,7 +72,7 @@ async function extractWithModel({ prompt, previousState, context = {}, fetchImpl
       // cannot consume a second timeout window or exhaust the app turn lease.
       const response = await fetchImpl("https://api.openai.com/v1/responses", {
         method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
-        body: JSON.stringify(request), signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+        body: JSON.stringify(request), signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline - Date.now()))),
       });
       if (!response.ok) throw new Error(`semantic_model_http_${response.status}`);
       const body = await response.json();
@@ -82,14 +85,18 @@ async function extractWithModel({ prompt, previousState, context = {}, fetchImpl
         trace: { request, candidate, validation, attempt_count: attempt, attempt_errors: attemptErrors } };
     } catch (error) {
       attemptErrors.push(error.name === "TimeoutError" ? "semantic_model_timeout" : error.message);
-      // Never merge conflicting duplicate fields or weaken validation. Ask once
-      // for a valid response; operational failures remain visible to the caller.
-      if (attempt !== 1 || error.message !== "duplicate_semantic_extraction_slot" || Date.now() >= deadline) {
+      // Extraction has no side effects. One bounded retry can recover malformed
+      // output or a transient model request, without hiding either attempt or
+      // allowing a second 20-second timeout window. Auth/quota failures fail fast.
+      const retryable = error.name === "TimeoutError"
+        || ["duplicate_semantic_extraction_slot", "semantic_model_incomplete", "semantic_model_http_502", "semantic_model_http_503", "semantic_model_http_504"].includes(error.message);
+      if (attempt !== 1 || !retryable || deadline - Date.now() < 1000) {
         error.semantic_attempt_count = attempt;
         error.semantic_attempt_errors = [...attemptErrors];
         throw error;
       }
-      request.input.push({ role: "system", content: "The previous extraction repeated a slot and was rejected. Return at most one entry per slot. Omit conflicting alternatives; report their ambiguity instead." });
+      if (error.message === "duplicate_semantic_extraction_slot") request.input.push({ role: "system", content: "The previous extraction repeated a slot and was rejected. Return at most one entry per slot. Omit conflicting alternatives; report their ambiguity instead." });
+      if (error.message === "semantic_model_incomplete") request.max_output_tokens = 1400;
     }
   }
 }

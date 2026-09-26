@@ -79,7 +79,7 @@ async function prepare() {
   assert.doesNotMatch(response.body, /Reply BLOCK|Tap.*notification|review-action/i);
   const acknowledgment = await send("Yes");
   assert.match(acknowledgment.body, /18 minutes/);
-  assert.match(acknowledgment.body, /already waiting.*Open Blankmind/);
+  assert.match(acknowledgment.body, /already prepared.*Check its result in Blankmind/);
   assert.doesNotMatch(acknowledgment.body, /Tap.*notification|review-action/i);
   assert.equal(memory.pending_assistant_action.type, "start_protection");
   assert.equal(memory.pending_assistant_action.minutes, 18);

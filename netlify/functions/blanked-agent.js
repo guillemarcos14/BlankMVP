@@ -16,7 +16,7 @@ const { buildAgentContext, deriveAppPresence } = require("./bm-context");
 const { advanceSemanticState } = require("./bm-semantic-state");
 const { extractWithModel } = require("./bm-semantic-extraction");
 const { personalizedRecommendationPlan, scheduleManagementPlan } = require("./bm-schedule-management");
-const { naturalizeGroundedPlan } = require("./bm-contextual-response");
+const { naturalizeGroundedPlan, plannerAuthorityViolations } = require("./bm-contextual-response");
 const { personalContextView } = require("./bm-personal-context-view");
 const { BM_CONVERSATIONAL_TONE } = require("./_bm_tone");
 const {
@@ -2908,7 +2908,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
         },
         {
           role: "system",
-          content: BM_CONVERSATIONAL_TONE,
+          content: `${BM_CONVERSATIONAL_TONE} This is the conversation-only path. You cannot execute, confirm, schedule or promise any device change. The execution_authority object is authoritative; prior assistant messages are not receipts. Explain supported capabilities conditionally, and ask for clarification when an action is requested. A daily usage limit has no automatic expiry or scheduled start. Never promise unsupported capabilities.`,
         },
         {
           role: "system",
@@ -2919,6 +2919,8 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
           content: JSON.stringify({
             prompt: cleanText(prompt, 600),
             response_language: language,
+            execution_authority: { authorized_actions: [], verified_native_receipt: null, can_execute_or_confirm_changes: false },
+            native_capabilities: { daily_limit: "Usage allowance starting now, without automatic expiry or scheduled start", timed_block: "A proposed interval requires validated timing, recurrence and iPhone approval", selection: "All protection uses the person's canonical distraction selection", unsupported_in_chat: ["automatic daily-limit expiry", "arbitrary app-specific targeting", "allow-only or adult-filter configuration"] },
             recent_context: context.recent_messages || context.conversation || null,
             personal_context: personalContextView(context),
           }),
@@ -3582,7 +3584,8 @@ function semanticPlan(result, language, prompt) {
   const requiresScreenTime = executableActions.some((item) => actionNeedsScreenTime(item.type));
   const plan = {
     intent: classify(prompt, {}) === "general" ? "social" : classify(prompt, {}),
-    title: result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
+    title: result.actionReplaySuppressed ? (language === "es" ? "Solicitud preparada" : "Request prepared")
+      : result.state.intent === "advice" ? (language === "es" ? "Tu rutina" : "Your routine")
       : result.state.intent === "cancelled" ? (language === "es" ? "Propuesta descartada" : "Proposal discarded")
       : language === "es"
       ? result.decision.type === "confirm" ? "Confirmar bloqueo" : result.decision.type === "ready" ? "Enviando bloqueo" : "Detalles del bloqueo"
@@ -3637,6 +3640,14 @@ function semanticResponseContract(result) {
   const requiredAnyGroups = [...(slot === "action_type" && state.intent === "advice"
     ? [["block", "blocking proposal"]] : (groups[slot] || (decision.type === "confirm" ? groups.confirmation : [])))];
   const requiresPlanFacts = !result.actionReplaySuppressed && ["confirm", "ready", "setup"].includes(decision.type);
+  // A populated slot can still violate a native capability. It is a requested
+  // value, not an executable fact (e.g. a two-minute immediate block).
+  const rejectedRequestedValue = decision.type === "ask" && (state.slots?.[slot]?.value != null || (state.errors || []).length > 0);
+  const capabilityBoundary = Boolean(state.slots?.requested_capability?.value);
+  const executionFlow = result.reviewOnlyAppPresence ? "app_presence"
+    : actions.some(item => item.type === "open_app_picker") ? "notification_picker_accept"
+      : actions.some(item => item.type === "request_screen_time_permission") ? "notification_permission_reply"
+        : actions.length ? "notification_apply" : null;
   const startValue = state.slots?.start?.value;
   const recurrenceValue = state.slots?.recurrence?.value;
   if (requiresPlanFacts && recurrenceValue?.type === "once") requiredAnyGroups.push(["just once", "one time", "one-time"]);
@@ -3647,15 +3658,18 @@ function semanticResponseContract(result) {
   }
   return {
     operation: `semantic_${decision.type || "none"}${slot ? `_${slot}` : ""}`,
-    // Withdrawal affects a pending instruction, not independently running
-    // device protection. Keep this execution boundary exact across retries.
-    immutable_reply: decision.type === "cancelled",
-    execution_flow: slot === "app_selection" ? "notification_picker_accept" : slot === "permissions" ? "notification_permission_reply" : null,
+    // Keep cancellation, rejected facts and native capability boundaries exact.
+    // A requested value is not permission to describe it as executable.
+    immutable_reply: decision.type === "cancelled" || rejectedRequestedValue || capabilityBoundary || result.actionReplaySuppressed === true,
+    execution_flow: executionFlow,
     action_type: state.slots?.action_type?.value || null,
     facts: {
       validated_reply: result.responseText,
       decision: decision.type || "none",
       missing_detail: slot || null,
+      validated_for_execution: decision.type === "ready",
+      rejected_requested_value: rejectedRequestedValue ? { slot, value: state.slots?.[slot]?.value ?? null } : null,
+      execution_flow: executionFlow,
       actions,
       action_type: state.slots?.action_type?.value || null,
       hard_mode: state.slots?.hard_mode?.value ?? null,
@@ -3665,7 +3679,7 @@ function semanticResponseContract(result) {
       recurrence: recurrenceValue || null,
       schedule_horizon_days: state.slots?.schedule_horizon_days?.value ?? null,
     },
-    required_phrases: (actions.length && !result.reviewOnlyAppPresence) || result.actionReplaySuppressed ? ["Blankmind notification"] : [],
+    required_phrases: actions.length && !result.reviewOnlyAppPresence ? ["Blankmind notification"] : [],
     required_any_groups: requiredAnyGroups,
     allowed_minutes: Array.from(new Set(allowedMinutes)),
     required_clock_minutes: requiresPlanFacts && startValue?.type === "time"
@@ -3685,16 +3699,26 @@ function enforceSemanticBoundary(plan, semantic, language) {
   const protectionTypes = new Set(["start_protection", "apply_schedule", "update_schedule", "delete_schedule", "delete_all_schedules", "set_daily_limit", "apply_ai_plan", "enable_allow_only", "enable_adult_filter", "pause_rules", "disable_pause"]);
   const setupCarriesAction = item => ["open_app_picker", "request_screen_time_permission"].includes(item.type)
     && ["minutes", "start_minute", "end_minute", "duration_days", "weekdays", "hard_mode", "name"].some(key => item[key] != null);
-  if ((plan.actions || []).some(item => protectionTypes.has(item.type) || setupCarriesAction(item))) {
-    // The legacy planner cannot create a new blocking intention or pending slot.
-    // Preserve the reducer's decision, including its absence of an authorized plan.
-    if (semantic?.decision?.type === "none" && semantic?.state?.status === "idle") {
-      const text = naturalChannelText(plan.response_text || plan.message_text, 700)
-        || "I can recommend a better phone plan once I have enough recent context.";
-      return { ...plan, actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
-    }
-    const text = language === "es" ? "No he podido validar una propuesta ejecutable a partir de esa petición. No he aplicado ningún cambio." : "I couldn't validate an executable proposal from that request. I haven't applied any changes.";
-    return { ...plan, title: language === "es" ? "Petición pendiente" : "Request not applied", actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", bullets: [], semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false };
+  const rejectedAction = (plan.actions || []).some(item => protectionTypes.has(item.type) || setupCarriesAction(item));
+  const violations = plannerAuthorityViolations(plan);
+  if (rejectedAction && !violations.length && semantic?.state?.intent === "advice"
+    && semantic?.state?.status === "idle" && semantic?.decision?.type === "none") {
+    // The reducer recognized advice, not execution. Keep its non-executive
+    // recommendation while discarding every model-supplied control and cue.
+    const text=naturalChannelText(plan.response_text || plan.message_text,700);
+    return { ...plan,actions:[],response_text:text,message_text:text,speech_text:text,followup_text:"",bullets:[],
+      semantic_state:semantic.state,semantic_decision:semantic.decision,blocking_ready:null,blocking_user_request:false,
+      blocking_data:null,blocking_missing_fields:[],requires_selected_apps:false,requires_screen_time_authorization:false,
+      execution_boundary:{decision:"advice_only",reasons:["unvalidated_model_action"]} };
+  }
+  if (rejectedAction || violations.length) {
+    // Reject the entire executable assertion together with its unauthorized
+    // action. Removing an action must never leave a success story behind.
+    const text = language === "es"
+      ? "No tengo una propuesta ejecutable validada ni confirmación del iPhone para esta petición. Podemos aclarar qué quieres cambiar antes de continuar."
+      : "I don't have a validated executable proposal or confirmation from your iPhone for this request. We can clarify what you want to change before continuing.";
+    return { ...plan, title: language === "es" ? "Petición pendiente" : "Request pending", actions: [], response_text: text, message_text: text, speech_text: text, followup_text: "", bullets: [], semantic_state: semantic.state, semantic_decision: semantic.decision, blocking_ready: null, blocking_user_request: false, blocking_data: null, blocking_missing_fields: [], requires_selected_apps: false, requires_screen_time_authorization: false,
+      execution_boundary: { decision:"rejected", reasons:[...(rejectedAction ? ["unvalidated_model_action"] : []),...violations] } };
   }
   return { ...plan, semantic_state: semantic.state, semantic_decision: semantic.decision };
 }

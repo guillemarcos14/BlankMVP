@@ -31,6 +31,17 @@ assert.equal((polling.match(/guard assistantIdentityMatches\(code: code, channel
 const signIn = between(home, '    private func verifyCode() async', '    private func performRequest(');
 assert(signIn.indexOf('guard AssistantAppSession.save(') >= 0
   && signIn.indexOf('guard AssistantAppSession.save(') < signIn.indexOf('phoneVerified = true'), 'Secure session must persist before verification is shown');
+const activation = between(home, '    private func confirmPendingAssistantAction()', '    private func assistantActionRequiresScreenTime(');
+assert(activation.indexOf('if assistantActionRequiresScreenTime(pendingAction)') < activation.indexOf('switch pendingAction'),
+  'Permission must be requested before schedule, selection or protection mutations');
+const permissionOnly = activation.slice(activation.indexOf('        case .requestScreenTimePermission:'));
+assert(permissionOnly.indexOf('guard assistantIdentityMatches(') > permissionOnly.indexOf('await screenTimeBlocker.requestAuthorization()')
+  && permissionOnly.indexOf('pendingAssistantActionId == actionID') < permissionOnly.indexOf('finishPendingAssistantAction('),
+  'Permission completion must not acknowledge a different account or action');
+const pickerDismissal = between(home, '        .onChange(of: showingContextualAppPicker)', '        .fullScreenCover(isPresented: $showingAssistantConnect)');
+assert.match(pickerDismissal, /let selectionConfirmed = permissionApproved &&/,
+  'Permission revoked while the picker was open must prevent applying its plan');
+assert(pickerDismissal.indexOf('screenTimeBlocker.refreshAuthorizationStatus()') < pickerDismissal.indexOf('sessionStore.selection = contextualPlanSelection'));
 
 const selection = between(store, '    @Published var selection:', '    @Published var sessions:')
   .replace('@Published var selection: FamilyActivitySelection', 'var selection: Int');
@@ -47,6 +58,10 @@ final class IdentityFixture {
 ${between(home, '    private func assistantIdentityMatches(', '    private func clearPendingAssistantIdentityState()')}
     func matches(code: String, channel: String, phone: String) -> Bool {
         assistantIdentityMatches(code: code, channel: channel, phone: phone)
+    }
+${between(home, '    private func assistantActionRequiresScreenTime(', '    private func finishPendingAssistantAction(')}
+    func requiresPermission(_ action: AssistantPendingAction) -> Bool {
+        assistantActionRequiresScreenTime(action)
     }
 }
 enum BlankSharedState {
@@ -72,11 +87,16 @@ ${selectionPolicy}
     func refreshDailyLimitMonitoring() { limits += 1 }
 }
 `;
+if (process.argv.includes('--source-only')) {
+  console.log('iOS protection source contracts passed; Swift runtime requires macOS CI');
+  process.exit(0);
+}
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'blank-protection-tests-'));
 try {
   const file = path.join(temporary, 'ProtectionTests.swift');
   const binary = path.join(temporary, 'protection-tests');
   fs.writeFileSync(file, 'import Foundation\n' + between(model, 'struct BlankHabitWindow:', 'struct BlankSession:')
+    + between(store, 'enum AssistantPendingAction:', 'struct AssistantProtectionExecution:')
     + extensionModel + fixtures + read('tools/ios_protection_test.swift'));
   const built = spawnSync('swiftc', ['-swift-version', '5', '-parse-as-library', file, '-o', binary], { encoding: 'utf8' });
   if (built.error) throw new Error(`Protection runtime tests require Swift on macOS: ${built.error.message}`);

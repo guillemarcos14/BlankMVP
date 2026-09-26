@@ -614,7 +614,9 @@ struct HomeView: View {
             if !isPresented {
                 var assistantActionApplied = false
                 var assistantProtectionExecution: AssistantProtectionExecution?
-                let selectionConfirmed = contextualPlanSelection.blankedSelectionCount > 0 && sessionStore.canEditSelectedDistractions
+                screenTimeBlocker.refreshAuthorizationStatus()
+                let permissionApproved = screenTimeBlocker.authorizationStatus == .approved
+                let selectionConfirmed = permissionApproved && contextualPlanSelection.blankedSelectionCount > 0 && sessionStore.canEditSelectedDistractions
                 if selectionConfirmed {
                     sessionStore.selection = contextualPlanSelection
                     if sessionStore.pendingPlanShouldActivate,
@@ -673,8 +675,9 @@ struct HomeView: View {
                 contextualPlanSelection = FamilyActivitySelection()
                 if !pendingAssistantActionId.isEmpty {
                     finishPendingAssistantAction(
-                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : (selectionConfirmed ? "failed" : "dismissed")),
-                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : (selectionConfirmed ? "device_activity_registration_failed" : "app_selection_cancelled")),
+                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : (!permissionApproved || selectionConfirmed ? "failed" : "dismissed")),
+                        detail: assistantProtectionExecution?.detail ?? (!permissionApproved ? "screen_time_permission_denied" : (assistantActionApplied ? "native_state_applied_after_selection" : (selectionConfirmed ? "device_activity_registration_failed" : "app_selection_cancelled"))),
+                        executionStarted: selectionConfirmed,
                         execution: assistantProtectionExecution
                     )
                 }
@@ -1693,25 +1696,32 @@ struct HomeView: View {
                 dailyLimitMinutes: minutes
             )
         case .requestScreenTimePermission:
+            let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+            let phone = assistantPhoneNumber
+            let actionID = pendingAssistantActionId
             Task {
                 _ = await screenTimeBlocker.requestAuthorization()
-                applyScreenTimeControls()
-                finishPendingAssistantAction(
-                    status: screenTimeBlocker.authorizationStatus == .approved ? "verified" : "failed",
-                    detail: "screen_time_authorization_checked"
-                )
+                await MainActor.run {
+                    guard assistantIdentityMatches(code: code, channel: channel, phone: phone),
+                          pendingAssistantActionId == actionID else { return }
+                    applyScreenTimeControls()
+                    finishPendingAssistantAction(
+                        status: screenTimeBlocker.authorizationStatus == .approved ? "verified" : "failed",
+                        detail: "screen_time_authorization_checked"
+                    )
+                }
             }
         }
     }
 
     private func assistantActionRequiresScreenTime(_ action: AssistantPendingAction) -> Bool {
         switch action {
-        case .startProtection, .setDailyLimit, .allowOnly, .adultFilter:
+        case .startProtection, .setDailyLimit, .allowOnly, .adultFilter,
+             .applySchedule, .updateSchedule, .disablePause, .applyAIPlan,
+             .openAppPicker, .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker:
             return true
-        case .applySchedule, .updateSchedule, .deleteSchedule, .deleteAllSchedules,
-             .pauseRules, .disablePause, .applyAIPlan, .openAppPicker,
-             .configureAndOpenAppPicker, .configureAndOpenDailyLimitPicker,
-             .requestScreenTimePermission:
+        case .deleteSchedule, .deleteAllSchedules, .pauseRules, .requestScreenTimePermission:
             return false
         }
     }

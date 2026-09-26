@@ -67,6 +67,11 @@ async function run() {
   assert.match(setupInput.action_contract.set_daily_limit, /No future start, automatic expiry, or hard mode/);
   assert.match(setupInput.action_contract.cancellation, /does not prove/);
   assert.match(setupInput.action_contract.evidence, /Current emitted_actions is authoritative/);
+  assert.match(setupInput.action_contract.setup_precedence, /permission.*false.*request_screen_time_permission/);
+  const presenceReview=buildJudgeInput({actual:{decision:{type:"setup",slot:"app_presence"}},trace:{context:{app_presence_recent:false},final_plan:{review_only_actions:true}}});
+  assert.equal(presenceReview.review_only_actions,true);
+  assert.equal(presenceReview.app_context.app_presence_recent,false);
+  assert.deepEqual(presenceReview.current_decision,{type:"setup",slot:"app_presence"});
   const flattened = flattenReport({ runs: [{ id: "replay", channel: "sms", turns: [
     { turn: 1, input: "Do it", actual: { visible: "Tap the notification.", actions: [{ type: "start_protection" }] } },
     { turn: 2, input: "Yes", actual: { visible: "It is already waiting.", actions: [] } },

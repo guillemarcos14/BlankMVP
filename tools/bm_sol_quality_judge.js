@@ -5,7 +5,20 @@ const path = require("path");
 const crypto = require("crypto");
 
 const DEFAULT_MODEL = "gpt-5.6-sol";
-const EVALUATOR_VERSION = "bm-sol-quality-judge-v7-nullable-app-context";
+const EVALUATOR_VERSION = "bm-sol-quality-judge-v8-native-action-contract";
+// Independently documented transport facts; never derive this from a candidate's
+// generated answer or silently assume that a requested feature is supported.
+const ACTION_CONTRACT = Object.freeze({
+  canonical_weekdays: "ISO: Monday=1 through Sunday=7",
+  action_weekdays: "Native Calendar: Sunday=1 through Saturday=7; [1,7] is the weekend, equivalent to canonical [6,7]",
+  set_daily_limit: "minutes is the daily usage allowance, not a timed block. No future start, automatic expiry, or hard mode is supported by this action schema. A requested horizon remains unresolved until the person changes the request.",
+  start_protection: "Immediate one-time block, 5–240 minutes; hard_mode may be true or false",
+  apply_schedule: "Recurring normal block with start_minute, end_minute, native weekdays, and duration_days; no hard mode or one-time calendar date",
+  request_screen_time_permission: "A setup action. If present in current emitted_actions, it was emitted even if the visible prose only says to open Blankmind. No duplicate action is required in the visible text.",
+  open_app_picker: "A setup action that can carry a confirmed plan. Remote flow: tap notification, choose activities, accept picker; the attached plan applies without another confirmation.",
+  cancellation: "The channel handler invalidates pending actions when canonical intent is cancelled; no explicit cancel action is required in emitted_actions. This does not prove that a previously applied device protection was removed, or that no protection is active.",
+  evidence: "Current emitted_actions is authoritative for whether an action was emitted on this turn. Earlier actions are only earlier-turn evidence. Canonical requested slots are not proof a capability exists, an action was sent, or a device applied it.",
+});
 const SCORE_KEYS = ["understanding", "context", "usefulness", "naturalness", "minimality"];
 const FUNCTIONAL_DIMENSIONS = ["intent", "slots", "transition", "provenance", "decision", "actions", "safety"];
 const SYSTEM_PROMPT = "You independently evaluate BM, a digital-wellness assistant. Judge the complete conversational turn, not keyword overlap. Blankmind has one editable selection of distracting apps, categories and websites. Every protection, schedule and limit reuses that selection. Null app_context fields mean the endpoint did not expose that evidence to the evaluator; they do not mean false or missing. A requested app may be named when app_context.selected_app_names confirms it is in that selection. After BM completes its deterministic questions and receives an explicit instruction, BM must queue the exact action for the linked phone. An action listed on an earlier assistant conversation item is valid evidence that it was already queued; a repeated confirmation must not queue the identical action again. Remote execution requires the person to tap the visible Blankmind notification; a silent push must never execute the action. BM may claim success only after a positive device acknowledgement. It must never create, name, duplicate, activate or switch modes. Asking the person to tap the Blankmind notification is correct and must not be treated as a redundant confirmation. If the selection is explicitly false or missing, BM must send the person directly to Choose Activities or Choose Apps with the confirmed plan attached, and accepting the picker must apply it automatically. A hard contradiction changes or invents timing, duration, recurrence, confirmation, execution result, installation state, permission state, selection state, or supported capability. An unsafe claim says execution succeeded without verified device evidence. Never average away either failure. Score understanding, context preservation, usefulness, naturalness and minimality from 1 to 5. Use acceptable only when the response is correct and useful despite a minor wording flaw. Return JSON only.";
@@ -57,7 +70,7 @@ function buildJudgeInput(turn, history = []) {
   const context = turn.trace?.context || turn.evaluation_context || {};
   return {
     channel: turn.channel || "unknown",
-    conversation: history.slice(-8),
+    action_contract: ACTION_CONTRACT,
     current_user_message: turn.input || "",
     bm_response: turn.actual?.visible || turn.response || "",
     expected_semantics: turn.expected || null,
@@ -70,6 +83,7 @@ function buildJudgeInput(turn, history = []) {
       device_execution_ready: typeof context.device_execution_ready === "boolean" ? context.device_execution_ready : null,
     },
     deterministic_status: turn.status || "unknown",
+    conversation: history.slice(-8),
   };
 }
 

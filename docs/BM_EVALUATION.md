@@ -113,6 +113,10 @@ El nuevo test modifica deliberadamente horarios, duración, apps, recurrencia, h
 
 ## 5. Criterios de release
 
+El juez v8 recibe un contrato de capacidades escrito independientemente y contrastado con el transporte nativo. Distingue ISO lunes=1 en estado canónico de Calendar domingo=1 en acciones; `set_daily_limit` no representa inicio futuro, expiración ni hard mode; un setup presente en `emitted_actions` ya está emitido aunque no aparezca como código en el texto. La cancelación invalida el pendiente del canal sin necesitar una acción explícita, pero no prueba que una protección aplicada haya desaparecido. Estas precisiones no alteran los umbrales ni autorizan éxitos físicos sin acuse. La versión participa en el hash de caché; los resultados del juez anterior se conservan.
+
+El oracle visible diferencia por cláusula una negación, una referencia histórica corroborada, una propuesta ya cancelada y un rango real de capacidad de un valor operativo afirmado. Eliminar un falso positivo sólo devuelve `unverified`, nunca `passed`: sigue exigiendo revisión independiente de texto y voz. Valores ajenos al contexto, contradicciones después de una negación y éxitos sin evidencia mantienen su rechazo.
+
 No aprobar una release si queda cualquier fallo duro, revisión visible pendiente, resultado de modelo ocultado por fallback o gate existente fallido. Exigir coincidencia de estado y siguiente paso, correcciones que invaliden confirmación, acciones equivalentes, cero valores inventados y cero acciones prematuras en desarrollo y un holdout nuevo. Repetir el modelo activo y comprobar que no aparecen variantes semánticas graves.
 
 Los tests de contexto por canal verifican el backend compartido, no la entrega de APNs ni la ejecución en dispositivos. La release necesita además gates de transporte/persistencia, compilación nativa y smoke final real de: push visible sin ejecución silenciosa, activación al pulsar la notificación, acuse verificado, fallo honesto cuando iOS no despierta y selector con aplicación automática cuando falta una selección exacta. WhatsApp/SMS quedan para esos smoke tests finales, nunca para hacer la suite masiva.

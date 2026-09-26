@@ -61,6 +61,12 @@ async function run() {
   const replayInput = buildJudgeInput({ evaluation_context: { has_selected_apps: true, selected_app_names: ["Instagram"] } });
   assert.strictEqual(replayInput.app_context.has_selected_apps, true);
   assert.deepStrictEqual(replayInput.app_context.selected_app_names, ["Instagram"]);
+  const setupInput = buildJudgeInput({ actual: { actions: [{ type: "request_screen_time_permission" }] } });
+  assert.deepStrictEqual(setupInput.emitted_actions, [{ type: "request_screen_time_permission" }]);
+  assert.match(setupInput.action_contract.action_weekdays, /Sunday=1/);
+  assert.match(setupInput.action_contract.set_daily_limit, /No future start, automatic expiry, or hard mode/);
+  assert.match(setupInput.action_contract.cancellation, /does not prove/);
+  assert.match(setupInput.action_contract.evidence, /Current emitted_actions is authoritative/);
   const flattened = flattenReport({ runs: [{ id: "replay", channel: "sms", turns: [
     { turn: 1, input: "Do it", actual: { visible: "Tap the notification.", actions: [{ type: "start_protection" }] } },
     { turn: 2, input: "Yes", actual: { visible: "It is already waiting.", actions: [] } },

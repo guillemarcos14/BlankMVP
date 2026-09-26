@@ -394,7 +394,9 @@ async function pollPendingAction(body) {
       const message = spanish
         ? "La acción caducó antes de llegar al iPhone. No se aplicó ningún cambio. Puedes pedírmela otra vez."
         : "The action expired before it reached the iPhone. Nothing was changed. You can ask me to try again.";
-      try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The explicit outcome remains recorded. */ }
+      if (!String(expired?.id || "").startsWith("app_")) {
+        try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The explicit outcome remains recorded. */ }
+      }
     }
   }
   if (pending && pending.status === "queued") {
@@ -518,7 +520,9 @@ async function acknowledgePendingAction(body) {
     } else {
       message = spanish ? "No he podido aplicar el bloqueo en el iPhone. No se ha marcado como completado." : "I couldn't apply the block on the iPhone. It hasn't been marked as completed.";
     }
-    try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The verified outcome remains recorded. */ }
+    if (!actionId.startsWith("app_")) {
+      try { await sendAssistantMessage(result.connection, message); } catch (_) { /* The verified outcome remains recorded. */ }
+    }
   }
   return json(200, { ok: true, acknowledged: true, status });
 }

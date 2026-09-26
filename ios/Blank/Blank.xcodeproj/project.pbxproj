@@ -15,6 +15,7 @@
 		8A0000010000000000000006 /* BlankColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000016 /* BlankColors.swift */; };
 		8A0000010000000000000007 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000017 /* SetupView.swift */; };
 		8A0000010000000000000008 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000018 /* HomeView.swift */; };
+		8A0000010000000000000040 /* AssistantAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A0000010000000000000041 /* AssistantAppView.swift */; };
 		8A0000010000000000000009 /* BlankDomainModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001B /* BlankDomainModels.swift */; };
 		8A000001000000000000000A /* ReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001C /* ReportView.swift */; };
 		8A000001000000000000000C /* DeviceActivityTimerScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A000001000000000000001E /* DeviceActivityTimerScheduler.swift */; };
@@ -98,6 +99,7 @@
 		8A0000010000000000000016 /* BlankColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankColors.swift; sourceTree = "<group>"; };
 		8A0000010000000000000017 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		8A0000010000000000000018 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		8A0000010000000000000041 /* AssistantAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantAppView.swift; sourceTree = "<group>"; };
 		8A0000010000000000000019 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		8A000001000000000000001A /* Blank.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Blank.entitlements; sourceTree = "<group>"; };
 		8A000001000000000000001B /* BlankDomainModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlankDomainModels.swift; sourceTree = "<group>"; };
@@ -192,6 +194,7 @@
 				8A0000010000000000000016 /* BlankColors.swift */,
 				8A0000010000000000000017 /* SetupView.swift */,
 				8A0000010000000000000018 /* HomeView.swift */,
+				8A0000010000000000000041 /* AssistantAppView.swift */,
 				8A000001000000000000001B /* BlankDomainModels.swift */,
 				8A000001000000000000001C /* ReportView.swift */,
 				8A0000010000000000000027 /* StoreKitPurchaseStore.swift */,
@@ -483,6 +486,7 @@
 				8A0000010000000000000006 /* BlankColors.swift in Sources */,
 				8A0000010000000000000007 /* SetupView.swift in Sources */,
 				8A0000010000000000000008 /* HomeView.swift in Sources */,
+				8A0000010000000000000040 /* AssistantAppView.swift in Sources */,
 				8A0000010000000000000009 /* BlankDomainModels.swift in Sources */,
 				8A000001000000000000000A /* ReportView.swift in Sources */,
 				8A0000010000000000000028 /* StoreKitPurchaseStore.swift in Sources */,

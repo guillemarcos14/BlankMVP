@@ -275,8 +275,8 @@ async function run(config, output, { infrastructureOnly = false } = {}) {
     synthetic_auth_user_ids: users.map(user => user.id),
     passed: !failure && checks.length === (infrastructureOnly ? 4 : 9) && cleanup.every(item => item.passed),
     limitations: [...(infrastructureOnly ? ["Only authentication, installation isolation and database access controls tested. Conversation generation, replay, shared memory and receipts are NOT tested in this run."] : []), "Seeded QA identities bypass phone OTP onboarding; no email or SMS is sent.",
-      "Native receipt is a simulated failed result, never verified; no iPhone enforcement tested.",
-      "Shared WhatsApp semantic storage is checked directly; no external provider webhook or delivery is exercised."] };
+      infrastructureOnly ? "No native receipt or iPhone enforcement is tested." : "Native receipt is a simulated failed result, never verified; no iPhone enforcement tested.",
+      infrastructureOnly ? "Shared WhatsApp memory, provider webhooks and delivery are not tested." : "Shared WhatsApp semantic storage is checked directly; no external provider webhook or delivery is exercised."] };
   if (output) { fs.mkdirSync(path.dirname(path.resolve(output)), { recursive: true }); fs.writeFileSync(output, JSON.stringify(result,null,2)+"\n"); }
   return result;
 }

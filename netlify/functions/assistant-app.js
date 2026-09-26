@@ -114,6 +114,46 @@ async function status(auth, body) {
   return json(200, { ok: true, turn: await presentWithMemory(auth, row) });
 }
 
+function actionCopy(action, spanish) {
+  if (!action) return null;
+  const picker = action.type === "open_app_picker";
+  let type = action.type;
+  if (picker) type = action.name === "Daily Limit" && Number.isInteger(action.minutes) ? "set_daily_limit"
+    : Number.isInteger(action.start_minute) && Number.isInteger(action.end_minute)
+      ? "apply_schedule" : Number.isInteger(action.minutes) ? "start_protection" : type;
+  let description;
+  if (type === "start_protection" && Number.isInteger(action.minutes)) description = spanish
+    ? `Bloqueo${action.hard_mode ? " estricto" : ""} de ${action.minutes} min para tus distracciones`
+    : `${action.minutes}-minute${action.hard_mode ? " hard" : ""} block for your distractions`;
+  if (type === "set_daily_limit" && Number.isInteger(action.minutes)) description = spanish
+    ? `Límite de ${action.minutes} minutos de uso al día para tus distracciones`
+    : `${action.minutes} minutes of use per day for your distractions`;
+  if (["apply_schedule", "update_schedule"].includes(type)) {
+    const days = spanish ? ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"] : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const clock = value => { const minute = Math.min(1439, Math.max(0, value)); return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`; };
+    const selectedDays = [...new Set(action.weekdays || [])].filter(day => Number.isInteger(day) && day >= 1 && day <= 7);
+    const weekdays = !selectedDays.length || selectedDays.length === 7 ? (spanish ? "cada día" : "every day") : selectedDays.map(day => days[day - 1]).join(", ");
+    // Mirror native creation defaults; editing a schedule preserves its expiry.
+    const durationDays = type === "apply_schedule" ? Math.min(14, Math.max(1, action.duration_days ?? 7)) : null;
+    const horizon = durationDays === null ? "" : (spanish ? ` durante ${durationDays} días` : ` for ${durationDays} days`);
+    description = spanish ? `Bloqueo de ${clock(action.start_minute)} a ${clock(action.end_minute)}, ${weekdays}${horizon}`
+      : `Block from ${clock(action.start_minute)} to ${clock(action.end_minute)}, ${weekdays}${horizon}`;
+  }
+  if (action.type === "request_screen_time_permission") return { label: spanish ? "Conceder permiso" : "Grant permission", text: spanish
+    ? "Concede el permiso de Tiempo de uso con el botón. Después dime cuando esté listo para continuar; todavía no se ha aplicado esta propuesta."
+    : "Use the button to grant Screen Time permission. Then tell me when you're ready to continue; this proposal has not been applied yet." };
+  if (picker && !description) return { label: spanish ? "Elegir distracciones" : "Choose distractions", text: spanish
+    ? "Pulsa el botón para elegir tus distracciones y continuar. Todavía no hay una propuesta de bloqueo completa."
+    : "Tap the button to choose your distractions and continue. There is no complete blocking proposal yet." };
+  if (picker) return { label: spanish ? "Elegir distracciones" : "Choose distractions", text: `${description}. ${spanish
+    ? "Pulsa el botón para elegir tus distracciones. Al aceptar la selección, el iPhone intentará aplicar la propuesta; el resultado requiere su verificación."
+    : "Tap the button to choose your distractions. Accepting the selection lets your iPhone attempt the proposal; the result requires device verification."}` };
+  if (!description) return null;
+  const label = type === "start_protection" ? (spanish ? `Bloquear ${action.minutes} min` : `Block ${action.minutes} min`)
+    : type === "set_daily_limit" ? (spanish ? "Aplicar límite" : "Apply daily limit") : (spanish ? "Aplicar horario" : "Apply schedule");
+  return { label, text: `${description}. ${spanish ? "Pulsa el botón para aplicarlo; el resultado requiere la verificación del iPhone." : "Tap the button to apply it; the result requires verification from your iPhone."}` };
+}
+
 function visibleReply(plan, context, action) {
   const answer = String(plan.message_text || plan.response_text || "").trim().slice(0, 4000);
   if (!answer) throw new Error("assistant_empty_reply");
@@ -124,6 +164,8 @@ function visibleReply(plan, context, action) {
       ? "No he podido preparar esta acción. No se ha aplicado ningún cambio. Puedes volver a pedírmela."
       : "I couldn't prepare this action. No change was applied. You can ask me to try again.";
   }
+  const copy = actionCopy(action, spanish);
+  if (copy) return copy.text;
   const claimsExecution = /\b(?:already blocked|blocked your|already applied|activated your|he bloqueado|he aplicado|ya est[aá]n bloquead[ao]s|ya est[aá] aplicado)\b/i.test(answer);
   const requestsNotification = /\b(?:notification|notificaci[oó]n)\b/i.test(answer);
   if (action && (claimsExecution || requestsNotification)) {
@@ -150,9 +192,7 @@ async function prepare(auth, row, leaseOwner, prompt) {
     context.memory?.last_topic || "", plan.semantic_state);
   const payload = {
     assistant_text: answer, action,
-    action_label: action?.type === "start_protection" && Number.isInteger(action.minutes)
-      ? (spanish ? `Bloquear ${action.minutes} min` : `Block ${action.minutes} min`)
-      : action ? (spanish ? "Aplicar ahora" : "Apply now") : null,
+    action_label: actionCopy(action, spanish)?.label || (action ? (spanish ? "Aplicar ahora" : "Apply now") : null),
     semantic_version: version + 1,
     invalidates: plan.semantic_state?.intent === "cancelled"
       || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status)),

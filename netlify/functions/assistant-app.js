@@ -84,11 +84,19 @@ async function send(auth, body) {
     const memory = await getAssistantMemory("whatsapp", auth.identity.phone_e164);
     return json(200, { ok: true, turn: presentTurn(existing, memory), idempotent: true });
   }
-  await supabaseFetch(TABLE, {
-    method: "POST",
-    headers: { prefer: "return=minimal" },
-    body: JSON.stringify({ id: turnId, auth_user_id: auth.user.id, user_text: prompt, status: "processing" }),
-  });
+  try {
+    await supabaseFetch(TABLE, {
+      method: "POST",
+      headers: { prefer: "return=minimal" },
+      body: JSON.stringify({ id: turnId, auth_user_id: auth.user.id, user_text: prompt, status: "processing" }),
+    });
+  } catch (error) {
+    const raced = await readTurn(auth.user.id, turnId);
+    if (!raced) throw error;
+    if (raced.status !== "completed") return json(409, { error: "turn_in_progress_or_failed" });
+    const memory = await getAssistantMemory("whatsapp", auth.identity.phone_e164);
+    return json(200, { ok: true, turn: presentTurn(raced, memory), idempotent: true });
+  }
   try {
     const { plan, context } = await callBlankedAgent(prompt, auth.identity.phone_e164, auth.connection);
     const answer = String(plan.message_text || plan.response_text || "").trim().slice(0, 4000);
@@ -131,9 +139,18 @@ async function send(auth, body) {
     const actionLabel = action?.type === "start_protection" && Number.isInteger(action.minutes)
       ? (spanish ? `Bloquear ${action.minutes} min` : `Block ${action.minutes} min`)
       : action ? (spanish ? "Aplicar ahora" : "Apply now") : null;
-    const visibleAnswer = queueFailed
-      ? `${answer}\n\n${spanish ? "No he podido preparar esta acción. No se ha aplicado ningún cambio." : "I couldn't prepare this action. No change was applied."}`
-      : answer;
+    const proposedAction = Array.isArray(plan.actions) && plan.actions.length > 0;
+    const claimsExecution = /\b(?:already blocked|blocked your|already applied|activated your|he bloqueado|he aplicado|ya est[aá]n bloquead[ao]s|ya est[aá] aplicado)\b/i.test(answer);
+    let visibleAnswer = answer;
+    if (queueFailed || (proposedAction && !action)) {
+      visibleAnswer = spanish
+        ? "No he podido preparar esta acción. No se ha aplicado ningún cambio. Puedes volver a pedírmela."
+        : "I couldn't prepare this action. No change was applied. You can ask me to try again.";
+    } else if (action && claimsExecution) {
+      visibleAnswer = spanish
+        ? "La acción está preparada para tus distracciones seleccionadas. Pulsa el botón para aplicarla; te diré si el iPhone la verifica."
+        : "The action is ready for your selected distractions. Tap the button to apply it; I'll show whether your iPhone verifies it.";
+    }
     const rows = await supabaseFetch(`${TABLE}?id=eq.${encodeURIComponent(turnId)}&auth_user_id=eq.${encodeURIComponent(auth.user.id)}`, {
       method: "PATCH", headers: { prefer: "return=representation" },
       body: JSON.stringify({ assistant_text: visibleAnswer, action_id: action?.id || null, action_label: actionLabel,

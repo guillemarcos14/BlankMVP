@@ -11,6 +11,7 @@ const rows = new Map();
 let plannerCalls = 0;
 let semanticCalls = 0;
 let queuedPrefix = "";
+let replyText = "Vamos a proteger tus distracciones.";
 let memory = {};
 const userId = "11111111-1111-4111-8111-111111111111";
 const turnId = "22222222-2222-4222-8222-222222222222";
@@ -51,7 +52,7 @@ Object.assign(require.cache[whatsapp].exports, {
   callBlankedAgent: async () => {
     plannerCalls += 1;
     return { plan: {
-      message_text: "Vamos a proteger tus distracciones.",
+      message_text: replyText,
       response_language: "es",
       blocking_user_request: true,
       blocking_ready: true,
@@ -82,8 +83,12 @@ const event = (token, body) => ({ httpMethod: "POST", headers: { authorization: 
   response = await handler(event("valid", { action: "send", app_install_id: "verified-install", turn_id: turnId, text: "Bloquea ahora 45 min, una vez" }));
   assert.equal(JSON.parse(response.body).idempotent, true);
   assert.equal(plannerCalls, 1);
+  replyText = "Ya están bloqueadas tus distracciones.";
+  const secondId = "33333333-3333-4333-8333-333333333333";
+  response = await handler(event("valid", { action: "send", app_install_id: "verified-install", turn_id: secondId, text: "Sí, ahora" }));
+  assert.match(JSON.parse(response.body).turn.assistant_text, /Pulsa el botón/);
   memory = { last_assistant_action_outcome: { id: "app_action", status: "verified" } };
   response = await handler(event("valid", { action: "history", app_install_id: "verified-install" }));
-  assert.equal(JSON.parse(response.body).turns[0].action_status, "verified");
+  assert.equal(JSON.parse(response.body).turns[1].action_status, "verified");
   console.log("assistant app transport: auth, canonical action, idempotency, verified receipt passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

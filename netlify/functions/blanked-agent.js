@@ -3394,6 +3394,16 @@ function contextualResponseFailure(error) {
   return { code, name };
 }
 
+function modelRequestLogMetrics(metrics) {
+  if (!metrics) return null;
+  const { usage, ...transport } = metrics;
+  // Flatten numeric counts so the harness privacy filter keeps them without
+  // opening its general ban on fields that may contain credential tokens.
+  return { ...transport, usage_input: usage?.input_tokens ?? null,
+    usage_output: usage?.output_tokens ?? null, usage_total: usage?.total_tokens ?? null,
+    usage_cached_input: usage?.cached_input_tokens ?? null, usage_reasoning: usage?.reasoning_tokens ?? null };
+}
+
 exports.handler = async (event, runtime = {}) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -3424,13 +3434,13 @@ exports.handler = async (event, runtime = {}) => {
         const rendered = await naturalizeGroundedPlan({ prompt, context, plan: contextPlan });
         contextPlan = rendered.plan;
         contextSource = `${deterministicSource}+${rendered.source}`;
-        recordStage(harnessRun, "planner_completed", { source: contextSource });
+        recordStage(harnessRun, "planner_completed", { source: contextSource, request_metrics: modelRequestLogMetrics(rendered.request_metrics) });
       } catch (error) {
         const { response_contract: _responseContract, ...fallbackPlan } = contextPlan;
         contextPlan = fallbackPlan;
         contextFailure = contextualResponseFailure(error);
         contextSource = `${deterministicSource}+grounded_deterministic_after_model_error`;
-        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name });
+        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name, request_metrics: modelRequestLogMetrics(error.model_request_metrics) });
       }
       recordStage(harnessRun, "action_gate", {
         decision: contextPlan.actions.length ? "proposal" : "read",
@@ -3453,43 +3463,54 @@ exports.handler = async (event, runtime = {}) => {
     let semanticExtraction = null;
     let semanticModelError = null;
     let semanticModelFailure = null;
+    let semanticRequestMetrics = [];
     if (semantic.handled && process.env.OPENAI_API_KEY) {
       try {
         semanticExtraction = await extractWithModel({ prompt, previousState: semanticOptions.previousState, context });
+        semanticRequestMetrics = semanticExtraction.attempt_metrics || [];
         semantic = advanceSemanticState({ ...semanticOptions, extraction: semanticExtraction.extraction });
       } catch (error) {
         semanticModelError = error.name === "TimeoutError" ? "semantic_model_timeout" : error.message;
         semanticModelFailure = { attempt_count: error.semantic_attempt_count || 1,
           attempt_errors: error.semantic_attempt_errors || [semanticModelError] };
-        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError, ...semanticModelFailure });
+        semanticRequestMetrics = error.semantic_attempt_metrics || [];
+        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError, ...semanticModelFailure,
+          request_metrics: modelRequestLogMetrics(semanticRequestMetrics.at(-1)),
+          first_attempt_metrics: semanticRequestMetrics.length > 1 ? modelRequestLogMetrics(semanticRequestMetrics[0]) : null });
       }
     }
     recordStage(harnessRun, "semantic_reduced", {
       revision: semantic.state.revision, intent: semantic.state.intent, status: semantic.state.status,
       pending_slots: semantic.state.pending_slots, errors: semantic.state.errors.map(error => error.code),
+      request_metrics: modelRequestLogMetrics(semanticRequestMetrics.at(-1)),
+      first_attempt_metrics: semanticRequestMetrics.length > 1 ? modelRequestLogMetrics(semanticRequestMetrics[0]) : null,
     });
     if (semantic.handled) {
       harnessRun.route = "semantic";
       let plan = semanticPlan(semantic, language, prompt);
       let contextualResponseSource = "grounded_deterministic";
       let contextFailure = null;
+      let contextualRequestMetrics = null;
       try {
         recordStage(harnessRun, "planner_started", { mode: "semantic_contextual_response" });
         const rendered = await naturalizeGroundedPlan({ prompt, context, plan });
+        contextualRequestMetrics = rendered.request_metrics || null;
         plan = rendered.plan;
         contextualResponseSource = rendered.source;
-        recordStage(harnessRun, "planner_completed", { source: rendered.source });
+        recordStage(harnessRun, "planner_completed", { source: rendered.source, request_metrics: modelRequestLogMetrics(contextualRequestMetrics) });
       } catch (error) {
         const { response_contract: _responseContract, ...fallbackPlan } = plan;
         plan = fallbackPlan;
         contextualResponseSource = "grounded_deterministic_after_model_error";
         contextFailure = contextualResponseFailure(error);
-        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name });
+        contextualRequestMetrics = error.model_request_metrics || null;
+        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name, request_metrics: modelRequestLogMetrics(contextualRequestMetrics) });
       }
       if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
         context, previous_state: semanticOptions.previousState || null,
         extraction: semanticExtraction?.trace || null, extraction_failure: semanticModelFailure, deterministic_patch: semantic.patch,
         contextual_response_failure: contextFailure,
+        model_requests: { extraction: semanticRequestMetrics, contextual: contextualRequestMetrics },
         extraction_validation: semantic.extractionValidation || null,
         semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
         postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",

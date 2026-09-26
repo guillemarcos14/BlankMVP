@@ -351,6 +351,30 @@
       "path": "tmp/oracle-recurrence-correction/README.md",
       "sha256": "5df2c810414e6033a11ff80190a1eae1858cf5a9e3e54e44de479bbe351df49f",
       "scope": "Post105 evaluation-tool correction only.34 new English/Spanish assertions plus42 mutation suite and200 batch jobs;0network. Original925 responses/reviews/failures preserved; no new runtime inference or release approval."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/timeout-diagnosis-20260926/artifact-audit.json",
+      "sha256": "5f43a72b278c44ef2225fe2bd7ba66bf2966da92933d9b2b5e4fb60ab0f7cc30",
+      "scope": "Bounded timeout diagnosis on source67cb2a6; one preflight plus24 paired API requests across8 historical timeout cases and4 controls. No timeouts reproduced; no model/policy change justified. Null-to-undefined diagnostic validator correction is offline and preserves raw responses. Not release evidence."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/timeout-diagnosis-20260926/preflight.json",
+      "sha256": "5d2f0c8f41e27cb39bdcc5c9b09fcf1d5a5c97322fe69da32d353c76f0f58d68",
+      "scope": "Bounded timeout diagnosis on source67cb2a6; one preflight plus24 paired API requests across8 historical timeout cases and4 controls. No timeouts reproduced; no model/policy change justified. Null-to-undefined diagnostic validator correction is offline and preserves raw responses. Not release evidence."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/timeout-diagnosis-20260926/paired.json",
+      "sha256": "62f33e28ee603caca5c16ae9bf64153a70d0b3a73ef625b1083c016321fbb7a8",
+      "scope": "Bounded timeout diagnosis on source67cb2a6; one preflight plus24 paired API requests across8 historical timeout cases and4 controls. No timeouts reproduced; no model/policy change justified. Null-to-undefined diagnostic validator correction is offline and preserves raw responses. Not release evidence."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/timeout-diagnosis-20260926/paired-offline-validation.json",
+      "sha256": "c50dda0896be202f7c73da91d8da956869e2ab89345645eb0705662c8f9a70d0",
+      "scope": "Bounded timeout diagnosis on source67cb2a6; one preflight plus24 paired API requests across8 historical timeout cases and4 controls. No timeouts reproduced; no model/policy change justified. Null-to-undefined diagnostic validator correction is offline and preserves raw responses. Not release evidence."
     }
   ],
   "coverage_limits": {
@@ -577,5 +601,16 @@
     "runtime_changed": false,
     "original_reports_reclassified": false,
     "tests": "34 added assertions;42 mutations;200 batch jobs;0 network"
+  },
+  "timeout_diagnosis": {
+    "document": "docs/BM_TIMEOUT_DIAGNOSIS_2026-09-26.md",
+    "historical_timeouts": 29,
+    "historical_timeouts_resolved": false,
+    "paired_requests": 24,
+    "preflight_requests": 1,
+    "concurrency": 1,
+    "observed_new_timeouts": 0,
+    "live_model_configuration_changed": false,
+    "followup": "Measure future slow requests by transport phase; no additional full925 run without a specific hypothesis"
   }
 }

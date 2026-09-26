@@ -2,14 +2,107 @@
 const assert = require("node:assert/strict");
 const { extractWithModel, parseCandidate, schema } = require("../netlify/functions/bm-semantic-extraction");
 const { advanceSemanticState } = require("../netlify/functions/bm-semantic-state");
+const { readModelJson } = require("../netlify/functions/bm-model-request");
 
 const bodyFor = fields => ({ model: "gpt-5.6-luna", status: "completed", output_text: JSON.stringify({ fields, ambiguities: [] }) });
 const field = (slot, value, evidence) => ({ slot, value, evidence });
+
+async function verifyRequestDiagnostics() {
+  const secret = "private-diagnostic-sentinel";
+  const request = { model: "mock-model", input: [{ role: "user", content: secret }], max_output_tokens: 700 };
+  const safe = metrics => {
+    assert.doesNotMatch(JSON.stringify(metrics), /private-diagnostic-sentinel|authorization|Bearer|prompt|output_text|input_text|stack/i);
+    assert.ok(Number.isFinite(metrics.elapsed_ms) && metrics.elapsed_ms >= 0);
+  };
+  const successful = await readModelJson({ request, timeoutMs: 20000, errorPrefix: "semantic_model",
+    fetchImpl: async (_url, options) => {
+      assert.deepEqual(JSON.parse(options.body), request, "instrumentation must preserve the model request");
+      assert.ok(options.signal instanceof AbortSignal);
+      return { ok: true, status: 200, headers: new Headers({ "x-request-id": "req_fixture_123", "openai-processing-ms": "7.5", authorization: `Bearer ${secret}` }),
+        json: async () => ({ model: "mock-model", status: "completed", output_text: secret,
+          usage: { input_tokens: 10, output_tokens: 20, total_tokens: 30, input_tokens_details: { cached_tokens: 5, secret }, output_tokens_details: { reasoning_tokens: 7, secret }, secret } }) };
+    } });
+  assert.equal(successful.body.output_text, secret, "the response body remains available to its existing parser");
+  assert.equal(successful.metrics.phase, "complete");
+  assert.equal(successful.metrics.budget_ms, 20000);
+  assert.equal(successful.metrics.http_status, 200);
+  assert.equal(successful.metrics.request_id, "req_fixture_123");
+  assert.equal(successful.metrics.processing_ms, 7.5);
+  assert.deepEqual(successful.metrics.usage, { input_tokens: 10, output_tokens: 20, total_tokens: 30, cached_input_tokens: 5, reasoning_tokens: 7 });
+  assert.ok(successful.metrics.headers_ms >= 0 && successful.metrics.body_ms >= 0);
+  safe(successful.metrics);
+
+  // These doubles obey the actual AbortSignal, including after headers have
+  // arrived. The short helper budget avoids twenty-second unit tests.
+  for (const phase of ["headers", "body"]) {
+    let calls = 0, signalSeen;
+    const keepAlive = setTimeout(() => {}, 1000);
+    try {
+      await assert.rejects(() => readModelJson({ request, timeoutMs: 10, errorPrefix: "semantic_model",
+        fetchImpl: async (_url, options) => {
+          calls++; signalSeen = options.signal;
+          const aborted = () => new Promise((resolve, reject) => {
+            if (signalSeen.aborted) reject(signalSeen.reason);
+            else signalSeen.addEventListener("abort", () => reject(signalSeen.reason), { once: true });
+          });
+          if (phase === "headers") return aborted();
+          return { ok: true, status: 200, headers: new Headers({ "x-request-id": "req_body_timeout" }), json: aborted };
+        } }), error => {
+        assert.equal(error.name, "TimeoutError");
+        assert.ok(signalSeen instanceof AbortSignal && signalSeen.aborted);
+        const metrics = error.model_request_metrics;
+        assert.equal(metrics.phase, phase);
+        assert.equal(metrics.budget_ms, 10);
+        assert.equal(metrics.error_name, "TimeoutError");
+        if (phase === "body") { assert.equal(metrics.http_status, 200); assert.equal(metrics.request_id, "req_body_timeout"); }
+        else assert.equal(metrics.http_status, undefined);
+        safe(metrics); return true;
+      });
+      assert.equal(calls, 1, "the request helper itself never retries");
+    } finally { clearTimeout(keepAlive); }
+  }
+
+  let reads = 0, cancelled = 0;
+  await assert.rejects(() => readModelJson({ request, timeoutMs: 20000, errorPrefix: "semantic_model",
+    fetchImpl: async () => ({ ok: false, status: 429,
+      headers: new Headers({ "x-request-id": `Bearer ${secret}`, "openai-processing-ms": "-1" }),
+      body: { cancel: async () => { cancelled++; throw new Error(`Bearer ${secret}`); } },
+      json: async () => { reads++; throw new Error(secret); }, text: async () => { reads++; return secret; } }) }), error => {
+    assert.equal(error.message, "semantic_model_http_429", "cancelling an error body cannot replace its original HTTP error");
+    assert.equal(error.model_request_metrics.http_status, 429);
+    assert.equal(error.model_request_metrics.request_id, undefined);
+    assert.equal(error.model_request_metrics.processing_ms, undefined);
+    safe(error.model_request_metrics); return true;
+  });
+  assert.equal(reads, 0, "provider error bodies are never read into diagnostics");
+  assert.equal(cancelled, 1);
+  let pendingCancel = 0, cancelGuard;
+  try {
+    await assert.rejects(() => Promise.race([
+      readModelJson({ request, timeoutMs: 20000, errorPrefix: "semantic_model", fetchImpl: async () => ({
+        ok: false, status: 503, body: { cancel: () => { pendingCancel++; return new Promise(() => {}); } },
+      }) }),
+      new Promise((_, reject) => { cancelGuard = setTimeout(() => reject(new Error("pending_cancel_blocked_http_failure")), 250); }),
+    ]), { message: "semantic_model_http_503" });
+    assert.equal(pendingCancel, 1, "best-effort cancellation must not retain the request deadline");
+  } finally { clearTimeout(cancelGuard); }
+  for (const cause of ["ECONNRESET", `Bearer ${secret}`]) {
+    await assert.rejects(() => readModelJson({ request, timeoutMs: 20000, errorPrefix: "semantic_model", fetchImpl: async () => {
+      const error = new TypeError(`authorization: Bearer ${secret}`); error.cause = { code: cause }; throw error;
+    } }), error => {
+      assert.equal(error.model_request_metrics.phase, "headers");
+      assert.equal(error.model_request_metrics.error_name, "TypeError");
+      assert.equal(error.model_request_metrics.cause_code, cause === "ECONNRESET" ? cause : undefined);
+      safe(error.model_request_metrics); return true;
+    });
+  }
+}
 
 (async () => {
   const oldKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "test-key-never-sent";
   try {
+    await verifyRequestDiagnostics();
     const first = advanceSemanticState({ prompt: "Block Instagram now for 30 minutes" });
     let request;
     const extracted = await extractWithModel({
@@ -17,6 +110,10 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
       fetchImpl: async (_url, options) => { request = JSON.parse(options.body); return { ok: true, json: async () => bodyFor([field("recurrence", { type: "once", weekdays: [] }, "Just once")]) }; },
     });
     assert.equal(extracted.model_returned, "gpt-5.6-luna");
+    assert.equal(extracted.attempt_metrics.length, 1);
+    assert.equal(extracted.attempt_metrics[0].phase, "complete");
+    assert.ok(extracted.attempt_metrics[0].budget_ms > 19000 && extracted.attempt_metrics[0].budget_ms <= 20000);
+    assert.deepEqual(extracted.trace.attempt_metrics, extracted.attempt_metrics);
     assert.ok(!request.text.format.schema.properties.actions, "extractor cannot return executable actions");
     for (const key of ["duration_minutes", "schedule_horizon_days"]) {
       const valueSchema=schema.properties.fields.items.anyOf.find(item=>item.properties.slot.enum[0]===key).properties.value;
@@ -61,6 +158,9 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
     assert.equal(retryCalls,2); assert.equal(repaired.extraction.set.duration_minutes,45);
     assert.deepEqual(repaired.attempt_errors,["duplicate_semantic_extraction_slot"]);
     assert.deepEqual(repaired.trace.attempt_errors,repaired.attempt_errors);
+    assert.equal(repaired.attempt_metrics.length, 2, "both parsed responses retain their separate request measurements");
+    assert.ok(repaired.attempt_metrics.every(metrics => metrics.phase === "complete"));
+    assert.deepEqual(repaired.trace.attempt_metrics, repaired.attempt_metrics);
     let failedCalls=0;
     await assert.rejects(()=>extractWithModel({prompt:"45 minutes",fetchImpl:async()=>{
       failedCalls++; return {ok:true,json:async()=>bodyFor([field("duration_minutes",30,"45 minutes"),field("duration_minutes",45,"45 minutes")])};
@@ -124,6 +224,9 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
       quotaAfterRepairCalls++;return quotaAfterRepairCalls===1?{ok:true,json:async()=>nonliteralEvidence}:{ok:false,status:429};
     }}),error=>{
       assert.equal(error.message,"semantic_model_http_429"); assert.equal(error.semantic_attempt_count,2);
+      assert.equal(error.semantic_attempt_metrics.length, 2);
+      assert.equal(error.semantic_attempt_metrics[0].phase, "complete");
+      assert.equal(error.semantic_attempt_metrics[1].http_status, 429);
       assert.deepEqual(error.semantic_attempt_errors,["ungrounded_semantic_extraction_evidence","semantic_model_http_429"]);return true;
     });
     assert.equal(quotaAfterRepairCalls,2,"quota after repair attempt must not trigger a third request");

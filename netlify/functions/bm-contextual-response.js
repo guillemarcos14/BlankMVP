@@ -1,4 +1,5 @@
 "use strict";
+const { readModelJson } = require("./bm-model-request");
 
 const crypto = require("crypto");
 const { personalContextView } = require("./bm-personal-context-view");
@@ -192,21 +193,15 @@ async function naturalizeGroundedPlan({ prompt, context = {}, plan, fetchImpl = 
     ],
     max_output_tokens: 320,
   };
-  const response = await fetchImpl("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify(request),
-    signal: AbortSignal.timeout(12000),
-  });
-  if (!response.ok) throw new Error(`contextual_response_http_${response.status}`);
-  const body = await response.json();
-  if (body.status === "incomplete") return { plan: fallback, source: `openai:${model}:incomplete_fallback` };
+  const { body, metrics } = await readModelJson({ request, timeoutMs: 12000, fetchImpl, errorPrefix: "contextual_response" });
+  if (body.status === "incomplete") return { plan: fallback, source: `openai:${model}:incomplete_fallback`, request_metrics: metrics };
   let text = clean(extractText(body));
   if (text && !/[.!?]$/.test(text)) text = `${text}.`;
-  if (!isGrounded(text, plan, context)) return { plan: fallback, source: `openai:${model}:grounding_fallback` };
+  if (!isGrounded(text, plan, context)) return { plan: fallback, source: `openai:${model}:grounding_fallback`, request_metrics: metrics };
   return {
     plan: { ...fallback, response_text: text, message_text: text, speech_text: text },
     source: `openai:${model}:grounded_contextual_response`,
+    request_metrics: metrics,
   };
 }
 

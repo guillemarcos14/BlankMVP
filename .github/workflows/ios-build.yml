@@ -21,6 +21,13 @@ jobs:
       - name: Validate bundle executable setting
         run: |
           /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" ios/Blank/Blank/Info.plist | grep -Fx '$(EXECUTABLE_NAME)'
+      - name: Test native conversation recovery
+        run: |
+          mkdir -p tmp/native-tests
+          swiftc ios/Blank/Blank/AssistantComposerState.swift tools/assistant_composer_test.swift -o tmp/native-tests/composer
+          tmp/native-tests/composer
+          node tools/run_assistant_client_tests.js
+          node tools/run_ios_protection_tests.js
       - name: Build simulator
         run: |
           xcodebuild \
@@ -28,5 +35,13 @@ jobs:
             -scheme Blank \
             -sdk iphonesimulator \
             -configuration Debug \
+            -derivedDataPath tmp/ios-build \
             CODE_SIGNING_ALLOWED=NO \
             build
+      - name: Capture conversation states on iPhone simulator
+        run: bash tools/capture_assistant_ios.sh tmp/ios-build/Build/Products/Debug-iphonesimulator/Blank.app
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-conversation-visuals
+          path: tmp/ios-visual/

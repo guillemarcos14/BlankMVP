@@ -22,6 +22,18 @@ struct AssistantInboxResponse: Decodable {
 
 private struct AssistantAcknowledgementResponse: Decodable {
     let acknowledged: Bool
+    let reason: String?
+}
+
+enum AssistantLifecycleAcknowledgement: Equatable {
+    case acknowledged
+    case stale
+    case retry
+}
+
+enum AssistantInboxPollResult {
+    case success(AssistantInboxAction?)
+    case retry
 }
 
 private struct AssistantPushRegistrationResponse: Decodable {
@@ -256,19 +268,19 @@ enum AssistantActionReceiptStore {
 }
 
 struct AssistantActionInboxClient {
-    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
+    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxPollResult {
         guard let data = try? await request(
             action: "poll_pending_action",
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber
         ), let response = try? JSONDecoder().decode(AssistantInboxResponse.self, from: data) else {
-            return nil
+            return .retry
         }
-        return response.pendingAction
+        return .success(response.pendingAction)
     }
 
-    func acknowledge(
+    private func acknowledge(
         actionId: String,
         status: String,
         connectCode: String,
@@ -276,7 +288,7 @@ struct AssistantActionInboxClient {
         phoneNumber: String,
         detail: String = "",
         evidence: AssistantActionReceipt? = nil
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         guard let data = try? await request(
             action: "ack_pending_action",
             connectCode: connectCode,
@@ -287,9 +299,11 @@ struct AssistantActionInboxClient {
             detail: detail,
             evidence: evidence
         ), let response = try? JSONDecoder().decode(AssistantAcknowledgementResponse.self, from: data) else {
-            return false
+            return .retry
         }
-        return response.acknowledged
+        if response.acknowledged { return .acknowledged }
+        if response.reason == "action_mismatch" || response.reason == "no_pending_action" { return .stale }
+        return .retry
     }
 
     func acknowledgeLifecycle(
@@ -297,22 +311,24 @@ struct AssistantActionInboxClient {
         connectCode: String,
         channel: String,
         phoneNumber: String
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         if receipt.executionStarted {
-            guard await acknowledge(
+            let confirmed = await acknowledge(
                 actionId: receipt.actionId,
                 status: "confirmed",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
-            guard await acknowledge(
+            )
+            guard confirmed == .acknowledged else { return confirmed }
+            let started = await acknowledge(
                 actionId: receipt.actionId,
                 status: "execution_started",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
+            )
+            guard started == .acknowledged else { return started }
         }
         return await acknowledge(
             actionId: receipt.actionId,
@@ -427,7 +443,6 @@ struct HomeView: View {
     @State private var pendingAssistantInboxAction: AssistantInboxAction?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     let onOpenOnboardingDemo: () -> Void
 
     init(_ onOpenOnboardingDemo: @escaping () -> Void = {}) {
@@ -545,6 +560,15 @@ struct HomeView: View {
             pollPendingAssistantActionIfNeeded(force: true)
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
+        .onChange(of: sessionStore.canEditSelectedDistractions) { canEdit in
+            if !canEdit {
+                showingPicker = false
+                if showingContextualAppPicker {
+                    contextualPlanSelection = FamilyActivitySelection()
+                    showingContextualAppPicker = false
+                }
+            }
+        }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
@@ -587,10 +611,9 @@ struct HomeView: View {
             if !isPresented {
                 var assistantActionApplied = false
                 var assistantProtectionExecution: AssistantProtectionExecution?
-                if contextualPlanSelection.blankedSelectionCount > 0 {
-                    if contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.selection = contextualPlanSelection
-                    }
+                let selectionConfirmed = contextualPlanSelection.blankedSelectionCount > 0 && sessionStore.canEditSelectedDistractions
+                if selectionConfirmed {
+                    sessionStore.selection = contextualPlanSelection
                     if sessionStore.pendingPlanShouldActivate,
                        contextualPlanSelection.blankedSelectionCount > 0 {
                         if let remote = pendingAssistantInboxAction,
@@ -621,9 +644,9 @@ struct HomeView: View {
                         sessionStore.dailyLimitEnabled = true
                         sessionStore.refreshDailyLimitMonitoring()
                         applyScreenTimeControls()
-                        message = "Daily limit set to \(dailyLimitMinutes) minutes."
+                        message = sessionStore.dailyLimitRegistered ? "Daily limit set to \(dailyLimitMinutes) minutes." : "The daily limit was saved, but iOS could not activate it. Check Screen Time permission."
                         messageAction = nil
-                        assistantActionApplied = sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == dailyLimitMinutes
+                        assistantActionApplied = sessionStore.dailyLimitRegistered && sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == dailyLimitMinutes
                     } else if let schedule = sessionStore.pendingPlanSchedule,
                               contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
@@ -636,9 +659,9 @@ struct HomeView: View {
                             weekdays: schedule.weekdays
                         )
                         applyScreenTimeControls()
-                        message = "Protection schedule added for your distractions."
+                        message = sessionStore.recurringScheduleRegistered ? "Protection schedule added for your distractions." : "The schedule was saved, but iOS could not activate it. Check Screen Time permission."
                         messageAction = nil
-                        assistantActionApplied = true
+                        assistantActionApplied = sessionStore.recurringScheduleRegistered
                     } else {
                         assistantActionApplied = contextualPlanSelection.blankedSelectionCount > 0
                     }
@@ -647,15 +670,17 @@ struct HomeView: View {
                 contextualPlanSelection = FamilyActivitySelection()
                 if !pendingAssistantActionId.isEmpty {
                     finishPendingAssistantAction(
-                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : "dismissed"),
-                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_cancelled"),
+                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : (selectionConfirmed ? "failed" : "dismissed")),
+                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : (selectionConfirmed ? "device_activity_registration_failed" : "app_selection_cancelled")),
                         execution: assistantProtectionExecution
                     )
                 }
             }
         }
         .fullScreenCover(isPresented: $showingAssistantConnect) {
-            AssistantAppView { actionId in
+            AssistantAppView(onOpenControls: { section in
+                if let section { openSection(section) }
+            }) { actionId in
                 BlankSharedState.defaults.set(true, forKey: AssistantRemoteNotification.pollAfterOpenKey)
                 BlankSharedState.defaults.set(actionId, forKey: AssistantRemoteNotification.tappedActionIDKey)
                 pollPendingAssistantActionIfNeeded(force: true)
@@ -851,6 +876,10 @@ struct HomeView: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: -8) {
+                minimalHomeRow("blankmind", color: BlankColors.homeLightInk) {
+                    showingAssistantConnect = true
+                }
+
                 minimalStartRow
 
                 minimalHomeRow("progress", color: BlankColors.homeLightOption) {
@@ -1439,6 +1468,14 @@ struct HomeView: View {
 
     private func processPendingBlockConfigurationIfNeeded() {
         guard sessionStore.shouldOpenBlockConfiguration else { return }
+        guard sessionStore.canEditSelectedDistractions else {
+            sessionStore.shouldOpenBlockConfiguration = false
+            message = "Your distraction selection stays fixed while protection is active."
+            if !pendingAssistantActionId.isEmpty {
+                finishPendingAssistantAction(status: "failed", detail: "selection_locked_during_protection", executionStarted: false)
+            }
+            return
+        }
         contextualPlanSelection = sessionStore.selection
         showingContextualAppPicker = true
         sessionStore.shouldOpenBlockConfiguration = false
@@ -1562,9 +1599,9 @@ struct HomeView: View {
                 weekdays: weekdays
             )
             applyScreenTimeControls()
-            message = "Protection schedule added for your distractions."
+            message = sessionStore.recurringScheduleRegistered ? "Protection schedule added for your distractions." : "The schedule was saved, but iOS could not activate it. Check Screen Time permission."
             messageAction = nil
-            finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
+            finishPendingAssistantAction(status: sessionStore.recurringScheduleRegistered ? "verified" : "failed", detail: sessionStore.recurringScheduleRegistered ? "schedule_registered" : "device_activity_registration_failed")
         case .updateSchedule(let windowId, let name, let start, let end, let weekdays):
             let updated = sessionStore.updateScheduleWindow(
                 id: windowId,
@@ -1574,9 +1611,10 @@ struct HomeView: View {
                 weekdays: weekdays
             )
             applyScreenTimeControls()
-            message = updated ? "Blocking window updated." : "That blocking window no longer exists."
+            let registered = updated && sessionStore.recurringScheduleRegistered
+            message = !updated ? "That blocking window no longer exists." : (registered ? "Blocking window updated." : "The change was saved, but iOS could not activate it. Check Screen Time permission.")
             messageAction = nil
-            finishPendingAssistantAction(status: updated ? "verified" : "failed", detail: updated ? "schedule_updated" : "schedule_not_found")
+            finishPendingAssistantAction(status: registered ? "verified" : "failed", detail: registered ? "schedule_updated" : (updated ? "device_activity_registration_failed" : "schedule_not_found"))
         case .deleteSchedule(let windowId):
             let deleted = sessionStore.deleteScheduleWindow(id: windowId)
             applyScreenTimeControls()
@@ -1597,17 +1635,17 @@ struct HomeView: View {
                 return
             }
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
-                sessionStore.requestBlockConfiguration(appNames: appNames)
+                sessionStore.requestBlockConfiguration(appNames: appNames, dailyLimitMinutes: minutes)
                 return
             }
             sessionStore.dailyLimitMinutes = minutes
             sessionStore.dailyLimitEnabled = true
             sessionStore.refreshDailyLimitMonitoring()
             applyScreenTimeControls()
-            message = "Daily limit set to \(minutes) minutes."
+            message = sessionStore.dailyLimitRegistered ? "Daily limit set to \(minutes) minutes." : "The daily limit was saved, but iOS could not activate it. Check Screen Time permission."
             messageAction = nil
             finishPendingAssistantAction(
-                status: sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes ? "verified" : "failed",
+                status: sessionStore.dailyLimitRegistered && sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes ? "verified" : "failed",
                 detail: "daily_limit_state_checked"
             )
         case .allowOnly:
@@ -1629,7 +1667,7 @@ struct HomeView: View {
         case .applyAIPlan:
             sessionStore.applyAIPlan()
             applyScreenTimeControls()
-            finishPendingAssistantAction(status: "verified", detail: "ai_plan_persisted")
+            finishPendingAssistantAction(status: sessionStore.recurringScheduleRegistered ? "verified" : "failed", detail: sessionStore.recurringScheduleRegistered ? "ai_plan_registered" : "device_activity_registration_failed")
         case .openAppPicker(let appNames):
             sessionStore.requestBlockConfiguration(appNames: appNames)
         case .configureAndOpenAppPicker(let appNames, let durationMinutes, let hardMode, let schedule):
@@ -1712,7 +1750,7 @@ struct HomeView: View {
             mergedWithExisting: receipt.mergedWithExisting
         )
         Task {
-            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+            let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                 receipt: receipt,
                 connectCode: code,
                 channel: channel,
@@ -1720,9 +1758,9 @@ struct HomeView: View {
             )
             await MainActor.run {
                 assistantActionExecutionInFlight = false
-                if acknowledged {
+                if acknowledgement == .acknowledged || acknowledgement == .stale {
                     AssistantActionReceiptStore.clear(actionId: actionId)
-                    pendingAssistantActionId = ""
+                    if pendingAssistantActionId == actionId { pendingAssistantActionId = "" }
                 }
             }
         }
@@ -1849,9 +1887,11 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
-        if let receipt = AssistantActionReceiptStore.load() {
+        let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        // An old receipt must not starve an explicitly requested newer action.
+        if !applyNowRequested, let receipt = AssistantActionReceiptStore.load() {
             Task {
-                let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                     receipt: receipt,
                     connectCode: code,
                     channel: channel,
@@ -1859,7 +1899,7 @@ struct HomeView: View {
                 )
                 await MainActor.run {
                     assistantActionPollInFlight = false
-                    if acknowledged {
+                    if acknowledgement == .acknowledged || acknowledgement == .stale {
                         AssistantActionReceiptStore.clear(actionId: receipt.actionId)
                         if pendingAssistantActionId == receipt.actionId {
                             pendingAssistantActionId = ""
@@ -1871,31 +1911,42 @@ struct HomeView: View {
             return
         }
         Task {
-            let remoteAction = await AssistantActionInboxClient().poll(
+            let pollResult = await AssistantActionInboxClient().poll(
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phoneNumber
             )
             await MainActor.run {
                 assistantActionPollInFlight = false
-                guard let remoteAction,
-                      let pendingAction = remoteAction.toPendingAction(),
-                      sessionStore.pendingAssistantAction == nil else { return }
                 // Read this after the network round-trip. On a cold launch the
                 // notification response can arrive while the initial poll is
                 // already in flight; reading it before the request loses the tap.
-                let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                guard applyNowRequested else { return }
+                let currentApplyRequest = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                guard case .success(let remoteAction) = pollResult else { return }
+                guard let remoteAction else {
+                    if currentApplyRequest { clearAssistantNotificationRequest() }
+                    return
+                }
+                guard let pendingAction = remoteAction.toPendingAction(),
+                      sessionStore.pendingAssistantAction == nil else { return }
+                guard currentApplyRequest else { return }
                 let tappedActionID = BlankSharedState.defaults.string(forKey: AssistantRemoteNotification.tappedActionIDKey) ?? ""
-                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else { return }
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
+                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else {
+                    clearAssistantNotificationRequest()
+                    return
+                }
+                clearAssistantNotificationRequest()
                 pendingAssistantActionId = remoteAction.id
                 pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)
                 confirmPendingAssistantAction()
             }
         }
+    }
+
+    private func clearAssistantNotificationRequest() {
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -2454,7 +2505,8 @@ private struct ScheduleEditorContent: View {
                 enabled: window.enabled,
                 startMinute: window.startMinute,
                 endMinute: window.endMinute,
-                weekdays: window.weekdays
+                weekdays: window.weekdays,
+                expiresAt: window.expiresAt
             )
         }
         let first = normalized.first ?? BlankHabitWindow(enabled: false)
@@ -3260,7 +3312,7 @@ private struct DistractionsScreen: View {
 
     private var editButton: some View {
         Button {
-            showingPicker = true
+            if sessionStore.canEditSelectedDistractions { showingPicker = true }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 22, weight: .medium))
@@ -3269,8 +3321,11 @@ private struct DistractionsScreen: View {
                 .background(Circle().fill(Color.black))
         }
         .buttonStyle(.plain)
+        .disabled(!sessionStore.canEditSelectedDistractions)
         .accessibilityLabel("Edit distractions")
-        .accessibilityHint("Choose apps to add or remove from your distractions")
+        .accessibilityHint(sessionStore.canEditSelectedDistractions
+                           ? "Choose apps to add or remove from your distractions"
+                           : "Available when protection ends")
     }
 }
 

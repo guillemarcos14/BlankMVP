@@ -1,5 +1,7 @@
 # Estado del proyecto
 
+- 2026-09-26, reanudación con API: runtime `a6f9e50`, integración `77a01e0`, deploy privado `6ab7e819cbfca0f727997215`. Harness 62/62 en ambas ramas con baseline y scope; 925/925 determinista y ES10/10 sin red. La API permitió evaluar el candidato anterior `01cb98b` (93,51%, no release) y luego volvió a devolver cuota agotada; la calidad generativa final sigue sin validar. Staging actual 4/4 y limpieza 12/12; las 9/9 completas pertenecen al deploy anterior. Producción y distribución sin cambios; firma y 20 casos físicos pendientes. Ver `docs/BM_CREDIT_RESUME_2026-09-26.md` y el índice de evidencias.
+
 Ultima actualizacion: 2026-09-26
 
 ## Hecho hoy

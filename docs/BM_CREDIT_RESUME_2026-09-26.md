@@ -8,7 +8,7 @@ El juez v8 completó los 925 turnos: 776 excelentes, 89 aceptables, 60 deficient
 
 Un muestreo adicional de cinco recorridos y diez turnos en español encontró dos defectos ausentes del corpus inglés: una retirada con explicación no cerraba la petición, y la conversación libre prometía aplicar un límite diario con caducidad sin emitir una acción. Inputs, respuestas y trazas originales permanecen en `tmp/bm-semantic/spanish-credit-resume-01cb98b`. Es una muestra de diagnóstico sintética, no un holdout ni una prueba de dispositivo.
 
-El smoke completo del backend privado anterior pasó **9/9** comprobaciones y **12/12** limpiezas: `Codigo-product-release/tmp/assistant-app-cloud/full-after-credit-20260926.json`, SHA-256 `bbc771f3f2712587a1ef7f3a111eb104d01ea3b8d9c4ebcf38e3a0ddd86aec0f`. Comprueba conversación real con modelo, aislamiento de cuentas/instalaciones, reintento inmutable, estado compartido, cancelación y conservación de un recibo fallido simulado. No envía mensajes, APNs ni demuestra bloqueo físico. Ese resultado pertenece al deploy privado anterior; cualquier nuevo despliegue debe repetirlo.
+El smoke completo del backend privado anterior pasó **9/9** comprobaciones y **12/12** limpiezas: `Codigo-product-release/tmp/assistant-app-cloud/full-after-credit-20260926.json`, SHA-256 `bbc771f3f2712587a1ef7f3a111eb104d01ea3b8d9c4ebcf38e3a0ddd86aec0f`. Comprueba el flujo cloud real de conversación, aislamiento de cuentas/instalaciones, reintento inmutable, estado compartido, cancelación y conservación de un recibo fallido simulado. No registra la procedencia de cada respuesta: por sí solo no acredita inferencia activa. No envía mensajes, APNs ni demuestra bloqueo físico. Ese resultado pertenece al deploy privado anterior; cualquier nuevo despliegue debe repetirlo.
 
 ## Cambios de producto
 
@@ -28,8 +28,30 @@ La revisión cruzada descartó una deduplicación basada solo en la última fase
 
 El juez v9 explicita un contrato nativo que v8 omitía: presencia → permiso de Screen Time → selección. Si faltan permiso y selección, pedir permiso primero es correcto. También recibe el indicador de revisión previa y la decisión de cada turno. Sus umbrales y la prohibición de afirmar éxito sin recibo no cambian. Estos ajustes no recalifican el informe v8 ni eliminan los defectos reales que motivaron las correcciones.
 
-## Validación del siguiente candidato
+## Validación y límite encontrado
 
-Congelar un commit limpio antes del nuevo replay; repetir los 925 turnos v2, el juez independiente y los diez turnos españoles. Ejecutar el harness con el baseline `tmp/product-harness/baseline-credit-resume-20260926.json` y `--enforce-scope`. Integrar en la rama Backend Cloud antes de publicar únicamente en staging y repetir las nueve comprobaciones cloud. Registrar los resultados finales y sus hashes sin sustituir los informes anteriores.
+El candidato `e47484b0ad2c036aa6d3dfcbed5225dcfc6826d4` pasó el harness **62/62**, incluido el nuevo control de entrega semántica. Su repetición con API terminó el 26/09 a las 15:38 UTC: 925 turnos, **cero turnos de modelo activos** y 925 fallos de proveedor correctamente marcados como fallo de seguridad del evaluador, aunque el fallback conserve las acciones esperadas. El informe `tmp/bm-semantic/product-next-live-v2-e47484b.json` no aprueba calidad; SHA-256 `18cb5c957a46ea1937b11606617ce56c258a06ccd30d047ab65b993cbec27e5e`. La fuente estaba limpia e inalterada. No se ejecutó un juez sobre respuestas que pretendieran pasar por generación real.
+
+La repetición española capturó diez respuestas HTTP 429 del proveedor: `insufficient_quota`, `credit_balance_exhausted`. Se usó la variable `OPENAI_API_KEY` heredada, sin sustituirla ni cargar otro `.env`. Eso demuestra el rechazo de la credencial disponible, no el saldo de todas las cuentas o proyectos de Guillem. Se conservaron las respuestas originales y los criterios previos en `tmp/bm-semantic/spanish-credit-resume-e47484b`. El fallback pasó nueve de diez criterios; el último era repetir el aviso de cancelación después de «Gracias».
+
+Ese detalle se corrigió en `a6f9e501165979b7ef81377cd32ea23aaa023c5d`: agradecer tras cancelar responde «De nada» / «You're welcome» y mantiene la cancelación, los slots vacíos y ninguna acción. Un agradecimiento dentro de otra instrucción no elimina el aviso ni modifica su autorización. Pruebas semánticas **105/105** y de entrega **26/26**. Harness final **62/62**, baseline de reanudación y `--enforce-scope`, run `ph_1790437280056_9841776d`.
+
+El replay final `tmp/bm-semantic/product-next-final-a6f9e50.json`, SHA-256 `a96a811f46e8cd8c2137b0b41233338e9d41ecb5746b38e7472fff0f743e46e1`, captura ese commit limpio antes de empezar y confirma que no cambia: **925/925 en cada una de siete dimensiones deterministas**, cero modelo activo, 925 textos aún `unverified`. Su salida 1 conserva correctamente el gate incompleto. Los diez turnos españoles repetidos sin red satisfacen sus diez criterios; tampoco son una aprobación del modelo.
+
+El contrato v2 no se ha ajustado para resolver el fallo de cuota. Los 85 cambios de acciones se hicieron antes de esta evaluación y tienen el manifiesto y la revisión independientes descritos arriba. Se preservan íntegros todos los resultados anteriores.
+
+## Recuperación sin repetir trabajo válido
+
+Antes de otra batería con modelo, comprobar una sola petición real con la credencial del entorno. Si devuelve cuota agotada, conservar el diagnóstico y detenerse. Con proveedor operativo: congelar fuente limpia, repetir v2 con `--model`, exigir 925 turnos activos sin fallos funcionales y ejecutar el juez con `--limit 925 --concurrency 8`; sus checkpoints permiten reanudar únicamente las revisiones pendientes, sin regenerar respuestas para encajar con un hash aprobado. Mantener separados los resultados del modelo, el transporte cloud y el dispositivo.
+
+La marca de propuesta preparada es deduplicación, no acuse de entrega. Una carrera en la que una nueva versión de memoria invalida un encolado antiguo falla sin ejecutar; la persona puede recuperar el resultado desde Blankmind o emitir una nueva instrucción explícita. Una respuesta breve por sí sola no puede rearmar ni prolongar la petición anterior.
+
+## Backend integrado y representación nativa
+
+Runtime final `a6f9e50`, integrado como `77a01e050e0c1d9c6fce514a12644928976cc93b`, subido y validado **62/62** con el baseline previo y scope (`ph_1790437338412_a6913d9b`). Deploy privado `6ab7e819cbfca0f727997215`: cuatro funciones, cuatro digests remotos comprobados, acceso anónimo HTTP 401, base aislada y sin proveedores salientes ni cron. Smoke actual `infrastructure-77a01e050e0c-20260926-154353.json`: **4/4**, **12/12 limpiezas**, run `bdd53442-9371-496e-8d24-ad56785b0b89`. No se modificaron migraciones ni producción.
+
+La única preflight remota del modelo conservada sobre la integración inmediatamente anterior (`588ddc1`) devuelve `semantic_model_http_429` y fallback; el endpoint no expone el subtipo del error del proveedor. El subtipo de saldo agotado sí está demostrado en el diagnóstico local. Las nueve pruebas cloud reales de las 15:00 UTC permanecen como evidencia de aquel despliegue anterior, no del final. No se repitieron llamadas con modelo tras confirmar el rechazo.
+
+CI [iOS a6f9e50](https://github.com/guillemarcos14/BlankmindAI/actions/runs/36252850746) terminó correctamente: build de simulador sin firma, pruebas nativas y 648 casos app/extensión, más ocho capturas SwiftUI del runtime final revisadas. La revisión confirma disposición y legibilidad, incluidas las capturas con tamaño máximo; no certifica gestos, VoiceOver ni ejecución física. CI [BM a6f9e50](https://github.com/guillemarcos14/BlankmindAI/actions/runs/36252850729) pasó harness/scope 62/62, PostgreSQL 15 real y compilación/tests Android. Metadatos, logs y hashes de capturas se conservan en `tmp/ci-a6f9e50`.
 
 La distribución firmada y las 20 comprobaciones físicas del iPhone siguen siendo requisitos separados. Una respuesta del modelo, un mock de recibo o una captura del simulador no los sustituyen.

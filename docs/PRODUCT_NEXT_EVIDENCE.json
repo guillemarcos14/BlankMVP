@@ -2,8 +2,8 @@
   "recorded_at": "2026-09-26",
   "purpose": "Audit index, not production release authorization. Reports remain in their original local worktrees; hashes refer to complete file bytes.",
   "pull_request": "https://github.com/guillemarcos14/BlankmindAI/pull/6",
-  "deployed_source_commit": "5cab6d312f505b7395456b9d2864be69c978bd48",
-  "private_deploy_id": "6ab7d0df552dead835399f9e",
+  "deployed_source_commit": "77a01e050e0c1d9c6fce514a12644928976cc93b",
+  "private_deploy_id": "6ab7e819cbfca0f727997215",
   "staging_supabase_ref": "njqbovsmoowkhhsqmitn",
   "staging_migrations": "001-024",
   "production_changed": false,
@@ -24,7 +24,7 @@
       "worktree": "Codigo-product-release",
       "path": "tmp/bm-semantic/product-next-final-clean.json",
       "sha256": "111925842d3032f11d8954b20bffa242fa010d505a8944f82c9c46d6631ce51c",
-      "scope": "Clean source at deployed commit, captured before replay with no changes during execution. 925/925 in each of seven deterministic dimensions, zero active model turns, 925 visible responses unverified. Release ineligible."
+      "scope": "Clean source at earlier deployment commit 5cab6d312f505b7395456b9d2864be69c978bd48, not the current deployment, captured before replay with no changes during execution. 925/925 in each of seven deterministic dimensions, zero active model turns, 925 visible responses unverified. Release ineligible."
     },
     {
       "worktree": "Codigo-product-release",
@@ -45,6 +45,108 @@
       "sha256": "6b37660c2a746fbc1bac352d78038819ba93e423d6fc0a2ed56cbeb105e9c8cf",
       "run_id": "7134b1c0-4e2a-4db4-b31a-d409238e8528",
       "scope": "Four real private-cloud checks pass: unauthenticated rejection, two synthetic identities, installation/account isolation, table/RPC restrictions. Cleanup passed. No model, delivery, native receipt or complete conversation tested."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-credit-resume-01cb98b.json",
+      "sha256": "ceaa4b59b4cf47ae2f00bea5d83b3233abd4c416dc408f23613d0daa5acc7a7b",
+      "scope": "Clean earlier candidate: 925 turns, 923 active model turns, two operational extraction failures; six functional dimensions passed all turns. Not the final runtime."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-judge-credit-resume-01cb98b.json",
+      "sha256": "691f271378c8c6bb67d85e9a696e9fd1a717e44f33868723e3921ad50c1b4a81",
+      "scope": "Completed v8 judge on earlier candidate: 776 excellent, 89 acceptable, 60 poor, 33 hard findings; 93.51% approval, release rejected."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-v2-e47484b.json",
+      "sha256": "18cb5c957a46ea1937b11606617ce56c258a06ccd30d047ab65b993cbec27e5e",
+      "scope": "Clean frozen v2 live attempt: 925 turns, zero active model turns, all 925 model failures exposed. Provider quota error, not a successful model evaluation."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/spanish-credit-resume-e47484b/outputs.json",
+      "sha256": "95a890e317c14b16b4c11f7817d6917f9e151bfabf488a711869c19ca25cae24",
+      "scope": "Same ten Spanish inputs with real API attempts; ten HTTP429 provider errors. No model inference validated."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-final-a6f9e50.json",
+      "sha256": "a96a811f46e8cd8c2137b0b41233338e9d41ecb5746b38e7472fff0f743e46e1",
+      "scope": "Final runtime captured clean before execution and unchanged: all seven deterministic dimensions 925/925, no model calls, all visible text unverified; release ineligible."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/offline-a6f9e50/outputs.json",
+      "sha256": "ab639d3c36eeae97897b90d1207bc14ea9de5c1dede8c820dcb780cfe2c6d833",
+      "scope": "Same ten Spanish inputs on final clean source with network calls zero. All ten offline criteria pass; not generative validation."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/offline-a6f9e50/review.json",
+      "sha256": "642a58588a1c0417c6119211e33c3a4d5749fd6fb4ecc41d018ccd6707dd0e90",
+      "scope": "Independent offline Spanish review against predeclared criteria; 10/10 after final thanks fix."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/product-harness/credit-resume-final.json",
+      "sha256": "47f4308036ca37f5391ebd22dd2b2ca993f6f53225740e437553c4e81ca655f4",
+      "scope": "62/62 checks on final runtime against pre-edit resume baseline with enforce-scope; run ph_1790437280056_9841776d."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/backend-release/product-harness-77a01e050e0c.json",
+      "sha256": "dbc96b066b5b8f5236c3993046ae2633f03388863b544d27a1b03495b5a27b9a",
+      "scope": "62/62 checks on integrated clean runtime against pre-edit resume baseline with enforce-scope; run ph_1790437338412_a6913d9b."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/assistant-app-cloud/full-after-credit-20260926.json",
+      "sha256": "bbc771f3f2712587a1ef7f3a111eb104d01ea3b8d9c4ebcf38e3a0ddd86aec0f",
+      "scope": "Earlier deployed runtime: 9/9 complete real cloud conversation/recovery/isolation checks, 12 cleanups, simulated failed receipt only. Does not certify final deployment."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/model-preflight-588ddc175d17.json",
+      "sha256": "99ed72d19cf194b0d91738f342d0940d54c4c995ba20c0bbdb186d21ef2de484",
+      "scope": "Single later private planner preflight: HTTP429 model error and fallback; endpoint does not expose provider-specific quota body. No further model requests."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-77a01e050e0c-1790437391654.json",
+      "sha256": "d24822106ed4d7d5be419e480d5413a48d936c3a341703953a1ad322193d4333",
+      "scope": "Final private deployment: exact four function ZIP hashes, isolated database, anonymous401, no outbound provider credentials or schedules."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-77a01e050e0c-1790437391654.verification-1790437430007-dcb38a.json",
+      "sha256": "c0cf790d28c2fe0c3d3de1105e67ac41e6bad93e2735347223d44ad428b8696a",
+      "scope": "Read-only verification of final active deployment and exact four remote function ZIP hashes."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/assistant-app-cloud/infrastructure-77a01e050e0c-20260926-154353.json",
+      "sha256": "8bed541bf123c214e4c7073c6b5a8fcdc5bb736f9b05e6cd93f3cf0afde1ac44",
+      "scope": "Final deployment: 4/4 real infrastructure checks and 12/12 cleanup operations; no model or physical execution."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/final-private-77a01e050e0c-evidence.json",
+      "sha256": "40977467ca123c500570811082805fe942e8f8f546583e8fadcf5b0e6580285a",
+      "scope": "Final integration manifest: 37 runtime inputs match both feature blobs and deployed package, scoped validation, deployment and smoke evidence."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-a6f9e50/bm-run.json",
+      "sha256": "83e0f50e28f5ee101cb61e0e99ae84b21ae7fae26d220c9734cdaadbc65a9211",
+      "scope": "Final runtime CI BM success: 62/62 scope, PostgreSQL 15 and Android."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-a6f9e50/visual-review.json",
+      "sha256": "1e49693c58fe8ca22ddd6336717df85832ee496e277ae557002b035f716cafa6",
+      "scope": "Eight final-runtime SwiftUI screenshots independently reviewed, exact image hashes preserved; static appearance only."
     }
   ],
   "coverage_limits": {
@@ -53,9 +155,38 @@
     "distinct_text_sequences": 160,
     "turns": 925,
     "heldout": false,
-    "model_quality_after_corrections": "unverified: API returned 429 insufficient_quota",
+    "model_quality_after_corrections": "Unverified: e47484b live attempt had 0 active model turns; local provider returned HTTP 429 insufficient_quota / credit_balance_exhausted. Final a6f9e50 has only deterministic evidence.",
     "signed_candidate_build": "unavailable",
     "physical_iphone_cases": 0,
-    "observed_user_value_multiplier": "not measured"
+    "observed_user_value_multiplier": "not measured",
+    "latest_completed_live_judge": {
+      "source_commit": "01cb98b88e6f4e7cbd2218e3769b443f1988d89e",
+      "turns": 925,
+      "approval_percent": 93.51,
+      "poor": 60,
+      "hard_findings": 33,
+      "release_eligible": false,
+      "applies_to_current_runtime": false
+    },
+    "current_cloud_full_conversation": false,
+    "current_cloud_infrastructure_checks": 4,
+    "current_cloud_cleanup_checks": 12
+  },
+  "previous_deploys": [
+    {
+      "source_commit": "5cab6d312f505b7395456b9d2864be69c978bd48",
+      "deploy_id": "6ab7d0df552dead835399f9e"
+    }
+  ],
+  "runtime_feature_commit": "a6f9e501165979b7ef81377cd32ea23aaa023c5d",
+  "final_runtime_ci": {
+    "source_commit": "a6f9e501165979b7ef81377cd32ea23aaa023c5d",
+    "ios_run": 36252850746,
+    "ios_conclusion": "success",
+    "bm_run": 36252850729,
+    "bm_conclusion": "success",
+    "visual_artifact": 10909902949,
+    "visual_artifact_sha256": "946cc17bbdc2fc79e79ecc4a45f17af32b7374ad9fc526f38549d317523593ac",
+    "physical_validation": false
   }
 }

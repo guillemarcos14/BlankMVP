@@ -48,7 +48,9 @@ Use these direct commands: the release wrapper's bounded replay/judge subprocess
 
 Budget: 925 planner turns plus up to 925 first-attempt judge calls (judge retries can increase requests); the planner may issue multiple model requests per turn. At an illustrative 4.3-second planner-turn median and concurrency 8, planner-only wall time is about 9 minutes before variance. A judge averaging 3 seconds per turn takes about 6 minutes at concurrency 8 before variance. These are estimates, not measured runtimes for this corpus. Concurrency defaults to 1, accepts 1–8, preserves result order and deduplicates identical pending reviews. No dollar estimate is asserted: the current runners do not retain enough token-usage evidence to derive one reliably. Review the resulting source counts to distinguish active model extraction from grounded or deterministic fallback.
 
-## First live run and subsequent repairs
+## First live run and subsequent repairs (historical v1 evidence)
+
+Current resume evidence and versioned v2 corrections are recorded in [BM_CREDIT_RESUME_2026-09-26.md](BM_CREDIT_RESUME_2026-09-26.md). The observations below describe the original v1 iteration, not the current release candidate. V1 input bytes remain unchanged; v2 explicitly revises 85 duplicate-action expectations with an independent manifest, preserving all 925 inputs and state/decision expectations.
 
 The first full model run, `tmp/bm-semantic/product-next-live-first.json`, is preserved with byte SHA-256 `a865d12773710004ae5b1cd12b7998ad6cf5d68300b8daec7d00a3f84f7b2413`. It contains 925 turns, 922 active-model turns, ten slot failures, and three operational model failures marked by the safety dimension. All 925 action comparisons passed. Ten slot failures were five retrospective journeys across two turns: quoted historical “15 minutes” was accepted by the model-advisory evidence path as an operational duration. The deterministic parser had correctly classified a past-block review, but the advisory supplement crossed that boundary. Model proposals can no longer add operational facts to review/capability turns; a later explicit new block remains allowed.
 

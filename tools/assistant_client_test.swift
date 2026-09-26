@@ -153,6 +153,81 @@ struct AssistantClientTests {
         TransportStub.respond = { _ in .init(error: URLError(.cancelled)) }
         do { _ = try await client.history(); fatalError("Expected cancellation") }
         catch is CancellationError { }
+        try await verifyViewRaces()
         print("assistant client: refresh concurrency, identity switch, transient recovery, typed errors, 202/status, network and cancellation passed")
     }
+}
+
+@MainActor final class SpeechFixture { func stop() {} }
+@MainActor enum AssistantDraftVault {
+    static var states: [String: AssistantComposerState] = [:]
+    static func load(owner: String) -> AssistantComposerState { states[owner] ?? AssistantComposerState() }
+    static func save(_ state: AssistantComposerState, owner: String) -> Bool { states[owner] = state; return true }
+}
+@MainActor enum ViewTransport {
+    static var history: () async throws -> AssistantAppHistoryPage = { .init(turns: [], nextBefore: nil) }
+    static var status: (String) async throws -> AssistantAppTurn? = { _ in nil }
+    static var send: (String, String) async throws -> AssistantAppTurn = { text, id in makeTurn(id: id, text: text) }
+}
+struct ConversationTestClient {
+    @MainActor func history() async throws -> AssistantAppHistoryPage { try await ViewTransport.history() }
+    @MainActor func status(turnId: String) async throws -> AssistantAppTurn? { try await ViewTransport.status(turnId) }
+    @MainActor func send(text: String, turnId: String) async throws -> AssistantAppTurn { try await ViewTransport.send(text, turnId) }
+}
+private func makeTurn(id: String, text: String) -> AssistantAppTurn {
+    .init(id: id, userText: text, assistantText: "Reply to \(text)", status: "completed", actionId: "",
+        actionLabel: "", actionStatus: "", createdAt: "2026-09-26T10:00:00Z")
+}
+
+@MainActor private func verifyViewRaces() async throws {
+    AssistantAppSession.save(accessToken: "session#A", refreshToken: "refresh-A")
+    let view = ConversationFixture()
+    view.composer.draft = "New message"
+    var suspendedHistory: CheckedContinuation<AssistantAppHistoryPage, Error>?
+    ViewTransport.history = { try await withCheckedThrowingContinuation { suspendedHistory = $0 } }
+    let oldReload = Task { await view.reloadForTest() }
+    while suspendedHistory == nil { await Task.yield() }
+    await view.sendForTest()
+    check(view.turns.last?.userText == "New message", "Send did not complete")
+    suspendedHistory!.resume(returning: .init(turns: [makeTurn(id: "old", text: "Older message")], nextBefore: nil))
+    await oldReload.value
+    check(view.turns.last?.userText == "New message" && view.turns.count == 1, "Stale history overwrote a completed reply")
+
+    // A status lookup belonging to an earlier account must not repopulate the
+    // cleared conversation or write that account's pending message to the vault.
+    view.composer.pending = .init(id: "pending-A", text: "Private A")
+    ViewTransport.history = { .init(turns: [], nextBefore: nil) }
+    var suspendedStatus: CheckedContinuation<AssistantAppTurn?, Error>?
+    ViewTransport.status = { _ in try await withCheckedThrowingContinuation { suspendedStatus = $0 } }
+    let oldStatus = Task { await view.reloadForTest() }
+    while suspendedStatus == nil { await Task.yield() }
+    AssistantAppSession.save(accessToken: "session#B", refreshToken: "refresh-B")
+    view.restoreForTest()
+    check(view.owner == "B" && view.turns.isEmpty && view.composer.pending == nil, "Account switch did not clear private state")
+    suspendedStatus!.resume(returning: makeTurn(id: "pending-A", text: "Private A"))
+    await oldStatus.value
+    check(view.turns.isEmpty && AssistantDraftVault.states["B"] == nil, "Old status leaked across accounts")
+
+    // A failed old send must not overwrite the new account's error or cancel its
+    // spinner while the new account has its own request in progress.
+    var firstSend: CheckedContinuation<AssistantAppTurn, Error>?
+    var secondSend: CheckedContinuation<AssistantAppTurn, Error>?
+    ViewTransport.send = { _, _ in try await withCheckedThrowingContinuation { firstSend = $0 } }
+    view.composer.draft = "B message"
+    let oldSend = Task { await view.sendForTest() }
+    while firstSend == nil { await Task.yield() }
+    AssistantAppSession.save(accessToken: "session#C", refreshToken: "refresh-C")
+    view.restoreForTest()
+    view.composer.draft = "C message"
+    ViewTransport.send = { _, _ in try await withCheckedThrowingContinuation { secondSend = $0 } }
+    let currentSend = Task { await view.sendForTest() }
+    while secondSend == nil { await Task.yield() }
+    firstSend!.resume(throwing: AssistantAppError.network)
+    await oldSend.value
+    check(view.isSending && view.error == nil && view.composer.pending?.text == "C message", "Old send changed the new owner's request")
+    let currentID = view.composer.pending!.id
+    secondSend!.resume(returning: makeTurn(id: currentID, text: "C message"))
+    await currentSend.value
+    check(!view.isSending && view.turns.last?.userText == "C message", "New owner's completion failed")
+    print("assistant view: stale history, account switch during status and obsolete send completion passed")
 }

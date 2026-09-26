@@ -6,16 +6,17 @@ import SwiftUI
 enum AssistantAppSession {
     private static let service = "com.blanknfc.app.assistant.session"
     private static let lock = NSLock()
+    static let didChangeNotification = Notification.Name("BlankAssistantSessionDidChange")
 
     private struct Credentials: Codable {
         let access: String
         let refresh: String
     }
 
-    static func save(accessToken: String, refreshToken: String) {
+    @discardableResult static func save(accessToken: String, refreshToken: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        saveCredentials(accessToken: accessToken, refreshToken: refreshToken)
+        return saveCredentials(accessToken: accessToken, refreshToken: refreshToken)
     }
 
     static func token(_ account: String) -> String? {
@@ -41,7 +42,7 @@ enum AssistantAppSession {
         lock.lock()
         defer { lock.unlock() }
         guard readToken("access") == expected else { return readToken("access") }
-        saveCredentials(accessToken: accessToken, refreshToken: refreshToken)
+        _ = saveCredentials(accessToken: accessToken, refreshToken: refreshToken)
         return readToken("access")
     }
 
@@ -67,9 +68,9 @@ enum AssistantAppSession {
         return result as? Data
     }
 
-    private static func saveCredentials(accessToken: String, refreshToken: String) {
+    private static func saveCredentials(accessToken: String, refreshToken: String) -> Bool {
         guard !accessToken.isEmpty, !refreshToken.isEmpty,
-              let data = try? JSONEncoder().encode(Credentials(access: accessToken, refresh: refreshToken)) else { return }
+              let data = try? JSONEncoder().encode(Credentials(access: accessToken, refresh: refreshToken)) else { return false }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -77,12 +78,20 @@ enum AssistantAppSession {
         ]
         // Keep the old credentials if writing fails; never delete before an update.
         let status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecSuccess { return }
-        guard status == errSecItemNotFound else { return }
+        if status == errSecSuccess { notifyChange(); return true }
+        guard status == errSecItemNotFound else { return false }
         var item = query
         item[kSecValueData as String] = data
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        SecItemAdd(item as CFDictionary, nil)
+        guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { return false }
+        notifyChange()
+        return true
+    }
+
+    private static func notifyChange() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: didChangeNotification, object: nil)
+        }
     }
 }
 
@@ -450,6 +459,7 @@ struct AssistantAppView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var speech = AssistantSpeechInput()
     @FocusState private var composerFocused: Bool
     @State private var turns: [AssistantAppTurn] = []
@@ -458,9 +468,10 @@ struct AssistantAppView: View {
     @State private var owner = ""
     @State private var speechPrefix = ""
     @State private var acceptingSpeech = false
-    @State private var isSending = false
+    @State private var sendRequestID: UUID?
     @State private var isLoading = true
-    @State private var isReloading = false
+    @State private var reloadRequestID: UUID?
+    @State private var conversationRevision = 0
     @State private var error: String?
     @State private var requiresVerification = false
     @State private var canRetry = true
@@ -490,6 +501,7 @@ struct AssistantAppView: View {
     private var foreground: Color { dark ? .white : BlankColors.charcoal }
     private var background: Color { dark ? BlankColors.charcoal : .white }
     private var draftTooLong: Bool { composer.draft.utf16.count > 4000 }
+    private var isSending: Bool { sendRequestID != nil }
     private var waiting: Bool { isSending || composer.pending != nil }
 
     var body: some View {
@@ -590,7 +602,12 @@ struct AssistantAppView: View {
         .onChange(of: speech.transcript) { transcript in
             if acceptingSpeech { composer.draft = speechPrefix + transcript }
         }
-        .onChange(of: speech.error) { value in if let value { error = value } }
+        .onChange(of: speech.error) { value in
+            if let value {
+                error = value
+                canRetry = false
+            }
+        }
         .onChange(of: composer.draft) { _ in
             saveTask?.cancel()
             saveTask = Task { @MainActor in
@@ -606,7 +623,19 @@ struct AssistantAppView: View {
         }
         .onChange(of: scenePhase) { phase in
             if phase == .active && !preview { Task { restoreOwner(); await reload() } }
-            else { acceptingSpeech = false; speech.stop(); persist() }
+            else {
+                // Permission alerts temporarily deactivate the scene. Keep that
+                // pending request; stop audio when leaving or while interrupted.
+                if phase == .background || speech.isRecording {
+                    acceptingSpeech = false
+                    speech.stop()
+                }
+                persist()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AssistantAppSession.didChangeNotification)) { _ in
+            guard !preview, restoreOwner() else { return }
+            Task { await reload() }
         }
         .onDisappear { acceptingSpeech = false; speech.stop(); saveTask?.cancel(); persist() }
         .sheet(isPresented: $showHistory) {
@@ -631,12 +660,18 @@ struct AssistantAppView: View {
                 Text(error)
                     .foregroundStyle(dark ? Color(red: 1, green: 0.66, blue: 0.64) : BlankColors.red)
                     .fixedSize(horizontal: false, vertical: true)
+                if let pending = composer.pending {
+                    Text((spanish ? "Pendiente: " : "Pending: ") + pending.text)
+                        .lineLimit(2)
+                        .foregroundStyle(foreground.opacity(0.74))
+                        .accessibilityLabel((spanish ? "Mensaje pendiente: " : "Pending message: ") + pending.text)
+                }
                 if requiresVerification {
                     if latest != nil { Button(spanish ? "Verificar teléfono" : "Verify phone") { showPhoneSignIn = true }.frame(minHeight: 44) }
                 } else if canRetry {
                     Button(spanish ? "Reintentar" : "Try again") {
                         Task {
-                            if composer.pending != nil || !composer.draft.isEmpty { await send() }
+                            if composer.pending != nil { await send() }
                             else { await reload() }
                         }
                     }
@@ -666,9 +701,11 @@ struct AssistantAppView: View {
 
     private var composerBar: some View {
         HStack(alignment: .bottom, spacing: 4) {
-            TextField(spanish ? "Escribe un mensaje" : "Write a message", text: $composer.draft, axis: .vertical)
+            TextField("", text: $composer.draft,
+                      prompt: Text(spanish ? "Escribe un mensaje" : "Write a message")
+                        .foregroundColor(foreground.opacity(0.72)), axis: .vertical)
                 .font(.blankInter(size: 17))
-                .lineLimit(1...5)
+                .lineLimit(1...(dynamicTypeSize.isAccessibilitySize ? 2 : 5))
                 .focused($composerFocused)
                 .submitLabel(.send)
                 .onSubmit { if composer.pending == nil { Task { await send() } } }
@@ -686,7 +723,9 @@ struct AssistantAppView: View {
                 Image(systemName: speech.isRecording || speech.isStarting ? "stop.circle.fill" : "mic")
                     .font(.system(size: 22)).frame(width: 44, height: 50)
             }
+            .fixedSize(horizontal: true, vertical: false)
             .disabled(requiresVerification || isSending)
+            .opacity(requiresVerification || isSending ? 0.45 : 1)
             .accessibilityLabel(speech.isRecording || speech.isStarting
                                 ? (spanish ? "Detener dictado" : "Stop dictation")
                                 : (spanish ? "Dictar mensaje" : "Dictate message"))
@@ -695,7 +734,9 @@ struct AssistantAppView: View {
                     Image(systemName: "arrow.up.circle.fill").font(.system(size: 29))
                         .frame(width: 44, height: 50)
                 }
+                .fixedSize(horizontal: true, vertical: false)
                 .disabled(waiting || draftTooLong || requiresVerification)
+                .opacity(waiting || draftTooLong || requiresVerification ? 0.45 : 1)
                 .accessibilityLabel(spanish ? "Enviar mensaje" : "Send message")
             }
         }
@@ -706,22 +747,31 @@ struct AssistantAppView: View {
     }
 
     private func openControls(_ section: HomeSection?) {
+        acceptingSpeech = false
         speech.stop()
         persist()
         dismiss()
         onOpenControls(section)
     }
 
-    private func restoreOwner() {
+    @discardableResult private func restoreOwner() -> Bool {
         let current = AssistantAppSession.userID ?? ""
-        guard current != owner else { return }
+        guard current != owner else { return false }
+        acceptingSpeech = false
         speech.stop()
         saveTask?.cancel()
+        conversationRevision += 1
+        sendRequestID = nil
+        reloadRequestID = nil
+        isLoading = true
         owner = current
         turns = []
         nextHistoryCursor = nil
         composer = AssistantDraftVault.load(owner: current)
         error = nil
+        requiresVerification = false
+        canRetry = true
+        return true
     }
 
     @discardableResult private func persist() -> Bool {
@@ -730,13 +780,18 @@ struct AssistantAppView: View {
     }
 
     private func reload() async {
-        guard !preview, !isReloading, !isSending else { return }
-        isReloading = true
+        guard !preview, reloadRequestID == nil, !isSending else { return }
+        let requestID = UUID()
+        reloadRequestID = requestID
         let expectedOwner = owner
-        defer { isReloading = false; isLoading = false }
+        let expectedRevision = conversationRevision
+        defer {
+            if reloadRequestID == requestID { reloadRequestID = nil; isLoading = false }
+        }
         do {
             let page = try await AssistantAppClient().history()
-            guard expectedOwner == owner, expectedOwner == AssistantAppSession.userID else { return }
+            guard expectedOwner == owner, expectedOwner == AssistantAppSession.userID,
+                  expectedRevision == conversationRevision else { return }
             turns = page.turns
             nextHistoryCursor = page.nextBefore
             requiresVerification = false
@@ -744,6 +799,8 @@ struct AssistantAppView: View {
                 let recovered: AssistantAppTurn?
                 if let stored = turns.first(where: { $0.id == pending.id }) { recovered = stored }
                 else { recovered = try await AssistantAppClient().status(turnId: pending.id) }
+                guard expectedOwner == owner, expectedOwner == AssistantAppSession.userID,
+                      expectedRevision == conversationRevision else { return }
                 if let recovered, recovered.status == "completed" {
                     accept(recovered)
                     error = nil
@@ -757,7 +814,10 @@ struct AssistantAppView: View {
                     canRetry = true
                 }
             } else { error = nil }
-        } catch { handle(error) }
+        } catch {
+            guard expectedOwner == owner, expectedRevision == conversationRevision else { return }
+            handle(error)
+        }
     }
 
     private func accept(_ turn: AssistantAppTurn) {
@@ -776,24 +836,31 @@ struct AssistantAppView: View {
         guard persist() else {
             composer = before
             error = spanish ? "No se pudo guardar el mensaje en este iPhone. Reintenta." : "Could not save the message on this iPhone. Try again."
-            canRetry = true
+            canRetry = false
             return
         }
         composerFocused = false
-        isSending = true
+        let requestID = UUID()
+        sendRequestID = requestID
+        conversationRevision += 1
+        let expectedRevision = conversationRevision
+        reloadRequestID = nil
+        isLoading = false
         error = nil
         let expectedOwner = owner
-        defer { isSending = false }
+        defer { if sendRequestID == requestID { sendRequestID = nil } }
         do {
             let turn = try await AssistantAppClient().send(text: pending.text, turnId: pending.id)
-            guard expectedOwner == owner, expectedOwner == AssistantAppSession.userID else { return }
+            guard expectedOwner == owner, expectedOwner == AssistantAppSession.userID,
+                  expectedRevision == conversationRevision else { return }
             accept(turn)
             requiresVerification = false
         } catch {
-            guard expectedOwner == owner else { return }
+            guard expectedOwner == owner, expectedRevision == conversationRevision else { return }
             handle(error)
             if let recovered = try? await AssistantAppClient().status(turnId: pending.id),
-               expectedOwner == owner, expectedOwner == AssistantAppSession.userID, recovered.status == "completed" {
+               expectedOwner == owner, expectedOwner == AssistantAppSession.userID,
+               expectedRevision == conversationRevision, recovered.status == "completed" {
                 accept(recovered)
                 self.error = nil
             }
@@ -850,6 +917,7 @@ private struct AssistantAppHistoryView: View {
     @State private var error: String?
     let foreground: Color
     let background: Color
+    private let owner: String?
     private var spanish: Bool { Locale.current.languageCode == "es" }
 
     init(turns: [AssistantAppTurn], nextBefore: String?, foreground: Color, background: Color) {
@@ -857,6 +925,7 @@ private struct AssistantAppHistoryView: View {
         _nextBefore = State(initialValue: nextBefore)
         self.foreground = foreground
         self.background = background
+        self.owner = AssistantAppSession.userID
     }
 
     var body: some View {
@@ -906,19 +975,36 @@ private struct AssistantAppHistoryView: View {
         }
         .foregroundStyle(foreground)
         .tint(foreground)
+        .onReceive(NotificationCenter.default.publisher(for: AssistantAppSession.didChangeNotification)) { _ in
+            validateOwner()
+        }
+    }
+
+    @discardableResult private func validateOwner() -> Bool {
+        guard owner == AssistantAppSession.userID else {
+            turns = []
+            nextBefore = nil
+            error = spanish ? "La cuenta ha cambiado. Cierra el historial para continuar." : "The account changed. Close history to continue."
+            return false
+        }
+        return true
     }
 
     private func loadEarlier() async {
-        guard let cursor = nextBefore, !loading else { return }
+        guard validateOwner(), let cursor = nextBefore, !loading else { return }
         loading = true
         error = nil
         defer { loading = false }
         do {
             let page = try await AssistantAppClient().history(before: cursor)
+            guard validateOwner() else { return }
             let ids = Set(turns.map(\.id))
             turns.insert(contentsOf: page.turns.filter { !ids.contains($0.id) }, at: 0)
             nextBefore = page.nextBefore
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            guard validateOwner() else { return }
+            self.error = error.localizedDescription
+        }
     }
 }
 

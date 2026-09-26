@@ -15,6 +15,7 @@ const model = read('ios/Blank/Blank/BlankDomainModels.swift');
 const scheduler = read('ios/Blank/Blank/DeviceActivityTimerScheduler.swift');
 const monitor = read('ios/Blank/BlankDeviceActivityMonitor/DeviceActivityMonitorExtension.swift');
 const store = read('ios/Blank/Blank/SessionStore.swift');
+const home = read('ios/Blank/Blank/HomeView.swift');
 
 // Cross-target integration gates complement the executable model regressions.
 assert.doesNotMatch(scheduler, /where window\.runsEveryDay/);
@@ -25,6 +26,11 @@ assert.match(store, /recurringScheduleRegistered = DeviceActivityTimerScheduler\
 assert.match(store, /blankActiveUntil == nil \|\| deviceActivityTimerScheduled/);
 const capacity = scheduler.indexOf('guard intervals.count + expirations.count <= maxScheduleActivities');
 assert(capacity >= 0 && scheduler.indexOf('center.stopMonitoring', capacity) > capacity);
+const polling = between(home, '    private func pollPendingAssistantActionIfNeeded', '    private func clearAssistantNotificationRequest');
+assert.equal((polling.match(/guard assistantIdentityMatches\(code: code, channel: channel, phone: phoneNumber\)/g) || []).length, 2);
+const signIn = between(home, '    private func verifyCode() async', '    private func performRequest(');
+assert(signIn.indexOf('guard AssistantAppSession.save(') >= 0
+  && signIn.indexOf('guard AssistantAppSession.save(') < signIn.indexOf('phoneVerified = true'), 'Secure session must persist before verification is shown');
 
 const selection = between(store, '    @Published var selection:', '    @Published var sessions:')
   .replace('@Published var selection: FamilyActivitySelection', 'var selection: Int');
@@ -34,6 +40,15 @@ const intervals = scheduler.slice(scheduler.indexOf('    private static func rec
 const extensionModel = between(monitor, '    private struct StoredWindow:', '    private static func recurringScheduleIsActive')
   .replace('private struct StoredWindow', 'struct StoredWindow');
 const fixtures = `
+final class IdentityFixture {
+    var assistantConnectCode = "code-A"
+    var assistantPreferredChannel = "whatsApp"
+    var assistantPhoneNumber = "+34000000000"
+${between(home, '    private func assistantIdentityMatches(', '    private func clearPendingAssistantIdentityState()')}
+    func matches(code: String, channel: String, phone: String) -> Bool {
+        assistantIdentityMatches(code: code, channel: channel, phone: phone)
+    }
+}
 enum BlankSharedState {
     static var sharedActive = false
     struct ActiveState { let isActive: Bool }

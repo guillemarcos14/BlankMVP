@@ -535,6 +535,8 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .blankAssistantApplyNowRequested)) { _ in
             pollPendingAssistantActionIfNeeded(force: true)
         }
+        .onChange(of: assistantConnectCode) { _ in clearPendingAssistantIdentityState() }
+        .onChange(of: assistantPhoneNumber) { _ in clearPendingAssistantIdentityState() }
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
             applyScreenTimeControls()
@@ -1528,9 +1530,15 @@ struct HomeView: View {
         screenTimeBlocker.refreshAuthorizationStatus()
         if assistantActionRequiresScreenTime(pendingAction), screenTimeBlocker.authorizationStatus != .approved {
             assistantActionExecutionInFlight = true
+            let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+            let phone = assistantPhoneNumber
+            let actionID = pendingAssistantActionId
             Task {
                 _ = await screenTimeBlocker.requestAuthorization()
                 await MainActor.run {
+                    guard assistantIdentityMatches(code: code, channel: channel, phone: phone),
+                          pendingAssistantActionId == actionID else { return }
                     if screenTimeBlocker.authorizationStatus == .approved {
                         confirmPendingAssistantAction()
                     } else {
@@ -1900,6 +1908,7 @@ struct HomeView: View {
                 )
                 await MainActor.run {
                     assistantActionPollInFlight = false
+                    guard assistantIdentityMatches(code: code, channel: channel, phone: phoneNumber) else { return }
                     if acknowledgement == .acknowledged || acknowledgement == .stale {
                         AssistantActionReceiptStore.clear(actionId: receipt.actionId)
                         if pendingAssistantActionId == receipt.actionId {
@@ -1919,6 +1928,7 @@ struct HomeView: View {
             )
             await MainActor.run {
                 assistantActionPollInFlight = false
+                guard assistantIdentityMatches(code: code, channel: channel, phone: phoneNumber) else { return }
                 // Read this after the network round-trip. On a cold launch the
                 // notification response can arrive while the initial poll is
                 // already in flight; reading it before the request loses the tap.
@@ -1948,6 +1958,23 @@ struct HomeView: View {
     private func clearAssistantNotificationRequest() {
         BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
         BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
+    }
+
+    private func assistantIdentityMatches(code: String, channel: String, phone: String) -> Bool {
+        let currentChannel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        return code == assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            && channel == currentChannel && phone == assistantPhoneNumber
+    }
+
+    private func clearPendingAssistantIdentityState() {
+        clearAssistantNotificationRequest()
+        pendingAssistantActionId = ""
+        pendingAssistantInboxAction = nil
+        sessionStore.clearAssistantActionConfirmation()
+        sessionStore.clearPendingPlanAppNames()
+        sessionStore.shouldOpenBlockConfiguration = false
+        showingContextualAppPicker = false
+        assistantActionExecutionInFlight = false
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -3730,14 +3757,16 @@ struct AppPhoneSignInSheet: View {
             guard let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty else {
                 throw AppPhoneSignInError.message("The account was verified but no phone number was returned.")
             }
+            guard AssistantAppSession.save(
+                accessToken: accessToken,
+                refreshToken: auth["refresh_token"] as? String ?? ""
+            ) else {
+                throw AppPhoneSignInError.message("Could not securely save your session on this iPhone. Try verifying again.")
+            }
             phoneNumber = linkedPhone
             connectCode = linkedCode
             preferredChannel = "whatsapp"
             phoneVerified = true
-            AssistantAppSession.save(
-                accessToken: accessToken,
-                refreshToken: auth["refresh_token"] as? String ?? ""
-            )
             onVerified?()
             if showsCancel { dismiss() }
         } catch {

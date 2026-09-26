@@ -33,16 +33,18 @@ function parseArgs(argv) {
     if (value === "--deploy") args.deploy = true;
     else if (value === "--dry-run") dryRun = true;
     else if (value === "--help") args.help = true;
-    else if (["--source", "--netlify-cli", "--site-id"].includes(value)) {
+    else if (["--source", "--netlify-cli", "--site-id", "--verify-report"].includes(value)) {
       const next = argv[++index];
       if (!next || next.startsWith("--")) fail(`${value} requires a value`);
-      args[value === "--source" ? "source" : value === "--netlify-cli" ? "cli" : "site"] = next;
+      args[value === "--source" ? "source" : value === "--netlify-cli" ? "cli" : value === "--verify-report" ? "verifyReport" : "site"] = next;
     } else fail(`Unknown argument: ${value}`);
   }
   if (dryRun && args.deploy) fail("Choose --dry-run or --deploy");
+  if (args.verifyReport && (dryRun || args.deploy)) fail("--verify-report cannot package or deploy");
   assertSite(args.site);
   args.source = path.resolve(args.source);
   args.cli = path.resolve(args.cli);
+  if (args.verifyReport) args.verifyReport = path.resolve(args.verifyReport);
   return args;
 }
 
@@ -177,10 +179,88 @@ function deployCommand(args, packaged) {
     "--dir", packaged.publicDir, "--functions", packaged.archives, "--skip-functions-cache", "--json"];
 }
 
+function productionFunctions(payload) {
+  // Netlify currently returns one group object. Older API responses were
+  // arrays of groups; accept both, but never infer success from an unknown shape.
+  const groups = Array.isArray(payload) ? payload : [payload];
+  if (!groups.length || groups.some((group) => !group || typeof group !== "object"
+      || !Object.hasOwn(group, "branch") || !Array.isArray(group.functions))) fail("Unknown Netlify function inventory shape");
+  const production = groups.filter((group) => group.branch === null);
+  if (production.length !== 1) fail("Expected one production function group for private staging");
+  const functions = production[0].functions;
+  if (functions.some((fn) => !fn || typeof fn !== "object"
+      || (fn.n && fn.name && fn.n !== fn.name) || (fn.d && fn.sha && fn.d !== fn.sha))) fail("Invalid Netlify function metadata");
+  assertEntries(functions.map((fn) => fn.n || fn.name));
+  return functions;
+}
+
+function validateReportArtifacts(report) {
+  assertSite(report.site_id);
+  if (report.site_url !== SITE_URL || report.supabase_ref !== SUPABASE_REF
+      || !/^[a-f0-9]{24}$/.test(report.deploy_id || "") || !/^[a-f0-9]{40}$/.test(report.source_commit || "")
+      || report.source_tree_clean !== true || !RELEASE_BRANCH.test(report.source_branch || "")
+      || !["deployed_unverified", "private_deploy_verified"].includes(report.status)) fail("Invalid deployed staging report identity or source snapshot");
+  if (!Array.isArray(report.functions) || typeof report.package_directory !== "string") fail("Missing staging artifact snapshot");
+  assertEntries(report.functions.map((fn) => fn?.name));
+  for (const fn of report.functions) {
+    const expected = path.join(report.package_directory, "functions", `${fn.name}.zip`);
+    if (typeof fn.path !== "string" || path.resolve(fn.path) !== path.resolve(expected)
+        || !/^[a-f0-9]{64}$/.test(fn.sha256 || "") || fn.schedule
+        || !fs.existsSync(fn.path) || sha256(fn.path) !== fn.sha256
+        || fs.statSync(fn.path).size !== fn.bytes) fail("Original function artifact is missing or changed");
+  }
+}
+
+async function verifyDeployment(report, token, fetcher) {
+  const site = await apiGet(`/sites/${SITE_ID}`, token, fetcher);
+  if (site.id !== SITE_ID || site.ssl_url !== SITE_URL || site.published_deploy?.id !== report.deploy_id) fail("The active staging deploy identity changed during verification");
+  report.environment_verification = validateEnvironment(await apiGet(`/accounts/${site.account_id}/env?site_id=${SITE_ID}`, token, fetcher));
+  const deployment = await apiGet(`/deploys/${report.deploy_id}`, token, fetcher);
+  if (deployment.site_id !== SITE_ID || deployment.state !== "ready" || deployment.function_schedules?.length) fail("Staging deploy is not ready or contains scheduled functions");
+  const remote = productionFunctions(await apiGet(`/sites/${SITE_ID}/functions`, token, fetcher));
+  if (remote.some((fn) => fn.schedule || (fn.d || fn.sha) !== report.functions.find((item) => item.name === (fn.n || fn.name))?.sha256)) fail("Remote function digests differ from the four packaged ZIPs");
+  await requirePrivateSite(fetcher);
+  const finalSite = await apiGet(`/sites/${SITE_ID}`, token, fetcher);
+  if (finalSite.id !== SITE_ID || finalSite.published_deploy?.id !== report.deploy_id) fail("The active staging deploy changed during verification");
+  report.remote_functions = remote.map((fn) => ({ name: fn.n || fn.name, sha256: fn.d || fn.sha, runtime: fn.r || fn.runtime || null }));
+  report.remote_function_hashes_verified = true;
+  report.verified_at = new Date().toISOString();
+  report.status = "private_deploy_verified";
+}
+
+async function verifyReport(reportFile, dependencies = {}) {
+  const original = fs.readFileSync(reportFile, "utf8");
+  const report = JSON.parse(original);
+  validateReportArtifacts(report);
+  // Preserve the original package/deploy evidence byte-for-byte. A separate
+  // receipt binds this read-only attempt to its original report and artifacts.
+  const reportPath = `${reportFile.replace(/\.json$/i, "")}.verification-${Date.now()}-${crypto.randomBytes(3).toString("hex")}.json`;
+  report.verification_mode = "read-only";
+  report.original_report = path.resolve(reportFile);
+  report.original_report_sha256 = crypto.createHash("sha256").update(original).digest("hex");
+  report.remote_function_hashes_verified = false;
+  report.status = "deployed_unverified";
+  delete report.remote_functions;
+  delete report.verified_at;
+  const save = () => fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  try {
+    await verifyDeployment(report, dependencies.token || netlifyToken(), dependencies.fetcher || fetch);
+    save();
+    return { report, reportPath };
+  } catch (error) {
+    save();
+    fail(`${error.message}. Verification report: ${reportPath}`);
+  }
+}
+
 async function main(args, dependencies = {}) {
   const execute = dependencies.execute || run;
   const fetcher = dependencies.fetcher || fetch;
   assertSite(args.site);
+  if (args.verifyReport) {
+    if (args.deploy) fail("--verify-report cannot package or deploy");
+    return verifyReport(args.verifyReport, dependencies);
+  }
   const state = sourceState(args.source, execute);
   if (args.deploy) requireDeployable(state);
   const bundler = dependencies.bundler || await loadBundler(args.cli);
@@ -217,19 +297,7 @@ async function main(args, dependencies = {}) {
     report.deploy_id = deployed.deploy_id;
     report.status = "deployed_unverified";
     save();
-    const after = await apiGet(`/sites/${SITE_ID}`, token, fetcher);
-    if (after.published_deploy?.id !== report.deploy_id) fail("The active staging deploy changed during verification");
-    const deployment = await apiGet(`/deploys/${report.deploy_id}`, token, fetcher);
-    if (deployment.site_id !== SITE_ID || deployment.state !== "ready" || deployment.function_schedules?.length) fail("Staging deploy is not ready or contains scheduled functions");
-    const groups = await apiGet(`/sites/${SITE_ID}/functions`, token, fetcher);
-    const remote = groups.filter((group) => !group.branch).flatMap((group) => group.functions || []);
-    assertEntries(remote.map((fn) => fn.n || fn.name));
-    if (remote.some((fn) => fn.schedule || (fn.d || fn.sha) !== packaged.functions.find((item) => item.name === (fn.n || fn.name))?.sha256)) fail("Remote function digests differ from the four packaged ZIPs");
-    await requirePrivateSite(fetcher);
-    const finalSite = await apiGet(`/sites/${SITE_ID}`, token, fetcher);
-    if (finalSite.published_deploy?.id !== report.deploy_id) fail("The active staging deploy changed during verification");
-    report.remote_function_hashes_verified = true;
-    report.status = "private_deploy_verified";
+    await verifyDeployment(report, token, fetcher);
     save();
     return { report, reportPath };
   } catch (error) {
@@ -242,7 +310,7 @@ async function main(args, dependencies = {}) {
 if (require.main === module) {
   (async () => {
     const args = parseArgs(process.argv.slice(2));
-    if (args.help) { console.log("node tools/backend_staging.js [--dry-run | --deploy] [--source <worktree-root>] [--netlify-cli <run.js>]"); return; }
+    if (args.help) { console.log("node tools/backend_staging.js [--dry-run | --deploy] [--source <worktree-root>] [--netlify-cli <run.js>] OR --verify-report <package-report.json>"); return; }
     const { report, reportPath } = await main(args);
     console.log(JSON.stringify({ status: report.status, mode: report.mode, source_commit: report.source_commit,
       source_tree_clean: report.source_tree_clean, deployable: report.deployable, site_id: SITE_ID,
@@ -251,4 +319,4 @@ if (require.main === module) {
   })().catch((error) => { console.error(`backend_staging: ${error.message}`); process.exitCode = 1; });
 }
 module.exports = { SITE_ID, SITE_URL, SUPABASE_REF, ENTRIES, parseArgs, assertSite, assertEntries, requireDeployable,
-  validateEnvironment, requirePrivateSite, deployCommand, packageCandidate, main };
+  validateEnvironment, requirePrivateSite, deployCommand, packageCandidate, productionFunctions, verifyReport, main };

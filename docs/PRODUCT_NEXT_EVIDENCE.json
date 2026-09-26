@@ -1,0 +1,61 @@
+{
+  "recorded_at": "2026-09-26",
+  "purpose": "Audit index, not production release authorization. Reports remain in their original local worktrees; hashes refer to complete file bytes.",
+  "pull_request": "https://github.com/guillemarcos14/BlankmindAI/pull/6",
+  "deployed_source_commit": "5cab6d312f505b7395456b9d2864be69c978bd48",
+  "private_deploy_id": "6ab7d0df552dead835399f9e",
+  "staging_supabase_ref": "njqbovsmoowkhhsqmitn",
+  "staging_migrations": "001-024",
+  "production_changed": false,
+  "reports": [
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-first.json",
+      "sha256": "a865d12773710004ae5b1cd12b7998ad6cf5d68300b8daec7d00a3f84f7b2413",
+      "scope": "First real model run, 925 turns. Predates subsequent corrective changes; original source capture is incomplete and cannot attest the current candidate."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-judge-first.json",
+      "sha256": "122ed9cd434a896b56f07c63c4742df93d7031fe41be4d91743ea78d7da26b44",
+      "scope": "First independent model judge: 647 excellent, 171 acceptable, 107 poor, 67 hard findings; 88.43 percent approval. Release rejected. Findings include evaluator false positives; no later live pass is claimed."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/bm-semantic/product-next-final-clean.json",
+      "sha256": "111925842d3032f11d8954b20bffa242fa010d505a8944f82c9c46d6631ce51c",
+      "scope": "Clean source at deployed commit, captured before replay with no changes during execution. 925/925 in each of seven deterministic dimensions, zero active model turns, 925 visible responses unverified. Release ineligible."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/backend-release/pre-staging-harness.json",
+      "sha256": "d80e57f03d7a73764b7db0666fee3a42fc16e097fc3057d45435dd7cac536a3f",
+      "run_id": "ph_1790428617049_9d657cf7",
+      "scope": "61/61 checks against original integration baseline with enforce-scope before private deployment. Does not constitute signed or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-5cab6d312f50-1790431428839.verification-1790431861755-12cd28.json",
+      "sha256": "49aabfad494feb6aa69f6efca40ec35c36e92bd74730fdf47b1f7454adf441df",
+      "scope": "Read-only recovery of the existing deployment verification. Original report preserved. Active deploy, exact four remote ZIP digests, private access and isolated database checked; no redeploy."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/assistant-app-cloud/infrastructure.json",
+      "sha256": "6b37660c2a746fbc1bac352d78038819ba93e423d6fc0a2ed56cbeb105e9c8cf",
+      "run_id": "7134b1c0-4e2a-4db4-b31a-d409238e8528",
+      "scope": "Four real private-cloud checks pass: unauthenticated rejection, two synthetic identities, installation/account isolation, table/RPC restrictions. Cleanup passed. No model, delivery, native receipt or complete conversation tested."
+    }
+  ],
+  "coverage_limits": {
+    "authored_base_journeys": 40,
+    "stateful_trajectories": 200,
+    "distinct_text_sequences": 160,
+    "turns": 925,
+    "heldout": false,
+    "model_quality_after_corrections": "unverified: API returned 429 insufficient_quota",
+    "signed_candidate_build": "unavailable",
+    "physical_iphone_cases": 0,
+    "observed_user_value_multiplier": "not measured"
+  }
+}

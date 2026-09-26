@@ -36,9 +36,9 @@ const env = [
   { key: "SUPABASE_SERVICE_ROLE_KEY", scopes: ["functions"], is_secret: true, values: [{ context: "production", value: "********************" }] },
 ];
 
-function dependencies({ dirty = false, protectedSite = true, extraFunction = false } = {}) {
+function dependencies({ dirty = false, protectedSite = true, extraFunction = false, published = false, inventoryShape = "object", mutateInventory } = {}) {
   const operations = [];
-  let deployed = false;
+  let deployed = published;
   return { operations, token: "test-token", bundler,
     execute(command, argv, cwd) {
       operations.push({ command, argv, cwd });
@@ -55,7 +55,8 @@ function dependencies({ dirty = false, protectedSite = true, extraFunction = fal
       deployed = true;
       return JSON.stringify({ site_id: staging.SITE_ID, deploy_id: deployId });
     },
-    async fetcher(url) {
+    async fetcher(url, options) {
+      assert(!options?.method || options.method === "GET", "verification must only read remote state");
       operations.push({ url });
       if (url.startsWith(staging.SITE_URL)) return { status: protectedSite ? 401 : 200, body: { cancel: async () => {} } };
       let value;
@@ -63,10 +64,14 @@ function dependencies({ dirty = false, protectedSite = true, extraFunction = fal
         account_id: "test-account", published_deploy: deployed ? { id: deployId } : null };
       else if (url.includes("/env?")) value = env;
       else if (url.endsWith(`/deploys/${deployId}`)) value = { site_id: staging.SITE_ID, state: "ready", function_schedules: [] };
-      else if (url.endsWith("/functions")) value = [{ branch: null, functions: [
-        ...staging.ENTRIES.map((name) => ({ n: name, d: digest(`artifact:${name}`), schedule: null })),
+      else if (url.endsWith("/functions")) {
+        const group = { id: "production-group", provider: "aws_lambda", branch: null, log_type: "socketeer", functions: [
+        ...staging.ENTRIES.map((name) => ({ n: name, d: digest(`artifact:${name}`), r: "nodejs24.x", schedule: null })),
         ...(extraFunction ? [{ n: "cron", d: "bad", schedule: "* * * * *" }] : []),
-      ] }];
+        ] };
+        value = inventoryShape === "array" ? [group] : group;
+        if (mutateInventory) value = mutateInventory(value);
+      }
       else throw new Error(`Unexpected read ${url}`);
       return { ok: true, json: async () => value };
     },
@@ -78,6 +83,8 @@ function dependencies({ dirty = false, protectedSite = true, extraFunction = fal
   assert.equal(staging.parseArgs(["--dry-run"]).deploy, false);
   assert.throws(() => staging.parseArgs(["--site-id", "59955668-9a9b-4979-a283-63fbf3115fe5", "--deploy"]), /Only the reserved/);
   assert.throws(() => staging.parseArgs(["--dry-run", "--deploy"]), /Choose/);
+  assert.throws(() => staging.parseArgs(["--verify-report", "receipt.json", "--deploy"]), /cannot package or deploy/);
+  assert.throws(() => staging.parseArgs(["--verify-report", "receipt.json", "--dry-run"]), /cannot package or deploy/);
   assert.throws(() => staging.assertEntries([...staging.ENTRIES, "cron"]), /exactly/);
   assert.throws(() => staging.requireDeployable({ clean: true, branch: "main" }), /release/);
   const dry = dependencies();
@@ -118,6 +125,68 @@ function dependencies({ dirty = false, protectedSite = true, extraFunction = fal
   assert.equal(completed.report.status, "private_deploy_verified");
   assert.equal(completed.report.remote_function_hashes_verified, true);
   assert.equal(completed.report.environment_preflight.service_key_ref_visible_and_verified, false, "masked keys must not be claimed as inspected");
+  assert.equal(completed.report.remote_functions[0].runtime, "nodejs24.x", "provider runtime is separate from the local compilation target");
   await assert.rejects(() => staging.main({ ...args, deploy: true }, dependencies({ extraFunction: true })), /exactly/);
-  console.log("Private staging: no default remote calls, exact site/function allowlists, clean release source, password/database/transport preflights and remote digest verification passed");
+
+  const previousReport = path.join(fixture, "deployed-unverified.json");
+  const snapshot = { ...completed.report, status: "deployed_unverified", remote_function_hashes_verified: false };
+  delete snapshot.remote_functions;
+  delete snapshot.verified_at;
+  fs.writeFileSync(previousReport, `${JSON.stringify(snapshot, null, 2)}\n`);
+  const previousBytes = fs.readFileSync(previousReport);
+  const readOnly = (options = {}) => ({ ...dependencies({ published: true, ...options }),
+    execute() { throw new Error("read-only verification invoked a command"); },
+    bundler: { zipFunctions() { throw new Error("read-only verification repackaged artifacts"); } },
+  });
+  const verifyArgs = staging.parseArgs(["--verify-report", previousReport]);
+  for (const inventoryShape of ["object", "array"]) {
+    const dep = readOnly({ inventoryShape });
+    const result = await staging.main(verifyArgs, dep);
+    assert.equal(result.report.status, "private_deploy_verified");
+    assert.equal(result.report.deploy_id, deployId);
+    assert.equal(result.report.original_report_sha256, digest(previousBytes));
+    assert.equal(result.report.source_commit, snapshot.source_commit);
+    assert.deepEqual(result.report.functions, snapshot.functions);
+    assert.deepEqual(result.report.source_inputs, snapshot.source_inputs);
+    assert.notEqual(result.reportPath, previousReport);
+    assert.deepEqual(fs.readFileSync(previousReport), previousBytes, "the original artifact snapshot must stay byte-for-byte intact");
+    assert(dep.operations.every((operation) => operation.url), "read-only verification executed a command");
+  }
+  const badInventories = [
+    { change: () => ({ functions: [] }), message: /inventory shape/ },
+    { change: () => "unexpected", message: /inventory shape/ },
+    { change: (group) => [group, structuredClone(group)], message: /one production/ },
+    { change: (group) => ({ ...group, functions: [...group.functions.slice(0, 3), group.functions[0]] }), message: /exactly/ },
+    { change: (group) => { group.functions[0].schedule = "* * * * *"; return group; }, message: /digests/ },
+    { change: (group) => { group.functions[0].d = "0".repeat(64); return group; }, message: /digests/ },
+  ];
+  for (const { change, message } of badInventories) {
+    const dep = readOnly({ mutateInventory: change });
+    let receipt;
+    await assert.rejects(() => staging.main(verifyArgs, dep), (error) => {
+      assert.match(error.message, message);
+      receipt = error.message.split("Verification report: ")[1];
+      return true;
+    });
+    const rejected = JSON.parse(fs.readFileSync(receipt, "utf8"));
+    assert.equal(rejected.status, "deployed_unverified");
+    assert.equal(rejected.remote_function_hashes_verified, false);
+    assert.equal(rejected.verified_at, undefined);
+    assert.deepEqual(fs.readFileSync(previousReport), previousBytes);
+    assert(dep.operations.every((operation) => operation.url));
+  }
+  await assert.rejects(() => staging.main(verifyArgs, readOnly({ published: false })), /active staging deploy/);
+  await assert.rejects(() => staging.main(verifyArgs, readOnly({ protectedSite: false })), /not password-protected/);
+  const originalArtifact = fs.readFileSync(snapshot.functions[0].path);
+  fs.writeFileSync(snapshot.functions[0].path, "tampered");
+  const tampered = readOnly();
+  await assert.rejects(() => staging.main(verifyArgs, tampered), /artifact is missing or changed/);
+  assert.equal(tampered.operations.length, 0, "local artifact mismatch should prevent every remote call");
+  fs.writeFileSync(snapshot.functions[0].path, originalArtifact);
+  const wrongSiteReport = path.join(fixture, "wrong-site-report.json");
+  fs.writeFileSync(wrongSiteReport, JSON.stringify({ ...snapshot, site_id: "59955668-9a9b-4979-a283-63fbf3115fe5" }));
+  const wrongSite = readOnly();
+  await assert.rejects(() => staging.main({ ...verifyArgs, verifyReport: wrongSiteReport }, wrongSite), /Only the reserved/);
+  assert.equal(wrongSite.operations.length, 0);
+  console.log("Private staging: package/deploy guards, real object and legacy array inventories, fail-closed metadata/digest checks and read-only recovery preserving original artifacts passed");
 })().catch((error) => { console.error(error); process.exitCode = 1; });

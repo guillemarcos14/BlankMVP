@@ -49,7 +49,7 @@ function memoryIdentity(phone) {
   return `assistant:${crypto.createHash("sha256").update(`whatsapp:${phone}`).digest("hex").slice(0,32)}`;
 }
 
-async function run(config, output) {
+async function run(config, output, { infrastructureOnly = false } = {}) {
   // Recheck even when called programmatically.
   target(config.supabase, "supabase"); target(config.netlify, "netlify");
   const runId = crypto.randomUUID();
@@ -176,6 +176,7 @@ async function run(config, output) {
         body: { p_auth_user_id: a.id, p_turn_id: crypto.randomUUID(), p_user_text: "forbidden", p_lease_owner: crypto.randomUUID() } });
       expect([401,403].includes(rpc.status), "client_claim_rpc_allowed");
     });
+    if (!infrastructureOnly) {
     let first;
     await check("send_commits_exact_reply_action_and_shared_state", async () => {
       first = await send(a, "Block my selected apps now for 25 minutes, just once.");
@@ -242,6 +243,7 @@ async function run(config, output) {
       expect(dbRow[0]?.action_status === "failed", "terminal_receipt_not_persisted");
       await send(a, "Cancel this request.");
     });
+    }
   } catch (error) {
     // All exceptions generated here have static labels; never log upstream body,
     // password, token, request headers or native IDs from fetched data.
@@ -268,11 +270,13 @@ async function run(config, output) {
   const result = { evaluator: "assistant-app-real-staging-v1", generated_at: new Date().toISOString(), run_id: runId,
     script_sha256: crypto.createHash("sha256").update(fs.readFileSync(__filename)).digest("hex"),
     targets: { supabase: config.supabase, netlify: config.netlify }, checks, cleanup,
+    scope: infrastructureOnly ? "infrastructure_only_no_model_calls" : "full_conversation_recovery",
+    full_conversation_tested: !infrastructureOnly,
     synthetic_auth_user_ids: users.map(user => user.id),
-    passed: !failure && checks.length === 9 && cleanup.every(item => item.passed),
-    limitations: ["Seeded QA identities bypass phone OTP onboarding; no email or SMS is sent.",
-      "Native receipt is a simulated failed result, never verified; no iPhone enforcement tested.",
-      "Shared WhatsApp semantic storage is checked directly; no external provider webhook or delivery is exercised."] };
+    passed: !failure && checks.length === (infrastructureOnly ? 4 : 9) && cleanup.every(item => item.passed),
+    limitations: [...(infrastructureOnly ? ["Only authentication, installation isolation and database access controls tested. Conversation generation, replay, shared memory and receipts are NOT tested in this run."] : []), "Seeded QA identities bypass phone OTP onboarding; no email or SMS is sent.",
+      infrastructureOnly ? "No native receipt or iPhone enforcement is tested." : "Native receipt is a simulated failed result, never verified; no iPhone enforcement tested.",
+      infrastructureOnly ? "Shared WhatsApp memory, provider webhooks and delivery are not tested." : "Shared WhatsApp semantic storage is checked directly; no external provider webhook or delivery is exercised."] };
   if (output) { fs.mkdirSync(path.dirname(path.resolve(output)), { recursive: true }); fs.writeFileSync(output, JSON.stringify(result,null,2)+"\n"); }
   return result;
 }
@@ -300,7 +304,7 @@ async function main() {
     return;
   }
   const at = args.indexOf("--out");
-  const result = await run(configuration(), at >= 0 ? args[at+1] : "tmp/assistant-app-cloud/report.json");
+  const result = await run(configuration(), at >= 0 ? args[at+1] : "tmp/assistant-app-cloud/report.json", { infrastructureOnly: args.includes("--infrastructure-only") });
   process.exitCode = result.passed ? 0 : 1;
 }
 module.exports = { configuration, target, protectionHeaders, memoryIdentity, run };

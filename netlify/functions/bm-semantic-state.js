@@ -319,6 +319,11 @@ function validateSemanticPatch(candidate, args) {
   const state = args.state || emptyState();
   const fields = Array.isArray(candidate?.fields) ? candidate.fields : [];
   function atomSupports(key, proposed) {
+    // A real quote can still describe an observation rather than an instruction.
+    // Capability/review turns deliberately supply no operational slots. Never
+    // supplement that grounded boundary with model-proposed times or durations.
+    if (grounded.set.requested_capability
+      || (!grounded.intent && value(state,"requested_capability"))) return false;
     const field = fields.find(f => f?.slot === key && same(f.value,proposed));
     const quote = clean(field?.evidence || candidate?.evidence?.[key]);
     // Evidence is a current-turn span, not a model-supplied explanation or old quote.
@@ -566,6 +571,12 @@ function knownFactLead(state, context = {}) {
   const start = value(state,"start");
   const end = value(state,"end");
   const duration = value(state,"duration_minutes");
+  if (value(state,"action_type") === "daily_limit") {
+    const allowance = duration == null ? "" : (es ? ` de ${duration} minutos al día` : ` of ${duration} minutes per day`);
+    const horizon = value(state,"schedule_horizon_days");
+    const expiry = horizon == null ? "" : (es ? `, solicitado durante ${horizon} días` : `, requested for ${horizon} days`);
+    return es ? `Entendido: un límite diario${allowance} para ${apps}${expiry}.` : `Got it: a daily limit${allowance} for ${apps}${expiry}.`;
+  }
   const facts = [];
   if (apps) facts.push(apps);
   if (start?.type === "now") facts.push(es ? "ahora" : "now");
@@ -590,10 +601,18 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     const minutes=context.weekly_protected_minutes, breaks=context.weekly_break_count;
     return typeof minutes === "number" && typeof breaks === "number" ? (es ? `Esta semana registras ${minutes} minutos protegidos y ${breaks} interrupciones. Estos datos describen tu semana; no requieren cambiar ningún bloqueo.` : `This week you recorded ${minutes} protected minutes and ${breaks} breaks. Those figures summarize your week without changing any blocks.`) : (es ? "Todavía no tengo tus métricas semanales. Abre Blankmind para sincronizarlas y poder revisar tu semana." : "I don't have your weekly metrics yet. Open Blankmind to sync them so we can review your week.");
   }
-  if (decision.type === "cancelled") return es ? "He descartado la propuesta." : "I've discarded the proposal.";
+  if (decision.type === "cancelled") return es
+    ? "He retirado esta instrucción. Si la protección ya empezó en tu iPhone, tendrás que detenerla allí."
+    : "I've withdrawn this instruction. If protection has already started on your iPhone, you'll need to stop it there.";
   if (decision.type === "none") return null;
   if (decision.type === "confirm") return `${semanticSummary(state,context)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
   if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado. Pulsa la notificación de Blankmind para terminar; solo confirmaré el éxito cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device. Tap the Blankmind notification to finish; I'll only report success after the device verifies the block."}`;
+  if (decision.type === "setup" && decision.slot === "permissions") return es
+    ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind y concede el permiso de bloqueo; después dime cuando esté listo para continuar. La protección todavía no está verificada.`
+    : `${semanticSummary(state,context)}. Tap the Blankmind notification and grant blocking permission, then tell me when it's ready to continue. Protection is not verified yet.`;
+  if (decision.type === "setup" && decision.slot === "app_selection") return es
+    ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind para elegir tus distracciones; al aceptar la selección, el iPhone intentará aplicar esta propuesta. Solo confirmaré el resultado cuando el dispositivo lo verifique.`
+    : `${semanticSummary(state,context)}. Tap the Blankmind notification to choose your distractions, then confirm the selection so your iPhone can apply this proposal. I'll only confirm the result after the device verifies it.`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
@@ -611,7 +630,9 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   const questions = {
     apps:es ? (value(state,"app_category") ? "¿Qué aplicaciones de esa categoría quieres bloquear?" : "¿Qué aplicaciones quieres bloquear?") : (value(state,"app_category") ? "Which apps in that category do you want to block?" : "Which apps do you want to block?"),
     action_type:state.intent === "advice" ? (es ? "¿Quieres convertir estos detalles en una propuesta de bloqueo?" : "Would you like to turn these details into a blocking proposal?") : (es ? "¿Quieres bloquearlas durante una franja o fijar un límite diario?" : "Do you want a blocking window or a daily usage limit?"),
-    start:state.intent === "advice" ? (es ? "¿A qué hora suele empezar ese uso del móvil? Indica mañana o tarde, o usa el formato de 24 horas." : "What time does that scrolling usually start? Include AM/PM or use a 24-hour time.") : (es ? "¿Cuándo debe empezar: ahora o a qué hora exacta? Indica mañana o tarde, o usa el formato de 24 horas." : "When should it start: now or at what exact time? Include AM/PM or use a 24-hour time."),
+    start:value(state,"action_type") === "daily_limit"
+      ? (es ? "Los límites diarios solo pueden empezar ahora. ¿Quieres que empiece ahora o prefieres un bloqueo programado?" : "Daily limits can only start now. Should it start now, or would you prefer a scheduled block?")
+      : state.intent === "advice" ? (es ? "¿A qué hora suele empezar ese uso del móvil? Indica mañana o tarde, o usa el formato de 24 horas." : "What time does that scrolling usually start? Include AM/PM or use a 24-hour time.") : (es ? "¿Cuándo debe empezar: ahora o a qué hora exacta? Indica mañana o tarde, o usa el formato de 24 horas." : "When should it start: now or at what exact time? Include AM/PM or use a 24-hour time."),
     end:es ? "¿A qué hora exacta debe terminar? Indica mañana o tarde, o usa el formato de 24 horas." : "What exact time should it end? Include AM/PM or use a 24-hour time.",
     end_or_duration:es ? "¿Cuánto debe durar o a qué hora exacta debe terminar?" : "How long should it last, or what exact time should it end?",
     duration_minutes:es ? "¿Qué duración exacta quieres en minutos? El bloqueo inmediato admite de 5 a 240 minutos." : "What exact duration do you want in minutes? An immediate block supports 5 to 240 minutes.",
@@ -659,7 +680,11 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   }
   const state = reduceSemanticState(base,patch,{language,now});
   const decision = decideSemanticState(state,context);
-  const handled = state.intent === "block" || patch.cancelled || Boolean(value(state,"requested_capability")) || (state.intent === "advice" && decision.type === "ask");
+  // Acknowledging a withdrawal must not fall through to free conversation,
+  // where prior messages could be mistaken for a proposal to restart.
+  const cancelledAcknowledgement = state.intent === "cancelled"
+    && /^(?:yes|yeah|yea|yep|yes please|yes do it|confirm|confirmed|do it|go ahead|ok|okay|understood|thanks|thank you|si|confirmo|hazlo|adelante|vale|entendido|gracias)$/.test(fold(prompt).replace(/[^a-z0-9]+/g," ").trim());
+  const handled = state.intent === "block" || patch.cancelled || cancelledAcknowledgement || Boolean(value(state,"requested_capability")) || (state.intent === "advice" && decision.type === "ask");
   let actions = decision.type === "ready" ? buildSemanticActions(state,context) : [];
   const reviewOnlyAppPresence = decision.type === "setup" && decision.slot === "app_presence";
   if (reviewOnlyAppPresence) actions = buildSemanticReviewAction(state, context);
@@ -678,7 +703,9 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   if (actionReplaySuppressed) actions = [];
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
   const responseText = actionReplaySuppressed
-    ? "That same request is already waiting in Blankmind. Tap its notification to continue, and I'll only confirm success after your device verifies it."
+    ? `${semanticSummary(state,context)}. ${state.language === "es"
+      ? "Esa misma solicitud ya está pendiente en Blankmind. Abre Blankmind para continuar; solo confirmaré el éxito cuando tu iPhone lo verifique."
+      : "That same request is already waiting in Blankmind. Open Blankmind to continue; I'll only confirm success after your iPhone verifies it."}`
     : renderSemanticResponse(state,decision,context,prompt);
   return { state, handled, decision, actions, actionReplaySuppressed, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText, patch, extractionValidation };
 }

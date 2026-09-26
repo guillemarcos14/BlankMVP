@@ -60,16 +60,38 @@ function parseCandidate(body, prompt) {
 async function extractWithModel({ prompt, previousState, context = {}, fetchImpl = fetch }) {
   if (!process.env.OPENAI_API_KEY) return { enabled: false, extraction: null, source: "deterministic_semantic_extraction" };
   const request = requestFor(prompt, previousState, context);
-  const response = await fetchImpl("https://api.openai.com/v1/responses", {
-    method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify(request), signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error(`semantic_model_http_${response.status}`);
-  const body = await response.json();
-  if (body.status === "incomplete") throw new Error("semantic_model_incomplete");
-  const { candidate, ambiguities } = parseCandidate(body, prompt);
-  const validation = validateSemanticPatch(candidate, { prompt, state: previousState, context });
-  return { enabled: true, extraction: candidate, source: `openai:${body.model || request.model}:semantic`, model_requested: request.model, model_returned: body.model || null, rejected: validation.rejected, ambiguities, trace: { request, candidate, validation } };
+  request.input[0].content += " Return each slot at most once. If alternatives conflict, omit that slot and report the ambiguity. Quantities describing a past event are observations, not requested future action parameters.";
+  const deadline = Date.now() + 20000;
+  const attemptErrors = [];
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      // Both attempts share the original 20-second extraction budget. A retry
+      // cannot consume a second timeout window or exhaust the app turn lease.
+      const response = await fetchImpl("https://api.openai.com/v1/responses", {
+        method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify(request), signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+      });
+      if (!response.ok) throw new Error(`semantic_model_http_${response.status}`);
+      const body = await response.json();
+      if (body.status === "incomplete") throw new Error("semantic_model_incomplete");
+      const { candidate, ambiguities } = parseCandidate(body, prompt);
+      const validation = validateSemanticPatch(candidate, { prompt, state: previousState, context });
+      return { enabled: true, extraction: candidate, source: `openai:${body.model || request.model}:semantic`,
+        model_requested: request.model, model_returned: body.model || null, rejected: validation.rejected, ambiguities,
+        attempt_count: attempt, attempt_errors: attemptErrors,
+        trace: { request, candidate, validation, attempt_count: attempt, attempt_errors: attemptErrors } };
+    } catch (error) {
+      attemptErrors.push(error.name === "TimeoutError" ? "semantic_model_timeout" : error.message);
+      // Never merge conflicting duplicate fields or weaken validation. Ask once
+      // for a valid response; operational failures remain visible to the caller.
+      if (attempt !== 1 || error.message !== "duplicate_semantic_extraction_slot" || Date.now() >= deadline) {
+        error.semantic_attempt_count = attempt;
+        error.semantic_attempt_errors = [...attemptErrors];
+        throw error;
+      }
+      request.input.push({ role: "system", content: "The previous extraction repeated a slot and was rejected. Return at most one entry per slot. Omit conflicting alternatives; report their ambiguity instead." });
+    }
+  }
 }
 
 module.exports = { extractWithModel, requestFor, parseCandidate, schema };

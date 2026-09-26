@@ -24,6 +24,30 @@ Credenciales y cookie se guardan cifradas con DPAPI en `tmp/cloud-stage/*.dpapi`
 
 La matriz SQL completa en staging comprueba instalaciones nuevas. La auditoría de producción confirmó por REST la existencia de las dos columnas SMS de `020` y de `bm_legacy_context_snapshots`; `assistant_app_turns` sigue ausente. El nombre histórico distinto de `020` no autoriza reescribir su historial. `022`–`024` son aditivas.
 
+## Empaquetado reproducible
+
+Desde el worktree candidato:
+
+```powershell
+node tools/backend_staging.js --dry-run
+```
+
+El comando predeterminado solo trabaja en local. Genera wrappers que importan los handlers del worktree, empaqueta sus dependencias con `esbuild` y conserva exactamente cuatro ZIP: `app-auth`, `assistant-app`, `assistant-channel` y `blanked-agent`. Registra SHA de Git, limpieza del árbol, hashes de las fuentes transitivas y de los ZIP en `tmp/cloud-stage/package-*.json`. Un paquete de un árbol modificado queda marcado como no desplegable. Las credenciales no se leen ni se incluyen en el paquete local.
+
+Los ZIP se guardan en un directorio temporal aislado de los repositorios. Netlify CLI acepta esos ZIP y los copia sin reempaquetarlos; esto permite comparar su SHA-256 con el digest remoto. El directorio aislado evita recoger `netlify.toml`, caches, cron o funciones internas de otro proyecto. Los módulos de transporte que necesita internamente la app pueden formar parte del bundle, pero no se publican como endpoints ni se configuran sus credenciales.
+
+Solo después de congelar y validar una rama `codex/backend-release-*` limpia:
+
+```powershell
+node tools/backend_staging.js --deploy
+```
+
+`--source <worktree>` permite seleccionar otro candidato y `--netlify-cli <run.js>` selecciona el runtime instalado. El site de destino está fijado a QA y rechaza producción. Antes de la única llamada de despliegue, el script comprueba contraseña anónima tanto en la página como en una ruta de función, URL de la base aislada, ausencia de credenciales de transporte, routing desactivado y fuente sin cambios desde el empaquetado. Las claves enmascaradas por Netlify se registran como no inspeccionadas; su validez se comprueba con el smoke autenticado. `--prod` del comando interno solo publica en el site privado de QA; no usa `--context`, incompatible con `--no-build` en este CLI.
+
+Al terminar, compara los cuatro digests remotos, ausencia de schedules, deploy activo y protección privada. El informe solo marca `private_deploy_verified` si todo coincide. Un fallo después de solicitar el despliegue queda como resultado desconocido o desplegado sin verificar; no se reintenta automáticamente. El script no aplica SQL, no ejecuta el modelo ni sustituye las pruebas físicas o el gate de producción.
+
+La regresión local del empaquetador se ejecuta con `node tools/backend_staging_test.js` y comprueba allowlists, ausencia de llamadas remotas por defecto, fuente limpia, privacidad, base aislada y comparación de hashes.
+
 ## Recuperación
 
 Los fixtures de QA y sus credenciales solo pertenecen al entorno aislado. Para una futura retirada se elimina primero el acceso del sitio y después los recursos sintéticos identificados; no se toca la base productiva. Una release productiva conserva el deploy anterior como rollback y mantiene las tablas aditivas para no perder turnos. Los límites de gasto, retención y plan permanecen sujetos al proveedor; no se configuraron servicios de pago ni mantenimiento artificial para evitar pausas del plan Free.

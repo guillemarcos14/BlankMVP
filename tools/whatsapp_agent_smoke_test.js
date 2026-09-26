@@ -355,8 +355,9 @@ async function twilioButtonTemplateHidesRawUrlFromMainReply() {
     assert.strictEqual(requests.length, 1);
     assert.doesNotMatch(requests[0].Body, /Do you confirm|review-action/i);
     assert.doesNotMatch(requests[0].Body, /https?:\/\//);
-    assert.match(requests[0].Body, /haven't sent a notification yet/i);
-    assert.match(requests[0].Body, /Connect this WhatsApp in Blankmind/i);
+    assert.match(requests[0].Body, /haven't sent the request yet/i);
+    assert.match(requests[0].Body, /Open Blankmind to connect this WhatsApp/i);
+    assert.doesNotMatch(requests[0].Body, /tap.*notification/i);
   } finally {
     global.fetch = originalFetch;
     delete process.env.SUPABASE_URL;

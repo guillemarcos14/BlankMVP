@@ -38,6 +38,44 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
     assert.throws(() => parseCandidate(bodyFor([field("start", { type: "time", minute: 600 }, "10am")]), "11am"), /ungrounded/);
     assert.throws(() => parseCandidate(bodyFor([field("confirmation", true, "yes")]), "yes"), /invalid_semantic_extraction_slot/);
     assert.throws(() => parseCandidate(bodyFor([field("end", 600, "10am"), field("end", 660, "10am")]), "10am"), /duplicate/);
+    let retryCalls = 0;
+    const repaired = await extractWithModel({ prompt: "45 minutes", previousState:first.state,
+      fetchImpl: async (_url, options) => {
+        retryCalls++;
+        if (retryCalls === 2) assert.match(JSON.parse(options.body).input.at(-1).content,/repeated a slot/);
+        return { ok:true, json:async()=>bodyFor(retryCalls === 1
+          ? [field("duration_minutes",30,"45 minutes"),field("duration_minutes",45,"45 minutes")]
+          : [field("duration_minutes",45,"45 minutes")]) };
+      } });
+    assert.equal(retryCalls,2); assert.equal(repaired.extraction.set.duration_minutes,45);
+    assert.deepEqual(repaired.attempt_errors,["duplicate_semantic_extraction_slot"]);
+    assert.deepEqual(repaired.trace.attempt_errors,repaired.attempt_errors);
+    let failedCalls=0;
+    await assert.rejects(()=>extractWithModel({prompt:"45 minutes",fetchImpl:async()=>{
+      failedCalls++; return {ok:true,json:async()=>bodyFor([field("duration_minutes",30,"45 minutes"),field("duration_minutes",45,"45 minutes")])};
+    }}),error=>{
+      assert.match(error.message,/duplicate/); assert.equal(error.semantic_attempt_count,2);
+      assert.deepEqual(error.semantic_attempt_errors,["duplicate_semantic_extraction_slot","duplicate_semantic_extraction_slot"]);return true;
+    });
+    assert.equal(failedCalls,2,"malformed extraction retry is bounded");
+    const realNow=Date.now, realTimeout=AbortSignal.timeout;
+    const budgets=[]; let elapsed=0;
+    try {
+      Date.now=()=>100000+elapsed;
+      AbortSignal.timeout=(milliseconds)=>{budgets.push(milliseconds);return new AbortController().signal;};
+      await extractWithModel({prompt:"45 minutes",fetchImpl:async()=>{
+        const firstAttempt=elapsed===0; elapsed+=5000;
+        return {ok:true,json:async()=>bodyFor(firstAttempt
+          ? [field("duration_minutes",30,"45 minutes"),field("duration_minutes",45,"45 minutes")]
+          : [field("duration_minutes",45,"45 minutes")])};
+      }});
+      assert.deepEqual(budgets,[20000,15000],"both attempts share one20-second budget");
+    } finally { Date.now=realNow; AbortSignal.timeout=realTimeout; }
+    let timeoutCalls=0;
+    await assert.rejects(()=>extractWithModel({prompt:"yes",fetchImpl:async()=>{
+      timeoutCalls++; const error=new Error("timed out");error.name="TimeoutError";throw error;
+    }}),{name:"TimeoutError"});
+    assert.equal(timeoutCalls,1,"a timeout remains observable, without another20-second wait");
     await assert.rejects(() => extractWithModel({ prompt: "yes", fetchImpl: async () => ({ ok: false, status: 503 }) }), /semantic_model_http_503/);
     await assert.rejects(() => extractWithModel({ prompt: "yes", fetchImpl: async () => ({ ok: true, json: async () => ({ status: "incomplete" }) }) }), /semantic_model_incomplete/);
     console.log("semantic extraction: evidence, hostile fields, authority, duplicate/schema and API failure checks passed");

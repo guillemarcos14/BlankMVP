@@ -333,6 +333,20 @@ test("explicit hard mode is preserved and fingerprinted before native execution"
   none(turn("Yes",corrected.state));
 });
 
+test("model-quoted historical quantities cannot populate operational slots", () => {
+  const prompt = "I broke the block yesterday after 15 minutes.";
+  const extraction = { set: { duration_minutes: 15, start: {type:"time",minute:900} },
+    evidence: { duration_minutes: "15 minutes", start: "15" } };
+  const past = advanceSemanticState({ prompt, context: DEVICE, now: NOW, extraction });
+  equalSlot(past,"requested_capability","past_block_review"); equalSlot(past,"duration_minutes",null); equalSlot(past,"start",null); none(past);
+  assert.equal(past.extractionValidation.rejected.length,2);
+  const yes = turn("Yes.",past.state); equalSlot(yes,"duration_minutes",null); none(yes);
+  const fresh = advanceSemanticState({ prompt:"Block selected apps now for 30 minutes once", previousState:yes.state, context:DEVICE, now:NOW,
+    extraction:{set:{duration_minutes:30},evidence:{duration_minutes:"30 minutes"}} });
+  equalSlot(fresh,"requested_capability",null); equalSlot(fresh,"duration_minutes",30);
+  assert.deepEqual(fresh.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
+});
+
 test("rejecting duration preserves start and recurrence across confirmation and replacement", () => {
   for (const rejected of ["Not 30 minutes.", "No 30 minutos."]) {
     const [initial, missing, confirmation, repaired] = chat(["Block selected apps now for 30 minutes once", rejected, "Yes.", "45 minutes."]);

@@ -25,6 +25,8 @@ After staging is ready and remote execution is authorized:
 node tools/assistant_app_cloud_test.js --run --out tmp/assistant-app-cloud/report.json
 ```
 
+If model API credits are unavailable, `--run --infrastructure-only --out tmp/assistant-app-cloud/infrastructure.json` executes only the first four checks, makes no model call, and still cleans both synthetic accounts. Its report declares `full_conversation_tested: false`; passing that restricted scope cannot stand in for the full nine-check smoke or release readiness.
+
 The test creates exactly two synthetic QA auth users with admin-confirmed `example.invalid` emails and randomly generated passwords. This bypasses email delivery. Phone fields are synthetic identity-table fixtures, never OTP recipients. Each user has its own install, connection, canonical snapshot and assistant memory namespace.
 
 Nine checks cover missing JWT, cross-install/account denial, client denial of service-only tables/RPC, committed reply/action/shared WhatsApp semantic state, immutable replay without duplicate rows/outbox events, payload conflict, history/status isolation, cancellation across shared memory, and a simulated delivered-to-failed receipt that remains durable after later turns. The report records checks, scoped cleanup results, synthetic user IDs, script hash and exact destinations; it excludes credentials, prompts from real users and auth tokens.

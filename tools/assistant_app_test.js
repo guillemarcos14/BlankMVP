@@ -258,6 +258,30 @@ const send = (id, text = "Bloquea ahora 45 min, una vez", token) => request({ ac
   assert.equal(response.body.turn.action_status, "unavailable");
   memoryUnavailable = false;
 
+  // The in-app surface preserves exact action facts and uses its own controls,
+  // even when the planner supplies misleading remote or success prose.
+  replyText = "Ya están bloqueadas. Pulsa la notificación de Blankmind.";
+  const copies = [
+    { action: { type: "set_daily_limit", minutes: 35 }, label: "Aplicar límite", required: /35 minutos de uso al día/ },
+    { action: { type: "apply_schedule", start_minute: 510, end_minute: 565, weekdays: [1, 7], duration_days: 14 }, label: "Aplicar horario", required: /08:30 a 09:25, domingo, sábado durante 14 días/ },
+    { action: { type: "apply_schedule", start_minute: 540, end_minute: 600 }, label: "Aplicar horario", required: /09:00 a 10:00, cada día durante 7 días/ },
+    { action: { type: "update_schedule", window_id: "existing", start_minute: 540, end_minute: 600, duration_days: 3 }, label: "Aplicar horario", required: /09:00 a 10:00, cada día\./, forbidden: /durante 3 días/ },
+    { action: { type: "request_screen_time_permission" }, label: "Conceder permiso", required: /Tiempo de uso.*Después dime/ },
+    { action: { type: "open_app_picker", name: "Daily Limit", minutes: 25 }, label: "Elegir distracciones", required: /25 minutos de uso al día.*Al aceptar la selección/ },
+    { action: { type: "open_app_picker", name: "Daily Limit", minutes: 35, start_minute: 540, end_minute: 600 }, label: "Elegir distracciones", required: /35 minutos de uso al día/, forbidden: /09:00/ },
+    { action: { type: "open_app_picker", name: "Distractions" }, label: "Elegir distracciones", required: /Todavía no hay una propuesta/ },
+  ];
+  for (const fixture of copies) {
+    actions = [fixture.action];
+    const rendered = await send(crypto.randomUUID());
+    assert.equal(rendered.status, 200);
+    assert.equal(rendered.body.turn.action_label, fixture.label);
+    assert.match(rendered.body.turn.assistant_text, fixture.required);
+    if (fixture.forbidden) assert.doesNotMatch(rendered.body.turn.assistant_text, fixture.forbidden);
+    assert.doesNotMatch(rendered.body.turn.assistant_text, /notificación|Ya están bloqueadas/i);
+    assert.equal(rendered.body.turn.action_status, "queued");
+  }
+
   // More than one page sharing exactly the same timestamp cannot lose turns.
   rows.clear();
   for (let i = 1; i <= 125; i += 1) {

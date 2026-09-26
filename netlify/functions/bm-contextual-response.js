@@ -47,6 +47,68 @@ function stripContract(plan = {}) {
   return publicPlan;
 }
 
+function plannerAuthorityViolations(plan, { proposalAuthorized = false } = {}) {
+  // The planner has no authenticated native receipt. A model-supplied status,
+  // prior assistant message or user context can never grant execution authority.
+  const texts = [plan.title, plan.response_text, plan.message_text, plan.speech_text, plan.followup_text, ...(plan.bullets || [])].filter(text => typeof text === "string");
+  const violations = new Set();
+  const claims = [
+    /\b(?:i|we) (?:have |ve )?(?:now |already |just )?(?:set|limited|scheduled|blocked|unblocked|unlocked|applied|deleted|removed|changed|moved|created|activated|enabled|disabled|paused|resumed)\b/g,
+    /\b(?:is|are|was|were|has been|have been)(?: (?:now|already|currently|successfully))? (?:set|limited|scheduled|blocked|applied|deleted|removed|changed|moved|created|active|running|enabled)\b/g,
+    /\b(?:he|hemos|acabo de|acabamos de) (?:ya |ahora )?(?:configurado|limitado|programado|bloqueado|desbloqueado|aplicado|eliminado|borrado|cambiado|movido|creado|activado|desactivado|pausado|reanudado)\b/g,
+    /\b(?:queda|quedan|esta|estan|ha quedado|han quedado|se ha|se han)(?: (?:ya|ahora))? (?:configurad[oa]s?|limitad[oa]s?|programad[oa]s?|bloquead[oa]s?|aplicad[oa]s?|activad[oa]s?|desactivad[oa]s?|activ[oa]s?)\b/g,
+    /\b(?:already|ya) (?:applied|blocked|limited|scheduled|active|running|aplicad[oa]s?|bloquead[oa]s?|limitad[oa]s?|programad[oa]s?|activ[oa]s?)\b/g,
+  ];
+  const transitions = [
+    /\b(?:will|ll) (?:now |automatically )?(?:block|limit|apply|activate|deactivate|disable|enable|expire|end|start|stop|turn off|turn on|be (?:blocked|limited|applied|scheduled|removed|disabled|enabled|active))\b/g,
+    /\b(?:voy|vamos) a (?:bloquear|limitar|aplicar|activar|desactivar|programar|eliminar)\b/g,
+    /\b(?:se )?(?:activara|desactivara|bloqueara|limitara|aplicara|mantendra|caducara|terminara|empezara|bloqueare|limitare|activare|programare|aplicare)\b/g,
+  ];
+  for (const text of texts) {
+    for (let sentence of text.split(/[.!?;\n]|\s+(?:but|pero|however|sin embargo)\s+/i)) {
+      if (/^\s*(?:if|unless|si|a menos que)\b/i.test(sentence)) {
+        // A conditional premise is not a device-status assertion. Its
+        // consequence still requires evidence if it claims a performed action.
+        const consequent=sentence.match(/(?:,|\bthen\b|\bentonces\b)\s*([\s\S]*)$/i);
+        if(consequent) sentence=consequent[1];
+        else {
+          const premise=sentence.replace(/^\s*(?:if|unless|si|a menos que)\s+/i,"");
+          const ownClause=premise.search(/\b(?:I|we|he|hemos|yo)\b/i);
+          if(ownClause<=0) continue;
+          sentence=premise.slice(ownClause);
+        }
+      }
+      let value=fold(sentence);
+      // Explicit attribution is a report of what the person said, not device
+      // evidence. A new assertion after a comma is evaluated independently.
+      if (/^(?:you (?:said|mentioned|told me)|me (?:dices|cuentas|has dicho)|segun lo que|por lo que cuentas)\b/.test(value)) {
+        const comma=sentence.indexOf(",");
+        const ownClause=sentence.match(/\b(?:and|y|e)\s+((?:I|we|he|hemos|yo|ya he|ya hemos)\b[\s\S]*)$/i);
+        if(comma<0 && !ownClause) continue;
+        value=fold(comma>=0 ? sentence.slice(comma+1) : ownClause[1]);
+      }
+      function affirmed(pattern) {
+        for(const match of value.matchAll(pattern)) {
+          const before=value.slice(0,match.index);
+          if(!/\b(?:no|nunca|not|never|cannot|can t)\s+(?:\w+\s+){0,2}$/.test(before)) return true;
+        }
+        return false;
+      }
+      if(claims.some(affirmed)) violations.add("unverified_execution_claim");
+      const generalUsageExplanation=/^(?:a daily (?:usage )?limit|a daily allowance|un limite (?:diario|de uso))\b/.test(value)
+        && /\b(?:after (?:the |your |you |its )?(?:allowance|use|usage)|once (?:you|the)|tras (?:agotar|usar)|cuando (?:agotas|usas))\b/.test(value);
+      if(!proposalAuthorized && !generalUsageExplanation && transitions.some(affirmed)) violations.add("unvalidated_device_transition");
+      const daily=/\b(?:daily (?:usage )?limit|daily allowance|minutes? (?:per|a) day|minutos? al dia|limite diario)\b/.test(value)
+        || plan.response_contract?.action_type === "daily_limit";
+      const automaticExpiry=/\b(?:expires?|expiry|caduca|caducidad|se desactiva|automatic expiration)\b/g;
+      if(daily && ((transitions.some(affirmed) && /\b(?:expir|caduc|desactiv|turn off|stop|end|termin|remov)/.test(value)) || affirmed(automaticExpiry))) {
+        violations.add("unsupported_daily_limit_expiry");
+      }
+    }
+  }
+  return [...violations];
+}
+
 function isGrounded(text, plan, context) {
   const value = fold(text);
   const contract = plan.response_contract || {};
@@ -68,6 +130,10 @@ function isGrounded(text, plan, context) {
   if (contract.execution_flow === "notification_permission_reply") {
     if (!/\b(?:tell me|let me know|reply)\b/.test(value)) return false;
   }
+  if (contract.execution_flow === "notification_apply"
+      && /\b(?:picker|(?:choose|pick|select) (?:your |the )?(?:apps|distractions)|grant (?:blocking |screen time )?permission)\b/.test(value)) return false;
+  if (contract.execution_flow === "app_presence" && /\b(?:notification|picker|grant permission|sending|sent)\b/.test(value)) return false;
+  if (String(contract.operation || "").startsWith("semantic_") && plannerAuthorityViolations({ ...plan, response_text:text, message_text:"", speech_text:"", followup_text:"", bullets:[] }, { proposalAuthorized: (plan.actions || []).length > 0 }).length) return false;
   const facts = factFold(text);
   if (Array.isArray(contract.required_phrases) && contract.required_phrases.some((phrase) => !facts.includes(factFold(phrase)))) return false;
   if (Array.isArray(contract.required_any_groups) && contract.required_any_groups.some((group) => !group.some((phrase) => facts.includes(factFold(phrase))))) return false;
@@ -139,4 +205,4 @@ async function naturalizeGroundedPlan({ prompt, context = {}, plan, fetchImpl = 
   };
 }
 
-module.exports = { isGrounded, naturalizeGroundedPlan, stripContract };
+module.exports = { isGrounded, naturalizeGroundedPlan, stripContract, plannerAuthorityViolations };

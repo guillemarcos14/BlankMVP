@@ -190,7 +190,7 @@ test("missing app presence suppresses executable action", () => {
   const r = turn("Block Instagram now for 30 minutes once",null,{...DEVICE,channel:"whatsapp"}); assert.equal(r.decision.slot,"app_presence"); assert.equal(r.actions[0].type,"start_protection"); assert.equal(r.reviewOnlyAppPresence,true);
 });
 test("app possession claims are not device presence evidence", () => {
-  const r = chat(["Block Instagram now for 30 minutes once","I have it"],{...DEVICE,channel:"whatsapp"})[1]; assert.equal(r.decision.slot,"app_presence"); assert.equal(r.actions[0].type,"start_protection"); assert.equal(r.reviewOnlyAppPresence,true);
+  const r = chat(["Block Instagram now for 30 minutes once","I have it"],{...DEVICE,channel:"whatsapp"})[1]; assert.equal(r.decision.slot,"app_presence"); none(r); assert.equal(r.reviewOnlyAppPresence,false); assert.equal(r.actionReplaySuppressed,true);
 });
 test("permission setup contains no hidden executable payload", () => {
   const r = turn("Block Instagram now for 30 minutes once",null,{...DEVICE,screen_time_authorized:false}); assert.deepEqual(r.actions,[{type:"request_screen_time_permission"}]);
@@ -435,8 +435,130 @@ test("an unrelated follow-up cannot requeue or claim to resend the same ready ac
   const followup = turn("Yes, do it", completed.state, DEVICE);
   assert.equal(followup.actionReplaySuppressed, true);
   none(followup);
-  assert.match(followup.responseText, /already waiting in Blankmind/i);
+  assert.match(followup.responseText, /already prepared/i);
+  assert.doesNotMatch(followup.responseText, /already waiting|is pending/i);
   assert.doesNotMatch(followup.responseText, /I'm sending it/i);
+});
+
+test("withdrawal clauses preserve cancellation through explanation and acknowledgement", () => {
+  for (const prompt of ["Cancela esa petición; no quiero aplicarla.","Retira esta instrucción pendiente. Gracias.","Anula la solicitud; he cambiado de idea.","Please cancel this pending request; I changed my mind.","Withdraw my instruction. Thanks.","Don't apply it.","No quiero aplicarla.","No, cancela esa propuesta.","Cancela la petición, por favor.","Cancel that request, please.","Do not apply a usage limit of 20 minutes per day.","Cancel that request because I no longer need it.","Cancela esa petición porque no quiero aplicarla.","Cancel that request for now.","Cancela esa petición por ahora.","Cancela esa petición por ahora, porque necesito trabajar."]) {
+    const results = chat(["Block selected apps now for 30 minutes once", prompt, "Gracias.", "Yes."]);
+    for (const result of results.slice(1)) {
+      assert.equal(result.state.intent,"cancelled",prompt); none(result);
+      assert.ok(Object.values(result.state.slots).every(v=>v===null));
+      assert.match(result.responseText,/If protection has already started/);
+    }
+  }
+});
+
+test("negated withdrawal and unrelated objects do not cancel the current instruction", () => {
+  const initial = turn("Block selected apps now for 30 minutes once");
+  for (const prompt of ["Don't cancel that request.","No canceles la petición.","What does cancel mean?","Cancel my dinner booking.","No quiero aplicarlo a otra cuenta.","Don't cancel that request because I still need it.","No canceles la petición por ahora porque la necesito.","Cancel my dinner booking because I need to focus."]) {
+    const result = turn(prompt,initial.state); assert.notEqual(result.state.intent,"cancelled",prompt); none(result);
+  }
+});
+
+test("a new instruction after withdrawal can replace the original with block or usage limit", () => {
+  const initial = turn("Block selected apps now for 30 minutes once");
+  assert.deepEqual(turn("Cancel that request; block selected apps now for 15 minutes once.",initial.state).actions,[{type:"start_protection",minutes:15,hard_mode:false}]);
+  assert.deepEqual(turn("Cancel that request because it is too long; block selected apps now for 15 minutes once.",initial.state).actions,[{type:"start_protection",minutes:15,hard_mode:false}]);
+  none(turn("Cancel that request because I previously said block selected apps now for 15 minutes once.",initial.state));
+  for (const prompt of ["Cancel that request; set a daily limit of 20 minutes for selected apps now.","No bloquees Instagram; pon un límite de uso de 20 minutos al día."]) {
+    assert.deepEqual(turn(prompt,initial.state).actions,[{type:"set_daily_limit",minutes:20}],prompt);
+  }
+  const withExpiry = turn("Cancel that request; set a daily limit of 20 minutes now; only for the next 7 days.",initial.state);
+  none(withExpiry); equalSlot(withExpiry,"schedule_horizon_days",7);
+});
+
+test("the last withdrawal defeats earlier replacement but negated cancellation preserves a correction", () => {
+  const initial = turn("Block selected apps now for 30 minutes once");
+  for (const prompt of ["Cancel that request; block selected apps now for 15 minutes once; cancel that request.","Cancel that request; block selected apps now for 15 minutes once; do not apply it.","Cancela esa petición; bloquea mis distracciones ahora 15 minutos una vez; cancela esa petición.","Cancela esa petición; pon un límite de 20 minutos al día; no quiero aplicarlo.","Cancel that request; block selected apps now for 15 minutes once; cancel that request because I changed my mind."]) {
+    const result = turn(prompt,initial.state); assert.equal(result.state.intent,"cancelled",prompt); none(result);
+  }
+  for (const prompt of ["No canceles la petición; cambia la duración a 45 minutos.","Don't cancel the request; change the duration to 45 minutes."]) {
+    const result = turn(prompt,initial.state);
+    assert.deepEqual(result.actions,[{type:"start_protection",minutes:45,hard_mode:false}]);
+    assert.ok(result.state.corrections.some(c=>c.slot==="duration_minutes"&&c.previous===30&&c.replacement===45));
+  }
+});
+
+test("incidental day wording cannot override once-only recurrence", () => {
+  const result = turn("Block selected apps now for 30 minutes, just once. I have a day off.");
+  assert.deepEqual(result.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
+});
+
+test("negative and zero quantities cannot become positive through parsing or shortened model evidence", () => {
+  for (const amount of ["-5","−5","- 5","minus five","menos cinco","0"]) {
+    const prompt = `Block selected apps now for ${amount} minutes once.`;
+    const result = advanceSemanticState({prompt,context:DEVICE,now:NOW,extraction:{set:{duration_minutes:5},evidence:{duration_minutes:"5 minutes"}}});
+    none(result); equalSlot(result,"duration_minutes",null);
+    assert.ok(result.state.errors.some(e=>e.code==="unsupported_duration"),prompt);
+    none(turn("Yes.",result.state));
+  }
+  assert.deepEqual(turn("Block selected apps now for 5 minutes once.").actions,[{type:"start_protection",minutes:5,hard_mode:false}]);
+});
+
+test("usage allowance and explicit limit vocabulary preserve the canonical daily budget", () => {
+  for (const prompt of ["Quiero poder usar mis distracciones 20 minutos al día; al consumirlos, que se bloqueen. Pon ese límite desde ahora.","Fija un límite de uso de 20 minutos al día para mis distracciones.","Apply a usage limit of 20 minutes per day to my distractions now."]) {
+    const result=turn(prompt); equalSlot(result,"action_type","daily_limit");
+    assert.deepEqual(result.actions,[{type:"set_daily_limit",minutes:20}],prompt);
+  }
+  none(turn("¿Cómo puedo usar menos mis distracciones cada día?"));
+});
+
+test("Spanish daily expiry cannot be waived by yes or a refusal of an indefinite limit", () => {
+  const results = chat(["Pon un límite de uso de 20 minutos al día para mis distracciones desde ahora, pero solo durante los próximos 7 días.","Sí, hazlo.","No quiero que dure indefinidamente: mantén los 7 días."],DEVICE,"es");
+  for (const result of results) {
+    equalSlot(result,"schedule_horizon_days",7); equalSlot(result,"duration_minutes",20); equalSlot(result,"action_type","daily_limit"); none(result);
+    assert.equal(result.decision.slot,"schedule_horizon_days"); assert.match(result.responseText,/no pueden caducar automáticamente/);
+  }
+});
+
+test("next and following day qualifiers preserve the exact finite horizon", () => {
+  for (const ending of ["durante los próximos 7 días","durante las próximas 1 semanas","for the next 7 days","for the following 1 weeks"]) {
+    const result=turn(`Set a daily limit of 20 minutes for selected apps now ${ending}`);
+    equalSlot(result,"schedule_horizon_days",7); none(result);
+  }
+});
+
+test("unsupported one-off dates are restated as requested rather than replaced with now", () => {
+  for (const [prompt,language] of [["Block selected apps now for 30 minutes tomorrow.","en"],["Bloquea mis distracciones ahora durante 30 minutos mañana.","es"]]) {
+    const result=turn(prompt,null,DEVICE,language); none(result); assert.equal(result.decision.slot,"calendar_date");
+    assert.match(result.responseText,language==="es"?/mañana/:/tomorrow/);
+    assert.match(result.responseText,/30/); assert.doesNotMatch(result.responseText,/\bnow\b|\bahora\b/);
+    assert.match(result.responseText,language==="es"?/no admite una fecha única/:/cannot target a specific one-off date/);
+    assert.equal((result.responseText.match(/\?/g)||[]).length,1);
+  }
+});
+
+test("unsupported daily start and expiry are both explained before one useful choice", () => {
+  for (const [prompt,language] of [["Set a 60-minute daily limit for selected apps starting at 09:00 for 7 days.","en"],["Pon un límite de uso de 60 minutos al día desde las 09:00 durante 7 días.","es"]]) {
+    const result=turn(prompt,null,DEVICE,language); none(result);
+    assert.match(result.responseText,language==="es"?/Pides/:/You requested/);
+    assert.match(result.responseText,/60/); assert.match(result.responseText,/7/); assert.match(result.responseText,/9:00 AM/);
+    assert.match(result.responseText,language==="es"?/solo pueden empezar ahora y no pueden caducar automáticamente/:/can only start now and cannot expire automatically/);
+    assert.equal((result.responseText.match(/\?/g)||[]).length,1);
+  }
+});
+
+test("conflicting clock times and duration are both visible without promising execution", () => {
+  for (const [prompt,language] of [["Block selected apps from 10am to 11am for 90 minutes every day for 7 days.","en"],["Bloquea mis distracciones de 10am a 11am durante 90 minutos cada día durante 7 días.","es"]]) {
+    const result=turn(prompt,null,DEVICE,language); none(result); assert.equal(result.decision.slot,"time_consistency");
+    assert.match(result.responseText,/10:00 AM/); assert.match(result.responseText,/11:00 AM/); assert.match(result.responseText,/90/);
+    assert.match(result.responseText,language==="es"?/no coinciden/:/details conflict/);
+    assert.equal((result.responseText.match(/\?/g)||[]).length,1);
+  }
+});
+
+test("accepting a past-block review starts the reflection without repeating the offer", () => {
+  for (const [prompt,yes,language] of [["Yesterday I ended a 30-minute block after 15 minutes.","Yes.","en"],["Ayer terminé un bloqueo de 30 minutos después de 15 minutos.","Sí.","es"]]) {
+    const first=turn(prompt,null,DEVICE,language); none(first);
+    const next=turn(yes,first.state,DEVICE,language); none(next);
+    assert.equal(next.state.slots.requested_capability.value,"past_block_review");
+    assert.notEqual(next.responseText,first.responseText);
+    assert.match(next.responseText,language==="es"?/Qué te llevó/:/What led you/);
+    assert.equal(next.state.slots.duration_minutes,null,"historical quantities never become a new instruction");
+  }
 });
 
 console.log(`BM semantic state: ${checks}/${checks} independent transition and invariant checks passed`);

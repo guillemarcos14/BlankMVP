@@ -152,16 +152,20 @@ check("whatsapp_confirmation_redelivers_existing_action", () => {
   assert.match(whatsapp, /deliverPendingAssistantAction\(linkedConnection, pendingAction, pendingMemory\)/);
 });
 
-check("schedule_crud_does_not_wait_for_screen_time_permission", () => {
+check("schedule_review_preserves_native_permission_preflight", () => {
   const context = {
     schedule: { windows: [{ id: "w1", name: "Lunch", start_minute: 780, end_minute: 840, weekdays: [1, 2, 3, 4, 5, 6, 7] }] },
     recent_messages: [{ role: "user", content: "blocking window" }],
   };
   const plan = scheduleManagementPlan("move the 1:00 PM to 2:00 PM window one hour later", context);
   assert.strictEqual(plan.actions[0].type, "update_schedule");
-  assert.strictEqual(plan.requires_screen_time_authorization, false);
-  assert.match(home, /case \.applySchedule, \.updateSchedule, \.deleteSchedule, \.deleteAllSchedules/);
-  assert.match(home, /case \.startProtection, \.setDailyLimit, \.allowOnly, \.adultFilter/);
+  assert.strictEqual(plan.requires_screen_time_authorization, false, "preparing a review does not require device permission");
+  const policy = blockBetween(home, "private func assistantActionRequiresScreenTime", "private func finishPendingAssistantAction");
+  assert.match(policy, /case \.startProtection, \.setDailyLimit, \.allowOnly, \.adultFilter,[\s\S]*?\.applySchedule, \.updateSchedule,[\s\S]*?return true/, "native schedule activation must require permission");
+  assert.match(policy, /case \.deleteSchedule, \.deleteAllSchedules, \.pauseRules, \.requestScreenTimePermission:\s*return false/, "removal and permission setup must remain available without authorization");
+  const confirmation = blockBetween(home, "private func confirmPendingAssistantAction()", "switch pendingAction");
+  assert.match(confirmation, /if assistantActionRequiresScreenTime\(pendingAction\), screenTimeBlocker\.authorizationStatus != \.approved[\s\S]*?await screenTimeBlocker\.requestAuthorization\(\)/, "permission preflight must precede native application");
+  assert.match(confirmation, /status: "failed",\s*detail: "screen_time_permission_denied",\s*executionStarted: false/, "denied permission must fail without claiming execution");
 });
 
 check("assistant_context_sync_reaches_messaging_identity", () => {

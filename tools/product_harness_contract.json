@@ -108,6 +108,7 @@
       { "name": "agent_smoke", "run": "node tools/blanked_agent_smoke_test.js" },
       { "name": "assistant_conversation_memory", "run": "node tools/assistant_conversation_memory_test.js" },
       { "name": "bm_semantic_state", "run": "node tools/bm_semantic_state_test.js" },
+      { "name": "bm_semantic_delivery", "run": "node tools/bm_semantic_delivery_test.js" },
       { "name": "bm_single_block_mvp", "run": "node tools/bm_single_block_mvp_test.js" },
       { "name": "bm_semantic_extraction", "run": "node tools/bm_semantic_extraction_test.js" },
       { "name": "bm_response_reliability", "run": "node tools/bm_response_reliability_test.js" },

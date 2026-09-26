@@ -443,6 +443,7 @@ struct HomeView: View {
     @State private var pendingAssistantInboxAction: AssistantInboxAction?
 
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let homeTagline = "Your plan adapts\nbefore the scroll\npulls you back."
     let onOpenOnboardingDemo: () -> Void
 
     init(_ onOpenOnboardingDemo: @escaping () -> Void = {}) {

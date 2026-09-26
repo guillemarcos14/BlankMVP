@@ -54,6 +54,18 @@ async function verifyOtp(body) {
   });
 }
 
+async function refreshSession(body) {
+  const token = cleanText(body.refresh_token, 2048);
+  if (!token) return json(400, { error: "missing_refresh_token" });
+  const session = await authRequest("token?grant_type=refresh_token", { refresh_token: token });
+  return json(200, {
+    ok: true,
+    access_token: session.access_token || "",
+    refresh_token: session.refresh_token || "",
+    expires_in: session.expires_in || 0,
+  });
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
@@ -62,6 +74,7 @@ exports.handler = async (event) => {
     const action = cleanText(body.action, 40).toLowerCase();
     if (action === "request_otp") return await requestOtp(body);
     if (action === "verify_otp") return await verifyOtp(body);
+    if (action === "refresh_session") return await refreshSession(body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {
     return json(502, { error: "app_auth_failed", detail: error.message });

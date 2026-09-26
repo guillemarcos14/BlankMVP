@@ -406,7 +406,7 @@ struct HomeView: View {
     @State private var messageAction: HomeMessageAction?
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
-    @State private var showingAssistantConnect = false
+    @State private var showingAssistantConnect = true
     @State private var assistantNotificationsAuthorized = false
     @State private var showingContextualAppPicker = false
     @State private var contextualPlanSelection = FamilyActivitySelection()
@@ -655,12 +655,11 @@ struct HomeView: View {
             }
         }
         .fullScreenCover(isPresented: $showingAssistantConnect) {
-            AssistantConnectSheet(
-                whatsAppNumber: configuredWhatsAppNumber(),
-                smsNumber: configuredSMSNumber(),
-                openURL: openURL,
-                initialContext: assistantContextPayload()
-            )
+            AssistantAppView { actionId in
+                BlankSharedState.defaults.set(true, forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                BlankSharedState.defaults.set(actionId, forKey: AssistantRemoteNotification.tappedActionIDKey)
+                pollPendingAssistantActionIfNeeded(force: true)
+            }
         }
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
@@ -3275,7 +3274,7 @@ private struct DistractionsScreen: View {
     }
 }
 
-private struct AssistantConnectSheet: View {
+struct AssistantConnectSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.dismiss) private var dismiss
@@ -3679,6 +3678,10 @@ struct AppPhoneSignInSheet: View {
             connectCode = linkedCode
             preferredChannel = "whatsapp"
             phoneVerified = true
+            AssistantAppSession.save(
+                accessToken: accessToken,
+                refreshToken: auth["refresh_token"] as? String ?? ""
+            )
             onVerified?()
             if showsCancel { dismiss() }
         } catch {

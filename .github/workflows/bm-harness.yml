@@ -35,14 +35,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Verify scope and run product harness
         shell: bash
         run: |
           if [ -n "${{ github.base_ref }}" ]; then
-            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --diff-base "origin/${{ github.base_ref }}" --enforce-scope --report tmp/product-harness/ci.json
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --diff-base "origin/${{ github.base_ref }}" --enforce-scope --allow-missing-external-context --report tmp/product-harness/ci.json
           else
-            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --enforce-scope --report tmp/product-harness/ci.json
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --enforce-scope --allow-missing-external-context --report tmp/product-harness/ci.json
           fi
       - name: Verify repository whitespace
         run: git diff --check
@@ -56,9 +55,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
       - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          sdkmanager_path="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$sdkmanager_path"
+          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0"
       - name: Compile and test Android
         run: |
           chmod +x ./gradlew

@@ -233,8 +233,8 @@ function messageLanguage(text, savedLanguage = "") {
   return detectedLanguage(text);
 }
 
-function pendingActionFromPlan(plan, prompt = "") {
-  return buildPendingActionFromPlan(plan, { idPrefix: "wa" });
+function pendingActionFromPlan(plan, prompt = "", idPrefix = "wa") {
+  return buildPendingActionFromPlan(plan, { idPrefix });
 }
 
 async function recordPushAttempt(connection, pending, pushResult) {
@@ -283,9 +283,9 @@ async function deliverPendingAssistantAction(connection, pending, memory = {}) {
   return { action: pending, push, duplicate: true };
 }
 
-async function queuePendingAssistantAction(connection, plan, prompt = "") {
+async function queuePendingAssistantAction(connection, plan, prompt = "", idPrefix = "wa") {
   if (!connection?.connectCode) return null;
-  const pending = pendingActionFromPlan(plan, prompt);
+  const pending = pendingActionFromPlan(plan, prompt, idPrefix);
   if (!pending) return null;
   let memory = {};
   try {
@@ -801,3 +801,8 @@ exports.pendingActionConfirmationPlan = pendingActionConfirmationPlan;
 exports.processTrustedQaMessage = processTrustedQaMessage;
 exports.processTrustedAppMessage = processTrustedAppMessage;
 exports.whatsappReplyText = whatsappReplyText;
+// The app transport shares the exact BM Final planner, semantic memory and
+// pending-action delivery path. It supplies its own authenticated ingress and
+// renders its own output, so no WhatsApp message is sent for an in-app turn.
+exports.callBlankedAgent = callBlankedAgent;
+exports.queuePendingAssistantAction = queuePendingAssistantAction;

@@ -49,10 +49,14 @@ function applySemanticDelivery({ delivery, fingerprint, actions = [], legacyActi
   return { actions:retained, delivery:record, suppressed };
 }
 
-function renderSuppressedDelivery(language = "en") {
+function renderSuppressedDelivery(language = "en", delivery = null) {
   // Native receipts use a transport action id that does not exist yet in this
   // pure reducer. Do not associate an unrelated last outcome with this marker,
   // or claim pending/success/failure from an acknowledgement such as "Ready".
+  const record = normalizeSemanticDelivery(delivery, delivery?.proposal_fingerprint);
+  if (record?.sent.includes("permission") && !record.sent.includes("execution")) return language === "es"
+    ? "La solicitud de permiso ya se preparó. Abre Blankmind, concede el permiso de bloqueo y dime cuando esté listo para continuar. No repetiré la solicitud de permiso con esta respuesta."
+    : "The permission request was already prepared. Open Blankmind, grant blocking permission, then tell me when it's ready to continue. I won't repeat the permission request from this reply.";
   return language === "es"
     ? "Esta solicitud ya se preparó. No la repetiré con esta respuesta. Consulta su resultado en Blankmind. Para intentarlo de nuevo, envía una nueva petición con los ajustes que quieras."
     : "This request was already prepared. I won't repeat it from this reply. Check its result in Blankmind. To try again, make a new request with the settings you want.";

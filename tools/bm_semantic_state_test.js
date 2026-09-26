@@ -642,4 +642,22 @@ test("daily allowance receipts name the limit while immediate blocks keep their 
   }
 });
 
+test("an ambiguous yes asks one precise recurrence question without repeating known details", () => {
+  for (const [request,yes,once,language] of [
+    ["Block Instagram now for 30 minutes.","Yes.","Just once.","en"],
+    ["Bloquea Instagram ahora durante 30 minutos.","Sí.","Solo esta vez.","es"],
+  ]) {
+    const [first,ambiguous,resolved] = chat([request,yes,once],DEVICE,language);
+    none(first); none(ambiguous);
+    assert.equal(ambiguous.decision.slot,"recurrence");
+    equalSlot(ambiguous,"duration_minutes",30); equalSlot(ambiguous,"start",{type:"now"});
+    assert.equal(ambiguous.state.slots.recurrence,null,"yes cannot select a repeat pattern");
+    assert.notEqual(ambiguous.responseText,first.responseText);
+    assert.equal((ambiguous.responseText.match(/\?/g)||[]).length,1);
+    assert.match(ambiguous.responseText,language === "es" ? /solo esta vez, cada día o en días concretos/ : /just once, every day, or on specific days/);
+    assert.doesNotMatch(ambiguous.responseText,/30|Instagram/);
+    assert.deepEqual(resolved.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
+  }
+});
+
 console.log(`BM semantic state: ${checks}/${checks} independent transition and invariant checks passed`);

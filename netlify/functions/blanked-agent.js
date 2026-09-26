@@ -2898,6 +2898,7 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       model,
@@ -2930,8 +2931,8 @@ async function modelConversationPlan(prompt, context = {}, language = "en") {
     }),
   });
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`openai_conversation_failed_${response.status}:${detail.slice(0, 240)}`);
+    await response.body?.cancel();
+    throw new Error(`openai_conversation_failed_${response.status}`);
   }
   const reply = completeNaturalText(extractResponseText(await response.json()), 280);
   if (!reply) return { plan: fallback, source: `openai:${model}:conversation_empty` };
@@ -3310,6 +3311,7 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
   const model = process.env.OPENAI_MODEL || "gpt-5.6-luna";
   const response = await fetchImpl("https://api.openai.com/v1/responses", {
     method: "POST",
+    signal: AbortSignal.timeout(30000),
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({
       model,
@@ -3364,12 +3366,32 @@ async function modelPlan(prompt, context, fallback, language, fetchImpl = fetch)
     }),
   });
   if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`openai_failed_${response.status}:${detail.slice(0, 240)}`);
+    await response.body?.cancel();
+    throw new Error(`openai_failed_${response.status}`);
   }
   const body = await response.json();
   const parsed = JSON.parse(extractResponseText(body));
   return { plan: normalizePlan(parsed, fallback, context, prompt, language), raw_plan: parsed.plan || parsed, source: `openai:${model}` };
+}
+
+function freeformModelError(error, channel) {
+  if (error?.name === "TimeoutError") return `openai_${channel}_timeout`;
+  const message = String(error?.message || "");
+  if (/^openai_(?:conversation_)?failed_[1-5]\d{2}$/.test(message)) return message;
+  if (error?.name === "SyntaxError") return `openai_${channel}_invalid_response`;
+  if (/^(?:fetch failed|failed to fetch|network request failed)$/i.test(message)) return `openai_${channel}_network_error`;
+  return `openai_${channel}_failed`;
+}
+
+function contextualResponseFailure(error) {
+  // Expose operational degradation, never provider bodies or arbitrary messages.
+  const name = /^[A-Za-z][A-Za-z0-9]{0,79}$/.test(error?.name || "") ? error.name : "Error";
+  const message = String(error?.message || "");
+  const code = name === "TimeoutError" ? "contextual_response_timeout"
+    : /^contextual_response_http_[1-5]\d{2}$/.test(message) ? message
+    : /^(?:fetch failed|failed to fetch|network request failed|NetworkError when attempting to fetch resource\.?)$/i.test(message) ? "contextual_response_network_error"
+    : name === "SyntaxError" ? "contextual_response_invalid_json" : "contextual_response_error";
+  return { code, name };
 }
 
 exports.handler = async (event, runtime = {}) => {
@@ -3395,6 +3417,7 @@ exports.handler = async (event, runtime = {}) => {
     if (contextPlan) {
       const deterministicSource = schedulePlan ? "schedule_management_v2" : "personal_context_v2";
       let contextSource = deterministicSource;
+      let contextFailure = null;
       harnessRun.route = schedulePlan ? "schedule_management" : "personal_context";
       try {
         recordStage(harnessRun, "planner_started", { mode: "grounded_contextual_response" });
@@ -3405,7 +3428,9 @@ exports.handler = async (event, runtime = {}) => {
       } catch (error) {
         const { response_contract: _responseContract, ...fallbackPlan } = contextPlan;
         contextPlan = fallbackPlan;
-        recordStage(harnessRun, "planner_fallback", { error_code: error.name || "contextual_response_error" });
+        contextFailure = contextualResponseFailure(error);
+        contextSource = `${deterministicSource}+grounded_deterministic_after_model_error`;
+        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name });
       }
       recordStage(harnessRun, "action_gate", {
         decision: contextPlan.actions.length ? "proposal" : "read",
@@ -3418,7 +3443,7 @@ exports.handler = async (event, runtime = {}) => {
       });
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
       finishRun(harnessRun, { plan:contextPlan, source:contextSource });
-      return json(200, { ok:true, plan:contextPlan, source:contextSource, harness:publicMeta(harnessRun), loop:publicLoop(loop) });
+      return json(200, { ok:true, plan:contextPlan, source:contextSource, model_error:contextFailure?.code || null, contextual_response_failure:contextFailure, harness:publicMeta(harnessRun), loop:publicLoop(loop) });
     }
     const semanticOptions = {
       previousState: context.semantic_state || context.memory?.conversation_state?.semantic_state,
@@ -3447,7 +3472,7 @@ exports.handler = async (event, runtime = {}) => {
       harnessRun.route = "semantic";
       let plan = semanticPlan(semantic, language, prompt);
       let contextualResponseSource = "grounded_deterministic";
-      let contextualResponseFailure = null;
+      let contextFailure = null;
       try {
         recordStage(harnessRun, "planner_started", { mode: "semantic_contextual_response" });
         const rendered = await naturalizeGroundedPlan({ prompt, context, plan });
@@ -3458,21 +3483,13 @@ exports.handler = async (event, runtime = {}) => {
         const { response_contract: _responseContract, ...fallbackPlan } = plan;
         plan = fallbackPlan;
         contextualResponseSource = "grounded_deterministic_after_model_error";
-        // Keep operational degradation visible without returning provider bodies,
-        // URLs or arbitrary exception messages that could contain credentials.
-        const name = /^[A-Za-z][A-Za-z0-9]{0,79}$/.test(error?.name || "") ? error.name : "Error";
-        const message = String(error?.message || "");
-        const code = name === "TimeoutError" ? "contextual_response_timeout"
-          : /^contextual_response_http_[1-5]\d{2}$/.test(message) ? message
-          : /^(?:fetch failed|failed to fetch|network request failed|NetworkError when attempting to fetch resource\.?)$/i.test(message) ? "contextual_response_network_error"
-          : name === "SyntaxError" ? "contextual_response_invalid_json" : "contextual_response_error";
-        contextualResponseFailure = { code, name };
-        recordStage(harnessRun, "planner_fallback", { error_code: code, error_name: name });
+        contextFailure = contextualResponseFailure(error);
+        recordStage(harnessRun, "planner_fallback", { error_code: contextFailure.code, error_name: contextFailure.name });
       }
       if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
         context, previous_state: semanticOptions.previousState || null,
         extraction: semanticExtraction?.trace || null, extraction_failure: semanticModelFailure, deterministic_patch: semantic.patch,
-        contextual_response_failure: contextualResponseFailure,
+        contextual_response_failure: contextFailure,
         extraction_validation: semantic.extractionValidation || null,
         semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
         postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",
@@ -3489,7 +3506,7 @@ exports.handler = async (event, runtime = {}) => {
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
       const source = `${semanticExtraction?.source || "semantic_state_v1"}+${contextualResponseSource}`;
       finishRun(harnessRun, { plan, source });
-      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError || contextualResponseFailure?.code || null, extraction_failure: semanticModelFailure, contextual_response_failure: contextualResponseFailure, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities, attempt_count: semanticExtraction.attempt_count, attempt_errors: semanticExtraction.attempt_errors } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
+      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError || contextFailure?.code || null, extraction_failure: semanticModelFailure, contextual_response_failure: contextFailure, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities, attempt_count: semanticExtraction.attempt_count, attempt_errors: semanticExtraction.attempt_errors } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
     }
     if (!useAppLayer) {
       let conversationResult;
@@ -3499,7 +3516,7 @@ exports.handler = async (event, runtime = {}) => {
         recordStage(harnessRun, "planner_completed", { source: conversationResult.source });
       } catch (error) {
         recordStage(harnessRun, "planner_fallback", { error_code: error.name || "planner_error" });
-        conversationResult = { plan: conversationFallbackPlan(prompt, language), source: "deterministic_conversation_fallback_after_model_error", error: error.message };
+        conversationResult = { plan: conversationFallbackPlan(prompt, language), source: "deterministic_conversation_fallback_after_model_error", error: freeformModelError(error, "conversation") };
       }
       conversationResult.plan = appendWebConversionNote(conversationResult.plan, prompt, context, language);
       conversationResult.plan = appendAppPresenceGuidance(conversationResult.plan, prompt, context, language);
@@ -3546,7 +3563,7 @@ exports.handler = async (event, runtime = {}) => {
       result = {
         plan: normalizePlan({ plan: fallback }, fallback, context, prompt, language),
         source: "deterministic_fallback_after_model_error",
-        error: error.message,
+        error: freeformModelError(error, "planner"),
       };
     }
     result.plan = appendAppPresenceGuidance(result.plan, prompt, context, language);

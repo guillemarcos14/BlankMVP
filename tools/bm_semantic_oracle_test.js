@@ -85,6 +85,52 @@ async function main() {
   assert.ok(run(capabilityBypass, { expected: { ...expected, state: { ...expected.state, requested_capability: "allow_only" } } }).issues.some(issue => issue.code === "requested_capability_cannot_become_block_action"), "capability execution gate is independent of gold equality");
   const clearedExpected = { ...expected, state: { ...expected.state, start: null, end: null, duration_minutes: null, recurrence: null, schedule_horizon_days: null, apps: null }, actions: [] };
   const referenceIssues = (text, gold = clearedExpected, inputs = [], extra = {}) => surfaceContradictions({ message_text: text, actions: [], ...extra }, gold, {}, inputs);
+  // Asking which recurrence the person wants does not assert any option.
+  // Only the complete canonical choice question gets this narrow exception.
+  const recurrenceQuestionExpected = { ...clearedExpected,
+    state: { ...clearedExpected.state, recurrence: null, pending_slots: ["recurrence"], status: "collecting", next_question: "recurrence" },
+    decision: { type: "ask", slot: "recurrence" }, actions: [] };
+  const recurrenceQuestions = [
+    ["en", "Should it happen just once, every day, or on specific days of the week?"],
+    ["es", "¿Lo quieres solo esta vez, cada día o en días concretos de la semana?"],
+  ];
+  const recurrenceIssue = issues => issues.some(issue => issue.code === "visible_recurrence_contradiction");
+  for (const [language, question] of recurrenceQuestions) {
+    const gold = { ...recurrenceQuestionExpected, language };
+    assert.deepEqual(referenceIssues(question, gold), [], "recurrence options are not an asserted daily schedule");
+    const assertion = language === "en" ? "It will happen every day." : "Será cada día.";
+    assert.ok(recurrenceIssue(referenceIssues(assertion, gold)), "an actual daily assertion still contradicts absent recurrence");
+    assert.ok(recurrenceIssue(referenceIssues(`${question} ${assertion}`, gold)), "the following assertion is not masked with the question");
+    assert.ok(recurrenceIssue(referenceIssues(`${assertion} ${question}`, gold)), "the preceding assertion is still checked");
+    assert.ok(recurrenceIssue(referenceIssues(question, gold, [], { speech_text: assertion })), "contradiction on another visible surface remains checked");
+    assert.ok(recurrenceIssue(referenceIssues(question.replace(/\?$/, `, ${assertion}?`), gold)), "an extra claim inside the question is not exempt");
+    assert.ok(recurrenceIssue(referenceIssues(question.replace(/\?$/, "."), gold)), "choice words without a question are not exempt");
+    assert.ok(recurrenceIssue(referenceIssues(question, { ...gold, decision: { type: "ready", slot: null } })), "ready is not asking for recurrence");
+    assert.ok(recurrenceIssue(referenceIssues(question, { ...gold, decision: { type: "ask", slot: "start" } })), "another missing slot is not exempt");
+    assert.ok(recurrenceIssue(referenceIssues(question, { ...gold, state: { ...gold.state, pending_slots: [] } })), "recurrence must actually be pending");
+    assert.ok(recurrenceIssue(referenceIssues(question, { ...gold, state: { ...gold.state, recurrence: { type: "once", weekdays: [] } } })), "a known once recurrence is not exempt");
+    assert.ok(recurrenceIssue(referenceIssues(question, { ...gold, actions: [{ type: "start_protection", minutes: 45 }] })), "expected executable proposals disable the exception");
+    assert.ok(recurrenceIssue(referenceIssues(question, gold, [], { actions: [{ type: "start_protection", minutes: 45 }] })), "observed executable proposals disable the exception");
+
+    const body = fixture();
+    body.semantic_state.language = language;
+    body.semantic_state.status = "collecting";
+    body.semantic_state.pending_slots = ["recurrence"];
+    body.semantic_state.next_question = "recurrence";
+    for (const key of Object.keys(body.semantic_state.slots)) {
+      const value = gold.state[key];
+      body.semantic_state.slots[key] = slot(key === "confirmation" ? { status: "confirmed", fingerprint: "test-confirmation" } : value ?? null);
+    }
+    body.semantic_decision = gold.decision;
+    body.plan = { message_text: question, response_text: question, speech_text: question, actions: [] };
+    const assessment = evaluateTurn({ expected: gold, body, inputs: [input], reviews: [] });
+    assert.equal(assessment.dimensions.visible_equivalence, "unverified", "a lexical exception cannot grant visible PASS without an exact review");
+    assert.equal(assessment.status, "unverified");
+    body.model_error = "semantic_model_timeout";
+    const degraded = evaluateTurn({ expected: gold, body, inputs: [input], reviews: [] });
+    assert.equal(degraded.dimensions.safety, "failed", "real provider timeout is independent of the lexical false positive");
+    assert.equal(degraded.status, "failed");
+  }
   for (const text of ["Okay, not 30 minutes. How long should it last?", "Got it—not 30 minutes. What exact end time?", "Okay, not every day. Which days?", "Got it—not daily. Once or specific days?"]) {
     const inputs = [text.includes("30") ? "Not 30 minutes." : "Not daily."];
     assert.deepEqual(referenceIssues(text, clearedExpected, inputs), [], "explicit grounded correction is not a positive slot claim");

@@ -541,10 +541,7 @@ struct AssistantAppView: View {
                                 .accessibilityLabel("Blankmind: \(latest.assistantText)")
                             if latest.canApply && !waiting {
                                 Button {
-                                    speech.stop()
-                                    composerFocused = false
-                                    onApplyAction(latest.actionId)
-                                    dismiss()
+                                    applyAction(latest.actionId)
                                 } label: {
                                     Text(latest.actionLabel.isEmpty ? (spanish ? "Aplicar ahora" : "Apply now") : latest.actionLabel)
                                         .font(.blankInter(size: 17, weight: .semibold))
@@ -639,7 +636,8 @@ struct AssistantAppView: View {
         }
         .onDisappear { acceptingSpeech = false; speech.stop(); saveTask?.cancel(); persist() }
         .sheet(isPresented: $showHistory) {
-            AssistantAppHistoryView(turns: turns, nextBefore: nextHistoryCursor, foreground: foreground, background: background)
+            AssistantAppHistoryView(turns: turns, nextBefore: nextHistoryCursor,
+                foreground: foreground, background: background, onApplyAction: applyAction)
                 .preferredColorScheme(dark ? .dark : .light)
         }
         .sheet(isPresented: $showPhoneSignIn, onDismiss: { Task { restoreOwner(); await reload() } }) {
@@ -744,6 +742,16 @@ struct AssistantAppView: View {
         .background(RoundedRectangle(cornerRadius: 28).fill(foreground.opacity(dark ? 0.11 : 0.06)))
         .frame(maxWidth: 640)
         .padding(.horizontal, 22).padding(.bottom, 12)
+    }
+
+    private func applyAction(_ actionID: String) {
+        guard !actionID.isEmpty, owner == AssistantAppSession.userID else { return }
+        acceptingSpeech = false
+        speech.stop()
+        composerFocused = false
+        showHistory = false
+        onApplyAction(actionID)
+        dismiss()
     }
 
     private func openControls(_ section: HomeSection?) {
@@ -911,20 +919,26 @@ enum AssistantActionCopy {
 
 private struct AssistantAppHistoryView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var turns: [AssistantAppTurn]
     @State private var nextBefore: String?
-    @State private var loading = false
+    @State private var loading = true
+    @State private var hasFreshSnapshot = false
+    @State private var requestID: UUID?
     @State private var error: String?
     let foreground: Color
     let background: Color
+    let onApplyAction: (String) -> Void
     private let owner: String?
     private var spanish: Bool { Locale.current.languageCode == "es" }
 
-    init(turns: [AssistantAppTurn], nextBefore: String?, foreground: Color, background: Color) {
+    init(turns: [AssistantAppTurn], nextBefore: String?, foreground: Color, background: Color,
+         onApplyAction: @escaping (String) -> Void) {
         _turns = State(initialValue: turns)
         _nextBefore = State(initialValue: nextBefore)
         self.foreground = foreground
         self.background = background
+        self.onApplyAction = onApplyAction
         self.owner = AssistantAppSession.userID
     }
 
@@ -937,11 +951,22 @@ private struct AssistantAppHistoryView: View {
                             Button(loading ? (spanish ? "Cargando…" : "Loading…") : (spanish ? "Cargar anteriores" : "Load earlier")) {
                                 Task { await loadEarlier() }
                             }
-                            .disabled(loading)
+                            .disabled(loading || !hasFreshSnapshot)
                             .font(.blankInter(size: 15, weight: .medium)).frame(minHeight: 44)
                         }
-                        if let error { Text(error).font(.blankInter(size: 14)).foregroundStyle(.red) }
-                        if turns.isEmpty {
+                        if let error {
+                            Text(error).font(.blankInter(size: 14)).foregroundStyle(.red)
+                            Button(spanish ? "Actualizar historial" : "Refresh history") {
+                                Task { await refresh() }
+                            }
+                            .font(.blankInter(size: 15, weight: .medium))
+                            .frame(minHeight: 44)
+                            .disabled(loading)
+                        } else if loading {
+                            ProgressView(spanish ? "Actualizando historial…" : "Updating history…")
+                                .font(.blankInter(size: 14)).tint(foreground)
+                        }
+                        if turns.isEmpty && !loading && error == nil {
                             Text(spanish ? "Tus mensajes y las respuestas aparecerán aquí." : "Your messages and replies will appear here.")
                                 .font(.blankInter(size: 17)).padding(.top, 32)
                         }
@@ -955,8 +980,27 @@ private struct AssistantAppHistoryView: View {
                                 Text(turn.assistantText.isEmpty ? (spanish ? "Respuesta pendiente" : "Reply pending") : turn.assistantText)
                                     .font(.blankInter(size: 17)).textSelection(.enabled)
                                 if !turn.actionId.isEmpty {
-                                    Text(turn.canApply ? (spanish ? "Pendiente de aplicar" : "Ready to apply") : AssistantActionCopy.outcome(turn.actionStatus, spanish: spanish))
-                                        .font(.blankInter(size: 14)).foregroundStyle(foreground.opacity(0.74))
+                                    if hasFreshSnapshot && error == nil && turn.canApply {
+                                        Button {
+                                            Task { await apply(turn) }
+                                        } label: {
+                                            Text(turn.actionLabel.isEmpty ? (spanish ? "Aplicar ahora" : "Apply now") : turn.actionLabel)
+                                                .font(.blankInter(size: 15, weight: .semibold))
+                                                .multilineTextAlignment(.leading)
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 12)
+                                                .frame(minHeight: 44)
+                                                .background(Capsule().fill(foreground))
+                                                .foregroundStyle(background)
+                                        }
+                                        .disabled(loading)
+                                        .accessibilityHint(spanish ? "Comprueba y aplica esta acción sobre tus distracciones seleccionadas" : "Checks and applies this action to your selected distractions")
+                                    } else {
+                                        Text(hasFreshSnapshot
+                                             ? AssistantActionCopy.outcome(turn.actionStatus, spanish: spanish)
+                                             : (spanish ? "Estado pendiente de actualizar" : "Waiting for an updated status"))
+                                            .font(.blankInter(size: 14)).foregroundStyle(foreground.opacity(0.74))
+                                    }
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -968,6 +1012,9 @@ private struct AssistantAppHistoryView: View {
                 }
                 .background(background)
                 .onAppear { if let id = turns.last?.id { scroll.scrollTo(id, anchor: .bottom) } }
+                .onChange(of: hasFreshSnapshot) { fresh in
+                    if fresh, let id = turns.last?.id { scroll.scrollTo(id, anchor: .bottom) }
+                }
             }
             .navigationTitle(spanish ? "Historial" : "Conversation history")
             .navigationBarTitleDisplayMode(.inline)
@@ -975,6 +1022,12 @@ private struct AssistantAppHistoryView: View {
         }
         .foregroundStyle(foreground)
         .tint(foreground)
+        .task { await refresh() }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { Task { await refresh() } }
+            else { invalidateSnapshot() }
+        }
+        .onDisappear { invalidateSnapshot() }
         .onReceive(NotificationCenter.default.publisher(for: AssistantAppSession.didChangeNotification)) { _ in
             validateOwner()
         }
@@ -982,6 +1035,7 @@ private struct AssistantAppHistoryView: View {
 
     @discardableResult private func validateOwner() -> Bool {
         guard owner == AssistantAppSession.userID else {
+            invalidateSnapshot()
             turns = []
             nextBefore = nil
             error = spanish ? "La cuenta ha cambiado. Cierra el historial para continuar." : "The account changed. Close history to continue."
@@ -990,19 +1044,76 @@ private struct AssistantAppHistoryView: View {
         return true
     }
 
+    private func invalidateSnapshot() {
+        hasFreshSnapshot = false
+        requestID = nil
+        loading = false
+    }
+
+    private func refresh() async {
+        guard validateOwner(), requestID == nil else { return }
+        let id = UUID()
+        requestID = id
+        loading = true
+        hasFreshSnapshot = false
+        error = nil
+        defer { if requestID == id { requestID = nil; loading = false } }
+        do {
+            let page = try await AssistantAppClient().history()
+            guard validateOwner(), requestID == id else { return }
+            turns = page.turns
+            nextBefore = page.nextBefore
+            hasFreshSnapshot = true
+        } catch {
+            guard validateOwner(), requestID == id else { return }
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func apply(_ turn: AssistantAppTurn) async {
+        guard validateOwner(), hasFreshSnapshot, !loading, error == nil, turn.canApply else { return }
+        let id = UUID()
+        requestID = id
+        loading = true
+        defer { if requestID == id { requestID = nil; loading = false } }
+        do {
+            // The action may have expired, been cancelled or superseded while
+            // reading older messages. Revalidate the exact server ID before Home.
+            let current = try await AssistantAppClient().status(turnId: turn.id)
+            guard validateOwner(), requestID == id else { return }
+            if let current, let index = turns.firstIndex(where: { $0.id == current.id }) {
+                turns[index] = current
+            }
+            guard let current, current.canApply, current.actionId == turn.actionId else {
+                hasFreshSnapshot = false
+                error = spanish ? "Esta acción ya no está disponible. Actualiza el historial." : "This action is no longer available. Refresh history."
+                return
+            }
+            dismiss()
+            onApplyAction(current.actionId)
+        } catch {
+            guard validateOwner(), requestID == id else { return }
+            hasFreshSnapshot = false
+            self.error = error.localizedDescription
+        }
+    }
+
     private func loadEarlier() async {
-        guard validateOwner(), let cursor = nextBefore, !loading else { return }
+        guard validateOwner(), hasFreshSnapshot, let cursor = nextBefore, !loading else { return }
+        let id = UUID()
+        requestID = id
         loading = true
         error = nil
-        defer { loading = false }
+        defer { if requestID == id { requestID = nil; loading = false } }
         do {
             let page = try await AssistantAppClient().history(before: cursor)
-            guard validateOwner() else { return }
+            guard validateOwner(), requestID == id else { return }
             let ids = Set(turns.map(\.id))
             turns.insert(contentsOf: page.turns.filter { !ids.contains($0.id) }, at: 0)
             nextBefore = page.nextBefore
         } catch {
-            guard validateOwner() else { return }
+            guard validateOwner(), requestID == id else { return }
+            hasFreshSnapshot = false
             self.error = error.localizedDescription
         }
     }

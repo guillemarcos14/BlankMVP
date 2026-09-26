@@ -50,8 +50,8 @@ function assistantReplyText(plan = {}, delivery = null, channel = "whatsapp") {
   const prefix = summary ? `${summary} ` : "";
   const setup = ["open_app_picker","request_screen_time_permission"].includes(action.type);
   if (plan.review_only_actions === true || (state?.status === "needs_setup" && !setup)) {
-    return prefix + (spanish ? "Abre Blankmind para conectar tu iPhone y continuar. La ejecución no está verificada."
-      : "Open Blankmind to connect your iPhone and continue. Execution is not verified.");
+    return prefix + (spanish ? "Abre Blankmind para conectar tu dispositivo y continuar. La ejecución no está verificada."
+      : "Open Blankmind to connect your device and continue. Execution is not verified.");
   }
   if (!delivery?.action) {
     return prefix + (spanish ? `Aún no he enviado la solicitud. Abre Blankmind para conectar este ${channel === "sms" ? "número" : "WhatsApp"} y vuelve a pedírmelo.`
@@ -74,11 +74,11 @@ function assistantReplyText(plan = {}, delivery = null, channel = "whatsapp") {
     ? "Pulsa la notificación de Blankmind para elegir tus distracciones y continuar. Todavía no hay una propuesta de bloqueo completa."
     : "Tap the Blankmind notification to choose your distractions and continue. There is no complete blocking proposal yet.");
   if (action.type === "open_app_picker") return prefix + (spanish
-    ? "Pulsa la notificación de Blankmind para elegir tus distracciones y acepta la selección para aplicar esta propuesta. El resultado requiere verificación del iPhone."
-    : "Tap the Blankmind notification to choose your distractions, then confirm the selection to apply this proposal. The result needs verification from your iPhone.");
+    ? "Pulsa la notificación de Blankmind para elegir tus distracciones y acepta la selección para aplicar esta propuesta. El resultado requiere verificación del dispositivo."
+    : "Tap the Blankmind notification to choose your distractions, then confirm the selection to apply this proposal. The result needs verification from your device.");
   return prefix + (spanish
-    ? "Pulsa la notificación de Blankmind para aplicar la solicitud. Solo confirmaré el éxito cuando el iPhone lo verifique."
-    : "Tap the Blankmind notification to apply the request. I'll only confirm success after your iPhone verifies it.");
+    ? "Pulsa la notificación de Blankmind para aplicar la solicitud. Solo confirmaré el éxito cuando el dispositivo lo verifique."
+    : "Tap the Blankmind notification to apply the request. I'll only confirm success after your device verifies it.");
 }
 
 module.exports = { assistantReplyText };

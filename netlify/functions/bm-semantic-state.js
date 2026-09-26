@@ -602,8 +602,8 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     return typeof minutes === "number" && typeof breaks === "number" ? (es ? `Esta semana registras ${minutes} minutos protegidos y ${breaks} interrupciones. Estos datos describen tu semana; no requieren cambiar ningún bloqueo.` : `This week you recorded ${minutes} protected minutes and ${breaks} breaks. Those figures summarize your week without changing any blocks.`) : (es ? "Todavía no tengo tus métricas semanales. Abre Blankmind para sincronizarlas y poder revisar tu semana." : "I don't have your weekly metrics yet. Open Blankmind to sync them so we can review your week.");
   }
   if (decision.type === "cancelled") return es
-    ? "He retirado esta instrucción. Si la protección ya empezó en tu iPhone, tendrás que detenerla allí."
-    : "I've withdrawn this instruction. If protection has already started on your iPhone, you'll need to stop it there.";
+    ? "He retirado esta instrucción. Si la protección ya empezó en tu dispositivo, tendrás que detenerla allí."
+    : "I've withdrawn this instruction. If protection has already started on your device, you'll need to stop it there.";
   if (decision.type === "none") return null;
   if (decision.type === "confirm") return `${semanticSummary(state,context)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
   if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado. Pulsa la notificación de Blankmind para terminar; solo confirmaré el éxito cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device. Tap the Blankmind notification to finish; I'll only report success after the device verifies the block."}`;
@@ -611,8 +611,8 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind y concede el permiso de bloqueo; después dime cuando esté listo para continuar. La protección todavía no está verificada.`
     : `${semanticSummary(state,context)}. Tap the Blankmind notification and grant blocking permission, then tell me when it's ready to continue. Protection is not verified yet.`;
   if (decision.type === "setup" && decision.slot === "app_selection") return es
-    ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind para elegir tus distracciones; al aceptar la selección, el iPhone intentará aplicar esta propuesta. Solo confirmaré el resultado cuando el dispositivo lo verifique.`
-    : `${semanticSummary(state,context)}. Tap the Blankmind notification to choose your distractions, then confirm the selection so your iPhone can apply this proposal. I'll only confirm the result after the device verifies it.`;
+    ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind para elegir tus distracciones; al aceptar la selección, el dispositivo intentará aplicar esta propuesta. Solo confirmaré el resultado cuando el dispositivo lo verifique.`
+    : `${semanticSummary(state,context)}. Tap the Blankmind notification to choose your distractions, then confirm the selection so your device can apply this proposal. I'll only confirm the result after the device verifies it.`;
   if (decision.slot === "app_presence" && value(state,"confirmation")?.fingerprint === proposalFingerprint(state)) {
     const followup = /^(?:done|ok(?:ay)?|i have it|i(?:'|’)ve got it|i(?:'|’)ve opened (?:the )?app|i have already opened (?:the )?app|it(?:'|’)s already opened|it(?:'|’)s already open|the app is already open|opened it|already opened(?: (?:the )?app)?|ya está|ya esta|ya está abierta|ya esta abierta|ya la he abierto|ya abrí|ya la abri)$/i.test(clean(prompt, 160));
     if (followup) return es
@@ -704,8 +704,8 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   if (decision.type === "ready" && actions.length) state.last_action_fingerprint = proposalFingerprint(state);
   const responseText = actionReplaySuppressed
     ? `${semanticSummary(state,context)}. ${state.language === "es"
-      ? "Esa misma solicitud ya está pendiente en Blankmind. Abre Blankmind para continuar; solo confirmaré el éxito cuando tu iPhone lo verifique."
-      : "That same request is already waiting in Blankmind. Open Blankmind to continue; I'll only confirm success after your iPhone verifies it."}`
+      ? "Esa misma solicitud ya está pendiente en Blankmind. Abre Blankmind para continuar; solo confirmaré el éxito cuando tu dispositivo lo verifique."
+      : "That same request is already waiting in Blankmind. Open Blankmind to continue; I'll only confirm success after your device verifies it."}`
     : renderSemanticResponse(state,decision,context,prompt);
   return { state, handled, decision, actions, actionReplaySuppressed, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText, patch, extractionValidation };
 }

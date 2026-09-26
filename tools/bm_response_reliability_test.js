@@ -48,7 +48,7 @@ for (const reply of [whatsappReplyText, (plan, delivery) => smsReplyText(plan, "
   assert.match(reply({actions:[dailyPicker]},{action:dailyPicker,push:{sent:true}}),/30 minutes per day/);
   const legacySchedule={type:"apply_schedule",start_minute:600,end_minute:660};
   assert.match(reply({actions:[legacySchedule]},{action:legacySchedule,push:{sent:true}}),/every day.*7 days/);
-  const original="Open Blankmind to connect your iPhone before continuing.";
+  const original="Open Blankmind to connect your device before continuing.";
   assert.equal(reply({message_text:original,actions:[],semantic_state:{status:"needs_setup"}}),original);
   const review=reply({actions:[{type:"start_protection",minutes:30}],review_only_actions:true},
     {action:{type:"start_protection"},push:{sent:true}});
@@ -105,7 +105,7 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     const first=await call("Block selected apps now for 30 minutes once.");
     const cancelled=await call("Cancel this request.",first.plan.semantic_state);
     assert.match(cancelled.plan.message_text,/withdrawn this instruction/);
-    assert.match(cancelled.plan.message_text,/If protection has already started on your iPhone/);
+    assert.match(cancelled.plan.message_text,/If protection has already started on your device/);
     rewrite="Do you want me to restart the old block? Nothing is active.";
     const before=calls.length;
     const acknowledged=await call("Yes.",cancelled.plan.semantic_state,{recent_messages:[

@@ -356,41 +356,7 @@ function pendingActionConfirmationPlan(action) {
 }
 
 function whatsappReplyText(plan, delivery = null) {
-  if (delivery?.action?.status === "superseded") return supersededAssistantReply(plan);
-  const action = firstPendingAction(plan);
-  const text = cleanText(plan.message_text || plan.response_text, 480)
-    .replace(/(?:https?|blank):\/\/\S+/gi, "")
-    .replace(/(?:open|abre|abrir)\s+(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
-    .replace(/[^.?!]*(?:review|revisa|revisar)[^.?!]*(?:blankmind|blanked)[^.?!]*(?:[.?!]|$)/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim()
-    .slice(0, 320) || "I can help with that in Blankmind.";
-  if (!action) return text;
-  const spanish = String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es");
-  if (["open_app_picker", "request_screen_time_permission"].includes(action.type)) {
-    return `${text}\n\n${spanish ? "Abre Blankmind para seleccionar las apps. El plan se aplicará al confirmar la selección." : "Open Blankmind to choose the apps. The plan will apply when you confirm the selection."}`;
-  }
-  if (plan.semantic_state?.status === "needs_setup") {
-    return spanish
-      ? "No he enviado ningún bloqueo ni notificación. Abre Blankmind, comprueba que tus distracciones estén seleccionadas, que Screen Time esté autorizado y que WhatsApp esté conectado. Después vuelve a pedírmelo."
-      : "I haven't sent a block or notification. Open Blankmind, check that your distractions are selected, Screen Time is authorized, and WhatsApp is connected. Then ask me again.";
-  }
-  if (!delivery?.action) {
-    return `${text}\n\n${spanish ? "Aún no he enviado ninguna notificación. Conecta este WhatsApp desde Blankmind y vuelve a pedírmelo." : "I haven't sent a notification yet. Connect this WhatsApp in Blankmind, then ask me again."}`;
-  }
-  if (delivery.push?.sent !== true) {
-    return spanish
-      ? "He guardado la solicitud, pero no he podido enviar la notificación. Abre Blankmind y comprueba que las notificaciones estén activadas; después vuelve a pedírmelo."
-      : "I've saved the request, but couldn't send a notification. Open Blankmind and check that notifications are enabled, then ask me again.";
-  }
-  const actionIsReady = plan.semantic_state?.status === "ready" || plan.blocking_ready === true;
-  if (action.type === "start_protection" && actionIsReady) {
-    const duration = Number.isInteger(action.minutes) ? ` de ${action.minutes} minutos` : "";
-    return spanish
-      ? `Pulsa la notificación de Blankmind para iniciar tu bloqueo${duration}.`
-      : `Tap the Blankmind notification to start your${duration ? ` ${action.minutes}-minute ` : " "}block.`;
-  }
-  return `${text}\n\n${spanish ? "Pulsa la notificación de Blankmind para aplicarlo." : "Tap the Blankmind notification to apply it."}`;
+  return require("./_assistant_reply").assistantReplyText(plan, delivery, "whatsapp");
 }
 
 async function sendPlanReply(to, plan, delivery = null) {

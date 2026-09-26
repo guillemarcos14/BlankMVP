@@ -2869,11 +2869,7 @@ function conversationFallbackPlan(prompt, language = "en") {
     intent: "general",
     title: "Conversation",
     response_text: fallbackText,
-    bullets: [
-      "Read: this is normal conversation.",
-      "Pattern: no Blanked app action is needed.",
-      "Move: answer as a regular chat."
-    ],
+    bullets: [],
     primary_label: "Reply",
     secondary_label: "Not now",
     actions: [],
@@ -3429,13 +3425,16 @@ exports.handler = async (event, runtime = {}) => {
     let semantic = advanceSemanticState(semanticOptions);
     let semanticExtraction = null;
     let semanticModelError = null;
+    let semanticModelFailure = null;
     if (semantic.handled && process.env.OPENAI_API_KEY) {
       try {
         semanticExtraction = await extractWithModel({ prompt, previousState: semanticOptions.previousState, context });
         semantic = advanceSemanticState({ ...semanticOptions, extraction: semanticExtraction.extraction });
       } catch (error) {
         semanticModelError = error.name === "TimeoutError" ? "semantic_model_timeout" : error.message;
-        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError });
+        semanticModelFailure = { attempt_count: error.semantic_attempt_count || 1,
+          attempt_errors: error.semantic_attempt_errors || [semanticModelError] };
+        recordStage(harnessRun, "planner_fallback", { error_code: semanticModelError, ...semanticModelFailure });
       }
     }
     recordStage(harnessRun, "semantic_reduced", {
@@ -3460,7 +3459,7 @@ exports.handler = async (event, runtime = {}) => {
       }
       if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
         context, previous_state: semanticOptions.previousState || null,
-        extraction: semanticExtraction?.trace || null, deterministic_patch: semantic.patch,
+        extraction: semanticExtraction?.trace || null, extraction_failure: semanticModelFailure, deterministic_patch: semantic.patch,
         extraction_validation: semantic.extractionValidation || null,
         semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
         postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",
@@ -3477,7 +3476,7 @@ exports.handler = async (event, runtime = {}) => {
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
       const source = `${semanticExtraction?.source || "semantic_state_v1"}+${contextualResponseSource}`;
       finishRun(harnessRun, { plan, source });
-      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
+      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction_failure: semanticModelFailure, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities, attempt_count: semanticExtraction.attempt_count, attempt_errors: semanticExtraction.attempt_errors } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
     }
     if (!useAppLayer) {
       let conversationResult;
@@ -3635,8 +3634,9 @@ function semanticResponseContract(result) {
   if (Number.isInteger(knownStart)) allowedMinutes.push(knownStart);
   if (Number.isInteger(knownEnd)) allowedMinutes.push(knownEnd);
   const asksUnknownClock = ["start", "end", "end_or_duration"].includes(slot) && allowedMinutes.length === 0;
-  const requiredAnyGroups = [...(groups[slot] || (decision.type === "confirm" ? groups.confirmation : []))];
-  const requiresPlanFacts = !result.actionReplaySuppressed && ["confirm", "ready"].includes(decision.type);
+  const requiredAnyGroups = [...(slot === "action_type" && state.intent === "advice"
+    ? [["block", "blocking proposal"]] : (groups[slot] || (decision.type === "confirm" ? groups.confirmation : [])))];
+  const requiresPlanFacts = !result.actionReplaySuppressed && ["confirm", "ready", "setup"].includes(decision.type);
   const startValue = state.slots?.start?.value;
   const recurrenceValue = state.slots?.recurrence?.value;
   if (requiresPlanFacts && recurrenceValue?.type === "once") requiredAnyGroups.push(["just once", "one time", "one-time"]);
@@ -3647,13 +3647,25 @@ function semanticResponseContract(result) {
   }
   return {
     operation: `semantic_${decision.type || "none"}${slot ? `_${slot}` : ""}`,
+    // Withdrawal affects a pending instruction, not independently running
+    // device protection. Keep this execution boundary exact across retries.
+    immutable_reply: decision.type === "cancelled",
+    execution_flow: slot === "app_selection" ? "notification_picker_accept" : slot === "permissions" ? "notification_permission_reply" : null,
+    action_type: state.slots?.action_type?.value || null,
     facts: {
       validated_reply: result.responseText,
       decision: decision.type || "none",
       missing_detail: slot || null,
       actions,
+      action_type: state.slots?.action_type?.value || null,
+      hard_mode: state.slots?.hard_mode?.value ?? null,
+      start: startValue || null,
+      end: state.slots?.end?.value ?? null,
+      duration_minutes: state.slots?.duration_minutes?.value ?? null,
+      recurrence: recurrenceValue || null,
+      schedule_horizon_days: state.slots?.schedule_horizon_days?.value ?? null,
     },
-    required_phrases: actions.length || result.actionReplaySuppressed ? ["Blankmind notification"] : [],
+    required_phrases: (actions.length && !result.reviewOnlyAppPresence) || result.actionReplaySuppressed ? ["Blankmind notification"] : [],
     required_any_groups: requiredAnyGroups,
     allowed_minutes: Array.from(new Set(allowedMinutes)),
     required_clock_minutes: requiresPlanFacts && startValue?.type === "time"

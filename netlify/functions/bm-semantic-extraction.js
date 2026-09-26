@@ -2,6 +2,7 @@
 
 // The model extracts evidence. It cannot emit actions or authorize a proposal.
 const { validateSemanticPatch } = require("./bm-semantic-state");
+const { readModelJson } = require("./bm-model-request");
 const object = properties => ({ type: "object", additionalProperties: false, required: Object.keys(properties), properties });
 const values = {
   apps: { type: "array", minItems: 1, maxItems: 12, items: { type: "string", minLength: 1, maxLength: 80 } },
@@ -11,8 +12,11 @@ const values = {
   hard_mode: { type: "boolean" },
   start: { anyOf: [object({ type: { type: "string", enum: ["now"] } }), object({ type: { type: "string", enum: ["time"] }, minute: { type: "integer", minimum: 0, maximum: 1439 } })] },
   end: { type: "integer", minimum: 0, maximum: 1439 },
-  duration_minutes: { type: "integer", minimum: 1, maximum: 1440 },
-  schedule_horizon_days: { type: "integer", minimum: 1, maximum: 14 },
+  // Evidence must be able to represent an unsupported request verbatim. Native
+  // limits belong to validateSemanticPatch/reducer/action gates; constraining
+  // extraction to 1–14 made a request for 40 days impossible to express.
+  duration_minutes: { type: "integer" },
+  schedule_horizon_days: { type: "integer" },
   recurrence: object({ type: { type: "string", enum: ["once", "daily", "weekly"] }, weekdays: { type: "array", maxItems: 7, items: { type: "integer", minimum: 1, maximum: 7 } } }),
 };
 const schema = {
@@ -60,16 +64,45 @@ function parseCandidate(body, prompt) {
 async function extractWithModel({ prompt, previousState, context = {}, fetchImpl = fetch }) {
   if (!process.env.OPENAI_API_KEY) return { enabled: false, extraction: null, source: "deterministic_semantic_extraction" };
   const request = requestFor(prompt, previousState, context);
-  const response = await fetchImpl("https://api.openai.com/v1/responses", {
-    method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify(request), signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error(`semantic_model_http_${response.status}`);
-  const body = await response.json();
-  if (body.status === "incomplete") throw new Error("semantic_model_incomplete");
-  const { candidate, ambiguities } = parseCandidate(body, prompt);
-  const validation = validateSemanticPatch(candidate, { prompt, state: previousState, context });
-  return { enabled: true, extraction: candidate, source: `openai:${body.model || request.model}:semantic`, model_requested: request.model, model_returned: body.model || null, rejected: validation.rejected, ambiguities, trace: { request, candidate, validation } };
+  request.input[0].content += " Return each slot at most once. If alternatives conflict, omit that slot and report the ambiguity. Quantities describing a past event are observations, not requested future action parameters. Copy requested quantities exactly, including unsupported values: never clamp, truncate or replace them to fit device capabilities. The separate action validator decides what the device supports.";
+  const deadline = Date.now() + 20000;
+  const attemptErrors = [];
+  const attemptMetrics = [];
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    let requestMetrics = null;
+    try {
+      // Both attempts share the original 20-second extraction budget. A retry
+      // cannot consume a second timeout window or exhaust the app turn lease.
+      const { body, metrics } = await readModelJson({ request, fetchImpl,
+        timeoutMs: Math.max(1, deadline - Date.now()), errorPrefix: "semantic_model" });
+      requestMetrics = metrics;
+      attemptMetrics.push(metrics);
+      if (body.status === "incomplete") throw new Error("semantic_model_incomplete");
+      const { candidate, ambiguities } = parseCandidate(body, prompt);
+      const validation = validateSemanticPatch(candidate, { prompt, state: previousState, context });
+      return { enabled: true, extraction: candidate, source: `openai:${body.model || request.model}:semantic`,
+        model_requested: request.model, model_returned: body.model || null, rejected: validation.rejected, ambiguities,
+        attempt_count: attempt, attempt_errors: attemptErrors, attempt_metrics: attemptMetrics,
+        trace: { request, candidate, validation, attempt_count: attempt, attempt_errors: attemptErrors, attempt_metrics: attemptMetrics } };
+    } catch (error) {
+      if (!requestMetrics && error.model_request_metrics) attemptMetrics.push(error.model_request_metrics);
+      attemptErrors.push(error.name === "TimeoutError" ? "semantic_model_timeout" : error.message);
+      // Extraction has no side effects. One bounded retry can recover malformed
+      // output or a transient model request, without hiding either attempt or
+      // allowing a second 20-second timeout window. Auth/quota failures fail fast.
+      const retryable = error.name === "TimeoutError"
+        || ["duplicate_semantic_extraction_slot", "ungrounded_semantic_extraction_evidence", "semantic_model_incomplete", "semantic_model_http_502", "semantic_model_http_503", "semantic_model_http_504"].includes(error.message);
+      if (attempt !== 1 || !retryable || deadline - Date.now() < 1000) {
+        error.semantic_attempt_count = attempt;
+        error.semantic_attempt_errors = [...attemptErrors];
+        error.semantic_attempt_metrics = [...attemptMetrics];
+        throw error;
+      }
+      if (error.message === "duplicate_semantic_extraction_slot") request.input.push({ role: "system", content: "The previous extraction repeated a slot and was rejected. Return at most one entry per slot. Omit conflicting alternatives; report their ambiguity instead." });
+      if (error.message === "ungrounded_semantic_extraction_evidence") request.input.push({ role: "system", content: "The previous extraction was rejected because an evidence quote was not an exact substring of current_message. Copy evidence literally from current_message, preserving capitalization, accents, whitespace and punctuation. Do not paraphrase or normalize it. Omit any field whose evidence cannot be copied exactly." });
+      if (error.message === "semantic_model_incomplete") request.max_output_tokens = 1400;
+    }
+  }
 }
 
 module.exports = { extractWithModel, requestFor, parseCandidate, schema };

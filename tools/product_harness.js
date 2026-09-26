@@ -355,7 +355,12 @@ function execute(args) {
     memory: { requested: args.applyMemory, updates: [] },
   };
 
-  if (context.missing_files.length > 0) {
+  // Blank Brain lives outside the Git repository. CI checks code and scope;
+  // the mandatory local baseline still requires all external context files.
+  const externalContextOnly = context.missing_files.every((file) => file.startsWith("Blank Brain/"));
+  const externalContextSkipped = args.allowMissingExternalContext === true
+    && process.env.CI === "true" && externalContextOnly;
+  if (context.missing_files.length > 0 && !externalContextSkipped) {
     run.status = "blocked";
     run.blocker = `missing_context_files:${context.missing_files.join(",")}`;
   } else if (args.mode === "plan") {
@@ -396,7 +401,7 @@ function printRun(run, jsonOutput) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.contract && args.help) {
-    process.stdout.write("Usage: node tools/product_harness.js --contract tools/product_harness_contract.json [--mode plan|validate|close] [--report path] [--write-baseline path] [--baseline path] [--diff-base ref] [--enforce-scope] [--apply-memory] [--json]\n");
+    process.stdout.write("Usage: node tools/product_harness.js --contract tools/product_harness_contract.json [--mode plan|validate|close] [--report path] [--write-baseline path] [--baseline path] [--diff-base ref] [--enforce-scope] [--allow-missing-external-context (CI only)] [--apply-memory] [--json]\n");
     return;
   }
   if (args.writeBaseline) {

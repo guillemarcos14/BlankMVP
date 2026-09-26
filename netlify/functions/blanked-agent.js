@@ -3447,6 +3447,7 @@ exports.handler = async (event, runtime = {}) => {
       harnessRun.route = "semantic";
       let plan = semanticPlan(semantic, language, prompt);
       let contextualResponseSource = "grounded_deterministic";
+      let contextualResponseFailure = null;
       try {
         recordStage(harnessRun, "planner_started", { mode: "semantic_contextual_response" });
         const rendered = await naturalizeGroundedPlan({ prompt, context, plan });
@@ -3457,11 +3458,21 @@ exports.handler = async (event, runtime = {}) => {
         const { response_contract: _responseContract, ...fallbackPlan } = plan;
         plan = fallbackPlan;
         contextualResponseSource = "grounded_deterministic_after_model_error";
-        recordStage(harnessRun, "planner_fallback", { error_code: error.name || "semantic_contextual_response_error" });
+        // Keep operational degradation visible without returning provider bodies,
+        // URLs or arbitrary exception messages that could contain credentials.
+        const name = /^[A-Za-z][A-Za-z0-9]{0,79}$/.test(error?.name || "") ? error.name : "Error";
+        const message = String(error?.message || "");
+        const code = name === "TimeoutError" ? "contextual_response_timeout"
+          : /^contextual_response_http_[1-5]\d{2}$/.test(message) ? message
+          : /^(?:fetch failed|failed to fetch|network request failed|NetworkError when attempting to fetch resource\.?)$/i.test(message) ? "contextual_response_network_error"
+          : name === "SyntaxError" ? "contextual_response_invalid_json" : "contextual_response_error";
+        contextualResponseFailure = { code, name };
+        recordStage(harnessRun, "planner_fallback", { error_code: code, error_name: name });
       }
       if (typeof runtime.captureSemanticTrace === "function") runtime.captureSemanticTrace({
         context, previous_state: semanticOptions.previousState || null,
         extraction: semanticExtraction?.trace || null, extraction_failure: semanticModelFailure, deterministic_patch: semantic.patch,
+        contextual_response_failure: contextualResponseFailure,
         extraction_validation: semantic.extractionValidation || null,
         semantic_state: semantic.state, canonical_plan: plan, final_plan: plan,
         postprocessing: "Canonical action facts and response bypass legacy rewriting; the final gate builds actions from validated state.",
@@ -3478,7 +3489,7 @@ exports.handler = async (event, runtime = {}) => {
       recordStage(harnessRun, "loop_planned", loopSummary(loop));
       const source = `${semanticExtraction?.source || "semantic_state_v1"}+${contextualResponseSource}`;
       finishRun(harnessRun, { plan, source });
-      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError, extraction_failure: semanticModelFailure, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities, attempt_count: semanticExtraction.attempt_count, attempt_errors: semanticExtraction.attempt_errors } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
+      return json(200, { ok: true, plan, semantic_state: semantic.state, source, model_error: semanticModelError || contextualResponseFailure?.code || null, extraction_failure: semanticModelFailure, contextual_response_failure: contextualResponseFailure, extraction: semanticExtraction ? { model_requested: semanticExtraction.model_requested, model_returned: semanticExtraction.model_returned, rejected: semanticExtraction.rejected, ambiguities: semanticExtraction.ambiguities, attempt_count: semanticExtraction.attempt_count, attempt_errors: semanticExtraction.attempt_errors } : null, harness: publicMeta(harnessRun), loop: publicLoop(loop) });
     }
     if (!useAppLayer) {
       let conversationResult;

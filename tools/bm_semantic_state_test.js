@@ -601,4 +601,45 @@ test("accepting a past-block review starts the reflection without repeating the 
   }
 });
 
+test("recurring blocks ask for a fixed clock time instead of offering now again", () => {
+  for (const [prompt,language,nowReply,clockReply] of [
+    ["Block Instagram now for 30 minutes every day.","en","Now.","Start at 09:00."],
+    ["Block Instagram now for 30 minutes on weekends.","en","Now.","Start at 09:00."],
+    ["Bloquea Instagram ahora durante 30 minutos cada día.","es","Ahora.","Empieza a las 09:00."],
+    ["Bloquea Instagram ahora durante 30 minutos los fines de semana.","es","Ahora.","Empieza a las 09:00."],
+  ]) {
+    const [first,repeated,resolved] = chat([prompt,nowReply,clockReply],DEVICE,language);
+    for (const result of [first,repeated]) {
+      none(result); assert.equal(result.decision.slot,"start");
+      assert.match(result.responseText,language === "es" ? /horario recurrente necesita una hora fija/ : /recurring schedule needs a fixed time/);
+      assert.match(result.responseText,language === "es" ? /A qué hora exacta debe empezar/ : /What exact time should it start/);
+      assert.doesNotMatch(result.responseText,/now or|ahora o/i);
+    }
+    equalSlot(resolved,"start",{type:"time",minute:540});
+    assert.equal(resolved.decision.slot,"schedule_horizon_days"); none(resolved);
+  }
+});
+
+test("one-time blocks still offer an immediate start", () => {
+  for (const [prompt,language] of [["Block Instagram for 30 minutes once.","en"],["Bloquea Instagram durante 30 minutos una vez.","es"]]) {
+    const result=turn(prompt,null,DEVICE,language); none(result);
+    assert.equal(result.decision.slot,"start");
+    assert.match(result.responseText,language === "es" ? /ahora o a qué hora exacta/ : /now or at what exact time/);
+  }
+});
+
+test("daily allowance receipts name the limit while immediate blocks keep their own result", () => {
+  for (const [daily,block,language] of [
+    ["Set a 20-minute daily limit for Instagram now.","Block Instagram now for 20 minutes once.","en"],
+    ["Pon un límite de uso de 20 minutos al día para Instagram desde ahora.","Bloquea Instagram ahora durante 20 minutos una vez.","es"],
+  ]) {
+    const limit=turn(daily,null,DEVICE,language), protection=turn(block,null,DEVICE,language);
+    assert.deepEqual(limit.actions,[{type:"set_daily_limit",minutes:20}]);
+    assert.match(limit.responseText,language === "es" ? /cuando el dispositivo verifique el límite/ : /after the device verifies the limit/);
+    assert.doesNotMatch(limit.responseText,/verifies the block|verifique el bloqueo/);
+    assert.deepEqual(protection.actions,[{type:"start_protection",minutes:20,hard_mode:false}]);
+    assert.match(protection.responseText,language === "es" ? /cuando el dispositivo verifique el bloqueo/ : /after the device verifies the block/);
+  }
+});
+
 console.log(`BM semantic state: ${checks}/${checks} independent transition and invariant checks passed`);

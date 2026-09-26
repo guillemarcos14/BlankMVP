@@ -69,6 +69,65 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
       assert.deepEqual(error.semantic_attempt_errors,["duplicate_semantic_extraction_slot","duplicate_semantic_extraction_slot"]);return true;
     });
     assert.equal(failedCalls,2,"malformed extraction retry is bounded");
+
+    const evidencePrompt = "Pon un límite de uso de 20 minutos al día para mis distracciones desde ahora, pero solo durante los próximos 7 días.";
+    const nonliteralEvidence = bodyFor([field("action_type","daily_limit","Un límite de uso de 20 minutos al día")]);
+    const literalEvidence = bodyFor([
+      field("action_type","daily_limit","un límite de uso de 20 minutos al día"),
+      field("duration_minutes",20,"20 minutos"),
+      field("schedule_horizon_days",7,"durante los próximos 7 días"),
+    ]);
+    assert.throws(()=>parseCandidate(nonliteralEvidence,evidencePrompt),/ungrounded_semantic_extraction_evidence/,"capitalization changes must not pass exact evidence validation");
+    let evidenceCalls=0;
+    const evidenceRepaired=await extractWithModel({prompt:evidencePrompt,fetchImpl:async(_url,options)=>{
+      evidenceCalls++;
+      if(evidenceCalls===2){
+        const hint=JSON.parse(options.body).input.at(-1).content;
+        assert.match(hint,/Copy evidence literally/); assert.match(hint,/Omit any field/);
+        assert.doesNotMatch(hint,/Un límite/,"repair instruction must not reflect rejected model content");
+      }
+      return {ok:true,json:async()=>evidenceCalls===1?nonliteralEvidence:literalEvidence};
+    }});
+    assert.equal(evidenceCalls,2); assert.equal(evidenceRepaired.attempt_count,2);
+    assert.deepEqual(evidenceRepaired.attempt_errors,["ungrounded_semantic_extraction_evidence"]);
+    assert.deepEqual(evidenceRepaired.trace.attempt_errors,evidenceRepaired.attempt_errors);
+    const expiryAfterRepair=advanceSemanticState({prompt:evidencePrompt,extraction:evidenceRepaired.extraction,context:{channel:"ios",screen_time_authorized:true,has_selected_apps:true}});
+    assert.equal(expiryAfterRepair.state.slots.duration_minutes.value,20);
+    assert.equal(expiryAfterRepair.state.slots.schedule_horizon_days.value,7);
+    assert.equal(expiryAfterRepair.decision.slot,"schedule_horizon_days"); assert.deepEqual(expiryAfterRepair.actions,[]);
+    let repeatedEvidenceCalls=0;
+    await assert.rejects(()=>extractWithModel({prompt:evidencePrompt,fetchImpl:async()=>{
+      repeatedEvidenceCalls++; return {ok:true,json:async()=>nonliteralEvidence};
+    }}),error=>{
+      assert.equal(error.semantic_attempt_count,2);
+      assert.deepEqual(error.semantic_attempt_errors,["ungrounded_semantic_extraction_evidence","ungrounded_semantic_extraction_evidence"]);return true;
+    });
+    assert.equal(repeatedEvidenceCalls,2,"a second invalid quote must fail, never start a third attempt");
+
+    let inventedValueCalls=0;
+    const inventedValue=await extractWithModel({prompt:"25 minutes",previousState:first.state,fetchImpl:async()=>{
+      inventedValueCalls++;return {ok:true,json:async()=>bodyFor([field("duration_minutes",45,inventedValueCalls===1?"25 MINUTES":"25 minutes")])};
+    }});
+    assert.equal(inventedValueCalls,2);
+    assert.deepEqual(inventedValue.rejected,[{slot:"duration_minutes",code:"ungrounded_model_fact"}],"literal evidence does not authorize an invented value");
+    const safeRepair=advanceSemanticState({prompt:"25 minutes",previousState:first.state,extraction:inventedValue.extraction});
+    assert.equal(safeRepair.state.slots.duration_minutes.value,25);assert.deepEqual(safeRepair.actions,[]);
+    let omittedCalls=0;
+    const omitted=await extractWithModel({prompt:"25 minutes",fetchImpl:async()=>{
+      omittedCalls++;return {ok:true,json:async()=>bodyFor(omittedCalls===1
+        ? [field("duration_minutes",25,"25 minutes"),field("apps",["TikTok"],"not in the message")]
+        : [])};
+    }});
+    assert.equal(omittedCalls,2);assert.deepEqual(omitted.extraction,{set:{},evidence:{}},"second candidate must not inherit any earlier rejected candidate fields");
+    let quotaAfterRepairCalls=0;
+    await assert.rejects(()=>extractWithModel({prompt:evidencePrompt,fetchImpl:async()=>{
+      quotaAfterRepairCalls++;return quotaAfterRepairCalls===1?{ok:true,json:async()=>nonliteralEvidence}:{ok:false,status:429};
+    }}),error=>{
+      assert.equal(error.message,"semantic_model_http_429"); assert.equal(error.semantic_attempt_count,2);
+      assert.deepEqual(error.semantic_attempt_errors,["ungrounded_semantic_extraction_evidence","semantic_model_http_429"]);return true;
+    });
+    assert.equal(quotaAfterRepairCalls,2,"quota after repair attempt must not trigger a third request");
+
     const realNow=Date.now, realTimeout=AbortSignal.timeout;
     const budgets=[]; let elapsed=0;
     try {
@@ -80,8 +139,26 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
           ? [field("duration_minutes",30,"45 minutes"),field("duration_minutes",45,"45 minutes")]
           : [field("duration_minutes",45,"45 minutes")])};
       }});
-      assert.deepEqual(budgets,[12000,12000],"each attempt is bounded within the shared20-second deadline");
+      assert.deepEqual(budgets,[20000,15000],"initial extraction gets its full deadline; an early failure leaves only the remaining budget");
     } finally { Date.now=realNow; AbortSignal.timeout=realTimeout; }
+    const evidenceBudgets=[];let evidenceElapsed=0,boundedEvidenceCalls=0;
+    try {
+      Date.now=()=>100000+evidenceElapsed;
+      AbortSignal.timeout=milliseconds=>{evidenceBudgets.push(milliseconds);return new AbortController().signal;};
+      await extractWithModel({prompt:evidencePrompt,fetchImpl:async()=>{
+        boundedEvidenceCalls++;if(boundedEvidenceCalls===1)evidenceElapsed=12000;
+        return {ok:true,json:async()=>boundedEvidenceCalls===1?nonliteralEvidence:literalEvidence};
+      }});
+      assert.equal(boundedEvidenceCalls,2);assert.deepEqual(evidenceBudgets,[20000,8000],"quote repair uses the same remaining deadline");
+    } finally { Date.now=realNow; AbortSignal.timeout=realTimeout; }
+    let expiredEvidenceElapsed=0,expiredEvidenceCalls=0;
+    try {
+      Date.now=()=>100000+expiredEvidenceElapsed;
+      await assert.rejects(()=>extractWithModel({prompt:evidencePrompt,fetchImpl:async()=>{
+        expiredEvidenceCalls++;expiredEvidenceElapsed=19001;return {ok:true,json:async()=>nonliteralEvidence};
+      }}),error=>error.semantic_attempt_count===1&&error.message==="ungrounded_semantic_extraction_evidence");
+      assert.equal(expiredEvidenceCalls,1,"less than a second remaining must not start quote repair");
+    } finally { Date.now=realNow; }
     let timeoutCalls=0;
     await assert.rejects(()=>extractWithModel({prompt:"yes",fetchImpl:async()=>{
       timeoutCalls++; const error=new Error("timed out");error.name="TimeoutError";throw error;
@@ -105,8 +182,22 @@ const field = (slot, value, evidence) => ({ slot, value, evidence });
         if(boundedCalls===1){timeoutElapsed+=12000;const error=new Error("timeout");error.name="TimeoutError";throw error;}
         return {ok:true,json:async()=>bodyFor([field("duration_minutes",45,"45 minutes")])};
       }});
-      assert.deepEqual(timeoutBudgets,[12000,8000]);
+      assert.deepEqual(timeoutBudgets,[20000,8000]);
       assert.deepEqual(bounded.attempt_errors,["semantic_model_timeout"]);
+    } finally { Date.now=realNow; AbortSignal.timeout=realTimeout; }
+    const exhaustedBudgets=[];let exhaustedElapsed=0,exhaustedCalls=0;
+    try {
+      Date.now=()=>100000+exhaustedElapsed;
+      AbortSignal.timeout=milliseconds=>{exhaustedBudgets.push(milliseconds);return new AbortController().signal;};
+      await assert.rejects(()=>extractWithModel({prompt:"yes",fetchImpl:async()=>{
+        exhaustedCalls++;exhaustedElapsed=20000;
+        const error=new Error("deadline exhausted");error.name="TimeoutError";throw error;
+      }}),error=>{
+        assert.equal(error.name,"TimeoutError");assert.equal(error.semantic_attempt_count,1);
+        assert.deepEqual(error.semantic_attempt_errors,["semantic_model_timeout"]);return true;
+      });
+      assert.equal(exhaustedCalls,1,"a timeout exhausting the shared deadline must never start a second request");
+      assert.deepEqual(exhaustedBudgets,[20000]);
     } finally { Date.now=realNow; AbortSignal.timeout=realTimeout; }
     let authCalls=0;
     await assert.rejects(()=>extractWithModel({prompt:"yes",fetchImpl:async()=>{authCalls++;return {ok:false,status:401};}}),/semantic_model_http_401/);

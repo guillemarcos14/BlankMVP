@@ -72,7 +72,7 @@ async function extractWithModel({ prompt, previousState, context = {}, fetchImpl
       // cannot consume a second timeout window or exhaust the app turn lease.
       const response = await fetchImpl("https://api.openai.com/v1/responses", {
         method: "POST", headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
-        body: JSON.stringify(request), signal: AbortSignal.timeout(Math.max(1, Math.min(12000, deadline - Date.now()))),
+        body: JSON.stringify(request), signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
       });
       if (!response.ok) throw new Error(`semantic_model_http_${response.status}`);
       const body = await response.json();
@@ -89,13 +89,14 @@ async function extractWithModel({ prompt, previousState, context = {}, fetchImpl
       // output or a transient model request, without hiding either attempt or
       // allowing a second 20-second timeout window. Auth/quota failures fail fast.
       const retryable = error.name === "TimeoutError"
-        || ["duplicate_semantic_extraction_slot", "semantic_model_incomplete", "semantic_model_http_502", "semantic_model_http_503", "semantic_model_http_504"].includes(error.message);
+        || ["duplicate_semantic_extraction_slot", "ungrounded_semantic_extraction_evidence", "semantic_model_incomplete", "semantic_model_http_502", "semantic_model_http_503", "semantic_model_http_504"].includes(error.message);
       if (attempt !== 1 || !retryable || deadline - Date.now() < 1000) {
         error.semantic_attempt_count = attempt;
         error.semantic_attempt_errors = [...attemptErrors];
         throw error;
       }
       if (error.message === "duplicate_semantic_extraction_slot") request.input.push({ role: "system", content: "The previous extraction repeated a slot and was rejected. Return at most one entry per slot. Omit conflicting alternatives; report their ambiguity instead." });
+      if (error.message === "ungrounded_semantic_extraction_evidence") request.input.push({ role: "system", content: "The previous extraction was rejected because an evidence quote was not an exact substring of current_message. Copy evidence literally from current_message, preserving capitalization, accents, whitespace and punctuation. Do not paraphrase or normalize it. Omit any field whose evidence cannot be copied exactly." });
       if (error.message === "semantic_model_incomplete") request.max_output_tokens = 1400;
     }
   }

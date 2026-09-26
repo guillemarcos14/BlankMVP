@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeConcurrency, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize } = require("./bm_sol_quality_judge");
+const { DEFAULT_MODEL, buildJudgeInput, checkpointSummary, digest, flattenReport, functionalFailures, judgeConcurrency, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize } = require("./bm_sol_quality_judge");
 
 async function run() {
   let requestBody = null;
@@ -46,6 +46,12 @@ async function run() {
   assert.strictEqual(digest({ a: 1 }), digest({ a: 1 }));
   assert.notStrictEqual(reviewDigest({ input: "x" }), reviewDigest({ input: "x" }, [], "another-model"));
   assert.strictEqual(summarize([{ review }]).release_eligible, true);
+  const completeTurn = { dimensions: Object.fromEntries(["intent", "slots", "transition", "provenance", "decision", "actions", "safety"].map(key => [key, "passed"])) };
+  assert.strictEqual(checkpointSummary([completeTurn, completeTurn], [{ review }]).summary.release_eligible, false, "a perfect partial checkpoint cannot approve release");
+  assert.strictEqual(checkpointSummary([completeTurn, completeTurn], [{ review }, { review: null }]).summary.release_eligible, false, "a placeholder is not a completed review");
+  assert.strictEqual(checkpointSummary([completeTurn], [{ review }], "provider timeout").summary.release_eligible, false, "infrastructure failure keeps the gate closed");
+  assert.strictEqual(checkpointSummary([completeTurn], [{ review }]).summary.release_eligible, true, "a complete passing review can approve its exact scope");
+  assert.strictEqual(checkpointSummary([], []).complete, false, "empty review scope cannot be complete");
   const unsafe = { ...review, verdict: "acceptable", unsafe_claim: true };
   assert.strictEqual(summarize([{ review: unsafe }]).release_eligible, false);
   assert.strictEqual(summarize([{ review: { ...review, hard_contradiction: true } }]).release_eligible, false, "evidence wording must never relax the hard contradiction gate");

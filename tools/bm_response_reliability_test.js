@@ -188,8 +188,87 @@ async function verifyFreeformDeadlines() {
   }
 }
 
+async function verifyInstrumentedSemanticDeadlines() {
+  const old = { fetch: global.fetch, key: process.env.OPENAI_API_KEY, timeout: AbortSignal.timeout, info: console.info,
+    url: process.env.SUPABASE_URL, service: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  process.env.OPENAI_API_KEY = "instrumentation-key-never-sent";
+  process.env.SUPABASE_URL = ""; process.env.SUPABASE_SERVICE_ROLE_KEY = "";
+  const keepAlive = setTimeout(() => {}, 2000);
+  try {
+    for (const stage of ["extraction", "contextual"]) {
+      for (const phase of ["headers", "body"]) {
+        const budgets = [], stages = []; let calls = 0, trace;
+        console.info = (...values) => {
+          if (values[0] === "bm_harness") stages.push(JSON.parse(values[1]));
+          else old.info(...values);
+        };
+        // Preserve the real AbortSignal implementation while accelerating the
+        // clock. The requested production budgets are asserted separately.
+        AbortSignal.timeout = milliseconds => { budgets.push(milliseconds); return old.timeout(10); };
+        global.fetch = async (url, options) => {
+          assert.equal(String(url), "https://api.openai.com/v1/responses"); calls++;
+          const structured = Boolean(JSON.parse(options.body).text?.format?.schema);
+          if (stage === "contextual" && structured) return { ok: true, status: 200,
+            headers: new Headers({ "x-request-id": "req_internal_extraction_success" }),
+            json: async () => ({ model: "mock-model", status: "completed", output_text: JSON.stringify({ fields: [], ambiguities: [] }),
+              usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15, output_tokens_details: { reasoning_tokens: 3 } } }) };
+          const aborted = () => new Promise((_, reject) => {
+            if (options.signal.aborted) reject(options.signal.reason);
+            else options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+          });
+          if (phase === "headers") return aborted();
+          return { ok: true, status: 200, headers: new Headers({ "x-request-id": "req_internal_body_timeout" }), json: aborted };
+        };
+        const prompt = stage === "extraction" ? "Block selected apps now for 30 minutes once."
+          : "What should I do about selected apps now for 30 minutes once?";
+        const response = await handler({ httpMethod: "POST", body: JSON.stringify({ prompt, context: {
+          channel: "whatsapp", language: "en", protection_target: "selected_distractions", has_selected_apps: true,
+          screen_time_authorized: true, app_presence: { app_present: true, app_ready: true, last_seen_at: new Date().toISOString() },
+        } }) }, { captureSemanticTrace: value => { trace = value; } });
+        assert.equal(response.statusCode, 200);
+        const body = JSON.parse(response.body);
+        assert.equal(body.model_error, stage === "extraction" ? "semantic_model_timeout" : "contextual_response_timeout");
+        assert.ok(budgets[0] > 19000 && budgets[0] <= 20000, "initial extraction retains its original shared twenty-second deadline");
+        assert.ok(trace.model_requests);
+        if (stage === "extraction") {
+          assert.equal(calls, 2, "an early aborted double gets at most the existing second attempt");
+          assert.ok(budgets[1] <= budgets[0] && budgets[1] > 19000);
+          assert.equal(trace.model_requests.extraction.length, 2);
+          assert.equal(trace.model_requests.contextual, null, "canonical block recovery cannot make a rewrite call");
+          assert.ok(trace.model_requests.extraction.every(metrics => metrics.phase === phase && metrics.error_name === "TimeoutError"));
+        } else {
+          assert.equal(calls, 2);
+          assert.equal(budgets[1], 12000, "contextual naturalization keeps its original twelve-second budget");
+          assert.equal(trace.model_requests.extraction.length, 1);
+          assert.equal(trace.model_requests.extraction[0].phase, "complete");
+          assert.deepEqual(trace.model_requests.extraction[0].usage, { input_tokens: 10, output_tokens: 5, total_tokens: 15, reasoning_tokens: 3 });
+          assert.ok(stages.some(stage => stage.request_metrics?.usage_input === 10 && stage.request_metrics?.usage_reasoning === 3),
+            "numeric usage survives the stage privacy filter without exposing provider payloads");
+          assert.equal(trace.model_requests.contextual.phase, phase);
+          assert.equal(trace.model_requests.contextual.budget_ms, 12000);
+          assert.equal(trace.model_requests.contextual.error_name, "TimeoutError");
+        }
+        const measured = stage === "extraction" ? trace.model_requests.extraction[0] : trace.model_requests.contextual;
+        if (phase === "body") { assert.equal(measured.http_status, 200); assert.equal(measured.request_id, "req_internal_body_timeout"); }
+        else assert.equal(measured.http_status, undefined);
+        assert.equal(body.model_requests, undefined);
+        assert.equal(body.harness?.model_requests, undefined);
+        assert.doesNotMatch(JSON.stringify(body), /req_internal_|attempt_metrics|request_metrics|model_requests|instrumentation-key-never-sent|"authorization"\s*:|Bearer/i,
+          "internal transport diagnostics and request IDs must never appear in the public response or harness metadata");
+      }
+    }
+  } finally {
+    clearTimeout(keepAlive);
+    global.fetch = old.fetch; AbortSignal.timeout = old.timeout; console.info = old.info;
+    for (const [key, value] of [["OPENAI_API_KEY", old.key], ["SUPABASE_URL", old.url], ["SUPABASE_SERVICE_ROLE_KEY", old.service]]) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+}
+
 (async()=>{
   await verifyFreeformDeadlines();
+  await verifyInstrumentedSemanticDeadlines();
   const oldFetch=global.fetch, oldKey=process.env.OPENAI_API_KEY;
   const oldURL=process.env.SUPABASE_URL, oldService=process.env.SUPABASE_SERVICE_ROLE_KEY;
   process.env.OPENAI_API_KEY="mock-key-not-sent";

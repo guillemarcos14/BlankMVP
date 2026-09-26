@@ -3,7 +3,7 @@
 ## Contrato
 
 - `assistant-app` exige un JWT vigente de Supabase y un `app_install_id` que coincida con la identidad autenticada. El cliente iOS guarda access/refresh tokens en Keychain tras OTP y renueva la sesión mediante `app-auth`.
-- `history` devuelve los últimos 60 turnos propios. `send` usa `turn_id` UUID idempotente y guarda la entrada y la salida en `assistant_app_turns`. La pantalla principal muestra solo la última salida; el menú abre el historial completo, incluidas las entradas del usuario.
+- `history` pagina los turnos propios de 60 en 60. `send` usa `turn_id` UUID idempotente y guarda la entrada y la salida en `assistant_app_turns`. La pantalla principal muestra solo la última salida; el menú permite recuperar el historial completo, incluidas las entradas del usuario.
 - El turno llama a `callBlankedAgent` de BM Final con la misma memoria semántica, perfil canónico y selección de distracciones que WhatsApp. No crea un agente ni un prompt alternativo. La app no envía una copia del turno por WhatsApp.
 - Una acción válida se encola en la misma bandeja nativa con ID `app_...`; `Apply now` usa el polling y el acuse existentes del iPhone. La interfaz solo muestra `verified` tras el recibo físico. Los avisos de reintento y resultado de esta acción se consultan en la app, sin mensaje saliente de WhatsApp.
 

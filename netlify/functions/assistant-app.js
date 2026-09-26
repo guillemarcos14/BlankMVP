@@ -33,6 +33,8 @@ async function readTurn(userId, turnId) {
 function actionStatus(actionId, memory) {
   if (!actionId) return "";
   if (memory.pending_assistant_action?.id === actionId) {
+    const expiry = Date.parse(memory.pending_assistant_action.expires_at || "");
+    if (Number.isFinite(expiry) && expiry <= Date.now()) return "expired";
     return memory.pending_assistant_action.status || "queued";
   }
   if (memory.last_assistant_action_outcome?.id === actionId) {
@@ -54,13 +56,22 @@ function presentTurn(row, memory) {
   };
 }
 
-async function history(auth) {
+async function history(auth, body) {
+  const before = String(body.before || "").trim();
+  if (before && !Number.isFinite(Date.parse(before))) return json(400, { error: "invalid_history_cursor" });
   const rows = await supabaseFetch(
-    `${TABLE}?auth_user_id=eq.${encodeURIComponent(auth.user.id)}&select=*&order=created_at.desc&limit=60`,
+    `${TABLE}?auth_user_id=eq.${encodeURIComponent(auth.user.id)}`
+      + (before ? `&created_at=lt.${encodeURIComponent(before)}` : "")
+      + "&select=*&order=created_at.desc&limit=61",
     { method: "GET" },
   );
   const memory = await getAssistantMemory("whatsapp", auth.identity.phone_e164);
-  return json(200, { ok: true, turns: rows.reverse().map((row) => presentTurn(row, memory)) });
+  const page = rows.slice(0, 60);
+  return json(200, {
+    ok: true,
+    turns: page.reverse().map((row) => presentTurn(row, memory)),
+    next_before: rows.length > 60 ? rows[59].created_at : null,
+  });
 }
 
 async function send(auth, body) {
@@ -146,7 +157,7 @@ exports.handler = async (event) => {
     const body = parseJsonBody(event);
     const auth = await authenticatedIdentity(event, body);
     if (auth.error) return json(auth.status, { error: auth.error });
-    if (body.action === "history") return await history(auth);
+    if (body.action === "history") return await history(auth, body);
     if (body.action === "send") return await send(auth, body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {

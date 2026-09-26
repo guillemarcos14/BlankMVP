@@ -546,7 +546,7 @@ async function recordAssistantConnection({ channel, connectCode, from, identityL
     });
     if (!identityLinked) await transitionPendingAssistantAction({ channel, channelUser: from,
       previous: previousMemory.pending_assistant_action, pending: null,
-      expectedVersion: previousMemory.semantic_store_version, source: "assistant_channel_connected" });
+      expectedVersion: previousMemory.semantic_store_version, invalidateGeneration: true, source: "assistant_channel_connected" });
     const attachedContext = await attachAssistantUserContext({ connectCode, channel, channelUser: from });
     context = attachedContext && Object.keys(attachedContext).length ? attachedContext : previousMemory.user_context || {};
   } catch (error) {
@@ -645,7 +645,7 @@ async function processMessage(message) {
     const stoppedMemory = await getAssistantMemory("whatsapp", message.from);
     await transitionPendingAssistantAction({ channel: "whatsapp", channelUser: message.from,
       previous: stoppedMemory.pending_assistant_action, pending: null,
-      expectedVersion: stoppedMemory.semantic_store_version, source: "assistant_channel_paused" });
+      expectedVersion: stoppedMemory.semantic_store_version, invalidateGeneration: true, source: "assistant_channel_paused" });
     await recordAssistantMemory({
       channel: "whatsapp",
       channelUser: message.from,

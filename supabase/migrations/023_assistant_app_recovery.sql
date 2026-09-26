@@ -290,6 +290,50 @@ $$;
 revoke all on function public.transition_assistant_pending_action(text, text, text, text, jsonb, jsonb, bigint) from public, anon, authenticated;
 grant execute on function public.transition_assistant_pending_action(text, text, text, text, jsonb, jsonb, bigint) to service_role;
 
+create or replace function public.invalidate_assistant_channel_generation(
+  p_anonymous_user_id text, p_channel text, p_expected_version bigint
+)
+returns table(updated boolean, status text)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  memory_version bigint;
+  current_pending jsonb;
+  cleared record;
+begin
+  if p_anonymous_user_id is null or p_anonymous_user_id !~ '^assistant:[a-f0-9]{32}$'
+      or p_channel is null or p_channel not in ('whatsapp', 'sms')
+      or p_expected_version is null or p_expected_version < 0 then
+    return query select false, 'invalid'::text;
+    return;
+  end if;
+  insert into public.assistant_semantic_conversations(anonymous_user_id, channel)
+    values (p_anonymous_user_id, p_channel) on conflict (anonymous_user_id) do nothing;
+  select c.storage_version into memory_version from public.assistant_semantic_conversations c
+    where c.anonymous_user_id = p_anonymous_user_id and c.channel = p_channel for update;
+  if not found or memory_version is distinct from p_expected_version then
+    return query select false, 'superseded'::text;
+    return;
+  end if;
+  -- STOP / changing a legacy connection cancels this generation, including a
+  -- prepared action whose enqueue has not arrived yet. Newer turns are preserved.
+  update public.assistant_semantic_conversations c set storage_version = c.storage_version + 1,
+    state = '{}'::jsonb, updated_at = clock_timestamp(), expires_at = clock_timestamp()
+    where c.anonymous_user_id = p_anonymous_user_id;
+  select e.payload #> '{properties,memory,pending_assistant_action}' into current_pending
+    from public.digital_wellness_feature_payloads e where e.anonymous_user_id = p_anonymous_user_id
+      and (e.payload -> 'properties' -> 'memory') ? 'pending_assistant_action'
+    order by e.submitted_at desc, e.id desc limit 1;
+  select * into cleared from public.transition_assistant_pending_action(p_anonymous_user_id, p_channel,
+    current_pending ->> 'id', case when jsonb_typeof(current_pending) = 'object' then coalesce(current_pending ->> 'status', 'queued') end,
+    null, null);
+  if not cleared.updated then raise exception 'assistant_generation_clear_failed'; end if;
+  return query select true, 'updated'::text;
+end;
+$$;
+revoke all on function public.invalidate_assistant_channel_generation(text, text, bigint) from public, anon, authenticated;
+grant execute on function public.invalidate_assistant_channel_generation(text, text, bigint) to service_role;
+
 revoke all on function public.claim_assistant_app_turn(uuid, uuid, text, uuid) from public, anon, authenticated;
 revoke all on function public.prepare_assistant_app_turn(uuid, uuid, uuid, text, bigint, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public.enqueue_assistant_app_action(uuid, uuid, uuid) from public, anon, authenticated;

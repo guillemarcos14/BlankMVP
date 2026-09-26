@@ -8,6 +8,7 @@ const {
   transitionPendingAssistantAction,
   getAssistantMemory,
   getAssistantActionRecord,
+  isInferredActionOutcome,
   getAssistantUserContext,
   normalizeConnectCode,
   recordAssistantUserContext,
@@ -498,7 +499,7 @@ async function acknowledgePendingAction(body) {
       : null);
   if (!pending || pending.id !== actionId) {
     const outcome = memory.last_assistant_action_outcome;
-    if (outcome?.id === actionId && TERMINAL_ACTION_STATUSES.has(normalizeActionStatus(outcome.status))) {
+    if (outcome?.id === actionId && !isInferredActionOutcome(outcome) && TERMINAL_ACTION_STATUSES.has(normalizeActionStatus(outcome.status))) {
       await persistAppActionReceipt(result, body, actionId, normalizeActionStatus(outcome.status));
       return json(200, {
         ok: true,
@@ -509,7 +510,7 @@ async function acknowledgePendingAction(body) {
     }
     if (TERMINAL_ACTION_STATUSES.has(status)) {
       const historical = await getAssistantActionRecord(result.connection.channel, result.connection.channelUser, actionId);
-      if (historical?.outcome?.id === actionId && TERMINAL_ACTION_STATUSES.has(normalizeActionStatus(historical.outcome.status))) {
+      if (historical?.outcome?.id === actionId && !isInferredActionOutcome(historical.outcome) && TERMINAL_ACTION_STATUSES.has(normalizeActionStatus(historical.outcome.status))) {
         await persistAppActionReceipt(result, body, actionId, normalizeActionStatus(historical.outcome.status));
         return json(200, { ok: true, acknowledged: true, idempotent: true, status: normalizeActionStatus(historical.outcome.status) });
       }

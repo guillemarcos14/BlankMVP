@@ -283,7 +283,7 @@ async function recordPendingAssistantAction({ channel, channelUser, pending = nu
   return receipt;
 }
 
-async function transitionPendingAssistantAction({ channel, channelUser, previous = null, pending = null, outcome = null, expectedVersion, source = "assistant_action_transition" }) {
+async function transitionPendingAssistantAction({ channel, channelUser, previous = null, pending = null, outcome = null, expectedVersion, invalidateGeneration = false, source = "assistant_action_transition" }) {
   if (!semanticPersistenceRequired()) {
     await recordAssistantMemory({ channel, channelUser, memory: {
       pending_assistant_action: pending,
@@ -291,7 +291,13 @@ async function transitionPendingAssistantAction({ channel, channelUser, previous
     }, source });
     return { updated: true, status: "updated" };
   }
-  const result = await supabaseFetch("rpc/transition_assistant_pending_action", {
+  if (invalidateGeneration && (!Number.isSafeInteger(expectedVersion) || expectedVersion < 0)) {
+    throw new Error("assistant_action_missing_semantic_version");
+  }
+  const result = invalidateGeneration ? await supabaseFetch("rpc/invalidate_assistant_channel_generation", {
+    method: "POST", body: JSON.stringify({ p_anonymous_user_id: assistantChannelUserId(channel, channelUser),
+      p_channel: channel, p_expected_version: expectedVersion }),
+  }) : await supabaseFetch("rpc/transition_assistant_pending_action", {
     method: "POST", body: JSON.stringify({ p_anonymous_user_id: assistantChannelUserId(channel, channelUser),
       p_channel: channel, p_expected_action_id: previous?.id || null,
       p_expected_status: previous ? previous.status || "queued" : null,
@@ -304,6 +310,10 @@ async function transitionPendingAssistantAction({ channel, channelUser, previous
   return receipt;
 }
 
+function isInferredActionOutcome(outcome) {
+  return outcome?.detail === "action_expired_before_execution";
+}
+
 async function getAssistantActionRecord(channel, channelUser, actionId) {
   const key = assistantChannelUserId(channel, channelUser);
   const id = cleanText(actionId, 80);
@@ -311,6 +321,12 @@ async function getAssistantActionRecord(channel, channelUser, actionId) {
   const filter = `(payload->properties->memory->pending_assistant_action->>id.eq.${id},payload->properties->memory->last_assistant_action_outcome->>id.eq.${id})`;
   const rows = await supabaseFetch(`${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(key)}&or=${encodeURIComponent(filter)}&select=payload&order=submitted_at.desc,id.desc&limit=1`, { method: "GET" });
   const memory = rows[0]?.payload?.properties?.memory;
+  if (isInferredActionOutcome(memory?.last_assistant_action_outcome)) {
+    // Expiry is an observation of delivery, not an acknowledgement from iPhone.
+    // Recover A's immutable envelope so a late native receipt is still validated.
+    const actions = await supabaseFetch(`${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(key)}&payload->properties->memory->pending_assistant_action->>id=eq.${encodeURIComponent(id)}&select=payload&order=submitted_at.desc,id.desc&limit=1`, { method: "GET" });
+    return { pending: actions[0]?.payload?.properties?.memory?.pending_assistant_action, outcome: memory.last_assistant_action_outcome };
+  }
   return memory ? { pending: memory.pending_assistant_action, outcome: memory.last_assistant_action_outcome } : null;
 }
 
@@ -694,6 +710,7 @@ module.exports = {
   getAssistantUserContext,
   getAssistantMemory,
   getAssistantActionRecord,
+  isInferredActionOutcome,
   hasProcessedAssistantMessage,
   normalizeConnectCode,
   proactiveGate,

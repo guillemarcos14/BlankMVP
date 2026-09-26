@@ -229,4 +229,52 @@ begin
   raise notice 'pending lifecycle SQL: stale poll, ack, expiry, onboarding and late receipts cannot erase or resurrect another action';
 end;
 $$;
+do $$
+declare
+  memory_key text := 'assistant:dddddddddddddddddddddddddddddddd';
+  owner_id uuid := '11111111-1111-4111-8111-111111111111';
+  turn_id uuid := 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  lease_id uuid := '44444444-4444-4444-8444-444444444444';
+  state jsonb := '{"semantic_state":{"intent":"block","status":"ready"}}';
+  payload jsonb := jsonb_build_object('assistant_text', 'Prepared before STOP.', 'semantic_version', 2,
+    'action', jsonb_build_object('id', 'app_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'minutes', 5,
+      'expires_at', now() + interval '30 minutes'));
+  pending jsonb := '{"id":"wa_late","status":"queued"}';
+  result record;
+begin
+  update public.assistant_app_turns set status = 'completed', lease_expires_at = null,
+    assistant_text = coalesce(assistant_text, 'Complete.'), completed_at = now() where auth_user_id = owner_id;
+  perform public.commit_assistant_semantic_conversation(memory_key, 'whatsapp', 0, state, 7200);
+  perform public.claim_assistant_app_turn(owner_id, turn_id, 'Prepare then stop', lease_id);
+  select * into result from public.prepare_assistant_app_turn(owner_id, turn_id, lease_id, memory_key, 1, state, payload);
+  assert result.prepared, 'pre-STOP app prepare failed';
+  -- The inbox is still empty, but a v2 app action already exists off the inbox.
+  select * into result from public.invalidate_assistant_channel_generation(memory_key, 'whatsapp', 2);
+  assert result.updated, 'STOP failed with empty pending inbox';
+  assert (select c.storage_version = 3 and c.state = '{}'::jsonb and c.expires_at <= clock_timestamp()
+    from public.assistant_semantic_conversations c where c.anonymous_user_id = memory_key), 'STOP did not invalidate semantic generation';
+  select * into result from public.enqueue_assistant_app_action(owner_id, turn_id, lease_id);
+  assert not result.enqueued and result.status = 'superseded', 'prepared app enqueue revived after STOP';
+  select * into result from public.enqueue_assistant_channel_action(memory_key, 'whatsapp', 2, pending);
+  assert not result.enqueued and result.status = 'superseded', 'late WA enqueue revived after STOP';
+
+  -- A new post-STOP intent remains usable; replaying the older STOP cannot erase B.
+  perform public.commit_assistant_semantic_conversation(memory_key, 'whatsapp', 3, state, 7200);
+  select * into result from public.enqueue_assistant_channel_action(memory_key, 'whatsapp', 4, pending);
+  assert result.enqueued, 'fresh post-STOP intent could not enqueue';
+  select * into result from public.invalidate_assistant_channel_generation(memory_key, 'whatsapp', 2);
+  assert not result.updated and result.status = 'superseded', 'stale STOP invalidated a newer intent';
+  assert (select storage_version = 4 from public.assistant_semantic_conversations where anonymous_user_id = memory_key), 'stale STOP changed generation';
+  -- If a prepared enqueue wins just before STOP's lock, STOP clears that same generation too.
+  select * into result from public.invalidate_assistant_channel_generation(memory_key, 'whatsapp', 4);
+  assert result.updated, 'STOP could not clear action already queued in its generation';
+  assert (select storage_version = 5 from public.assistant_semantic_conversations where anonymous_user_id = memory_key), 'STOP did not advance queued generation';
+  select * into result from public.enqueue_assistant_channel_action(memory_key, 'whatsapp', 4, pending);
+  assert not result.enqueued, 'same-generation enqueue revived after clearing';
+  assert not has_function_privilege('anon', 'public.invalidate_assistant_channel_generation(text,text,bigint)', 'execute'), 'anon invalidation access';
+  assert not has_function_privilege('authenticated', 'public.invalidate_assistant_channel_generation(text,text,bigint)', 'execute'), 'client invalidation access';
+  assert has_function_privilege('service_role', 'public.invalidate_assistant_channel_generation(text,text,bigint)', 'execute'), 'server invalidation grant missing';
+  raise notice 'STOP / identity generation SQL: prepared app and WA enqueue fenced; newer intents preserved';
+end;
+$$;
 rollback;

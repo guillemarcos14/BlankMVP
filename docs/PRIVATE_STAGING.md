@@ -2,6 +2,8 @@
 
 La autorización explícita de Guillem del 26/09/2026 permite a esta tarea asumir integración y despliegue. La exposición de una release a usuarios sigue dependiendo de sus gates. La verificación previa se hace en infraestructura separada, sin copiar datos de producción.
 
+Estado del 26/09, 15:44 UTC: runtime `a6f9e50` integrado en `77a01e050e0c1d9c6fce514a12644928976cc93b`, deploy `6ab7e819cbfca0f727997215`, cuatro ZIP remotos verificados y acceso anónimo HTTP 401. Harness integrado 62/62; smoke actual de infraestructura 4/4 y 12/12 limpiezas. Las 9/9 comprobaciones completas del flujo cloud se hicieron sobre el despliegue anterior a las 15:00 UTC. La preflight posterior del modelo devolvió HTTP 429: el resultado anterior no se atribuye al actual. Índice y hashes: [PRODUCT_NEXT_EVIDENCE.json](PRODUCT_NEXT_EVIDENCE.json).
+
 ## Entorno reservado
 
 - Supabase: `blank-product-staging`, referencia `njqbovsmoowkhhsqmitn`, misma organización y plan Free, región `eu-west-3`.

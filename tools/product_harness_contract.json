@@ -68,6 +68,7 @@
       { "name": "node_syntax_context", "run": "node --check netlify/functions/bm-context.js" },
       { "name": "node_syntax_personal_context_view", "run": "node --check netlify/functions/bm-personal-context-view.js" },
       { "name": "node_syntax_contextual_response", "run": "node --check netlify/functions/bm-contextual-response.js" },
+      { "name": "bm_contextual_response", "run": "node tools/bm_contextual_response_test.js" },
       { "name": "node_syntax_schedule_management", "run": "node --check netlify/functions/bm-schedule-management.js" },
       { "name": "node_syntax_blocking", "run": "node --check netlify/functions/bm-blocking-contract.js" },
       { "name": "node_syntax_contracts", "run": "node --check netlify/functions/bm-contracts.js" },

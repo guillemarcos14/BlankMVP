@@ -159,6 +159,11 @@ function isGrounded(text, plan, context) {
 async function naturalizeGroundedPlan({ prompt, context = {}, plan, fetchImpl = fetch }) {
   const fallback = stripContract(plan);
   if (plan?.response_contract?.immutable_reply === true) return { plan: fallback, source: "grounded_execution_boundary" };
+  // The validated block renderer already contains the facts and next step.
+  // Rephrasing those controls adds another request without changing the plan.
+  // Advice and personal recommendations still use contextual naturalization.
+  if (String(plan?.response_contract?.operation || "").startsWith("semantic_")
+      && plan?.semantic_state?.intent === "block") return { plan: fallback, source: "grounded_canonical_response" };
   const language = String(plan?.semantic_state?.language || context.language || "").toLowerCase();
   if (language.startsWith("es")) return { plan: fallback, source: "grounded_deterministic:spanish" };
   if (!process.env.OPENAI_API_KEY || !plan?.response_contract) return { plan: fallback, source: "grounded_deterministic" };

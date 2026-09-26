@@ -738,6 +738,11 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
   const question = value(state,"action_type") === "daily_limit" && decision.slot === "end_or_duration"
     ? (es ? "¿Cuántos minutos al día quieres permitir?" : "How many minutes per day should the limit allow?")
     : questions[decision.slot] || (es ? "Necesito aclarar ese dato antes de seguir." : "I need to clarify that detail before continuing.");
+  if (decision.type === "ask" && decision.slot === "recurrence"
+      && /^(?:yes|yeah|yep|yes please|okay|ok|sure|si|si por favor|vale|de acuerdo)[.!?]?$/.test(fold(prompt))) {
+    return es ? "¿Lo quieres solo esta vez, cada día o en días concretos de la semana?"
+      : "Should it happen just once, every day, or on specific days of the week?";
+  }
   const lead = knownFactLead(state,context);
   return lead ? `${lead} ${question}` : question;
 }
@@ -795,7 +800,7 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   state.delivery = delivery.delivery;
   if (state.delivery?.sent.includes("execution")) state.last_action_fingerprint = proposalFingerprint(state);
   const responseText = actionReplaySuppressed
-    ? `${semanticSummary(state,context)}. ${renderSuppressedDelivery(state.language)}`
+    ? `${semanticSummary(state,context)}. ${renderSuppressedDelivery(state.language, state.delivery)}`
     : renderSemanticResponse(state,decision,context,prompt);
   return { state, handled, decision, actions, actionReplaySuppressed, reviewOnlyAppPresence: reviewOnlyAppPresence && actions.length > 0, blockingContract:asBlockingContract(state,context), responseText, patch, extractionValidation };
 }

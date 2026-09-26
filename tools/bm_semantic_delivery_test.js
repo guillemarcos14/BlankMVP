@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const { advanceSemanticState, normalizeSemanticState, TTL_MS } = require("../netlify/functions/bm-semantic-state");
-const { normalizeSemanticDelivery, applySemanticDelivery, deliveryStage } = require("../netlify/functions/bm-semantic-delivery");
+const { normalizeSemanticDelivery, applySemanticDelivery, deliveryStage, renderSuppressedDelivery } = require("../netlify/functions/bm-semantic-delivery");
 const NOW = Date.parse("2026-09-26T12:00:00Z");
 const READY = { channel:"whatsapp", app_presence_state:"recently_seen", screen_time_authorized:true, has_selected_apps:true };
 const ABSENT = { ...READY, app_presence_state:"stale" };
@@ -34,6 +34,9 @@ for (const [request, type] of REQUESTS) {
   test(`${type}: permission request cannot repeat, but permission to execution is legitimate`, () => {
     const permission = turn(request, null, PERMISSION); assert.deepEqual(permission.actions, [{type:"request_screen_time_permission"}]);
     const repeat = turn("I said yes", permission, PERMISSION); suppressed(repeat);
+    assert.match(repeat.responseText,/permission request was already prepared/);
+    assert.match(repeat.responseText,/Open Blankmind, grant blocking permission/);
+    assert.doesNotMatch(repeat.responseText,/Check its result|This request was already prepared/);
     const ready = turn("Ready", repeat); assert.equal(ready.actions[0].type, type);
     assert.deepEqual(ready.state.delivery.sent, ["permission", "execution"]); suppressed(turn("Yes", ready));
   });
@@ -44,6 +47,29 @@ for (const [request, type] of REQUESTS) {
     suppressed(turn("Ready", picker));
   });
 }
+
+test("Spanish repeated permission directs the user to grant access without claiming an executable result", () => {
+  const first=turn("Bloquea mis distracciones ahora durante 30 minutos una vez.",null,PERMISSION,{language:"es"});
+  assert.deepEqual(first.actions,[{type:"request_screen_time_permission"}]);
+  const repeat=turn("Sí.",first,PERMISSION,{language:"es"}); suppressed(repeat);
+  assert.match(repeat.responseText,/solicitud de permiso ya se preparó/);
+  assert.match(repeat.responseText,/Abre Blankmind, concede el permiso de bloqueo/);
+  assert.doesNotMatch(repeat.responseText,/Consulta su resultado|permiso concedido|ya se envió|ya se aplicó/);
+  assert.deepEqual(repeat.state.delivery,first.state.delivery);
+  const ready=turn("Listo.",repeat,READY,{language:"es"});
+  assert.deepEqual(ready.actions,[{type:"start_protection",minutes:30,hard_mode:false}]);
+});
+
+test("an earlier executable keeps its original result guidance after permission preflight", () => {
+  const fingerprint="a".repeat(24);
+  for (const language of ["en","es"]) {
+    const original=renderSuppressedDelivery(language);
+    assert.equal(renderSuppressedDelivery(language,{version:1,proposal_fingerprint:fingerprint,sent:["permission","execution"]}),original);
+    const permission=renderSuppressedDelivery(language,{version:1,proposal_fingerprint:fingerprint,sent:["permission"]});
+    assert.notEqual(permission,original);
+    assert.doesNotMatch(permission,/already sent|ya se envió|permission granted|permiso concedido/i);
+  }
+});
 
 test("permission then picker transports execution once", () => {
   const permission = turn(REQUESTS[0][0], null, {...PERMISSION, has_selected_apps:false});

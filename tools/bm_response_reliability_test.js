@@ -137,7 +137,59 @@ for (const text of [
 assert.equal(isGrounded("A daily limit of 30 minutes is ready for approval.",{actions:[],response_contract:semantic},{}),true);
 assert.equal(isGrounded("A daily limit blocks the selected distractions after you use 30 minutes per day.",{actions:[],response_contract:semantic},{}),true);
 
+async function verifyFreeformDeadlines() {
+  const old={fetch:global.fetch,key:process.env.OPENAI_API_KEY,timeout:AbortSignal.timeout};
+  process.env.OPENAI_API_KEY="mock-not-sent";
+  const aborted=signal=>new Promise((_,reject)=>{
+    if(signal.aborted) reject(signal.reason);
+    else signal.addEventListener("abort",()=>reject(signal.reason),{once:true});
+  });
+  try {
+    for(const [prompt,kind,source] of [
+      ["Hello","conversation","deterministic_conversation_fallback_after_model_error"],
+      ["How can I reduce my screen time?","planner","deterministic_fallback_after_model_error"],
+    ]) {
+      const invoke=async()=>{
+        const result=await handler({httpMethod:"POST",body:JSON.stringify({prompt,context:{channel:"whatsapp",language:"en"}})});
+        assert.equal(result.statusCode,200); const body=JSON.parse(result.body);
+        assert.equal(body.source,source); assert.deepEqual(body.plan.actions,[]); assert.ok(body.plan.message_text);
+        return body;
+      };
+      // The same fetch signal must bound both waiting for headers and consuming
+      // the response body; a mock that throws immediately would not prove this.
+      for(const phase of ["headers","body"]) {
+        let calls=0; const budgets=[];
+        AbortSignal.timeout=ms=>{budgets.push(ms);const c=new AbortController();setImmediate(()=>c.abort(new DOMException("timed out","TimeoutError")));return c.signal;};
+        global.fetch=async(url,options)=>{
+          assert.equal(url,"https://api.openai.com/v1/responses"); calls++; assert.ok(options.signal);
+          if(phase==="headers") return aborted(options.signal);
+          return {ok:true,status:200,json:()=>aborted(options.signal)};
+        };
+        assert.equal((await invoke()).model_error,`openai_${kind}_timeout`);
+        assert.deepEqual(budgets,[30000]); assert.equal(calls,1,"free conversation and planner do not retry a timed-out request");
+      }
+      for(const fault of ["http","network"]) {
+        let calls=0,reads=0,cancelled=0;
+        AbortSignal.timeout=ms=>{assert.equal(ms,30000);return new AbortController().signal;};
+        global.fetch=async()=>{
+          calls++;
+          if(fault==="network") throw new Error("Authorization: Bearer synthetic-private-value");
+          return {ok:false,status:503,body:{cancel:async()=>{cancelled++;}},text:async()=>{reads++;return "Authorization: Bearer synthetic-private-value";}};
+        };
+        const body=await invoke();
+        assert.equal(body.model_error,fault==="http"?(kind==="conversation"?"openai_conversation_failed_503":"openai_failed_503"):`openai_${kind}_failed`);
+        assert.doesNotMatch(JSON.stringify(body),/synthetic-private-value|Authorization:/);
+        assert.equal(calls,1); assert.equal(reads,0); if(fault==="http") assert.equal(cancelled,1);
+      }
+    }
+  } finally {
+    global.fetch=old.fetch; AbortSignal.timeout=old.timeout;
+    if(old.key===undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY=old.key;
+  }
+}
+
 (async()=>{
+  await verifyFreeformDeadlines();
   const oldFetch=global.fetch, oldKey=process.env.OPENAI_API_KEY;
   const oldURL=process.env.SUPABASE_URL, oldService=process.env.SUPABASE_SERVICE_ROLE_KEY;
   process.env.OPENAI_API_KEY="mock-key-not-sent";
@@ -203,25 +255,26 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     assert.doesNotMatch(acknowledged.plan.message_text,/restart|nothing (?:is active|will start)/i);
 
     rewrite="Your selected distractions are limited to 45 minutes per day, starting now. Tap the Blankmind notification to finish.";
+    const limitBefore=calls.length;
     const limit=await call("Set a 45-minute daily limit for selected apps now.");
-    assert.match(limit.source,/grounding_fallback/);
+    assert.match(limit.source,/grounded_canonical_response/);
+    assert.equal(calls.length-limitBefore,1,"a validated block uses extraction and canonical copy, with no second model call");
     assert.match(limit.plan.message_text,/45 minutes per day/);
     assert.doesNotMatch(limit.plan.message_text,/are limited/);
     assert.equal(limit.plan.actions[0].type,"set_daily_limit");
 
     rewrite="Got it: your selected distractions now for 35 minutes. Tap the Blankmind notification and grant permission, then tell me when ready.";
     const permission=await call("Set a 35-minute daily limit for selected apps now.",null,{screen_time_authorized:false});
-    assert.match(permission.source,/grounding_fallback/);
+    assert.match(permission.source,/grounded_canonical_response/);
     assert.match(permission.plan.message_text,/35 minutes per day/);
     assert.match(permission.plan.message_text,/grant blocking permission/);
     assert.equal(permission.plan.actions[0].type,"request_screen_time_permission");
-    const rewriteRequest=calls.at(-1);
-    const immutable=JSON.parse(rewriteRequest.input.find(item=>item.role==="user").content).immutable_facts;
-    assert.equal(immutable.action_type,"daily_limit"); assert.equal(immutable.duration_minutes,35);
+    assert.equal(permission.semantic_state.slots.action_type.value,"daily_limit");
+    assert.equal(permission.semantic_state.slots.duration_minutes.value,35);
 
     rewrite="Your selected distractions will run from 10:00 AM to 11:00 AM every day for 7 days. Choose your distractions in Blankmind, then tap the Blankmind notification and confirm.";
     const picker=await call("Block selected apps from 10am to 11am every day for 7 days.",null,{has_selected_apps:false,selection_count:0});
-    assert.match(picker.source,/grounding_fallback/);
+    assert.match(picker.source,/grounded_canonical_response/);
     const visible=picker.plan.message_text;
     assert.ok(visible.indexOf("Blankmind notification")<visible.indexOf("choose"));
     assert.ok(visible.indexOf("choose")<visible.indexOf("confirm the selection"));
@@ -250,14 +303,21 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     const ordinary=await call("Can you read the contents of my private messages?");
     assert.deepEqual(ordinary.plan.bullets,[],"internal diagnostic bullets are absent from conversation surfaces");
 
-    // A rewrite timeout must retain the validated plan while explicitly failing
-    // model safety. Active extraction alone cannot mask a renderer outage.
+    // Blocking requests never invoke the contextual model. Advice still can,
+    // and a timeout there must remain visible instead of silently passing safety.
+    const advicePrompt="What should I do about selected apps now for 30 minutes once?";
+    const advice=await call(advicePrompt);
+    assert.equal(advice.semantic_state.intent,"advice");
     rewriteFailure=Object.assign(new Error("request timed out"),{name:"TimeoutError"});
+    const canonicalBefore=calls.length;
+    const canonical=await call("Block selected apps now for 30 minutes once.");
+    assert.equal(calls.length-canonicalBefore,1); assert.equal(canonical.model_error,null);
+    assert.deepEqual(canonical.plan.actions,first.plan.actions);
     let timeoutTrace;
-    const prompt="Block selected apps now for 30 minutes once.";
+    const prompt=advicePrompt;
     const timedOut=await call(prompt,null,{}, {captureSemanticTrace:value=>{timeoutTrace=value;}});
-    assert.deepEqual(timedOut.plan.actions,first.plan.actions);
-    assert.deepEqual(projectState(timedOut.plan.semantic_state),projectState(first.plan.semantic_state));
+    assert.deepEqual(timedOut.plan.actions,advice.plan.actions);
+    assert.deepEqual(projectState(timedOut.plan.semantic_state),projectState(advice.plan.semantic_state));
     assert.match(timedOut.source,/grounded_deterministic_after_model_error/);
     assert.match(timedOut.plan.message_text,/30 minutes/);
     assert.doesNotMatch(timedOut.plan.message_text,/already blocked|is active|has been applied/i);
@@ -265,7 +325,7 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     assert.deepEqual(timedOut.contextual_response_failure,{code:"contextual_response_timeout",name:"TimeoutError"});
     assert.deepEqual(timeoutTrace.contextual_response_failure,timedOut.contextual_response_failure);
     const assessment=evaluateTurn({body:timedOut,inputs:[prompt],context,expected:{
-      state:projectState(first.plan.semantic_state),decision:first.plan.semantic_decision,actions:first.plan.actions,language:"en",
+      state:projectState(advice.plan.semantic_state),decision:advice.plan.semantic_decision,actions:advice.plan.actions,language:"en",
     }});
     assert.equal(assessment.dimensions.actions,"passed");
     assert.equal(assessment.dimensions.safety,"failed");
@@ -280,17 +340,52 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
       assert.equal(failed.model_error,code);
       assert.equal(failed.contextual_response_failure.code,code);
       assert.doesNotMatch(JSON.stringify(failed),/private-fixture-value|Authorization:/);
-      assert.deepEqual(failed.plan.actions,first.plan.actions);
+      assert.deepEqual(failed.plan.actions,advice.plan.actions);
+    }
+
+    // Schedule management and personal recommendations retain contextual AI.
+    // Their existing deterministic recovery must expose the same bounded,
+    // redacted failure contract, including when an authorized action is queued.
+    const scheduleContext={schedule:{enabled:true,windows:[{
+      id:"2D7B82F5-3F07-48F2-8D20-D4E7EA02967E",name:"Lunch focus",enabled:true,
+      start_minute:780,end_minute:840,weekdays:[1,2,3,4,5,6,7],
+    }]},recent_plan_outcomes:[{outcome:"held"}]};
+    for(const [contextPrompt,source,actionTypes] of [
+      ["Delete all blocking windows.","schedule_management_v2",["delete_all_schedules"]],
+      ["What should I do this week?","personal_context_v2",[]],
+    ]) {
+      rewriteFailure=null;
+      const healthy=await call(contextPrompt,null,scheduleContext);
+      assert.equal(healthy.model_error,null);
+      assert.deepEqual(healthy.plan.actions.map(item=>item.type),actionTypes);
+      for(const [error,code] of [
+        [Object.assign(new Error("timeout"),{name:"TimeoutError"}),"contextual_response_timeout"],
+        [new Error("contextual_response_http_503"),"contextual_response_http_503"],
+        [Object.assign(new Error("fetch failed"),{name:"TypeError"}),"contextual_response_network_error"],
+        [new Error("Authorization: Bearer private-fixture-value"),"contextual_response_error"],
+      ]) {
+        rewriteFailure=error;
+        const beforeFailure=calls.length;
+        const failed=await call(contextPrompt,null,scheduleContext);
+        assert.equal(calls.length-beforeFailure,1);
+        assert.equal(failed.source,`${source}+grounded_deterministic_after_model_error`);
+        assert.equal(failed.model_error,code);
+        assert.equal(failed.contextual_response_failure.code,code);
+        assert.deepEqual(failed.plan.actions,healthy.plan.actions);
+        assert.equal(failed.plan.message_text,healthy.plan.message_text);
+        assert.doesNotMatch(JSON.stringify(failed),/private-fixture-value|Authorization:/);
+      }
     }
     rewriteFailure=Object.assign(new Error("request timed out"),{name:"TimeoutError"});
     extractionFailure=true;
-    const degraded=await call("Block selected apps now for 30 minutes once.");
+    const degraded=await call(advicePrompt);
     assert.equal(degraded.model_error,"semantic_model_timeout","terminal degradation remains externally observable");
     assert.equal(degraded.extraction_failure.attempt_count,2);
     assert.deepEqual(degraded.extraction_failure.attempt_errors,["duplicate_semantic_extraction_slot","semantic_model_timeout"]);
     assert.deepEqual(degraded.contextual_response_failure,{code:"contextual_response_timeout",name:"TimeoutError"});
     assert.equal(degraded.model_error,"semantic_model_timeout","extraction failure takes precedence while both failures remain observable");
-    assert.equal(degraded.plan.actions[0].minutes,30,"failed extraction cannot invent an action quantity");
+    assert.deepEqual(degraded.plan.actions,[],"an advice extraction failure cannot invent an action");
+    assert.equal(degraded.semantic_state.slots.duration_minutes.value,30,"failed extraction cannot invent an action quantity");
     console.log("BM response reliability: historical live copy mutations rejected, cancellation stays closed, native setup order and daily-limit meaning preserved (mock model, real endpoint)");
   } finally {
     global.fetch=oldFetch;

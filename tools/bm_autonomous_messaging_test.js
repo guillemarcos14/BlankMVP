@@ -71,7 +71,7 @@ assert.doesNotMatch(blankApp, /duplicateMode\(named:/);
 assert.match(home, /confirmPendingAssistantAction\(\)/);
 assert.match(home, /blankAssistantApplyNowRequested/);
 assert.match(home, /applyNowRequested/);
-assert.match(home, /guard applyNowRequested else/);
+assert.match(home, /guard currentApplyRequest else/);
 assert.match(home, /Read this after the network round-trip/);
 assert.match(blankApp, /tappedActionIDKey/);
 assert.match(home, /native_state_applied_after_selection/);

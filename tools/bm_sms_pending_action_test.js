@@ -50,6 +50,10 @@ channel.ensureAssistantConnectionForPhone = async ({ channel: name, channelUser 
   appInstallId: "install-sms",
 });
 channel.recordAssistantMemory = async ({ memory: patch }) => { memory = { ...memory, ...patch }; };
+channel.recordPendingAssistantAction = async ({ pending }) => {
+  memory.pending_assistant_action = pending;
+  return { enqueued: true, status: pending ? "queued" : "invalidated" };
+};
 channel.recordAssistantConversationTurn = async ({ semanticState, userMessage, assistantMessage }) => {
   memory.conversation_state = {
     semantic_state: semanticState,

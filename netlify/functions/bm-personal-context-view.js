@@ -47,6 +47,7 @@ function personalContextView(context = {}) {
   const view = {
     person: compact({
       name: clean(source.profile_name || source.user_context?.profile_name, 80) || undefined,
+      age: Number.isInteger(profile.age) ? profile.age : undefined,
       age_range: clean(source.age_range || source.user_context?.age_range, 40) || undefined,
       goals_and_preferences: compact(copy(profile)),
     }),

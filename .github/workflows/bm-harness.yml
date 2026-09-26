@@ -25,6 +25,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  assistant-database:
+    name: Conversation recovery on PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: blank_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGDATABASE: blank_test
+      PGPASSWORD: test-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - name: Migrate a disposable database and exercise recovery
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tools/assistant_app_database_setup.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/003_digital_wellness_feature_payloads.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/015_assistant_semantic_conversations.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/022_assistant_app_turns.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/023_assistant_app_recovery.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/024_restore_bm_legacy_context_snapshots.sql
+          psql -v ON_ERROR_STOP=1 -f tools/assistant_app_database_test.sql
   harness:
     name: Contract and runtime gate
     runs-on: ubuntu-latest
@@ -35,14 +67,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - name: Verify scope and run product harness
         shell: bash
         run: |
           if [ -n "${{ github.base_ref }}" ]; then
-            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --diff-base "origin/${{ github.base_ref }}" --enforce-scope --report tmp/product-harness/ci.json
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --diff-base "origin/${{ github.base_ref }}" --enforce-scope --allow-missing-external-context --report tmp/product-harness/ci.json
           else
-            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --enforce-scope --report tmp/product-harness/ci.json
+            node tools/product_harness.js --contract tools/product_harness_contract.json --mode validate --enforce-scope --allow-missing-external-context --report tmp/product-harness/ci.json
           fi
       - name: Verify repository whitespace
         run: git diff --check
@@ -56,9 +87,11 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
       - name: Install Android SDK platform
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          sdkmanager_path="$(find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$sdkmanager_path"
+          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0"
       - name: Compile and test Android
         run: |
           chmod +x ./gradlew

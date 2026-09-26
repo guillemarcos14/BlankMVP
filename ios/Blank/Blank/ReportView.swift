@@ -287,7 +287,7 @@ struct ReportView: View {
             Spacer(minLength: 18)
 
             Text(formatDuration(savedTime))
-                .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .tracking(-1.5)
                 .foregroundStyle(reportPrimary)
                 .lineLimit(1)
@@ -1116,27 +1116,6 @@ private struct ControlForecast {
 
     var windowEndMinute: Int {
         ((max(0, min(23, weakHour)) + 1) * 60) % (24 * 60)
-    }
-}
-
-private struct ReportLiquidBackground: View {
-    let isActive: Bool
-
-    var body: some View {
-        ZStack {
-            BlankAtmosphericBackground(dimmed: isActive)
-
-            LinearGradient(
-                colors: [
-                    BlankColors.pureWhite.opacity(isActive ? 0.04 : 0.22),
-                    (isActive ? BlankColors.ink : BlankColors.background).opacity(isActive ? 0.22 : 0.28),
-                    BlankColors.pureWhite.opacity(isActive ? 0.03 : 0.14)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-        .ignoresSafeArea()
     }
 }
 

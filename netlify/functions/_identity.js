@@ -39,6 +39,16 @@ async function identityForPhone(phoneE164) {
   return rows[0] || null;
 }
 
+async function identityForConnectCode(connectCode) {
+  const code = cleanText(connectCode, 32).toUpperCase();
+  if (!/^[A-Z0-9]{10}$/.test(code)) return null;
+  const rows = await supabaseFetch(
+    `blankmind_identity_links?assistant_connect_code=eq.${encodeURIComponent(code)}&select=*`,
+    { method: "GET" },
+  );
+  return rows[0] || null;
+}
+
 async function identityForAppInstall(appInstallId) {
   const installId = cleanText(appInstallId, 160);
   if (!installId) return null;
@@ -116,6 +126,7 @@ module.exports = {
   ensureIdentityForAuthUser,
   identityForAppInstall,
   identityForAuthUser,
+  identityForConnectCode,
   identityForPhone,
   linkAppInstall,
   normalizePhone,

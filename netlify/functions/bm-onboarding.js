@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { getAssistantMemory, recordAssistantMemory } = require("./_assistant_channel");
+const { getAssistantMemory, recordAssistantMemory, transitionPendingAssistantAction } = require("./_assistant_channel");
 const { sendAssistantActionPush } = require("./_assistant_push");
 const { reviewActionLink } = require("./_bm_action_link");
 const { isActivePendingAction } = require("./bm-pending-action");
@@ -27,13 +27,17 @@ function onboardingMessages(context = {}) {
     return {
       welcome: "Hola, soy Blankmind. Cuéntame qué te está llevando al móvil o qué te gustaría hacer más fácil.",
       setup: "Elige las apps que más te enganchan. Esa será la lista que usaré cuando me pidas un bloqueo o un plan. Pulsa la notificación para seleccionarlas y vuelve aquí.",
-      ready: "Ya está todo preparado. Cuéntame qué te está llevando al móvil, cuándo lo coges o qué te gustaría cambiar.",
+      ready: context.device_execution_ready === true
+        ? "Cuéntame qué te está llevando al móvil, cuándo lo coges o qué te gustaría cambiar."
+        : "Ya recibí tu lista de distracciones. Vuelve a Blankmind para terminar de conectar este iPhone.",
     };
   }
   return {
     welcome: "Hey, I’m Blankmind. Tell me what’s been pulling you into your phone, or what you’d like to make easier.",
     setup: "Pick the apps that pull you in most. That list is what I’ll use when you ask for a block or a plan. Tap the notification to choose them, then come back here.",
-    ready: "You’re all set. Tell me what’s been pulling you in, when you reach for your phone, or what you want to change.",
+    ready: context.device_execution_ready === true
+      ? "Tell me what’s been pulling you in, when you reach for your phone, or what you want to change."
+      : "I have your distraction list. Return to Blankmind to finish connecting this iPhone.",
   };
 }
 
@@ -120,12 +124,15 @@ async function queueOnboardingPicker({ channel, channelUser, messages }) {
   }
 
   const action = onboardingAction(messages);
-  await recordAssistantMemory({
+  const receipt = await transitionPendingAssistantAction({
     channel,
     channelUser,
-    memory: { pending_assistant_action: action },
+    previous: existing,
+    pending: action,
+    expectedVersion: memory.semantic_store_version,
     source: "assistant_onboarding_picker_pending",
   });
+  if (!receipt.updated) return { action: null, push: { sent: false, reason: "newer_action_preserved" }, button: null, preserved: true };
   let push = { sent: false, reason: "push_not_attempted" };
   try { push = await sendAssistantActionPush(memory.assistant_device_push, action); }
   catch (error) { push = { sent: false, reason: `push_exception:${error.message}` }; }

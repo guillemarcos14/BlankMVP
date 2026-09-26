@@ -27,16 +27,22 @@ async function authRequest(path, body) {
   });
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
-  if (!response.ok) throw new Error(data.msg || data.message || data.error_description || `supabase_auth_${response.status}`);
+  if (!response.ok) {
+    const error = new Error("supabase_auth_failed");
+    error.status = response.status;
+    error.code = data.error_code || data.code || "";
+    throw error;
+  }
   return data;
 }
 
 async function requestOtp(body) {
   const phone = normalizePhone(body.phone);
-  const channel = cleanText(body.channel, 20).toLowerCase();
-  if (!phone || !["whatsapp", "sms"].includes(channel)) return json(400, { error: "missing_phone_or_channel" });
-  await authRequest("otp", { phone, create_user: true, channel });
-  return json(200, { ok: true, phone_e164: phone, channel });
+  if (!phone) return json(400, { error: "missing_phone" });
+  // Authentication is independent of the assistant channel. An unsolicited
+  // WhatsApp OTP requires an approved template and cannot be relied on here.
+  await authRequest("otp", { phone, create_user: true, channel: "sms" });
+  return json(200, { ok: true, phone_e164: phone, channel: "sms" });
 }
 
 async function verifyOtp(body) {
@@ -53,16 +59,39 @@ async function verifyOtp(body) {
   });
 }
 
+async function refreshSession(body) {
+  const token = cleanText(body.refresh_token, 2048);
+  if (!token) return json(400, { error: "missing_refresh_token" });
+  let session;
+  try { session = await authRequest("token?grant_type=refresh_token", { refresh_token: token }); }
+  catch (error) {
+    if ([400, 401, 403].includes(error.status)) return json(401, { error: "session_expired" });
+    throw error;
+  }
+  return json(200, {
+    ok: true,
+    access_token: session.access_token || "",
+    refresh_token: session.refresh_token || "",
+    expires_in: session.expires_in || 0,
+  });
+}
+
 exports.handler = async (event) => {
   const methodError = requireMethod(event, "POST");
   if (methodError) return methodError;
+  let body;
+  try { body = parseJsonBody(event); }
+  catch (_) { return json(400, { error: "invalid_json" }); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json(400, { error: "invalid_json" });
   try {
-    const body = parseJsonBody(event);
     const action = cleanText(body.action, 40).toLowerCase();
     if (action === "request_otp") return await requestOtp(body);
     if (action === "verify_otp") return await verifyOtp(body);
+    if (action === "refresh_session") return await refreshSession(body);
     return json(400, { error: "unsupported_action" });
   } catch (error) {
-    return json(502, { error: "app_auth_failed", detail: error.message });
+    if (error.status === 429) return json(429, { error: "too_many_requests" });
+    if ([400, 401, 403, 422].includes(error.status)) return json(400, { error: "phone_verification_failed" });
+    return json(502, { error: "app_auth_unavailable" });
   }
 };

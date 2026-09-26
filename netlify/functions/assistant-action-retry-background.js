@@ -72,12 +72,14 @@ exports.handler = async (event) => {
       },
       source: "assistant_action_delivery_delayed",
     });
-    await sendAssistantMessage(
-      { channel: target.channel, channelUser: target.channelUser },
-      String(fresh.language || "").toLowerCase().startsWith("es")
-        ? "El iPhone aún no ha confirmado esta orden. No la cuento como aplicada. iOS puede retrasar o impedir la ejecución en segundo plano; seguiré aceptando únicamente la evidencia de esa acción concreta."
-        : "The iPhone has not confirmed this request. It is not counted as applied. iOS may delay background execution; only evidence for this exact action will complete it."
-    );
+    if (!target.actionId.startsWith("app_")) {
+      await sendAssistantMessage(
+        { channel: target.channel, channelUser: target.channelUser },
+        String(fresh.language || "").toLowerCase().startsWith("es")
+          ? "El iPhone aún no ha confirmado esta orden. No la cuento como aplicada. iOS puede retrasar o impedir la ejecución en segundo plano; seguiré aceptando únicamente la evidencia de esa acción concreta."
+          : "The iPhone has not confirmed this request. It is not counted as applied. iOS may delay background execution; only evidence for this exact action will complete it."
+      );
+    }
   }
   return { statusCode: 200 };
 };

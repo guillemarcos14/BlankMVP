@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 private struct BlankMinimalAppearanceKey: EnvironmentKey {
     static let defaultValue = false
@@ -49,20 +50,20 @@ enum BlankColors {
     static let premiumBlue = seafoam
     static let controlSurface = pureWhite.opacity(0.16)
     static let activeControlSurface = pureWhite.opacity(0.09)
-    static let minimalBackground = powderGray
+    static let minimalBackground = pureWhite
     static let minimalInk = charcoal
     static let minimalSecondary = secondaryText
-    static let minimalFaded = paleSteelBlue.opacity(0.72)
-    static let minimalCardSurface = pureWhite
-    static let darkCardSurface = paleSteelBlue.opacity(0.16)
+    static let minimalFaded = charcoal.opacity(0.42)
+    static let minimalCardSurface = Color(uiColor: .secondarySystemBackground)
+    static let darkCardSurface = pureWhite.opacity(0.10)
     static let newLookDarkBackground = charcoal
-    static let newLookDarkSecondary = paleSteelBlue.opacity(0.46)
+    static let newLookDarkSecondary = pureWhite.opacity(0.55)
     static let homeLightBackground = pureWhite
     static let homeLightInk = charcoal
-    static let homeLightOption = Color(red: 201 / 255.0, green: 202 / 255.0, blue: 196 / 255.0)
+    static let homeLightOption = charcoal.opacity(0.78)
     static let homeLightSecondary = charcoal.opacity(0.68)
     static let homeDarkBackground = charcoal
-    static let homeDarkSecondary = paleSteelBlue.opacity(0.46)
+    static let homeDarkSecondary = pureWhite.opacity(0.74)
     static let newLookRule = charcoal.opacity(0.16)
     static let glassBorder = LinearGradient(
         colors: [
@@ -89,10 +90,13 @@ extension Font {
 struct BlankPrimaryButtonStyle: ButtonStyle {
     var light: Bool = false
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeBody(configuration: Configuration) -> some View {
-        let minimalTextColor = light ? BlankColors.pureWhite : BlankColors.minimalInk
-        let minimalSurfaceColor = light ? BlankColors.minimalInk : BlankColors.pureWhite
+        let minimalTextColor = light ? BlankColors.pureWhite :
+            (colorScheme == .dark ? BlankColors.charcoal : BlankColors.pureWhite)
+        let minimalSurfaceColor = light ? BlankColors.minimalInk :
+            (colorScheme == .dark ? BlankColors.pureWhite : BlankColors.charcoal)
 
         configuration.label
             .font(.blankInter(size: 16, weight: .medium, relativeTo: .headline))

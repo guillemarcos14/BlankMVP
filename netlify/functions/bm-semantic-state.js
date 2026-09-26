@@ -194,9 +194,12 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
   if (/^(?:not|no)\s+[^,;.]+[.!]?$/i.test(full) && !/\b(?:thanks|gracias)\b/.test(full)) {
     const rejectedApps = extractApps(full,context);
     if (rejectedApps.length) patch.clear.push("apps");
-    if (parseDuration(full)) patch.clear.push("duration_minutes","end");
+    const rejectedDuration = parseDuration(full);
+    if (rejectedDuration) patch.clear.push("duration_minutes","end");
     if (parseRecurrence(full,state.next_question)) patch.clear.push("recurrence","schedule_horizon_days");
-    if (/\b(?:at|from|until|start|end|a las|desde|hasta)\b/.test(full) || new RegExp(CLOCK,"i").test(full.replace(/^not\s+/i,""))) {
+    // A duration number is not also a rejected clock. "Not 30 minutes"
+    // withdraws only the quantity, preserving an independently authorized start.
+    if (/\b(?:at|from|until|start|end|a las|desde|hasta)\b/.test(full) || (!rejectedDuration && new RegExp(CLOCK,"i").test(full.replace(/^not\s+/i,"")))) {
       if (/\b(?:end|until|hasta|fin)\b/.test(full)) patch.clear.push("end","duration_minutes");
       else patch.clear.push("start");
     }
@@ -211,6 +214,12 @@ function extractSemanticPatch({ prompt, state = emptyState(), context = {} }) {
   if (advice) { patch.intent = "advice"; patch.meaningful = true; }
   if (actionRequest) { patch.intent = "block"; put("action_type", /\b(?:daily limit|limite diario|per day|al dia|por dia|limit|limita|limitar)\b/.test(text) ? "daily_limit" : "strict_block"); }
   if (actionRequest || advice) patch.clear.push("requested_capability");
+  // Daily limits have no native expiry field. Only explicit removal of that
+  // constraint may clear it; a generic yes or changing the start cannot do so.
+  if (value(state,"action_type") === "daily_limit" && value(state,"schedule_horizon_days") != null
+    && /^(?:keep (?:it|the limit) until i remove it|remove the end date|quita la fecha de fin|mantenlo hasta que lo quite)[.!]?$/i.test(full)) {
+    patch.clear.push("schedule_horizon_days"); patch.meaningful = true;
+  }
   const greeting = /^(?:hi|hello|hey|hola|buenas|thanks|thank you|gracias|good morning|buenos dias)[.!]?$/i.test(full);
   if (greeting) return patch;
   if (!actionRequest && !advice && state.intent !== "block" && state.intent !== "advice") return patch;
@@ -350,9 +359,16 @@ function reduceSemanticState(previous, patch, { language, now = Date.now() } = {
   state.revision += 1;
   state.updated_at = new Date(now).toISOString();
   if (language) state.language = language === "es" ? "es" : "en";
+  // Answering the offered protection-style choice edits the same proposal.
+  // The word "block" in "Use a normal block" must not discard its schedule.
+  const styleOnlyAmendment = state.intent === "block"
+    && Object.hasOwn(patch.set, "hard_mode")
+    && patch.set.action_type === value(state, "action_type")
+    && Object.keys(patch.set).every(key => ["action_type", "hard_mode"].includes(key));
   const startsNewBlockAfterConfirmation = patch.intent === "block"
     && Object.hasOwn(patch.set, "action_type")
-    && value(state, "confirmation")?.status === "confirmed";
+    && value(state, "confirmation")?.status === "confirmed"
+    && !styleOnlyAmendment;
   if (startsNewBlockAfterConfirmation) {
     // Repeating the same request is a new proposal, not permission to reuse the
     // previous conversational confirmation or facts omitted from this turn.
@@ -420,12 +436,13 @@ function requiredFields(state, context = {}) {
   const pending = [];
   if (!usesSingleDistractionBlock(context) && !value(state,"apps")?.length) pending.push("apps");
   if (!value(state,"action_type")) pending.push("action_type");
-  if (!value(state,"start")) pending.push("start");
+  if (!value(state,"start") || (value(state,"action_type") === "daily_limit" && value(state,"start")?.type !== "now")) pending.push("start");
   if (value(state,"end") == null && value(state,"duration_minutes") == null) pending.push("end_or_duration");
   const recurrence = value(state,"recurrence");
   if (!recurrence) pending.push("recurrence");
   const start = value(state,"start");
-  if (start?.type === "time" && recurrence && recurrence.type !== "once" && !value(state,"schedule_horizon_days")) pending.push("schedule_horizon_days");
+  if (value(state,"action_type") !== "daily_limit" && start?.type === "time" && recurrence && recurrence.type !== "once" && !value(state,"schedule_horizon_days")) pending.push("schedule_horizon_days");
+  if (value(state,"action_type") === "daily_limit" && value(state,"schedule_horizon_days") != null) pending.push("schedule_horizon_days");
   if (value(state,"hard_mode") === true && (start?.type === "time" || value(state,"action_type") === "daily_limit")) pending.push("hard_mode");
   if (start?.type === "now" && value(state,"duration_minutes") == null && !pending.includes("end_or_duration")) pending.push("end_or_duration");
   if (start?.type === "now" && recurrence && recurrence.type !== "once" && value(state,"action_type") !== "daily_limit") pending.push("start");
@@ -454,6 +471,7 @@ function semanticActionFromFacts(state, context = {}) {
   if (start.type === "now" && (recurrence.date || recurrence.relative_date === "tomorrow")) return [];
   if (value(state,"action_type") === "daily_limit") {
     if (start.type !== "now" || recurrence.type !== "daily" || duration < 5 || duration > 240) return [];
+    if (value(state,"schedule_horizon_days") != null) return [];
     return [{ type:"set_daily_limit", minutes:duration }];
   }
   if (start.type === "now") {
@@ -598,7 +616,9 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     end_or_duration:es ? "¿Cuánto debe durar o a qué hora exacta debe terminar?" : "How long should it last, or what exact time should it end?",
     duration_minutes:es ? "¿Qué duración exacta quieres en minutos? El bloqueo inmediato admite de 5 a 240 minutos." : "What exact duration do you want in minutes? An immediate block supports 5 to 240 minutes.",
     recurrence:es ? "¿Es solo esta vez o se repite? Si se repite, ¿qué días?" : "Is this just once or recurring? If recurring, which days?",
-    schedule_horizon_days:es ? "¿Durante cuántos días quieres repetirlo? La app admite de 1 a 14 días por programación." : "For how many days should it repeat? The app supports 1 to 14 days per schedule.",
+    schedule_horizon_days:value(state,"action_type") === "daily_limit"
+      ? (es ? "Los límites diarios no pueden caducar automáticamente. ¿Quieres mantener el límite hasta que lo quites o usar un bloqueo programado?" : "Daily limits cannot expire automatically. Do you want to keep the limit until you remove it, or use a scheduled block?")
+      : (es ? "¿Durante cuántos días quieres repetirlo? La app admite de 1 a 14 días por programación." : "For how many days should it repeat? The app supports 1 to 14 days per schedule."),
     hard_mode:value(state,"action_type") === "daily_limit" ? (es ? "El modo estricto no está disponible para límites diarios. Elige un límite normal o un bloqueo estricto inmediato." : "Hard mode is not available for daily limits. Choose a regular limit or an immediate hard block.") : (es ? "El modo estricto solo admite bloqueos inmediatos. ¿Quieres protección normal programada o iniciar el modo estricto ahora?" : "Hard mode supports immediate blocks only. Do you want regular scheduled protection or to start hard mode now?"),
     time_consistency:es ? "La hora final y la duración no coinciden. ¿Cuál quieres mantener?" : "The end time and duration disagree. Which should I keep?",
     calendar_date:es ? "La app aún no admite una fecha única en este tipo de programación. Puedo ayudarte a revisarla manualmente en Blankmind." : "The app does not yet support a specific one-off date for this schedule. You can review it manually in Blankmind.",

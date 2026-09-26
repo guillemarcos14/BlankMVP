@@ -153,7 +153,7 @@ async function smsCommandOpensStoredAction() {
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
-      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "sms" }),
+      body: JSON.stringify({ action: "poll_pending_action", connect_code: "ABC123", preferred_channel: "sms" }),
     });
     assert.strictEqual(polled.statusCode, 200, polled.body);
     const pending = JSON.parse(polled.body).pending_action;
@@ -295,7 +295,7 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
-      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "whatsapp" }),
+      body: JSON.stringify({ action: "poll_pending_action", connect_code: "ABC123", preferred_channel: "whatsapp" }),
     });
     const pending = JSON.parse(polled.body).pending_action;
     assert.strictEqual(pending.type, "open_app_picker");
@@ -401,7 +401,7 @@ async function whatsappUsesCanonicalSelectionForRequestedApp() {
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
-      body: JSON.stringify({ action: "poll_pending_action", app_install_id: "install-sms-wa", preferred_channel: "whatsapp" }),
+      body: JSON.stringify({ action: "poll_pending_action", connect_code: "ABC123", preferred_channel: "whatsapp" }),
     });
     const pending = JSON.parse(polled.body).pending_action;
     assert.strictEqual(pending.type, "start_protection");

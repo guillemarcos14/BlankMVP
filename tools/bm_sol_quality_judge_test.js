@@ -1,7 +1,7 @@
 "use strict";
 
 const assert = require("assert");
-const { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeTurn, oracleReviews, reviewDigest, summarize } = require("./bm_sol_quality_judge");
+const { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeConcurrency, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize } = require("./bm_sol_quality_judge");
 
 async function run() {
   let requestBody = null;
@@ -84,7 +84,86 @@ async function run() {
   });
   assert.strictEqual(retryCount, 2);
   assert.strictEqual(retryReview.verdict, "excellent");
-  console.log("BM Sol quality judge tests passed");
+
+  assert.strictEqual(judgeConcurrency(), 1);
+  assert.strictEqual(judgeConcurrency("8"), 8);
+  for (const invalid of [0, 9, 1.5, "no", undefined]) {
+    if (invalid !== undefined) assert.throws(() => judgeConcurrency(invalid), /invalid_judge_concurrency/);
+  }
+  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const inputs = Array.from({ length: 12 }, (_, index) => ({
+    conversation_id: `conversation-${index}`, turn: 1, input: `Request ${index}`,
+    channel: "ios", status: "unverified", expected: { language: "en" },
+    actual: { visible: { message_text: `Reply ${index}` }, actions: [] },
+    history: [], review_binding: binding,
+  }));
+  const fixtureReview = turn => ({ ...review, rationale: turn.input });
+  const sequential = await reviewTurns(inputs, { judgeImpl: async turn => fixtureReview(turn) });
+  let active = 0, peak = 0;
+  const checkpoints = [];
+  const concurrent = await reviewTurns(inputs, {
+    concurrency: 8,
+    judgeImpl: async turn => {
+      active += 1; peak = Math.max(peak, active);
+      await delay(12 - Number(turn.input.split(" ")[1]));
+      active -= 1;
+      return fixtureReview(turn);
+    },
+    onCheckpoint: (reviews, error) => checkpoints.push({ reviews: structuredClone(reviews), error }),
+  });
+  assert.strictEqual(peak, 8, "bounded workers use but never exceed requested concurrency");
+  assert.deepStrictEqual(concurrent, sequential, "out-of-order completion preserves sequential result order and content");
+  assert.strictEqual(checkpoints.at(-1).reviews.length, inputs.length);
+  for (const checkpoint of checkpoints) {
+    const positions = checkpoint.reviews.map(item => Number(item.conversation_id.split("-")[1]));
+    assert.deepStrictEqual(positions, [...positions].sort((a, b) => a - b), "partial checkpoints retain input order");
+    assert.strictEqual(checkpoint.error, null);
+  }
+
+  const duplicates = [inputs[0], { ...inputs[0], conversation_id: "same-review-another-run" }, inputs[1], inputs[2], { ...inputs[2], conversation_id: "same-third-review" }];
+  let duplicateCalls = 0;
+  const deduplicated = await reviewTurns(duplicates, { concurrency: 8, judgeImpl: async turn => {
+    duplicateCalls += 1; await delay(3); return fixtureReview(turn);
+  } });
+  assert.strictEqual(duplicateCalls, 3, "in-flight identical hashes share one request");
+  assert.deepStrictEqual(deduplicated.map(item => item.reused), [false, true, false, false, true]);
+  let resumeCalls = 0;
+  const cachedReviews = await reviewTurns(duplicates, { concurrency: 8, previousReviews: deduplicated, judgeImpl: async () => { resumeCalls += 1; throw new Error("cache must avoid request"); } });
+  assert.strictEqual(resumeCalls, 0);
+  assert.ok(cachedReviews.every(item => item.reused));
+  assert.notStrictEqual(reviewDigest(inputs[0]), reviewDigest(inputs[0], [{ role: "user", content: "Earlier context differs" }]), "history participates in cache identity");
+  const historyChanged = { ...inputs[0], history: [{ role: "user", content: "Earlier context differs" }] };
+  await reviewTurns([historyChanged], { previousReviews: deduplicated, judgeImpl: async turn => { resumeCalls += 1; return fixtureReview(turn); } });
+  assert.strictEqual(resumeCalls, 1, "a changed history invalidates the cached review");
+
+  const started = [];
+  const interruptedCheckpoints = [];
+  await assert.rejects(reviewTurns(inputs, {
+    concurrency: 3,
+    judgeImpl: async turn => {
+      started.push(turn.conversation_id);
+      if (turn.conversation_id === "conversation-1") { await delay(1); throw new Error("mock judge unavailable"); }
+      await delay(8); return fixtureReview(turn);
+    },
+    onCheckpoint: (reviews, error) => interruptedCheckpoints.push({ reviews: structuredClone(reviews), error }),
+  }), /mock judge unavailable/);
+  assert.strictEqual(started.length, 3, "an error stops dispatch but drains requests already started");
+  const saved = interruptedCheckpoints.at(-1);
+  assert.deepStrictEqual(saved.reviews.map(item => item.conversation_id), ["conversation-0", "conversation-2"]);
+  assert.strictEqual(saved.error, "mock judge unavailable", "later completions cannot erase the failure from checkpoint");
+  let recoveredCalls = 0;
+  const recovered = await reviewTurns(inputs, { concurrency: 8, previousReviews: saved.reviews, judgeImpl: async turn => { recoveredCalls += 1; return fixtureReview(turn); } });
+  assert.strictEqual(recoveredCalls, inputs.length - saved.reviews.length);
+  assert.deepStrictEqual(recovered.map(item => item.review), sequential.map(item => item.review), "resume recovers only missing reviews without changing the result");
+
+  let checkpointCalls = 0, checkpointStarted = 0;
+  await assert.rejects(reviewTurns(inputs, { concurrency: 2,
+    judgeImpl: async turn => { checkpointStarted += 1; await delay(2); return fixtureReview(turn); },
+    onCheckpoint: () => { checkpointCalls += 1; throw new Error("mock checkpoint write failure"); },
+  }), /mock checkpoint write failure/);
+  assert.strictEqual(checkpointStarted, 2, "failed persistence stops scheduling new paid requests");
+  assert.strictEqual(checkpointCalls, 1, "do not hide or loop on a checkpoint failure");
+  console.log("BM Sol quality judge tests passed: bounded concurrency, ordered identical results, shared in-flight cache, resumable failure checkpoints and persistence errors");
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; });

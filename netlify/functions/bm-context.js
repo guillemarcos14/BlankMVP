@@ -31,6 +31,7 @@ const SCALAR_KEYS = [
   "protection_target",
   "has_selected_apps",
   "screen_time_authorized",
+  "notification_authorized",
   "is_blank_active",
   "emergency_unlocks_remaining",
   "vacation_mode_active",

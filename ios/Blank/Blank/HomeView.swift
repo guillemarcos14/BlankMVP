@@ -2,6 +2,7 @@ import FamilyControls
 import LocalAuthentication
 import SwiftUI
 import UIKit
+import UserNotifications
 
 enum HomeSection: Hashable {
     case distractions
@@ -21,6 +22,22 @@ struct AssistantInboxResponse: Decodable {
 
 private struct AssistantAcknowledgementResponse: Decodable {
     let acknowledged: Bool
+    let reason: String?
+}
+
+enum AssistantLifecycleAcknowledgement: Equatable {
+    case acknowledged
+    case stale
+    case retry
+}
+
+enum AssistantInboxPollResult {
+    case success(AssistantInboxAction?)
+    case retry
+}
+
+private struct AssistantPushRegistrationResponse: Decodable {
+    let registered: Bool
 }
 
 struct AssistantInboxAction: Decodable {
@@ -251,19 +268,19 @@ enum AssistantActionReceiptStore {
 }
 
 struct AssistantActionInboxClient {
-    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxAction? {
+    func poll(connectCode: String, channel: String, phoneNumber: String) async -> AssistantInboxPollResult {
         guard let data = try? await request(
             action: "poll_pending_action",
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber
         ), let response = try? JSONDecoder().decode(AssistantInboxResponse.self, from: data) else {
-            return nil
+            return .retry
         }
-        return response.pendingAction
+        return .success(response.pendingAction)
     }
 
-    func acknowledge(
+    private func acknowledge(
         actionId: String,
         status: String,
         connectCode: String,
@@ -271,7 +288,7 @@ struct AssistantActionInboxClient {
         phoneNumber: String,
         detail: String = "",
         evidence: AssistantActionReceipt? = nil
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         guard let data = try? await request(
             action: "ack_pending_action",
             connectCode: connectCode,
@@ -282,9 +299,11 @@ struct AssistantActionInboxClient {
             detail: detail,
             evidence: evidence
         ), let response = try? JSONDecoder().decode(AssistantAcknowledgementResponse.self, from: data) else {
-            return false
+            return .retry
         }
-        return response.acknowledged
+        if response.acknowledged { return .acknowledged }
+        if response.reason == "action_mismatch" || response.reason == "no_pending_action" { return .stale }
+        return .retry
     }
 
     func acknowledgeLifecycle(
@@ -292,22 +311,24 @@ struct AssistantActionInboxClient {
         connectCode: String,
         channel: String,
         phoneNumber: String
-    ) async -> Bool {
+    ) async -> AssistantLifecycleAcknowledgement {
         if receipt.executionStarted {
-            guard await acknowledge(
+            let confirmed = await acknowledge(
                 actionId: receipt.actionId,
                 status: "confirmed",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
-            guard await acknowledge(
+            )
+            guard confirmed == .acknowledged else { return confirmed }
+            let started = await acknowledge(
                 actionId: receipt.actionId,
                 status: "execution_started",
                 connectCode: connectCode,
                 channel: channel,
                 phoneNumber: phoneNumber
-            ) else { return false }
+            )
+            guard started == .acknowledged else { return started }
         }
         return await acknowledge(
             actionId: receipt.actionId,
@@ -321,15 +342,15 @@ struct AssistantActionInboxClient {
     }
 
     func registerDevicePush(token: String, environment: String, connectCode: String, channel: String, phoneNumber: String) async -> Bool {
-        guard (try? await request(
+        guard let data = try? await request(
             action: "register_device_push",
             connectCode: connectCode,
             channel: channel,
             phoneNumber: phoneNumber,
             deviceToken: token,
             environment: environment
-        )) != nil else { return false }
-        return true
+        ), let response = try? JSONDecoder().decode(AssistantPushRegistrationResponse.self, from: data) else { return false }
+        return response.registered
     }
 
     private func request(
@@ -401,7 +422,8 @@ struct HomeView: View {
     @State private var messageAction: HomeMessageAction?
     @State private var showingPicker = false
     @State private var activeSection: HomeSection?
-    @State private var showingAssistantConnect = false
+    @State private var showingAssistantConnect = true
+    @State private var assistantNotificationsAuthorized = false
     @State private var showingContextualAppPicker = false
     @State private var contextualPlanSelection = FamilyActivitySelection()
     @State private var showingRelink = false
@@ -513,6 +535,8 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: .blankAssistantApplyNowRequested)) { _ in
             pollPendingAssistantActionIfNeeded(force: true)
         }
+        .onChange(of: assistantConnectCode) { _ in clearPendingAssistantIdentityState() }
+        .onChange(of: assistantPhoneNumber) { _ in clearPendingAssistantIdentityState() }
         .onAppear {
             sessionStore.syncFromSharedDefaults(now: now)
             applyScreenTimeControls()
@@ -522,6 +546,7 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            refreshAssistantNotificationAuthorization()
             pollPendingAssistantActionIfNeeded(force: true)
         }
         .onChange(of: scenePhase) { phase in
@@ -534,9 +559,19 @@ struct HomeView: View {
             showPendingBAIProactiveAlertIfNeeded()
             evaluateBAIProactiveSignals()
             syncAssistantContext()
+            refreshAssistantNotificationAuthorization()
             pollPendingAssistantActionIfNeeded(force: true)
         }
         .familyActivityPicker(isPresented: $showingPicker, selection: $sessionStore.selection)
+        .onChange(of: sessionStore.canEditSelectedDistractions) { canEdit in
+            if !canEdit {
+                showingPicker = false
+                if showingContextualAppPicker {
+                    contextualPlanSelection = FamilyActivitySelection()
+                    showingContextualAppPicker = false
+                }
+            }
+        }
         .onChange(of: sessionStore.selection) { newSelection in
             screenTimeBlocker.updateSelection(newSelection, isBlankActive: sessionStore.isBlankActive)
             sessionStore.refreshDailyLimitMonitoring()
@@ -579,10 +614,9 @@ struct HomeView: View {
             if !isPresented {
                 var assistantActionApplied = false
                 var assistantProtectionExecution: AssistantProtectionExecution?
-                if contextualPlanSelection.blankedSelectionCount > 0 {
-                    if contextualPlanSelection.blankedSelectionCount > 0 {
-                        sessionStore.selection = contextualPlanSelection
-                    }
+                let selectionConfirmed = contextualPlanSelection.blankedSelectionCount > 0 && sessionStore.canEditSelectedDistractions
+                if selectionConfirmed {
+                    sessionStore.selection = contextualPlanSelection
                     if sessionStore.pendingPlanShouldActivate,
                        contextualPlanSelection.blankedSelectionCount > 0 {
                         if let remote = pendingAssistantInboxAction,
@@ -613,9 +647,9 @@ struct HomeView: View {
                         sessionStore.dailyLimitEnabled = true
                         sessionStore.refreshDailyLimitMonitoring()
                         applyScreenTimeControls()
-                        message = "Daily limit set to \(dailyLimitMinutes) minutes."
+                        message = sessionStore.dailyLimitRegistered ? "Daily limit set to \(dailyLimitMinutes) minutes." : "The daily limit was saved, but iOS could not activate it. Check Screen Time permission."
                         messageAction = nil
-                        assistantActionApplied = sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == dailyLimitMinutes
+                        assistantActionApplied = sessionStore.dailyLimitRegistered && sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == dailyLimitMinutes
                     } else if let schedule = sessionStore.pendingPlanSchedule,
                               contextualPlanSelection.blankedSelectionCount > 0 {
                         sessionStore.selection = contextualPlanSelection
@@ -628,9 +662,9 @@ struct HomeView: View {
                             weekdays: schedule.weekdays
                         )
                         applyScreenTimeControls()
-                        message = "Protection schedule added for your distractions."
+                        message = sessionStore.recurringScheduleRegistered ? "Protection schedule added for your distractions." : "The schedule was saved, but iOS could not activate it. Check Screen Time permission."
                         messageAction = nil
-                        assistantActionApplied = true
+                        assistantActionApplied = sessionStore.recurringScheduleRegistered
                     } else {
                         assistantActionApplied = contextualPlanSelection.blankedSelectionCount > 0
                     }
@@ -639,20 +673,21 @@ struct HomeView: View {
                 contextualPlanSelection = FamilyActivitySelection()
                 if !pendingAssistantActionId.isEmpty {
                     finishPendingAssistantAction(
-                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : "dismissed"),
-                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : "app_selection_cancelled"),
+                        status: assistantProtectionExecution?.status ?? (assistantActionApplied ? "verified" : (selectionConfirmed ? "failed" : "dismissed")),
+                        detail: assistantProtectionExecution?.detail ?? (assistantActionApplied ? "native_state_applied_after_selection" : (selectionConfirmed ? "device_activity_registration_failed" : "app_selection_cancelled")),
                         execution: assistantProtectionExecution
                     )
                 }
             }
         }
         .fullScreenCover(isPresented: $showingAssistantConnect) {
-            AssistantConnectSheet(
-                whatsAppNumber: configuredWhatsAppNumber(),
-                smsNumber: configuredSMSNumber(),
-                openURL: openURL,
-                initialContext: assistantContextPayload()
-            )
+            AssistantAppView(onOpenControls: { section in
+                if let section { openSection(section) }
+            }) { actionId in
+                BlankSharedState.defaults.set(true, forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                BlankSharedState.defaults.set(actionId, forKey: AssistantRemoteNotification.tappedActionIDKey)
+                pollPendingAssistantActionIfNeeded(force: true)
+            }
         }
         .sheet(isPresented: $showingRelink) {
             RelinkSheet(message: $message, messageAction: $messageAction)
@@ -844,6 +879,10 @@ struct HomeView: View {
             Spacer(minLength: 0)
 
             VStack(alignment: .leading, spacing: -8) {
+                minimalHomeRow("blankmind", color: BlankColors.homeLightInk) {
+                    showingAssistantConnect = true
+                }
+
                 minimalStartRow
 
                 minimalHomeRow("progress", color: BlankColors.homeLightOption) {
@@ -900,8 +939,8 @@ struct HomeView: View {
                             Button("unblank") {
                                 beginFullScreenUnblankHold()
                             }
-                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                            .tracking(-0.8)
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                            .tracking(0)
                             .foregroundStyle(BlankColors.homeDarkSecondary)
                             .frame(minWidth: 44, minHeight: 44, alignment: .leading)
                             .buttonStyle(.plain)
@@ -976,8 +1015,8 @@ struct HomeView: View {
         ZStack(alignment: .leading) {
             if isHoldingToUnblank {
                 Text("hold the screen to unblank")
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.pureWhite)
                     .lineLimit(3)
                     .minimumScaleFactor(0.78)
@@ -986,8 +1025,8 @@ struct HomeView: View {
                     .transition(.opacity)
             } else if let cooldownText {
                 Text(cooldownText)
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.homeDarkSecondary)
                     .monospacedDigit()
                     .lineLimit(2)
@@ -995,8 +1034,8 @@ struct HomeView: View {
                     .transition(.opacity)
             } else if let timerCountdownText {
                 Text(timerCountdownText)
-                    .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                    .tracking(-1.1)
+                    .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                    .tracking(0)
                     .foregroundStyle(BlankColors.homeDarkSecondary)
                     .monospacedDigit()
                     .lineLimit(2)
@@ -1071,9 +1110,9 @@ struct HomeView: View {
             setMessage(for: result)
         } label: {
             Text(title)
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
                 .foregroundStyle(titleColor)
-                .tracking(-0.6)
+                .tracking(0)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -1139,7 +1178,7 @@ struct HomeView: View {
     private func centerContent(maxWidth: CGFloat, actionWidth: CGFloat) -> some View {
         VStack(spacing: 28) {
             Text(homeTagline)
-                .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
                 .foregroundStyle(BlankColors.pureWhite)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
@@ -1432,6 +1471,14 @@ struct HomeView: View {
 
     private func processPendingBlockConfigurationIfNeeded() {
         guard sessionStore.shouldOpenBlockConfiguration else { return }
+        guard sessionStore.canEditSelectedDistractions else {
+            sessionStore.shouldOpenBlockConfiguration = false
+            message = "Your distraction selection stays fixed while protection is active."
+            if !pendingAssistantActionId.isEmpty {
+                finishPendingAssistantAction(status: "failed", detail: "selection_locked_during_protection", executionStarted: false)
+            }
+            return
+        }
         contextualPlanSelection = sessionStore.selection
         showingContextualAppPicker = true
         sessionStore.shouldOpenBlockConfiguration = false
@@ -1483,9 +1530,15 @@ struct HomeView: View {
         screenTimeBlocker.refreshAuthorizationStatus()
         if assistantActionRequiresScreenTime(pendingAction), screenTimeBlocker.authorizationStatus != .approved {
             assistantActionExecutionInFlight = true
+            let code = assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            let channel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+            let phone = assistantPhoneNumber
+            let actionID = pendingAssistantActionId
             Task {
                 _ = await screenTimeBlocker.requestAuthorization()
                 await MainActor.run {
+                    guard assistantIdentityMatches(code: code, channel: channel, phone: phone),
+                          pendingAssistantActionId == actionID else { return }
                     if screenTimeBlocker.authorizationStatus == .approved {
                         confirmPendingAssistantAction()
                     } else {
@@ -1555,9 +1608,9 @@ struct HomeView: View {
                 weekdays: weekdays
             )
             applyScreenTimeControls()
-            message = "Protection schedule added for your distractions."
+            message = sessionStore.recurringScheduleRegistered ? "Protection schedule added for your distractions." : "The schedule was saved, but iOS could not activate it. Check Screen Time permission."
             messageAction = nil
-            finishPendingAssistantAction(status: "verified", detail: "schedule_persisted")
+            finishPendingAssistantAction(status: sessionStore.recurringScheduleRegistered ? "verified" : "failed", detail: sessionStore.recurringScheduleRegistered ? "schedule_registered" : "device_activity_registration_failed")
         case .updateSchedule(let windowId, let name, let start, let end, let weekdays):
             let updated = sessionStore.updateScheduleWindow(
                 id: windowId,
@@ -1567,9 +1620,10 @@ struct HomeView: View {
                 weekdays: weekdays
             )
             applyScreenTimeControls()
-            message = updated ? "Blocking window updated." : "That blocking window no longer exists."
+            let registered = updated && sessionStore.recurringScheduleRegistered
+            message = !updated ? "That blocking window no longer exists." : (registered ? "Blocking window updated." : "The change was saved, but iOS could not activate it. Check Screen Time permission.")
             messageAction = nil
-            finishPendingAssistantAction(status: updated ? "verified" : "failed", detail: updated ? "schedule_updated" : "schedule_not_found")
+            finishPendingAssistantAction(status: registered ? "verified" : "failed", detail: registered ? "schedule_updated" : (updated ? "device_activity_registration_failed" : "schedule_not_found"))
         case .deleteSchedule(let windowId):
             let deleted = sessionStore.deleteScheduleWindow(id: windowId)
             applyScreenTimeControls()
@@ -1590,17 +1644,17 @@ struct HomeView: View {
                 return
             }
             guard sessionStore.restoreSavedSelectionForAssistant(appNames: appNames) else {
-                sessionStore.requestBlockConfiguration(appNames: appNames)
+                sessionStore.requestBlockConfiguration(appNames: appNames, dailyLimitMinutes: minutes)
                 return
             }
             sessionStore.dailyLimitMinutes = minutes
             sessionStore.dailyLimitEnabled = true
             sessionStore.refreshDailyLimitMonitoring()
             applyScreenTimeControls()
-            message = "Daily limit set to \(minutes) minutes."
+            message = sessionStore.dailyLimitRegistered ? "Daily limit set to \(minutes) minutes." : "The daily limit was saved, but iOS could not activate it. Check Screen Time permission."
             messageAction = nil
             finishPendingAssistantAction(
-                status: sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes ? "verified" : "failed",
+                status: sessionStore.dailyLimitRegistered && sessionStore.dailyLimitEnabled && sessionStore.dailyLimitMinutes == minutes ? "verified" : "failed",
                 detail: "daily_limit_state_checked"
             )
         case .allowOnly:
@@ -1622,7 +1676,7 @@ struct HomeView: View {
         case .applyAIPlan:
             sessionStore.applyAIPlan()
             applyScreenTimeControls()
-            finishPendingAssistantAction(status: "verified", detail: "ai_plan_persisted")
+            finishPendingAssistantAction(status: sessionStore.recurringScheduleRegistered ? "verified" : "failed", detail: sessionStore.recurringScheduleRegistered ? "ai_plan_registered" : "device_activity_registration_failed")
         case .openAppPicker(let appNames):
             sessionStore.requestBlockConfiguration(appNames: appNames)
         case .configureAndOpenAppPicker(let appNames, let durationMinutes, let hardMode, let schedule):
@@ -1705,7 +1759,7 @@ struct HomeView: View {
             mergedWithExisting: receipt.mergedWithExisting
         )
         Task {
-            let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+            let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                 receipt: receipt,
                 connectCode: code,
                 channel: channel,
@@ -1713,9 +1767,9 @@ struct HomeView: View {
             )
             await MainActor.run {
                 assistantActionExecutionInFlight = false
-                if acknowledged {
+                if acknowledgement == .acknowledged || acknowledgement == .stale {
                     AssistantActionReceiptStore.clear(actionId: actionId)
-                    pendingAssistantActionId = ""
+                    if pendingAssistantActionId == actionId { pendingAssistantActionId = "" }
                 }
             }
         }
@@ -1772,6 +1826,7 @@ struct HomeView: View {
             "has_selected_apps": sessionStore.hasSelectedApps,
             "selection_count": sessionStore.selectionCount,
             "screen_time_authorized": screenTimeBlocker.authorizationStatus == .approved,
+            "notification_authorized": assistantNotificationsAuthorized,
             "emergency_unlocks_remaining": sessionStore.emergencyUnlocksRemaining,
             "vacation_mode_active": sessionStore.isVacationModeActive,
             "adherence_score": system.profile.adherenceScore,
@@ -1785,7 +1840,7 @@ struct HomeView: View {
             "app_presence": BlankmindAppPresence.payload(
                 appReady: sessionStore.hasSelectedApps && screenTimeBlocker.authorizationStatus == .approved
             ),
-            "device_execution_ready": !(BlankSharedState.defaults.string(forKey: "blankAssistantPushToken") ?? "").isEmpty,
+            "device_execution_ready": BlankSharedState.defaults.bool(forKey: "blankAssistantPushRegistered") && assistantNotificationsAuthorized,
             "schedule": sessionStore.assistantScheduleContext(),
             "allow_only_mode_enabled": sessionStore.allowOnlyModeEnabled,
             "adult_content_blocking_enabled": sessionStore.adultContentBlockingEnabled,
@@ -1814,6 +1869,21 @@ struct HomeView: View {
         }
     }
 
+    private func refreshAssistantNotificationAuthorization() {
+        Task {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            let granted = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+                || settings.authorizationStatus == .ephemeral
+            let authorized = granted && (settings.alertSetting == .enabled
+                || settings.notificationCenterSetting == .enabled
+                || settings.lockScreenSetting == .enabled)
+            guard assistantNotificationsAuthorized != authorized else { return }
+            assistantNotificationsAuthorized = authorized
+            syncAssistantContext()
+        }
+    }
+
     private func pollPendingAssistantActionIfNeeded(force: Bool = false, now: Date = Date()) {
         guard force || now.timeIntervalSince(lastAssistantActionPollAt) >= 5 else { return }
         guard !assistantActionPollInFlight,
@@ -1826,9 +1896,11 @@ struct HomeView: View {
         lastAssistantActionPollAt = now
         assistantActionPollInFlight = true
         let phoneNumber = assistantPhoneNumber
-        if let receipt = AssistantActionReceiptStore.load() {
+        let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        // An old receipt must not starve an explicitly requested newer action.
+        if !applyNowRequested, let receipt = AssistantActionReceiptStore.load() {
             Task {
-                let acknowledged = await AssistantActionInboxClient().acknowledgeLifecycle(
+                let acknowledgement = await AssistantActionInboxClient().acknowledgeLifecycle(
                     receipt: receipt,
                     connectCode: code,
                     channel: channel,
@@ -1836,7 +1908,8 @@ struct HomeView: View {
                 )
                 await MainActor.run {
                     assistantActionPollInFlight = false
-                    if acknowledged {
+                    guard assistantIdentityMatches(code: code, channel: channel, phone: phoneNumber) else { return }
+                    if acknowledgement == .acknowledged || acknowledgement == .stale {
                         AssistantActionReceiptStore.clear(actionId: receipt.actionId)
                         if pendingAssistantActionId == receipt.actionId {
                             pendingAssistantActionId = ""
@@ -1848,31 +1921,60 @@ struct HomeView: View {
             return
         }
         Task {
-            let remoteAction = await AssistantActionInboxClient().poll(
+            let pollResult = await AssistantActionInboxClient().poll(
                 connectCode: code,
                 channel: channel,
                 phoneNumber: phoneNumber
             )
             await MainActor.run {
                 assistantActionPollInFlight = false
-                guard let remoteAction,
-                      let pendingAction = remoteAction.toPendingAction(),
-                      sessionStore.pendingAssistantAction == nil else { return }
+                guard assistantIdentityMatches(code: code, channel: channel, phone: phoneNumber) else { return }
                 // Read this after the network round-trip. On a cold launch the
                 // notification response can arrive while the initial poll is
                 // already in flight; reading it before the request loses the tap.
-                let applyNowRequested = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                guard applyNowRequested else { return }
+                let currentApplyRequest = BlankSharedState.defaults.bool(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+                guard case .success(let remoteAction) = pollResult else { return }
+                guard let remoteAction else {
+                    if currentApplyRequest { clearAssistantNotificationRequest() }
+                    return
+                }
+                guard let pendingAction = remoteAction.toPendingAction(),
+                      sessionStore.pendingAssistantAction == nil else { return }
+                guard currentApplyRequest else { return }
                 let tappedActionID = BlankSharedState.defaults.string(forKey: AssistantRemoteNotification.tappedActionIDKey) ?? ""
-                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else { return }
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
-                BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
+                guard tappedActionID.isEmpty || tappedActionID == remoteAction.id else {
+                    clearAssistantNotificationRequest()
+                    return
+                }
+                clearAssistantNotificationRequest()
                 pendingAssistantActionId = remoteAction.id
                 pendingAssistantInboxAction = remoteAction
                 sessionStore.requestAssistantActionConfirmation(pendingAction)
                 confirmPendingAssistantAction()
             }
         }
+    }
+
+    private func clearAssistantNotificationRequest() {
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.pollAfterOpenKey)
+        BlankSharedState.defaults.removeObject(forKey: AssistantRemoteNotification.tappedActionIDKey)
+    }
+
+    private func assistantIdentityMatches(code: String, channel: String, phone: String) -> Bool {
+        let currentChannel = assistantPreferredChannel == "whatsApp" ? "whatsapp" : assistantPreferredChannel.lowercased()
+        return code == assistantConnectCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            && channel == currentChannel && phone == assistantPhoneNumber
+    }
+
+    private func clearPendingAssistantIdentityState() {
+        clearAssistantNotificationRequest()
+        pendingAssistantActionId = ""
+        pendingAssistantInboxAction = nil
+        sessionStore.clearAssistantActionConfirmation()
+        sessionStore.clearPendingPlanAppNames()
+        sessionStore.shouldOpenBlockConfiguration = false
+        showingContextualAppPicker = false
+        assistantActionExecutionInFlight = false
     }
 
     private var relapseIntervention: RelapseIntervention {
@@ -1986,9 +2088,9 @@ struct HomeView: View {
 
 private extension View {
     func blankHomeDisplayTextStyle(color: Color) -> some View {
-        font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
+        font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
             .foregroundStyle(color)
-            .tracking(-0.6)
+            .tracking(0)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .lineSpacing(0)
@@ -2192,7 +2294,7 @@ struct SectionBackHeader: View {
         HStack {
             Button(action: action) {
                 Text("back")
-                    .font(.blankInter(size: 20, weight: .bold, relativeTo: .headline))
+                    .font(.blankInter(size: 20, weight: .semibold, relativeTo: .headline))
                     .tracking(-0.3)
                     .foregroundStyle(sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.72) : BlankColors.premiumBlue)
                     .frame(minWidth: 44, minHeight: 44, alignment: .leading)
@@ -2228,8 +2330,8 @@ struct SectionHeader: View {
             SectionBackHeader(action: action)
 
             Text(title.lowercased())
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                .tracking(-0.6)
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                .tracking(0)
                 .foregroundStyle(resolvedTitleColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.86)
@@ -2312,7 +2414,7 @@ private struct SettingsScreen: View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(title)
-                    .font(.blankInter(size: 28, weight: .bold, relativeTo: .title3))
+                    .font(.blankInter(size: 28, weight: .semibold, relativeTo: .title3))
                     .tracking(-0.4)
 
                 Text(detail)
@@ -2431,7 +2533,8 @@ private struct ScheduleEditorContent: View {
                 enabled: window.enabled,
                 startMinute: window.startMinute,
                 endMinute: window.endMinute,
-                weekdays: window.weekdays
+                weekdays: window.weekdays,
+                expiresAt: window.expiresAt
             )
         }
         let first = normalized.first ?? BlankHabitWindow(enabled: false)
@@ -2839,8 +2942,8 @@ private struct RelapseReviewSheet: View {
 
                 ZStack(alignment: .bottomLeading) {
                     Text("why now?")
-                        .font(.blankInter(size: 42, weight: .bold, relativeTo: .largeTitle))
-                        .tracking(-1.1)
+                        .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                        .tracking(0)
                         .foregroundStyle(BlankColors.pureWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -2860,8 +2963,8 @@ private struct RelapseReviewSheet: View {
                             onDismiss()
                         } label: {
                             Text("skip")
-                                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                                .tracking(-0.6)
+                                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                                .tracking(0)
                                 .foregroundStyle(BlankColors.homeDarkSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
@@ -2886,8 +2989,8 @@ private struct RelapseReasonTile: View {
     var body: some View {
         HStack {
             Text(reason.title.lowercased())
-                .font(.blankInter(size: 40, weight: .bold, relativeTo: .title))
-                .tracking(-0.6)
+                .font(.blankInter(size: 32, weight: .semibold, relativeTo: .title))
+                .tracking(0)
                 .foregroundStyle(BlankColors.homeDarkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -3094,7 +3197,7 @@ private struct TechnicalSheetTitle: View {
 
     var body: some View {
         Text(text)
-            .font(.blankInter(size: 34, weight: .medium, relativeTo: .largeTitle))
+            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.86)
@@ -3161,8 +3264,8 @@ private struct DistractionsScreen: View {
 
                     VStack(alignment: .leading, spacing: 0) {
                         Text("distractions")
-                            .font(.blankInter(size: 40, weight: .bold, relativeTo: .largeTitle))
-                            .tracking(-0.6)
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                            .tracking(0)
                             .foregroundStyle(textColor)
                             .lineLimit(1)
 
@@ -3237,7 +3340,7 @@ private struct DistractionsScreen: View {
 
     private var editButton: some View {
         Button {
-            showingPicker = true
+            if sessionStore.canEditSelectedDistractions { showingPicker = true }
         } label: {
             Image(systemName: "plus")
                 .font(.system(size: 22, weight: .medium))
@@ -3246,12 +3349,15 @@ private struct DistractionsScreen: View {
                 .background(Circle().fill(Color.black))
         }
         .buttonStyle(.plain)
+        .disabled(!sessionStore.canEditSelectedDistractions)
         .accessibilityLabel("Edit distractions")
-        .accessibilityHint("Choose apps to add or remove from your distractions")
+        .accessibilityHint(sessionStore.canEditSelectedDistractions
+                           ? "Choose apps to add or remove from your distractions"
+                           : "Available when protection ends")
     }
 }
 
-private struct AssistantConnectSheet: View {
+struct AssistantConnectSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.blankMinimalAppearance) private var minimalAppearance
     @Environment(\.dismiss) private var dismiss
@@ -3259,6 +3365,7 @@ private struct AssistantConnectSheet: View {
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
     @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var phoneVerified = false
     @State private var copiedCode = false
     @State private var showingPhoneSignIn = false
 
@@ -3312,14 +3419,12 @@ private struct AssistantConnectSheet: View {
                             Text(minimalAppearance ? "your phone" : "Your phone")
                                 .font(.blankInter(size: 13, weight: .semibold, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor)
-                            TextField("+1 555 000 0000", text: $phoneNumber)
-                                .keyboardType(.phonePad)
-                                .textContentType(.telephoneNumber)
+                            Text(phoneVerified ? phoneNumber : "Verify your phone to continue")
                                 .font(.blankInter(size: 16, weight: .medium, relativeTo: .body))
                                 .padding(.horizontal, 16)
                                 .frame(height: 52)
                                 .blankGlassCard(cornerRadius: 16, tintOpacity: 0.28)
-                            Text(minimalAppearance ? "used to match your connect message." : "Used to match your CONNECT message.")
+                            Text("This verified number must match your WhatsApp account.")
                                 .font(.blankInter(size: 12, weight: .medium, relativeTo: .caption))
                                 .foregroundStyle(secondaryColor.opacity(0.82))
 
@@ -3337,7 +3442,7 @@ private struct AssistantConnectSheet: View {
                                 subtitle: "Recommended",
                                 systemImage: "message.fill",
                                 usesWhatsAppLogo: true,
-                                enabled: whatsAppNumber != nil,
+                                enabled: whatsAppNumber != nil && phoneVerified && !connectCode.isEmpty && !phoneNumber.isEmpty,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
                             ) {
@@ -3349,7 +3454,7 @@ private struct AssistantConnectSheet: View {
                                 subtitle: "Same code, same assistant",
                                 systemImage: "message",
                                 usesWhatsAppLogo: false,
-                                enabled: smsNumber != nil,
+                                enabled: smsNumber != nil && phoneVerified && !connectCode.isEmpty && !phoneNumber.isEmpty,
                                 textColor: textColor,
                                 secondaryColor: secondaryColor
                             ) {
@@ -3402,9 +3507,6 @@ private struct AssistantConnectSheet: View {
         .foregroundStyle(textColor)
         .environment(\.blankMinimalAppearance, true)
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
-        .onAppear {
-            ensureConnectCode()
-        }
         .sheet(isPresented: $showingPhoneSignIn) {
             AppPhoneSignInSheet(initialPhone: phoneNumber)
                 .environmentObject(sessionStore)
@@ -3415,10 +3517,9 @@ private struct AssistantConnectSheet: View {
     private var secondaryColor: Color { sessionStore.isBlankActive ? BlankColors.pureWhite.opacity(0.70) : BlankColors.mutedInk }
 
     private var statusText: String {
-        guard !connectedAt.isEmpty else {
-            return "Send this code once to verify Assistant."
-        }
-        return "Finish in \(preferredChannelName) by sending the CONNECT code."
+        if !phoneVerified || connectCode.isEmpty { return "Verify your phone before connecting a chat channel." }
+        if !connectedAt.isEmpty { return "Connected to \(preferredChannelName)." }
+        return "Send this code from your verified \(preferredChannelName) number."
     }
 
     private var preferredChannelName: String {
@@ -3426,18 +3527,15 @@ private struct AssistantConnectSheet: View {
     }
 
     private var connectMessage: String {
-        "CONNECT \(connectCode.isEmpty ? "BLANKED" : connectCode)"
-    }
-
-    private func ensureConnectCode() {
-        guard connectCode.isEmpty else { return }
-        connectCode = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6)).uppercased()
+        connectCode.isEmpty ? "Verify phone first" : "CONNECT \(connectCode)"
     }
 
     private func openAssistantChannel(_ channel: AssistantChannel) {
-        ensureConnectCode()
+        guard phoneVerified, !connectCode.isEmpty, !phoneNumber.isEmpty else {
+            showingPhoneSignIn = true
+            return
+        }
         preferredChannel = channel.rawValue
-        connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
         let cleanedUserPhone = phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let message = connectMessage
@@ -3504,85 +3602,130 @@ private struct AssistantConnectSheet: View {
     }
 }
 
-private struct AppPhoneSignInSheet: View {
+struct AppPhoneSignInSheet: View {
     @EnvironmentObject private var sessionStore: SessionStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("blankAssistantPhoneNumber", store: BlankSharedState.defaults) private var phoneNumber = ""
     @AppStorage("blankAssistantConnectCode", store: BlankSharedState.defaults) private var connectCode = ""
     @AppStorage("blankAssistantPreferredChannel", store: BlankSharedState.defaults) private var preferredChannel = ""
-    @AppStorage("blankAssistantConnectedAt", store: BlankSharedState.defaults) private var connectedAt = ""
+    @AppStorage("blankAssistantPhoneVerified", store: BlankSharedState.defaults) private var phoneVerified = false
     @State private var code = ""
-    @State private var channel = "whatsapp"
+    @State private var inputPhone = ""
     @State private var verificationStarted = false
+    @State private var dataConsent = false
     @State private var isWorking = false
     @State private var errorMessage: String?
 
     let initialPhone: String
+    let showsCancel: Bool
+    var onVerified: (() -> Void)?
+
+    init(initialPhone: String, showsCancel: Bool = true, onVerified: (() -> Void)? = nil) {
+        self.initialPhone = initialPhone
+        self.showsCancel = showsCancel
+        self.onVerified = onVerified
+    }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Text("Use the same phone number you verified on the web. Blankmind will link this app install to that account and its WhatsApp or SMS thread.")
-                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Phone") {
-                    TextField("+1 555 000 0000", text: $phoneNumber)
-                        .keyboardType(.phonePad)
-                        .textContentType(.telephoneNumber)
-                    Picker("Send code by", selection: $channel) {
-                        Text("WhatsApp").tag("whatsapp")
-                        Text("SMS").tag("sms")
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                if verificationStarted {
-                    Section("Verification code") {
-                        TextField("123456", text: $code)
-                            .keyboardType(.numberPad)
-                            .textContentType(.oneTimeCode)
-                        Button(isWorking ? "Verifying…" : "Verify and connect") {
-                            Task { await verifyCode() }
+        Group {
+            if showsCancel {
+                NavigationStack {
+                    phoneForm
+                        .navigationTitle("Verify phone")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { dismiss() }
+                            }
                         }
-                        .disabled(isWorking || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                } else {
-                    Section {
-                        Button(isWorking ? "Sending…" : "Send verification code") {
-                            Task { await requestCode() }
-                        }
-                        .disabled(isWorking || phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
                 }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(BlankColors.red)
-                    }
-                }
-            }
-            .navigationTitle("Connect Blankmind")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-            .onAppear {
-                if phoneNumber.isEmpty { phoneNumber = initialPhone }
+            } else {
+                phoneForm
             }
         }
         .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
     }
 
+    private var phoneForm: some View {
+        Form {
+            if !showsCancel {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("blank")
+                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                            .padding(.bottom, 34)
+                        Text("Link your iPhone")
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                        Text("We’ll send a one-time code by SMS to verify your number.")
+                            .font(.blankInter(size: 16, relativeTo: .body))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 16)
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                Section {
+                    Text("We’ll send a one-time code by SMS. After setup, you can talk to Blankmind in your connected channel.")
+                        .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Phone") {
+                TextField("+34 600 000 000", text: $inputPhone)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+            }
+
+            Section {
+                Toggle("Link this number and iPhone to my Blankmind account for WhatsApp and device protection.", isOn: $dataConsent)
+            }
+
+            if verificationStarted {
+                Section("Verification code") {
+                    TextField("123456", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                    Button(isWorking ? "Verifying…" : "Verify phone") {
+                        Task { await verifyCode() }
+                    }
+                    .disabled(isWorking || !dataConsent || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            } else {
+                Section {
+                    Button(isWorking ? "Sending…" : "Send verification code") {
+                        Task { await requestCode() }
+                    }
+                    .disabled(isWorking || inputPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
+            Section {
+                HStack(spacing: 18) {
+                    Link("Privacy Policy", destination: URL(string: "https://blanked.app/privacy")!)
+                    Link("Terms", destination: URL(string: "https://blanked.app/terms")!)
+                }
+                .font(.blankInter(size: 13, relativeTo: .footnote))
+            }
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(BlankColors.red)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemBackground))
+        .tint(Color(uiColor: .label))
+        .onAppear {
+            inputPhone = phoneNumber.isEmpty ? initialPhone : phoneNumber
+        }
+    }
+
     private func requestCode() async {
         await performRequest(action: "request_otp", payload: [
-            "phone": phoneNumber,
-            "channel": channel,
+            "phone": inputPhone,
         ])
         if errorMessage == nil { verificationStarted = true }
     }
@@ -3593,7 +3736,7 @@ private struct AppPhoneSignInSheet: View {
             errorMessage = nil
             let auth = try await postJSON(path: "app-auth", payload: [
                 "action": "verify_otp",
-                "phone": phoneNumber,
+                "phone": inputPhone,
                 "token": code,
             ])
             guard let accessToken = auth["access_token"] as? String, !accessToken.isEmpty else {
@@ -3604,20 +3747,28 @@ private struct AppPhoneSignInSheet: View {
                 payload: [
                     "action": "claim_identity",
                     "app_install_id": BlankSharedState.appInstallId,
-                    "data_consent": true,
+                    "data_consent": dataConsent,
                 ],
                 bearerToken: accessToken
             )
             guard let linkedCode = linked["assistant_connect_code"] as? String, !linkedCode.isEmpty else {
                 throw AppPhoneSignInError.message("The account was verified but the assistant link was not created.")
             }
-            connectCode = linkedCode
-            preferredChannel = channel
-            if let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty {
-                phoneNumber = linkedPhone
+            guard let linkedPhone = linked["phone_e164"] as? String, !linkedPhone.isEmpty else {
+                throw AppPhoneSignInError.message("The account was verified but no phone number was returned.")
             }
-            connectedAt = Date.now.formatted(date: .abbreviated, time: .shortened)
-            dismiss()
+            guard AssistantAppSession.save(
+                accessToken: accessToken,
+                refreshToken: auth["refresh_token"] as? String ?? ""
+            ) else {
+                throw AppPhoneSignInError.message("Could not securely save your session on this iPhone. Try verifying again.")
+            }
+            phoneNumber = linkedPhone
+            connectCode = linkedCode
+            preferredChannel = "whatsapp"
+            phoneVerified = true
+            onVerified?()
+            if showsCancel { dismiss() }
         } catch {
             errorMessage = error.localizedDescription
         }

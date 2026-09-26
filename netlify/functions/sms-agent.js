@@ -36,9 +36,13 @@ const {
   releaseAssistantInboundMessage,
   ensureAssistantConnectionForPhone,
   getAssistantMemory,
+  getAssistantUserContext,
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordPendingAssistantAction,
+  supersededAssistantReply,
+  recordAssistantUserContext,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
 
@@ -523,12 +527,20 @@ function pendingAssistantActionFromPlan(plan, appNames = []) {
   return pendingActionFromPlan(plan, { idPrefix: "wa" });
 }
 
-async function queuePendingAssistantAction(connection, plan, appNames) {
+async function queuePendingAssistantAction(connection, plan, appNames, expectedVersion) {
   if (!connection?.connectCode) return null;
   const pending = pendingAssistantActionFromPlan(plan, appNames);
   if (!pending) return null;
   const memory = await getAssistantMemory(connection.channel, connection.channelUser);
   const existing = memory.pending_assistant_action;
+  if (semanticPersistenceRequired()) {
+    const next = pending;
+    const receipt = await recordPendingAssistantAction({ channel: connection.channel, channelUser: connection.channelUser,
+      pending: next, expectedVersion });
+    if (!receipt.enqueued) return { ...next, status: "superseded" };
+    try { await sendAssistantActionPush(memory.assistant_device_push, next); } catch (_) { /* Polling remains the fallback. */ }
+    return next;
+  }
   if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
     try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
     return existing;
@@ -671,6 +683,16 @@ function memoryFactsFromText(text) {
   const apps = namedApps(text);
   const lunchMinute = lunchEndMinute(text);
   const facts = {};
+  const name = cleanText(text, 800).match(/\b(?:my name is|call me|me llamo|ll[aá]mame)\s+([A-Za-zÀ-ÖØ-öø-ÿ]{2,32})\b/i);
+  if (name) facts.profile_name = name[1];
+  const age = cleanText(text, 800).match(/\b(?:i(?:'|’)m|i am)\s+(\d{1,2})\s+years?\s+old\b|\btengo\s+(\d{1,2})\s+a[ñn]os\b/i);
+  const exactAge = Number(age?.[1] || age?.[2]);
+  if (Number.isInteger(exactAge) && exactAge >= 13 && exactAge <= 99) {
+    facts.age = exactAge;
+    facts.age_range = exactAge < 18 ? "Under 18" : exactAge < 25 ? "18-24" : exactAge < 35 ? "25-34" : exactAge < 45 ? "35-44" : "45+";
+  }
+  const goal = cleanText(text, 800).match(/\b(?:i want to|i'd like to|quiero|me gustar[ií]a)\s+([^.!?]{5,120})/i);
+  if (goal) facts.declared_goal = cleanText(goal[1], 120);
   if (/(sleep|bed|night|dormir|duermo|cama|noche)/i.test(value)) facts.last_topic = "sleep";
   else if (/(scroll|social|instagram|tiktok|youtube|reddit|reels|shorts|redes)/i.test(value)) facts.last_topic = "social";
   else if (/(focus|work|study|foco|trabaj|estudi)/i.test(value)) facts.last_topic = "focus";
@@ -704,10 +726,34 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   const storedUserContext = savedMemory.user_context && typeof savedMemory.user_context === "object"
     ? savedMemory.user_context
     : {};
-  const userContext = await enrichAssistantContext(
-    storedUserContext,
-    linkedConnection?.connectCode || savedMemory.assistant_connect_code,
+  const connectCode = linkedConnection?.connectCode || savedMemory.assistant_connect_code;
+  let sharedContext = {};
+  if (connectCode) {
+    try { sharedContext = await getAssistantUserContext(connectCode); } catch (_) { /* Conversation remains available. */ }
+  }
+  const enrichedContext = await enrichAssistantContext(
+    { ...storedUserContext, ...sharedContext },
+    connectCode,
   );
+  const userContext = {
+    ...enrichedContext,
+    profile_name: newFacts.profile_name || sharedContext.profile_name || savedMemory.profile_name || enrichedContext.profile_name,
+    age_range: newFacts.age_range || sharedContext.age_range || savedMemory.age_range || enrichedContext.age_range,
+    personal_profile: {
+      ...(enrichedContext.personal_profile || {}),
+      ...(sharedContext.personal_profile || {}),
+      ...(Number.isInteger(newFacts.age || savedMemory.age) ? { age: newFacts.age || savedMemory.age } : {}),
+      ...((newFacts.declared_goal || savedMemory.declared_goal) ? { goal: newFacts.declared_goal || savedMemory.declared_goal } : {}),
+    },
+  };
+  if (connectCode && (newFacts.profile_name || newFacts.age || newFacts.declared_goal)) {
+    try {
+      await recordAssistantUserContext({
+        connectCode, channel, userPhone: from,
+        context: { ...sharedContext, ...userContext },
+      });
+    } catch (_) { /* Profile persistence must not block the reply. */ }
+  }
   const response = await blankedAgentHandler({
     httpMethod: "POST",
     headers: { "content-type": "application/json" },
@@ -788,16 +834,19 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   let queuedAction = null;
   if (channel === "whatsapp" || channel === "sms") {
     try {
-      queuedAction = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      queuedAction = await queuePendingAssistantAction(linkedConnection, plan, responseApps, savedMemory.semantic_store_version + 1);
+      if (queuedAction?.status === "superseded") return { text: supersededAssistantReply(plan) };
       const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
         || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
       if (!queuedAction && linkedConnection?.connectCode && invalidatesQueuedAction) {
-        await recordAssistantMemory({
+        const invalidation = await recordPendingAssistantAction({
           channel,
           channelUser: from,
-          memory: { pending_assistant_action: null },
+          pending: null,
+          expectedVersion: savedMemory.semantic_store_version + 1,
           source: "assistant_action_invalidated",
         });
+        if (!invalidation.enqueued) return { text: supersededAssistantReply(plan) };
       }
     } catch (error) {
       if (semanticPersistenceRequired()) throw error;
@@ -814,12 +863,14 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   if (channel === "whatsapp") {
     if (duplicatePendingRequest) {
       try {
-        await recordAssistantMemory({
+        const invalidation = await recordPendingAssistantAction({
           channel,
           channelUser: from,
-          memory: { pending_assistant_action: null },
+          pending: null,
+          expectedVersion: savedMemory.semantic_store_version + 1,
           source: "assistant_action_replaced_by_new_request",
         });
+        if (!invalidation.enqueued) return { text: supersededAssistantReply(plan) };
       } catch (_) {
         // The conversational clarification remains safe even if cleanup is unavailable.
       }
@@ -1068,3 +1119,5 @@ exports.actionDeepLink = actionDeepLink;
 exports.pendingActionFromMemory = pendingActionFromMemory;
 exports.pendingAssistantActionFromPlan = pendingAssistantActionFromPlan;
 exports.verifyTwilioSignature = verifyTwilioSignature;
+exports.memoryFactsFromText = memoryFactsFromText;
+exports.queuePendingAssistantAction = queuePendingAssistantAction;

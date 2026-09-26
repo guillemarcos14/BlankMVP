@@ -98,7 +98,7 @@ assert.match(home, /AssistantActionReceiptStore\.save/, "foreground outcomes mus
 assert.match(home, /AssistantActionReceiptStore\.load/, "foreground must retry an unacknowledged outcome before polling again");
 assert.match(home, /acknowledgeLifecycle/, "foreground lifecycle delivery must be retryable");
 assert.match(home, /screen_time_permission_denied/, "permission denial must end explicitly");
-assert.match(home, /assistantActionApplied \? "verified" : "dismissed"/, "picker cancellation must be dismissed, not a false execution failure");
+assert.match(home, /assistantActionApplied \? "verified" : \(selectionConfirmed \? "failed" : "dismissed"\)/, "picker cancellation is dismissed; native registration failure must never be verified");
 assert.match(app, /completionHandler\(\.noData\)/, "silent pushes must never execute a pending action");
 assert.doesNotMatch(app, /AssistantBackgroundActionRunner/, "background execution is removed from the tap-gated flow");
 assert.match(channel, /action_expired_before_execution/, "expired actions must have an explicit terminal outcome");

@@ -18,6 +18,8 @@ node tools/bai_release_gate.js --quality-judge --dataset tools/datasets/<release
 
 El dataset de release debe contener al menos 200 conversaciones realmente distintas; repetir seis conversaciones no aumenta esa cobertura. La plantilla generada es evidencia por completar, no evidencia válida. Los incidentes históricos son reconstrucciones de fallos observados; evitan regresiones conocidas, pero no sustituyen una ejecución física nueva.
 
+El gate mide trayectorias textuales con expectativas: deduplica la secuencia ordenada de inputs (Unicode NFC, minúsculas y espacios normalizados) y expectativas completas. IDs, canales, modos, repeticiones y contexto sin un cambio observable en el gold no aumentan el conteo; los turnos únicos son la suma de turnos de esas secuencias. Exige `runs` completos y contadores coherentes con ellos. Este conteo reproducible no demuestra diversidad semántica: una auditoría independiente debe descartar variaciones superficiales de redacción, horas o valores y declarar las bases y combinaciones reales del corpus.
+
 ## Juez independiente de calidad
 
 La exactitud dura sigue perteneciendo al oracle determinista y a la verificación nativa. La calidad conversacional se revisa aparte con `tools/bm_sol_quality_judge.js`, usando por defecto `gpt-5.6-sol` con razonamiento `low`. Luna genera las respuestas y no autoriza su propia release. Sol puntúa comprensión, continuidad, utilidad, naturalidad y concisión. Tras confirmación conversacional, pedir abrir Blankmind o una segunda confirmación cuando existe selección exacta es fallo duro. Afirmar éxito antes del acuse positivo del dispositivo también suspende el caso.

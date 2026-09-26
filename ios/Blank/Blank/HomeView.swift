@@ -3535,65 +3535,110 @@ struct AppPhoneSignInSheet: View {
     @State private var errorMessage: String?
 
     let initialPhone: String
-    var onVerified: (() -> Void)? = nil
+    let showsCancel: Bool
+    var onVerified: (() -> Void)?
+
+    init(initialPhone: String, showsCancel: Bool = true, onVerified: (() -> Void)? = nil) {
+        self.initialPhone = initialPhone
+        self.showsCancel = showsCancel
+        self.onVerified = onVerified
+    }
 
     var body: some View {
-        NavigationStack {
-            Form {
+        Group {
+            if showsCancel {
+                NavigationStack {
+                    phoneForm
+                        .navigationTitle("Verify phone")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") { dismiss() }
+                            }
+                        }
+                }
+            } else {
+                phoneForm
+            }
+        }
+        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+    }
+
+    private var phoneForm: some View {
+        Form {
+            if !showsCancel {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("blank")
+                            .font(.blankInter(size: 18, weight: .semibold, relativeTo: .headline))
+                            .padding(.bottom, 34)
+                        Text("Link your iPhone")
+                            .font(.blankInter(size: 32, weight: .semibold, relativeTo: .largeTitle))
+                        Text("We’ll send a one-time code by SMS to verify your number.")
+                            .font(.blankInter(size: 16, relativeTo: .body))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 16)
+                }
+                .listRowBackground(Color.clear)
+            } else {
                 Section {
                     Text("We’ll send a one-time code by SMS. After setup, you can talk to Blankmind in your connected channel.")
                         .font(.blankInter(size: 15, weight: .medium, relativeTo: .body))
                         .foregroundStyle(.secondary)
                 }
+            }
 
-                Section("Phone") {
-                    TextField("+34 600 000 000", text: $inputPhone)
-                        .keyboardType(.phonePad)
-                        .textContentType(.telephoneNumber)
+            Section("Phone") {
+                TextField("+34 600 000 000", text: $inputPhone)
+                    .keyboardType(.phonePad)
+                    .textContentType(.telephoneNumber)
+            }
+
+            Section {
+                Toggle("Link this number and iPhone to my Blankmind account for WhatsApp and device protection.", isOn: $dataConsent)
+            }
+
+            if verificationStarted {
+                Section("Verification code") {
+                    TextField("123456", text: $code)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                    Button(isWorking ? "Verifying…" : "Verify phone") {
+                        Task { await verifyCode() }
+                    }
+                    .disabled(isWorking || !dataConsent || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-
+            } else {
                 Section {
-                    Toggle("Link this phone and iPhone to my Blankmind account so I can use the assistant in my chosen conversation channel.", isOn: $dataConsent)
-                }
-
-                if verificationStarted {
-                    Section("Verification code") {
-                        TextField("123456", text: $code)
-                            .keyboardType(.numberPad)
-                            .textContentType(.oneTimeCode)
-                        Button(isWorking ? "Verifying…" : "Verify phone") {
-                            Task { await verifyCode() }
-                        }
-                        .disabled(isWorking || !dataConsent || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button(isWorking ? "Sending…" : "Send verification code") {
+                        Task { await requestCode() }
                     }
-                } else {
-                    Section {
-                        Button(isWorking ? "Sending…" : "Send verification code") {
-                            Task { await requestCode() }
-                        }
-                        .disabled(isWorking || inputPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(BlankColors.red)
-                    }
+                    .disabled(isWorking || inputPhone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .navigationTitle("Verify phone")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+
+            Section {
+                HStack(spacing: 18) {
+                    Link("Privacy Policy", destination: URL(string: "https://blanked.app/privacy")!)
+                    Link("Terms", destination: URL(string: "https://blanked.app/terms")!)
                 }
+                .font(.blankInter(size: 13, relativeTo: .footnote))
             }
-            .onAppear {
-                inputPhone = phoneNumber.isEmpty ? initialPhone : phoneNumber
+
+            if let errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundStyle(BlankColors.red)
+                }
             }
         }
-        .preferredColorScheme(sessionStore.isBlankActive ? .dark : .light)
+        .scrollContentBackground(.hidden)
+        .background(Color(uiColor: .systemBackground))
+        .tint(Color(uiColor: .label))
+        .onAppear {
+            inputPhone = phoneNumber.isEmpty ? initialPhone : phoneNumber
+        }
     }
 
     private func requestCode() async {
@@ -3635,7 +3680,7 @@ struct AppPhoneSignInSheet: View {
             preferredChannel = "whatsapp"
             phoneVerified = true
             onVerified?()
-            dismiss()
+            if showsCancel { dismiss() }
         } catch {
             errorMessage = error.localizedDescription
         }

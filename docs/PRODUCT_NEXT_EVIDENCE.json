@@ -28,10 +28,16 @@
     },
     {
       "worktree": "Codigo-product-release",
-      "path": "tmp/backend-release/product-harness.json",
+      "path": "tmp/backend-release/pre-staging-harness.json",
       "sha256": "d80e57f03d7a73764b7db0666fee3a42fc16e097fc3057d45435dd7cac536a3f",
       "run_id": "ph_1790428617049_9d657cf7",
       "scope": "61/61 checks against original integration baseline with enforce-scope before private deployment. Does not constitute signed or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-5cab6d312f50-1790431428839.verification-1790431861755-12cd28.json",
+      "sha256": "49aabfad494feb6aa69f6efca40ec35c36e92bd74730fdf47b1f7454adf441df",
+      "scope": "Read-only recovery of the existing deployment verification. Original report preserved. Active deploy, exact four remote ZIP digests, private access and isolated database checked; no redeploy."
     },
     {
       "worktree": "Codigo-product-release",

@@ -83,6 +83,39 @@ async function main() {
   const capabilityBypass = fixture();
   capabilityBypass.semantic_state.slots.requested_capability = slot("allow_only");
   assert.ok(run(capabilityBypass, { expected: { ...expected, state: { ...expected.state, requested_capability: "allow_only" } } }).issues.some(issue => issue.code === "requested_capability_cannot_become_block_action"), "capability execution gate is independent of gold equality");
+  const clearedExpected = { ...expected, state: { ...expected.state, start: null, end: null, duration_minutes: null, recurrence: null, schedule_horizon_days: null, apps: null }, actions: [] };
+  const referenceIssues = (text, gold = clearedExpected, inputs = [], extra = {}) => surfaceContradictions({ message_text: text, actions: [], ...extra }, gold, {}, inputs);
+  for (const text of ["Okay, not 30 minutes. How long should it last?", "Got it—not 30 minutes. What exact end time?", "Okay, not every day. Which days?", "Got it—not daily. Once or specific days?"]) {
+    const inputs = [text.includes("30") ? "Not 30 minutes." : "Not daily."];
+    assert.deepEqual(referenceIssues(text, clearedExpected, inputs), [], "explicit grounded correction is not a positive slot claim");
+  }
+  assert.ok(referenceIssues("Not 30 minutes.").some(issue => issue.code === "visible_duration_contradiction"), "unbacked rejection is not exempt");
+  assert.ok(referenceIssues("Not 30 minutes. I will block for 30 minutes.", clearedExpected, ["Not 30 minutes."]).some(issue => issue.code === "visible_duration_contradiction"), "positive duration after a negation is still rejected");
+  assert.ok(referenceIssues("Not daily. I will repeat every day.", clearedExpected, ["Not daily."]).some(issue => issue.code === "visible_recurrence_contradiction"), "positive recurrence after a negation is still rejected");
+  assert.ok(referenceIssues("Not 30 minutes.", { ...clearedExpected, state: { ...clearedExpected.state, duration_minutes: 30 } }, ["Not 30 minutes."]).some(issue => issue.code === "visible_duration_negates_expected"), "negation cannot contradict retained gold");
+  assert.ok(referenceIssues("Not daily.", expected, ["Not daily."]).some(issue => issue.code === "visible_recurrence_negates_expected"));
+  const rangeExpected = { ...clearedExpected, state: { ...clearedExpected.state, action_type: "strict_block", start: { type: "now" }, duration_minutes: 2, pending_slots: ["duration_minutes"] } };
+  for (const verb of ["can run for", "can last", "can be", "can only last", "support"]) {
+    assert.deepEqual(referenceIssues(`Immediate blocks ${verb} 5 to 240 minutes. What exact duration?`, rangeExpected), [], "native supported range is not the requested duration");
+  }
+  assert.deepEqual(referenceIssues("El bloqueo inmediato admite de 5 a 240 minutos. ¿Qué duración quieres?", rangeExpected), []);
+  for (const text of ["Immediate blocks support 2 to 240 minutes.", "Immediate blocks can last 5 to 300 minutes.", "Immediate blocks can last 5 to 240 minutes. I will block for 240 minutes."]) {
+    assert.ok(referenceIssues(text, rangeExpected).length, "wrong range or proposed range endpoint remains a contradiction");
+  }
+  const pastInput = ["I broke the block yesterday after 15 minutes."];
+  assert.deepEqual(referenceIssues("You’re describing a previous block that ended after 15 minutes. We can discuss a future proposal.", clearedExpected, pastInput), []);
+  for (const [text, inputs] of [["A previous block ended after 16 minutes.", pastInput], ["A previous block ended after 15 minutes.", []], ["A previous block ended after 15 minutes. I will block for 15 minutes.", pastInput]]) {
+    assert.ok(referenceIssues(text, clearedExpected, inputs).some(issue => issue.code === "visible_duration_contradiction"), "history must be grounded and cannot authorize a new duration");
+  }
+  const cancelledExpected = { ...clearedExpected, state: { ...clearedExpected.state, intent: "cancelled", status: "cancelled" } };
+  const cancelledInputs = ["Block Instagram from 10 AM to 11 AM daily for 7 days.", "Cancel this request.", "Yes."];
+  assert.deepEqual(referenceIssues("Would you like me to recreate the 10 - 11 AM Instagram block for 7 days?", cancelledExpected, cancelledInputs), [], "question about the withdrawn plan does not reactivate it");
+  assert.deepEqual(referenceIssues("The 45-minute daily limit remains withdrawn, and nothing is active.", cancelledExpected, ["Set a 45-minute daily limit.", "Cancel this request."]), []);
+  for (const text of ["Would you like me to recreate the 10 - 12 PM Instagram block for 7 days?", "Would you like me to recreate the 10 - 11 AM TikTok block for 7 days?", "Would you like me to recreate the 10 - 11 AM Instagram block for 8 days?", "Would you like me to recreate the 10 - 11 AM Instagram block for 7 days? I have already blocked Instagram.", "The daily limit remains withdrawn, but I will repeat every day."]) {
+    assert.ok(referenceIssues(text, cancelledExpected, cancelledInputs).length, "historical language cannot hide a new or fabricated claim");
+  }
+  assert.ok(referenceIssues("Would you like me to recreate the 10 - 11 AM Instagram block for 7 days?", cancelledExpected, []).length, "withdrawn-reference exemption requires prior user facts");
+  assert.ok(referenceIssues("Okay, not 30 minutes.", clearedExpected, ["Not 30 minutes."], { speech_text: "I will block for 30 minutes." }).some(issue => issue.code === "visible_duration_contradiction"), "all visible surfaces remain checked");
   const weeklyExpected = { ...expected, state: { ...expected.state, requested_capability: "weekly_review", start: null, end: null, duration_minutes: null } };
   const weeklyContext = { weekly_protected_minutes: 120, weekly_break_count: 2 };
   assert.deepEqual(surfaceContradictions({ message_text: "You protected 120 minutes this week, with 2 breaks." }, weeklyExpected, weeklyContext), [], "correct observed metrics are not future block slots");

@@ -578,6 +578,9 @@ function decideSemanticState(state, context = {}) {
   return { type:"ready", slot:null };
 }
 
+function isThanksAcknowledgement(prompt) {
+  return /^(?:thanks(?: a lot)?|thank you(?: very much)?|gracias|muchas gracias)$/.test(fold(prompt).replace(/[^a-z0-9]+/g, " ").trim());
+}
 function clockLabel(v) { return `${String(Math.floor(v / 60)).padStart(2,"0")}:${String(v % 60).padStart(2,"0")}`; }
 function clockMeridiemLabel(v) {
   const hour24 = Math.floor(v / 60) % 24;
@@ -644,9 +647,12 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     const minutes=context.weekly_protected_minutes, breaks=context.weekly_break_count;
     return typeof minutes === "number" && typeof breaks === "number" ? (es ? `Esta semana registras ${minutes} minutos protegidos y ${breaks} interrupciones. Estos datos describen tu semana; no requieren cambiar ningún bloqueo.` : `This week you recorded ${minutes} protected minutes and ${breaks} breaks. Those figures summarize your week without changing any blocks.`) : (es ? "Todavía no tengo tus métricas semanales. Abre Blankmind para sincronizarlas y poder revisar tu semana." : "I don't have your weekly metrics yet. Open Blankmind to sync them so we can review your week.");
   }
-  if (decision.type === "cancelled") return es
-    ? "He retirado esta instrucción. Si la protección ya empezó en tu dispositivo, tendrás que detenerla allí."
-    : "I've withdrawn this instruction. If protection has already started on your device, you'll need to stop it there.";
+  if (decision.type === "cancelled") {
+    if (isThanksAcknowledgement(prompt)) return es ? "De nada." : "You're welcome.";
+    return es
+      ? "He retirado esta instrucción. Si la protección ya empezó en tu dispositivo, tendrás que detenerla allí."
+      : "I've withdrawn this instruction. If protection has already started on your device, you'll need to stop it there.";
+  }
   if (decision.type === "none") return null;
   if (decision.type === "ask" && decision.slot === "calendar_date") {
     const recurrence = value(state,"recurrence");
@@ -761,7 +767,7 @@ function advanceSemanticState({ previousState, prompt, context = {}, language, n
   // Acknowledging a withdrawal must not fall through to free conversation,
   // where prior messages could be mistaken for a proposal to restart.
   const cancelledAcknowledgement = state.intent === "cancelled"
-    && /^(?:yes|yeah|yea|yep|yes please|yes do it|confirm|confirmed|do it|go ahead|ok|okay|understood|thanks|thank you|si|confirmo|hazlo|adelante|vale|entendido|gracias)$/.test(fold(prompt).replace(/[^a-z0-9]+/g," ").trim());
+    && (isThanksAcknowledgement(prompt) || /^(?:yes|yeah|yea|yep|yes please|yes do it|confirm|confirmed|do it|go ahead|ok|okay|understood|si|confirmo|hazlo|adelante|vale|entendido)$/.test(fold(prompt).replace(/[^a-z0-9]+/g," ").trim()));
   const handled = state.intent === "block" || patch.cancelled || cancelledAcknowledgement || Boolean(value(state,"requested_capability")) || (state.intent === "advice" && decision.type === "ask");
   let actions = decision.type === "ready" ? buildSemanticActions(state,context) : [];
   const reviewOnlyAppPresence = decision.type === "setup" && decision.slot === "app_presence";

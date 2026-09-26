@@ -446,7 +446,8 @@ test("withdrawal clauses preserve cancellation through explanation and acknowled
     for (const result of results.slice(1)) {
       assert.equal(result.state.intent,"cancelled",prompt); none(result);
       assert.ok(Object.values(result.state.slots).every(v=>v===null));
-      assert.match(result.responseText,/If protection has already started/);
+      if (result === results[2]) assert.equal(result.responseText,"You're welcome.");
+      else assert.match(result.responseText,/If protection has already started/);
     }
   }
 });
@@ -455,6 +456,45 @@ test("negated withdrawal and unrelated objects do not cancel the current instruc
   const initial = turn("Block selected apps now for 30 minutes once");
   for (const prompt of ["Don't cancel that request.","No canceles la petición.","What does cancel mean?","Cancel my dinner booking.","No quiero aplicarlo a otra cuenta.","Don't cancel that request because I still need it.","No canceles la petición por ahora porque la necesito.","Cancel my dinner booking because I need to focus."]) {
     const result = turn(prompt,initial.state); assert.notEqual(result.state.intent,"cancelled",prompt); none(result);
+  }
+});
+
+test("thanks after withdrawal acknowledges naturally without restoring authorization", () => {
+  for (const [language,prompts,reply] of [
+    ["es",["Gracias.","¡Gracias!","Muchas gracias.","Gracias 🙏"],"De nada."],
+    ["en",["Thanks.","Thank you!","Thanks a lot.","Thank you very much.","Thanks,"],"You're welcome."],
+  ]) {
+    const initial = turn("Block selected apps now for 30 minutes once",null,DEVICE,language);
+    const cancelled = turn("Cancel that request.",initial.state,DEVICE,language);
+    const before = JSON.stringify(cancelled.state);
+    for (const prompt of prompts) {
+      const result = turn(prompt,cancelled.state,DEVICE,language);
+      assert.equal(result.responseText,reply,prompt);
+      assert.equal(result.handled,true,prompt);
+      assert.equal(result.state.intent,"cancelled"); assert.equal(result.state.status,"cancelled");
+      assert.deepEqual(result.decision,{type:"cancelled",slot:null}); none(result);
+      assert.ok(Object.values(result.state.slots).every(v=>v===null));
+      assert.equal(result.state.delivery,null); assert.equal(result.state.last_action_fingerprint,null);
+      assert.equal(JSON.stringify(cancelled.state),before,"an acknowledgement must not mutate supplied state");
+    }
+  }
+});
+
+test("thanks inside instructions never replaces a cancellation warning or changes unrelated authorization", () => {
+  const initial = turn("Block selected apps now for 30 minutes once");
+  const cancelled = turn("Cancel that request.",initial.state);
+  for (const prompt of ["Thanks; cancel that request.","Thanks; don't cancel that request.","Gracias; no canceles esa petición.","Thanks for cancelling my dinner booking."]) {
+    const result = turn(prompt,cancelled.state);
+    assert.match(result.responseText,/If protection has already started/,prompt);
+    assert.equal(result.state.intent,"cancelled"); none(result);
+    assert.ok(Object.values(result.state.slots).every(v=>v===null));
+  }
+  for (const prompt of ["Thanks; don't cancel that request.","Gracias; no canceles esa petición.","Thanks; cancel my dinner booking."]) {
+    const result = turn(prompt,initial.state);
+    assert.equal(result.state.intent,"block",prompt); none(result);
+    assert.deepEqual(result.state.slots,initial.state.slots,prompt);
+    assert.deepEqual(result.state.delivery,initial.state.delivery,prompt);
+    assert.notEqual(result.responseText,"You're welcome.",prompt);
   }
 });
 

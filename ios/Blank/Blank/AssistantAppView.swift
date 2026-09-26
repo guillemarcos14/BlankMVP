@@ -526,7 +526,10 @@ struct AssistantAppView: View {
                     .contentShape(Rectangle())
             }
             .accessibilityLabel(spanish ? "Menú de Blankmind" : "Blankmind menu")
-            .padding(.top, 8)
+            .frame(height: 56)
+            .layoutPriority(1)
+            .background(background)
+            .zIndex(1)
 
             GeometryReader { geometry in
                 ScrollView {
@@ -573,17 +576,19 @@ struct AssistantAppView: View {
                                     .frame(minHeight: 44)
                             }
                         }
+                        if dynamicTypeSize.isAccessibilitySize { status }
                     }
                     .frame(maxWidth: 640, alignment: .leading)
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: geometry.size.height * 0.72, alignment: .center)
+                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 0 : geometry.size.height * 0.72, alignment: .center)
                     .padding(.horizontal, 28)
                     .padding(.vertical, 16)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
+            .clipped()
 
-            status
+            if !dynamicTypeSize.isAccessibilitySize { status }
             composerBar
         }
         .foregroundStyle(foreground)
@@ -692,14 +697,38 @@ struct AssistantAppView: View {
         .font(.blankInter(size: 14))
         .frame(maxWidth: 640, alignment: .leading)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal, 28)
+        .padding(.horizontal, dynamicTypeSize.isAccessibilitySize ? 0 : 28)
         .padding(.bottom, 10)
         .accessibilityElement(children: .contain)
     }
 
     private var composerBar: some View {
-        HStack(alignment: .bottom, spacing: 4) {
-            TextField("", text: $composer.draft,
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    composerField
+                    HStack(spacing: 12) {
+                        Spacer(minLength: 0)
+                        composerActions
+                    }
+                    .padding(.bottom, 6)
+                }
+            } else {
+                HStack(alignment: .bottom, spacing: 4) {
+                    composerField
+                    composerActions
+                }
+            }
+        }
+        .padding(.leading, 18).padding(.trailing, 8)
+        .background(RoundedRectangle(cornerRadius: 28).fill(foreground.opacity(dark ? 0.11 : 0.06)))
+        .frame(maxWidth: 640)
+        .padding(.horizontal, 22).padding(.bottom, 12)
+        .layoutPriority(1)
+    }
+
+    private var composerField: some View {
+        TextField("", text: $composer.draft,
                       prompt: Text(spanish ? "Escribe un mensaje" : "Write a message")
                         .foregroundColor(foreground.opacity(0.72)), axis: .vertical)
                 .font(.blankInter(size: 17))
@@ -708,9 +737,13 @@ struct AssistantAppView: View {
                 .submitLabel(.send)
                 .onSubmit { if composer.pending == nil { Task { await send() } } }
                 .padding(.vertical, 14)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                 .disabled(requiresVerification)
                 .accessibilityLabel(spanish ? "Mensaje para Blankmind" : "Message Blankmind")
-            Button {
+    }
+
+    @ViewBuilder private var composerActions: some View {
+        Button {
                 if !speech.isRecording && !speech.isStarting {
                     let prefix = composer.draft.trimmingCharacters(in: .whitespacesAndNewlines)
                     speechPrefix = prefix.isEmpty ? "" : "\(prefix) "
@@ -737,11 +770,6 @@ struct AssistantAppView: View {
                 .opacity(waiting || draftTooLong || requiresVerification ? 0.45 : 1)
                 .accessibilityLabel(spanish ? "Enviar mensaje" : "Send message")
             }
-        }
-        .padding(.leading, 18).padding(.trailing, 8)
-        .background(RoundedRectangle(cornerRadius: 28).fill(foreground.opacity(dark ? 0.11 : 0.06)))
-        .frame(maxWidth: 640)
-        .padding(.horizontal, 22).padding(.bottom, 12)
     }
 
     private func applyAction(_ actionID: String) {
@@ -935,7 +963,7 @@ private struct AssistantAppHistoryView: View {
     let foreground: Color
     let background: Color
     let onApplyAction: (String) -> Void
-    private let owner: String?
+    @State private var owner: String?
     private var spanish: Bool { Locale.current.languageCode == "es" }
     private var preview: Bool {
         #if DEBUG
@@ -952,7 +980,7 @@ private struct AssistantAppHistoryView: View {
         self.foreground = foreground
         self.background = background
         self.onApplyAction = onApplyAction
-        self.owner = AssistantAppSession.userID
+        _owner = State(initialValue: AssistantAppSession.userID)
     }
 
     var body: some View {

@@ -188,5 +188,9 @@
     "visual_artifact": 10909902949,
     "visual_artifact_sha256": "946cc17bbdc2fc79e79ecc4a45f17af32b7374ad9fc526f38549d317523593ac",
     "physical_validation": false
+  },
+  "current_evaluator": {
+    "version": "bm-sol-quality-judge-v10-preparation-evidence",
+    "scope": "Evaluation tooling only. Prepared planner actions do not prove queue persistence, notification delivery or physical execution. Independently reviewed; thresholds unchanged; no live evaluation run with v10."
   }
 }

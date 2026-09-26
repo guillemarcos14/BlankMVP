@@ -15,7 +15,7 @@ function recentAssistantMemoryResponse(target, options = {}) {
   if (!String(target).startsWith("https://supabase.test/rest/v1/")) return null;
   if (String(target).includes("/blankmind_identity_links")) {
     const rows = String(target).includes("app_install_id=eq.install-1")
-      ? [{ assistant_connect_code: "ABC123", app_install_id: "install-1" }]
+      ? [{ assistant_connect_code: "ABC123", app_install_id: "install-1", phone_e164: "+34600000000" }]
       : [];
     return { ok: true, status: 200, text: async () => JSON.stringify(rows), json: async () => rows };
   }

@@ -40,6 +40,8 @@ const {
   recordAssistantConversationTurn,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordPendingAssistantAction,
+  supersededAssistantReply,
   recordAssistantUserContext,
   sendWhatsAppMessage,
 } = require("./_assistant_channel");
@@ -525,12 +527,20 @@ function pendingAssistantActionFromPlan(plan, appNames = []) {
   return pendingActionFromPlan(plan, { idPrefix: "wa" });
 }
 
-async function queuePendingAssistantAction(connection, plan, appNames) {
+async function queuePendingAssistantAction(connection, plan, appNames, expectedVersion) {
   if (!connection?.connectCode) return null;
   const pending = pendingAssistantActionFromPlan(plan, appNames);
   if (!pending) return null;
   const memory = await getAssistantMemory(connection.channel, connection.channelUser);
   const existing = memory.pending_assistant_action;
+  if (semanticPersistenceRequired()) {
+    const next = pending;
+    const receipt = await recordPendingAssistantAction({ channel: connection.channel, channelUser: connection.channelUser,
+      pending: next, expectedVersion });
+    if (!receipt.enqueued) return { ...next, status: "superseded" };
+    try { await sendAssistantActionPush(memory.assistant_device_push, next); } catch (_) { /* Polling remains the fallback. */ }
+    return next;
+  }
   if (existing?.fingerprint === pending.fingerprint && Date.parse(existing.expires_at || "") > Date.now()) {
     try { await sendAssistantActionPush(memory.assistant_device_push, existing); } catch (_) { /* Polling remains the fallback. */ }
     return existing;
@@ -824,16 +834,19 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   let queuedAction = null;
   if (channel === "whatsapp" || channel === "sms") {
     try {
-      queuedAction = await queuePendingAssistantAction(linkedConnection, plan, responseApps);
+      queuedAction = await queuePendingAssistantAction(linkedConnection, plan, responseApps, savedMemory.semantic_store_version + 1);
+      if (queuedAction?.status === "superseded") return { text: supersededAssistantReply(plan) };
       const invalidatesQueuedAction = plan.semantic_state?.intent === "cancelled"
         || (plan.semantic_state?.intent === "block" && ["collecting", "awaiting_confirmation"].includes(plan.semantic_state?.status));
       if (!queuedAction && linkedConnection?.connectCode && invalidatesQueuedAction) {
-        await recordAssistantMemory({
+        const invalidation = await recordPendingAssistantAction({
           channel,
           channelUser: from,
-          memory: { pending_assistant_action: null },
+          pending: null,
+          expectedVersion: savedMemory.semantic_store_version + 1,
           source: "assistant_action_invalidated",
         });
+        if (!invalidation.enqueued) return { text: supersededAssistantReply(plan) };
       }
     } catch (error) {
       if (semanticPersistenceRequired()) throw error;
@@ -850,12 +863,14 @@ async function askBAI(prompt, from, channel, linkedConnection = null) {
   if (channel === "whatsapp") {
     if (duplicatePendingRequest) {
       try {
-        await recordAssistantMemory({
+        const invalidation = await recordPendingAssistantAction({
           channel,
           channelUser: from,
-          memory: { pending_assistant_action: null },
+          pending: null,
+          expectedVersion: savedMemory.semantic_store_version + 1,
           source: "assistant_action_replaced_by_new_request",
         });
+        if (!invalidation.enqueued) return { text: supersededAssistantReply(plan) };
       } catch (_) {
         // The conversational clarification remains safe even if cleanup is unavailable.
       }
@@ -1105,3 +1120,4 @@ exports.pendingActionFromMemory = pendingActionFromMemory;
 exports.pendingAssistantActionFromPlan = pendingAssistantActionFromPlan;
 exports.verifyTwilioSignature = verifyTwilioSignature;
 exports.memoryFactsFromText = memoryFactsFromText;
+exports.queuePendingAssistantAction = queuePendingAssistantAction;

@@ -328,7 +328,50 @@ test("a past block duration is never a future blocking instruction", () => {
 test("explicit hard mode is preserved and fingerprinted before native execution", () => {
   const result=turn("Start a strict block for selected apps now for 45 minutes once");
   equalSlot(result,"hard_mode",true); assert.equal(result.actions[0].hard_mode,true); assert.match(result.responseText,/hard mode/);
-  const corrected=turn("Use a normal block",result.state); equalSlot(corrected,"hard_mode",false); assert.equal(slot(corrected,"confirmation").status,"confirmed"); none(corrected);
+  const corrected=turn("Use a normal block",result.state); equalSlot(corrected,"hard_mode",false); assert.equal(slot(corrected,"confirmation").status,"confirmed");
+  assert.deepEqual(corrected.actions,[{type:"start_protection",minutes:45,hard_mode:false}]);
+  none(turn("Yes",corrected.state));
+});
+
+test("rejecting duration preserves start and recurrence across confirmation and replacement", () => {
+  for (const rejected of ["Not 30 minutes.", "No 30 minutos."]) {
+    const [initial, missing, confirmation, repaired] = chat(["Block selected apps now for 30 minutes once", rejected, "Yes.", "45 minutes."]);
+    assert.equal(initial.actions[0].minutes,30);
+    for (const result of [missing, confirmation]) {
+      equalSlot(result,"start",{type:"now"}); equalSlot(result,"duration_minutes",null);
+      equalSlot(result,"recurrence",{type:"once",weekdays:[]});
+      assert.deepEqual(result.state.pending_slots,["end_or_duration"]); none(result);
+    }
+    assert.deepEqual(repaired.actions,[{type:"start_protection",minutes:45,hard_mode:false}]);
+    assert.ok(missing.state.corrections.some(c => c.slot === "duration_minutes" && c.replacement === null));
+  }
+});
+
+test("answering unsupported hard schedule style preserves the authored schedule", () => {
+  const [unsupported, regular, confirmation] = chat([
+    "Start a strict block for selected apps from 10am to 11am every day for 7 days",
+    "Use a normal block.", "Yes."]);
+  assert.equal(unsupported.decision.slot,"hard_mode"); none(unsupported);
+  equalSlot(regular,"apps",["selected_apps"]); equalSlot(regular,"start",{type:"time",minute:600});
+  equalSlot(regular,"hard_mode",false); equalSlot(regular,"schedule_horizon_days",7);
+  assert.deepEqual(regular.actions.map(({name,...fields})=>fields),[{type:"apply_schedule",start_minute:600,end_minute:660,weekdays:[1,2,3,4,5,6,7],duration_days:7}]);
+  assert.ok(regular.state.corrections.some(c => c.slot === "hard_mode" && c.previous === true && c.replacement === false));
+  none(confirmation);
+  const fresh = turn("Block selected apps now for 20 minutes once in normal mode", regular.state);
+  equalSlot(fresh,"schedule_horizon_days",null); equalSlot(fresh,"start",{type:"now"});
+  assert.equal(fresh.actions[0].minutes,20);
+});
+
+test("daily limit never drops a requested expiry without an explicit adjustment", () => {
+  const [initial, now, yes, accepted] = chat([
+    "Set a 60-minute daily limit for selected apps starting at 09:00 for 7 days.",
+    "Start now.", "Yes.", "Keep it until I remove it."]);
+  assert.deepEqual(initial.state.pending_slots,["start","schedule_horizon_days"]);
+  for (const r of [initial,now,yes]) { none(r); equalSlot(r,"schedule_horizon_days",7); }
+  assert.equal(now.decision.slot,"schedule_horizon_days");
+  assert.match(now.responseText,/cannot expire automatically/);
+  equalSlot(accepted,"schedule_horizon_days",null);
+  assert.deepEqual(accepted.actions,[{type:"set_daily_limit",minutes:60}]);
 });
 test("unsupported scheduled hard mode cannot silently become regular protection", () => {
   const results=chat(["Start a strict block for selected apps from 10am to 11am every day for 7 days","yes"]);

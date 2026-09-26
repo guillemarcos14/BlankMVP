@@ -182,7 +182,7 @@ function reportResults(dataset, runs, options, baseline) {
 }
 async function replay(dataset, options, adapter, reviews = [], baseline = null) {
   validateDataset(dataset);
-  options = { ...options, sourceSnapshot: Object.fromEntries(["tools/bm_semantic_oracle.js", "tools/bm_semantic_replay.js", "netlify/functions/blanked-agent.js", "netlify/functions/bm-semantic-state.js", "netlify/functions/bm-semantic-extraction.js", "netlify/functions/bm-context.js"].filter(file => fs.existsSync(path.join(ROOT, file))).map(file => [file, digest(fs.readFileSync(path.join(ROOT, file), "utf8"))])) };
+  options = { ...options, sourceSnapshot: Object.fromEntries(["tools/bm_semantic_oracle.js", "tools/bm_semantic_replay.js", "tools/bm_conversation_coverage.js", "netlify/functions/blanked-agent.js", "netlify/functions/bm-semantic-state.js", "netlify/functions/bm-semantic-extraction.js", "netlify/functions/bm-context.js"].filter(file => fs.existsSync(path.join(ROOT, file))).map(file => [file, digest(fs.readFileSync(path.join(ROOT, file), "utf8"))])) };
   const jobs = [];
   for (let repetition = 1; repetition <= options.repeats; repetition++) for (const mode of options.modes) for (const conversation of dataset.conversations) jobs.push({ conversation, repetition, mode });
   const runs = await mapConcurrent(jobs, options.concurrency, job => runConversation(job.conversation, job.repetition, job.mode, adapter, reviews));

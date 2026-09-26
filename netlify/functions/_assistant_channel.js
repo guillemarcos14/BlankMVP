@@ -230,6 +230,9 @@ async function ensureAssistantConnectionForPhone({ channel, channelUser }) {
 }
 
 async function recordAssistantMemory({ channel, channelUser, memory = {}, source = "" }) {
+  if (semanticPersistenceRequired() && Object.hasOwn(memory, "pending_assistant_action")) {
+    throw new Error("pending_action_requires_atomic_write");
+  }
   const normalizedChannel = cleanChannel(channel);
   const normalizedUser = cleanText(channelUser, 160);
   if (!normalizedChannel || !normalizedUser || !memory || !Object.keys(memory).length) return;
@@ -264,12 +267,65 @@ async function recordAssistantMemory({ channel, channelUser, memory = {}, source
   });
 }
 
-async function getAssistantMemory(channel, channelUser) {
+async function recordPendingAssistantAction({ channel, channelUser, pending = null, expectedVersion, source = "assistant_action_pending" }) {
+  if (!semanticPersistenceRequired()) {
+    // Explicit legacy environments retain the event-store contract.
+    await recordAssistantMemory({ channel, channelUser, memory: { pending_assistant_action: pending }, source });
+    return { enqueued: true, status: pending ? "queued" : "invalidated" };
+  }
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1) throw new Error("assistant_action_missing_semantic_version");
+  const result = await supabaseFetch("rpc/enqueue_assistant_channel_action", {
+    method: "POST", body: JSON.stringify({ p_anonymous_user_id: assistantChannelUserId(channel, channelUser),
+      p_channel: channel, p_expected_version: expectedVersion, p_action: pending }),
+  });
+  const receipt = Array.isArray(result) ? result[0] : result;
+  if (!receipt || (!receipt.enqueued && receipt.status !== "superseded")) throw new Error("assistant_action_enqueue_failed");
+  return receipt;
+}
+
+async function transitionPendingAssistantAction({ channel, channelUser, previous = null, pending = null, outcome = null, expectedVersion, source = "assistant_action_transition" }) {
+  if (!semanticPersistenceRequired()) {
+    await recordAssistantMemory({ channel, channelUser, memory: {
+      pending_assistant_action: pending,
+      ...(outcome ? { last_assistant_action_outcome: outcome } : {}),
+    }, source });
+    return { updated: true, status: "updated" };
+  }
+  const result = await supabaseFetch("rpc/transition_assistant_pending_action", {
+    method: "POST", body: JSON.stringify({ p_anonymous_user_id: assistantChannelUserId(channel, channelUser),
+      p_channel: channel, p_expected_action_id: previous?.id || null,
+      p_expected_status: previous ? previous.status || "queued" : null,
+      p_action: pending, p_outcome: outcome, p_expected_version: Number.isSafeInteger(expectedVersion) ? expectedVersion : null }),
+  });
+  const receipt = Array.isArray(result) ? result[0] : result;
+  if (!receipt || (!receipt.updated && !["superseded", "status_changed"].includes(receipt.status))) {
+    throw new Error("assistant_action_transition_failed");
+  }
+  return receipt;
+}
+
+async function getAssistantActionRecord(channel, channelUser, actionId) {
+  const key = assistantChannelUserId(channel, channelUser);
+  const id = cleanText(actionId, 80);
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) return null;
+  const filter = `(payload->properties->memory->pending_assistant_action->>id.eq.${id},payload->properties->memory->last_assistant_action_outcome->>id.eq.${id})`;
+  const rows = await supabaseFetch(`${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(key)}&or=${encodeURIComponent(filter)}&select=payload&order=submitted_at.desc,id.desc&limit=1`, { method: "GET" });
+  const memory = rows[0]?.payload?.properties?.memory;
+  return memory ? { pending: memory.pending_assistant_action, outcome: memory.last_assistant_action_outcome } : null;
+}
+
+function supersededAssistantReply(plan) {
+  return String(plan.response_language || plan.semantic_state?.language || "").toLowerCase().startsWith("es")
+    ? "Otra petición ha actualizado la conversación. No he aplicado esta solicitud anterior."
+    : "Another request updated the conversation. I haven't applied this earlier request.";
+}
+
+async function getAssistantMemory(channel, channelUser, options = {}) {
   const normalizedChannel = cleanChannel(channel);
   const normalizedUser = cleanText(channelUser, 160);
   if (!normalizedChannel || !normalizedUser) return {};
   const rows = await supabaseFetch(
-    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantChannelUserId(normalizedChannel, normalizedUser))}&select=payload,submitted_at&order=submitted_at.desc&limit=100`,
+    `${EVENT_TABLE}?anonymous_user_id=eq.${encodeURIComponent(assistantChannelUserId(normalizedChannel, normalizedUser))}&select=payload,submitted_at&order=submitted_at.desc,id.desc&limit=100`,
     { method: "GET" }
   );
   const memory = rows.reverse().reduce((memory, row) => {
@@ -294,7 +350,7 @@ async function getAssistantMemory(channel, channelUser) {
     }
     return merged;
   }, {});
-  if (semanticPersistenceRequired()) {
+  if (options.requireSemantic === true || semanticPersistenceRequired()) {
     const stored = await readSemanticConversation(assistantChannelUserId(normalizedChannel, normalizedUser));
     // An empty or expired dedicated session must not resurrect older event-log state.
     delete memory.conversation_state;
@@ -637,6 +693,7 @@ module.exports = {
   ensureAssistantConnectionForPhone,
   getAssistantUserContext,
   getAssistantMemory,
+  getAssistantActionRecord,
   hasProcessedAssistantMessage,
   normalizeConnectCode,
   proactiveGate,
@@ -645,7 +702,11 @@ module.exports = {
   approvedProactiveTemplateSids,
   recordAssistantChannel,
   recordAssistantMemory,
+  recordPendingAssistantAction,
+  transitionPendingAssistantAction,
+  supersededAssistantReply,
   recordAssistantConversationTurn,
+  recordConversationTurnState,
   recordProcessedAssistantMessage,
   recordAssistantUserContext,
   sendAssistantMessage,

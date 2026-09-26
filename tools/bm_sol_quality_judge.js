@@ -169,17 +169,77 @@ function oracleReviews(reviews) {
   }));
 }
 
+function judgeConcurrency(value = 1) {
+  const concurrency = Number(value);
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) throw new Error("invalid_judge_concurrency:1..8");
+  return concurrency;
+}
+
+async function reviewTurns(turns, options = {}) {
+  const concurrency = judgeConcurrency(options.concurrency);
+  const model = options.model || DEFAULT_MODEL;
+  const judge = options.judgeImpl || judgeTurn;
+  const cached = new Map((options.previousReviews || []).filter(item => item.input_sha256 && item.review).map(item => [item.input_sha256, item.review]));
+  const inFlight = new Map();
+  const results = new Array(turns.length);
+  let next = 0;
+  let failure = null;
+  let checkpointFailed = false;
+  const orderedReviews = () => results.filter(Boolean);
+  // Checkpoint callbacks are synchronous, like the CLI's filesystem writes.
+  // Workers therefore cannot overwrite a newer checkpoint with an older one.
+  const checkpoint = () => {
+    if (checkpointFailed) return;
+    try { options.onCheckpoint?.(orderedReviews(), failure?.message || null); }
+    catch (error) { failure ||= error; checkpointFailed = true; }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, turns.length) }, async () => {
+    while (!failure && next < turns.length) {
+      const index = next++;
+      const turn = turns[index];
+      try {
+        const history = turn.history || [];
+        const inputSha256 = reviewDigest(turn, history, model);
+        const reused = cached.has(inputSha256) || inFlight.has(inputSha256);
+        let review = cached.get(inputSha256);
+        if (!review) {
+          if (!inFlight.has(inputSha256)) {
+            // Publish the promise before awaiting it: duplicate turns share the
+            // same request, including duplicates assigned to another worker.
+            inFlight.set(inputSha256, Promise.resolve().then(() => judge(turn, history, { ...options.judgeOptions, model })).then(value => {
+              cached.set(inputSha256, value);
+              return value;
+            }));
+          }
+          review = await inFlight.get(inputSha256);
+        }
+        results[index] = { conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status,
+          input_sha256: inputSha256, review_binding: turn.review_binding, language: turn.expected?.language, review, reused };
+      } catch (error) {
+        failure ||= error;
+      }
+      checkpoint();
+    }
+  }));
+  // Drain already-started requests after a failure, preserve their successes in
+  // input order, and keep the error so a partial run cannot appear complete.
+  checkpoint();
+  if (failure) throw failure;
+  return orderedReviews();
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const input = path.resolve(option(args, "--input", "tmp/bm-semantic/replay.json"));
   const out = path.resolve(option(args, "--out", "tmp/bm-semantic/sol-quality-review.json"));
   const oracleReviewsOut = option(args, "--oracle-reviews-out", null);
   const limit = Math.max(1, Math.min(Number(option(args, "--limit", "200")), 2000));
+  const concurrency = judgeConcurrency(option(args, "--concurrency", "1"));
   const report = JSON.parse(fs.readFileSync(input, "utf8").replace(/^\uFEFF/, ""));
   const turns = flattenReport(report).slice(0, limit);
   const model = process.env.BM_QUALITY_JUDGE_MODEL || DEFAULT_MODEL;
   if (args.includes("--dry-run")) {
-    console.log(JSON.stringify({ model: DEFAULT_MODEL, reasoning_effort: "low", turns: turns.length, schema: judgeSchema() }, null, 2));
+    console.log(JSON.stringify({ model: DEFAULT_MODEL, reasoning_effort: "low", turns: turns.length, concurrency, schema: judgeSchema() }, null, 2));
     return;
   }
   let previous = null;
@@ -189,9 +249,7 @@ async function main() {
     previous = null;
   }
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  const cached = new Map((previous?.reviews || []).filter(item => item.input_sha256 && item.review).map(item => [item.input_sha256, item]));
-  const reviews = [];
-  const checkpoint = (infrastructureError = null) => {
+  const checkpoint = (reviews, infrastructureError = null) => {
     const failures = functionalFailures(turns);
     const reviewSummary = summarize(reviews);
     const summary = {
@@ -203,6 +261,7 @@ async function main() {
       evaluator: EVALUATOR_VERSION,
       generated_at: new Date().toISOString(),
       source_report: input,
+      concurrency,
       reviews,
       summary,
       complete: reviews.length === turns.length && !infrastructureError,
@@ -216,26 +275,12 @@ async function main() {
     }
     return result;
   };
-  for (const turn of turns) {
-    const inputSha256 = reviewDigest(turn, turn.history, model);
-    const reused = cached.get(inputSha256);
-    if (reused) {
-      reviews.push({ ...reused, conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, review_binding: turn.review_binding, language: turn.expected?.language, reused: true });
-      continue;
-    }
-    try {
-      const review = await judgeTurn(turn, turn.history);
-      reviews.push({ conversation_id: turn.conversation_id, turn: turn.turn, deterministic_status: turn.status, input_sha256: inputSha256, review_binding: turn.review_binding, language: turn.expected?.language, review, reused: false });
-      checkpoint();
-    } catch (error) {
-      checkpoint(error.message);
-      throw error;
-    }
-  }
-  const result = checkpoint();
+  let result = null;
+  await reviewTurns(turns, { model, concurrency, previousReviews: previous?.reviews,
+    onCheckpoint: (reviews, error) => { result = checkpoint(reviews, error); } });
   console.log(JSON.stringify({ report: out, summary: result.summary }, null, 2));
   process.exitCode = result.summary.release_eligible ? 0 : 1;
 }
 
-module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeSchema, judgeTurn, oracleReviews, reviewDigest, summarize };
+module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeConcurrency, judgeSchema, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

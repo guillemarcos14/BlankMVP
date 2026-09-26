@@ -145,11 +145,13 @@ async function smsCommandOpensStoredAction() {
       }).toString(),
     });
     assert.strictEqual(first.statusCode, 200, first.body);
-    assert.match(first.body, /Tap the Blankmind notification to apply it/i);
+    assert.match(first.body, /22:00.*07:00.*every day.*7 days/i);
+    assert.match(first.body, /saved the request.*couldn(?:'|&apos;)t send a notification.*Open Blankmind/i);
+    assert.doesNotMatch(first.body, /tap.*notification|already applied|already blocked/i);
     assert.doesNotMatch(first.body, /Reply BLOCK/);
     assert.doesNotMatch(first.body, /https?:\/\//);
 
-    assert.doesNotMatch(first.body, /Reply BLOCK|Open Blankmind|Open Blanked|Do you confirm/i);
+    assert.doesNotMatch(first.body, /Reply BLOCK|Open Blanked|Do you confirm/i);
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",
@@ -202,12 +204,12 @@ async function whatsappBlockingFollowupKeepsPendingContract() {
       }).toString(),
     });
     assert.strictEqual(second.statusCode, 200, second.body);
-    assert.match(second.body, /Tap the Blankmind notification to start your 5-minute block/i);
-    assert.doesNotMatch(second.body, /selected distractions|once/i);
-    assert.match(second.body, /Tap the Blankmind notification to start your 5-minute block/i);
+    assert.match(second.body, /Block your selected distractions.*5 minutes.*just once/i);
+    assert.match(second.body, /saved the request.*couldn(?:'|&apos;)t send a notification.*Open Blankmind/i);
+    assert.doesNotMatch(second.body, /tap.*notification|already applied|already blocked/i);
     assert.doesNotMatch(second.body, /https?:\/\//);
     assert.doesNotMatch(second.body, /https?:\/\/|review-action|ContentSid|Do you confirm/i);
-    assert.doesNotMatch(second.body, /Open Blankmind/i);
+    assert.match(second.body, /Execution is not verified/i);
     assert.strictEqual(twilioCalls.length, 0, "Twilio WhatsApp must not send a duplicate review template");
 
     const polled = await assistantChannelHandler({
@@ -289,6 +291,8 @@ async function whatsappMissingSelectionCarriesConfirmedProtection() {
     const textMessage = new URLSearchParams(twilioCalls[0].body);
     const buttonMessage = new URLSearchParams(twilioCalls[1].body);
     assert.doesNotMatch(textMessage.get("Body") || "", /https?:\/\//);
+    assert.match(textMessage.get("Body") || "", /couldn't send a notification.*Open Blankmind.*selection/i);
+    assert.doesNotMatch(textMessage.get("Body") || "", /tap.*notification|already applied|already blocked/i);
     assert.strictEqual(buttonMessage.get("ContentSid"), "HXchooseapps");
     assert.match(buttonMessage.get("ContentVariables") || "", /review-action/);
     assert.match(buttonMessage.get("ContentVariables") || "", /open_app_picker/);
@@ -396,8 +400,9 @@ async function whatsappUsesCanonicalSelectionForRequestedApp() {
     });
     assert.match((await send("Block Instagram now for 5 minutes", "SMcopy-1")).body, /once or recurring/i);
     const activated = await send("Once", "SMcopy-2");
-    assert.match(activated.body, /Tap the Blankmind notification to start your 5-minute block/i);
-    assert.doesNotMatch(activated.body, /Do you confirm|Open Blankmind|Select exactly Instagram/i);
+    assert.match(activated.body, /Block your selected distractions.*5 minutes.*just once/i);
+    assert.match(activated.body, /saved the request.*couldn(?:'|&apos;)t send a notification.*Open Blankmind/i);
+    assert.doesNotMatch(activated.body, /tap.*notification|Do you confirm|Select exactly Instagram/i);
 
     const polled = await assistantChannelHandler({
       httpMethod: "POST",

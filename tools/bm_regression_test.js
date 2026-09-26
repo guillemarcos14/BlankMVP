@@ -107,7 +107,15 @@ check("immediate_protection_does_not_invent_duration", () => {
 });
 
 check("messaging_actions_wait_for_notification_tap", () => {
-  assert.match(whatsapp, /Tap the Blankmind notification to apply it/);
+  const action={type:"start_protection",minutes:17};
+  const plan={actions:[action],message_text:"I'm applying it now. Tap the Blankmind notification."};
+  const delivered=whatsappModule.whatsappReplyText(plan,{action,push:{sent:true}});
+  assert.match(delivered,/17-minute block.*Tap the Blankmind notification.*apply/);
+  assert.match(delivered,/only confirm success after.*verifies/);
+  assert.doesNotMatch(delivered,/I'm applying it now/);
+  const pending=whatsappModule.whatsappReplyText(plan,{action,push:{sent:false}});
+  assert.match(pending,/saved the request.*couldn't send a notification.*Open Blankmind/);
+  assert.doesNotMatch(pending,/tap.*notification|I'm applying it now/i);
   assert.doesNotMatch(whatsapp, /I'm applying it now/);
   assert.doesNotMatch(whatsapp, /Open Blankmind to review and apply it/);
   assert.match(assistantChannel, /poll_pending_action/);

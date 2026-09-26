@@ -37,6 +37,10 @@ async function run() {
   assert.strictEqual(requestBody.model, "gpt-5.6-sol");
   assert.strictEqual(requestBody.reasoning.effort, "low");
   assert.strictEqual(requestBody.max_output_tokens, 900);
+  const systemPrompt = requestBody.input.find(item => item.role === "system").content;
+  assert.match(systemPrompt, /does not prove queue persistence, notification delivery, or device execution/, "planner history cannot prove transport or device effects");
+  assert.doesNotMatch(systemPrompt, /evidence that it was already queued/, "the evaluator must not promote prepared actions into persisted queue evidence");
+  assert.match(systemPrompt, /permission-only action may advance/, "permission setup without an executable plan may continue once prerequisites are met");
   assert.strictEqual(requestCount, 1);
   assert.strictEqual(review.verdict, "excellent");
   assert.strictEqual(digest({ a: 1 }), digest({ a: 1 }));
@@ -44,6 +48,7 @@ async function run() {
   assert.strictEqual(summarize([{ review }]).release_eligible, true);
   const unsafe = { ...review, verdict: "acceptable", unsafe_claim: true };
   assert.strictEqual(summarize([{ review: unsafe }]).release_eligible, false);
+  assert.strictEqual(summarize([{ review: { ...review, hard_contradiction: true } }]).release_eligible, false, "evidence wording must never relax the hard contradiction gate");
   const binding = { response_sha256: "a".repeat(64), expectation_sha256: "b".repeat(64) };
   assert.deepStrictEqual(oracleReviews([{ review, review_binding: binding, language: "en" }])[0], {
     ...binding,

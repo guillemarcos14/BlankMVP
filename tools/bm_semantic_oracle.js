@@ -150,6 +150,13 @@ function surfaceContradictions(plan, expected, context = {}, inputs = []) {
   });
   const noAction = expected.actions.length === 0 && !(plan.actions || []).length;
   claimText = claimText.split(/(?<=[.!?])\s+|\n+/).map(clause => {
+    // These complete choice questions ask for an unknown recurrence. Only this
+    // clause is masked; adjacent claims and other surfaces stay checked.
+    const recurrenceChoice = noAction && expected.decision?.type === "ask"
+      && expected.decision.slot === "recurrence" && expected.state.recurrence == null
+      && expected.state.pending_slots?.includes("recurrence")
+      && /^(?:Should it happen just once, every day, or on specific days of the week\?|¿Lo quieres solo esta vez, cada d[ií]a o en d[ií]as concretos de la semana\?)$/i.test(clause.trim());
+    if (recurrenceChoice) return "[unknown recurrence choice question]";
     // These are references to supplied history, not current slot assertions.
     // Questions stay subject to independent meaning review; no lexical PASS.
     const cancelledReference = expected.state.status === "cancelled" && noAction

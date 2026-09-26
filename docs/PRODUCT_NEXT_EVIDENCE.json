@@ -1,9 +1,9 @@
 {
-  "recorded_at": "2026-09-26",
+  "recorded_at": "2026-09-26T17:26:54.702Z",
   "purpose": "Audit index, not production release authorization. Reports remain in their original local worktrees; hashes refer to complete file bytes.",
   "pull_request": "https://github.com/guillemarcos14/BlankmindAI/pull/6",
-  "deployed_source_commit": "77a01e050e0c1d9c6fce514a12644928976cc93b",
-  "private_deploy_id": "6ab7e819cbfca0f727997215",
+  "deployed_source_commit": "30311fe5bae90df21453d506aed834acceb8c6c8",
+  "private_deploy_id": "6ab7fc6184f6d6492d619bb7",
   "staging_supabase_ref": "njqbovsmoowkhhsqmitn",
   "staging_migrations": "001-024",
   "production_changed": false,
@@ -147,6 +147,210 @@
       "path": "tmp/ci-a6f9e50/visual-review.json",
       "sha256": "1e49693c58fe8ca22ddd6336717df85832ee496e277ae557002b035f716cafa6",
       "scope": "Eight final-runtime SwiftUI screenshots independently reviewed, exact image hashes preserved; static appearance only."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-credit2-ee36783.json",
+      "sha256": "3ca0859ed141e59851f14641324e154002047eea6810b253574307b327fdc0b9",
+      "scope": "Historical clean ee replay:925 functional passes,14 extraction operational failures; no judge requested. Does not validate 105."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-final-66d6d52.json",
+      "sha256": "347d79830eead9f288c8a5347dcdc13d45eae9bbc573eee2b632a2e9368eaf30",
+      "scope": "Rejected 66 original:925 turns,890 active extraction turns,six functional dimensions925/925;139 operational failures including35 extraction+109 contextualization minus5 overlap. 29m9.065s wall time at concurrency4."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-judge-final-66d6d52.json",
+      "sha256": "368c6cba1320aa7c61a1198dc446b21f9a931ecd5d933acf8ea65ba26d413aec",
+      "scope": "Actual v10 judge of66:925 reviews,824 excellent,91 acceptable,10 poor,6 hard;98.92 percent. Release rejected."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-oracle-final-66d6d52.json",
+      "sha256": "92a6d0c34b5bba8d040ff814b953d4d9e768ef2f4c29710b66a0eba93a4b36ff",
+      "scope": "Exact925 oracle review bindings exported from complete v10 judge of66. No planner regeneration or invented judgments."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/reviewed-66d6d52.json",
+      "sha256": "273ccc58d102ce45bb760b3b0bb4b81ef91a57f004710e893ac7189ab2b12fa4",
+      "scope": "Offline binding derivative of66 originals:776 passed,149 failed,0 unverified. All139 operational and10 visible failures preserved. Release ineligible."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/quality-bound-66d6d52.json",
+      "sha256": "43422f228dba89153bc84dc1bb7450f5a0f18ae7006106cbf014fb1c49671c64",
+      "scope": "Quality derivative points to reviewed66; original judgments unchanged and original judged status explicitly preserved. Release ineligible."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/backend-release/product-harness-30311fe5bae9.json",
+      "sha256": "6f9567676a60af922c5ebed4670c620e75ff947ea6ef922bbdaa6fcf48e8ed1c",
+      "scope": "Private105 integration303 harness; source identity preserved. No production or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-30311fe5bae9-1790442582030.json",
+      "sha256": "499d802b5759dbdfdf46aec145c1888df6079357f11648a12c3bf092ec78ea8f",
+      "scope": "Private105 integration303 deployment; source identity preserved. No production or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/package-30311fe5bae9-1790442582030.verification-1790442622201-88f5fd.json",
+      "sha256": "7c01c538645c6614801a877c96e9789188e063ac28ac2c1100fe06f47265439f",
+      "scope": "Private105 integration303 verification; source identity preserved. No production or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/model-preflight-30311fe5bae9.json",
+      "sha256": "64b74cb265e3ca6c67d9614c761348b461f167439526e7434f21a61ff4a49246",
+      "scope": "Private105 integration303 model_preflight; source identity preserved. No production or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/assistant-app-cloud/full-final-30311fe5bae9-20260926-171107.json",
+      "sha256": "8214d4b825bc4bd75cccc28c4d38300863a7c395f285d589d2ff10661e47f5c9",
+      "scope": "Private105 integration303 cloud_full; source identity preserved. No production or physical validation."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/private-30311fe5bae9-final-evidence.json",
+      "sha256": "0611a2392ff0b1bbcf79b6be9c00a77f4226a27b6c3cd87e0c4f79bf8cfc4204",
+      "scope": "Verified private105 integration303:37 runtime inputs match feature blobs;four remote ZIPs,privacy,63checks,9cloudchecks,12cleanup. One active-model preflight;individual smoke response provenance absent;simulated failed receipt only."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-live-canonical-105cf12.json",
+      "sha256": "0dabfe87206c9cabcfd45520e3b8cc4e044bdba150b04d0375535c2dc1033326",
+      "scope": "Clean unchanged105 model replay:925turns;892active semantic extractions+5conversation;28extraction timeouts and1contextual timeout;33failed before review including5lexical recurrence flags with1overlap. Six functional dimensions925/925. Judge pending; release ineligible."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/close-105cf12-drafts/current-results.json",
+      "sha256": "c74aa674f388d28cdc9d41e177981e1f0e66cbbfd066d0066fb62ed9c10957fe",
+      "scope": "Independent read-only105 provenance, latency, failure separation and finalCI audit.185source hashes and925input/response/expectationbindings match. Not model judgment or physical evidence."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-judge-canonical-105cf12.json",
+      "sha256": "7cd9cc9ab24bf116953573e331d44636b122fb776efaf7157818d463c1f025c1",
+      "scope": "Complete925 independent v10 verdicts; exact hash cache reuse explicitly counted. No new model responses."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/product-next-oracle-canonical-105cf12.json",
+      "sha256": "7763db872f78462a75437ebe173f6498784735f575e9fedd2addb83f8970d70b",
+      "scope": "Exact exported925 verdict bindings for original105 responses."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/reviewed-105cf12.json",
+      "sha256": "cbc089a56e56e6a572dd95359701a2e86d77320d8f3ecbb693e2c3d982b5654f",
+      "scope": "Offline application of existing reviews; original functional and lexical failures retained. Not a new replay."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/quality-bound-105cf12.json",
+      "sha256": "874a4f0ade687e66af60d698f8df2979286d3a76df19bd9c01da1a1aa97aa383",
+      "scope": "Derived quality binding retains original judged source and hashes. Not release approval."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/judge-cache-seed-105cf12.json",
+      "sha256": "94eb4f5715722959af68ff5d7eb001cfec0dfffd7cfaa12ce6b704ef2c0f97f7",
+      "scope": "Immutable cache source provenance; reuse requires identical full judge input including history and deterministic status."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/candidate-binding-105cf12.json",
+      "sha256": "2f3dc0aeca4ffd82f5c9840162734edb63d074c58079b4de0a0249983c3316fe",
+      "scope": "Runtime105 and integration303 share full Git tree; iOS source unchanged since reviewed a6. Commit identities remain distinct."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/spanish-canonical-105cf12-20260926/outputs.json",
+      "sha256": "561811f2db6dcffc2ac4c4da22d3dfee1428dbb88eb178623e8e79817f03036c",
+      "scope": "Ten known Spanish diagnostic turns; ten criteria and final extractions, eleven successful HTTP calls including one literal-quote repair. Synthetic, not heldout."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/bm-semantic/spanish-canonical-105cf12-20260926/review.json",
+      "sha256": "73d5f0c9a7359ef1ce7c00535b67ea673f23ac97ee115f15a75ffea0381385d5",
+      "scope": "Ten known Spanish diagnostic turns; ten criteria and final extractions, eleven successful HTTP calls including one literal-quote repair. Synthetic, not heldout."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-105cf12/ios-run.json",
+      "sha256": "88a3b447903d3857a5beb1588f4358eaf8263abb41afcf3451367cdafd4d7499",
+      "scope": "Successful exact105 CI; unsigned simulator and test evidence, not physical execution. New screenshot artifact is listed, not independently reviewed here."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-105cf12/bm-run.json",
+      "sha256": "299be0d2f7a4d73e7d85ad3dfa473c77beb480412dc34f03665ca61d51a44643",
+      "scope": "Successful exact105 CI; unsigned simulator and test evidence, not physical execution. New screenshot artifact is listed, not independently reviewed here."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-105cf12/ios-artifacts.json",
+      "sha256": "463d242ec494e89a5945d51a26c5169ea56a8943d834d10a15e519712807140a",
+      "scope": "Successful exact105 CI; unsigned simulator and test evidence, not physical execution. New screenshot artifact is listed, not independently reviewed here."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-105cf12/ios-build.log",
+      "sha256": "3df364bdf059b4f8bdea58a0fecdd9f879cf94ddc8460b94852456e076535d47",
+      "scope": "Successful exact105 CI; unsigned simulator and test evidence, not physical execution. New screenshot artifact is listed, not independently reviewed here."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/ci-105cf12/ios-evidence-lines.txt",
+      "sha256": "7b4a3f031d56aa4bb5c6b1b4f8799e2729f603d6c1def679ea42c33b6716ce6d",
+      "scope": "Successful exact105 CI; unsigned simulator and test evidence, not physical execution. New screenshot artifact is listed, not independently reviewed here."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/product-harness/canonical-action-candidate-20260926.json",
+      "sha256": "b7abfeeda1b37fba8b76335016abcfdfb918cea2b05ac5917e623efe0b30696a",
+      "scope": "Clean candidate105 harness63 with original baseline and enforced committed scope."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/offline-review-binding/apply-existing-reviews.js",
+      "sha256": "ebb3a6855697726edc18d96b22c06ed86f40eed2831b3687a048e368f7fa7da8",
+      "scope": "Audited offline binding utility and26 synthetic integrity tests; no model or network."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/offline-review-binding/test.js",
+      "sha256": "ce759d05275048e9acd5201d353f9f4304e54e915f197fba5006d02def3422c0",
+      "scope": "Audited offline binding utility and26 synthetic integrity tests; no model or network."
+    },
+    {
+      "worktree": "Codigo-product-release",
+      "path": "tmp/cloud-stage/candidate-anchor-105cf12.json",
+      "sha256": "6c6220f99159f654b2badfbd58ec0eae33606684976b15cc5c3f1762adb6bf4b",
+      "scope": "Published exact candidate105 anchor; historical66 branch preserved. No release approval."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/oracle-recurrence-correction/change-report.json",
+      "sha256": "e558521db4ad77c8116b12598cc655099501d235696f727264b34295a058f4c4",
+      "scope": "Post105 evaluation-tool correction only.34 new English/Spanish assertions plus42 mutation suite and200 batch jobs;0network. Original925 responses/reviews/failures preserved; no new runtime inference or release approval."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/oracle-recurrence-correction/unit-test.json",
+      "sha256": "64ac31ef16d80d1caaaeb01eb6b5dffbc78a835c2e314923fe447aba155b44ec",
+      "scope": "Post105 evaluation-tool correction only.34 new English/Spanish assertions plus42 mutation suite and200 batch jobs;0network. Original925 responses/reviews/failures preserved; no new runtime inference or release approval."
+    },
+    {
+      "worktree": "Codigo-product-next",
+      "path": "tmp/oracle-recurrence-correction/README.md",
+      "sha256": "5df2c810414e6033a11ff80190a1eae1858cf5a9e3e54e44de479bbe351df49f",
+      "scope": "Post105 evaluation-tool correction only.34 new English/Spanish assertions plus42 mutation suite and200 batch jobs;0network. Original925 responses/reviews/failures preserved; no new runtime inference or release approval."
     }
   ],
   "coverage_limits": {
@@ -155,31 +359,193 @@
     "distinct_text_sequences": 160,
     "turns": 925,
     "heldout": false,
-    "model_quality_after_corrections": "Unverified: e47484b live attempt had 0 active model turns; local provider returned HTTP 429 insufficient_quota / credit_balance_exhausted. Final a6f9e50 has only deterministic evidence.",
+    "model_quality_after_corrections": "Complete925 reviewed; release remains rejected due29 operational failures. Five original lexical flags remain in report despite independent false-positive diagnosis.",
     "signed_candidate_build": "unavailable",
     "physical_iphone_cases": 0,
     "observed_user_value_multiplier": "not measured",
     "latest_completed_live_judge": {
-      "source_commit": "01cb98b88e6f4e7cbd2218e3769b443f1988d89e",
+      "source_commit": "105cf120761594b75d5a0b47656ea903e4abac2f",
       "turns": 925,
-      "approval_percent": 93.51,
-      "poor": 60,
-      "hard_findings": 33,
+      "judged": 925,
+      "excellent": 839,
+      "acceptable": 86,
+      "poor": 0,
+      "hard_failures": 0,
+      "approval_percent": 100,
+      "average_scores": {
+        "understanding": 4.98,
+        "context": 4.98,
+        "usefulness": 4.95,
+        "naturalness": 4.73,
+        "minimality": 4.91
+      },
+      "release_eligible": false,
+      "functional_failures": 29,
+      "operational_failures": 29,
+      "reviewed_total_failures": 33,
+      "reused_exact_reviews": 504,
+      "applies_to_current_runtime": true
+    },
+    "current_cloud_full_conversation": true,
+    "current_cloud_infrastructure_checks": 4,
+    "current_cloud_cleanup_checks": 12,
+    "current_cloud_model_provenance": "One separate active-model preflight; nine smoke checks do not record per-response provenance.",
+    "historical_completed_live_judge": {
+      "source_commit": "66d6d5288d897d40533a9bf0c6d63bb773c9fde5",
+      "turns": 925,
+      "approval_percent": 98.92,
+      "excellent": 824,
+      "acceptable": 91,
+      "poor": 10,
+      "hard_findings": 6,
+      "operational_failures": 139,
+      "reviewed_total_failures": 149,
       "release_eligible": false,
       "applies_to_current_runtime": false
     },
-    "current_cloud_full_conversation": false,
-    "current_cloud_infrastructure_checks": 4,
-    "current_cloud_cleanup_checks": 12
+    "current_cloud_checks": 9,
+    "current_metrics": {
+      "turns": 925,
+      "concurrency": 8,
+      "wall_ms": 475881,
+      "latency_ms": {
+        "p50": 2067,
+        "p95": 13630,
+        "p99": 20014,
+        "max": 24836,
+        "mean": 3975.96
+      },
+      "quantile_method": "nearest rank",
+      "source_counts": {
+        "openai:gpt-5.6-luna:semantic+grounded_canonical_response": 514,
+        "openai:gpt-5.6-luna:semantic+grounded_execution_boundary": 363,
+        "semantic_state_v1+grounded_execution_boundary": 12,
+        "semantic_state_v1+grounded_canonical_response": 16,
+        "openai:gpt-5.6-luna:semantic+openai:gpt-5.6-luna:grounded_contextual_response": 14,
+        "openai:gpt-5.6-luna:semantic+grounded_deterministic_after_model_error": 1,
+        "openai:gpt-5.6-luna:conversation": 5
+      },
+      "active_model_turns": 897,
+      "active_model_definition": "Source starts openai; not an extraction-only counter",
+      "active_semantic_extraction_turns": 892,
+      "active_conversation_turns": 5,
+      "semantic_extraction_failure_turns": 28,
+      "semantic_extraction_failure_attempt_counts": {
+        "1": 28
+      },
+      "semantic_extraction_failure_codes": {
+        "semantic_model_timeout": 28
+      },
+      "contextual_response_failure_turns": 1,
+      "contextual_response_failure_codes": {
+        "contextual_response_timeout": 1
+      },
+      "extraction_and_context_failure_overlap": 0,
+      "pre_review_summary": {
+        "conversations": 200,
+        "turns": 925,
+        "active_model_turns": 897,
+        "source_counts": {
+          "openai:gpt-5.6-luna:semantic+grounded_canonical_response": 514,
+          "openai:gpt-5.6-luna:semantic+grounded_execution_boundary": 363,
+          "semantic_state_v1+grounded_execution_boundary": 12,
+          "semantic_state_v1+grounded_canonical_response": 16,
+          "openai:gpt-5.6-luna:semantic+openai:gpt-5.6-luna:grounded_contextual_response": 14,
+          "openai:gpt-5.6-luna:semantic+grounded_deterministic_after_model_error": 1,
+          "openai:gpt-5.6-luna:conversation": 5
+        },
+        "passed": 0,
+        "failed": 33,
+        "unverified": 892,
+        "dimensions": {
+          "intent": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "slots": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "transition": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "provenance": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "decision": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "actions": {
+            "passed": 925,
+            "failed": 0,
+            "unverified": 0,
+            "pass_percent": 100
+          },
+          "safety": {
+            "passed": 896,
+            "failed": 29,
+            "unverified": 0,
+            "pass_percent": 96.86
+          },
+          "visible_equivalence": {
+            "passed": 0,
+            "failed": 5,
+            "unverified": 920,
+            "pass_percent": 0
+          }
+        }
+      },
+      "visible_lexical_failure_turns": 5,
+      "safety_and_visible_overlap": 1
+    }
   },
   "previous_deploys": [
     {
       "source_commit": "5cab6d312f505b7395456b9d2864be69c978bd48",
       "deploy_id": "6ab7d0df552dead835399f9e"
+    },
+    {
+      "source_commit": "77a01e050e0c1d9c6fce514a12644928976cc93b",
+      "deploy_id": "6ab7e819cbfca0f727997215"
+    },
+    {
+      "source_commit": "621ba322a85ca5c0141d91c63b2d5653e6a494b1",
+      "deploy_id": "6ab7f3296eda28e3dc2f5be6"
     }
   ],
-  "runtime_feature_commit": "a6f9e501165979b7ef81377cd32ea23aaa023c5d",
+  "runtime_feature_commit": "105cf120761594b75d5a0b47656ea903e4abac2f",
   "final_runtime_ci": {
+    "source_commit": "105cf120761594b75d5a0b47656ea903e4abac2f",
+    "bm_run": 36257915234,
+    "bm_conclusion": "success",
+    "ios_run": 36257915232,
+    "ios_conclusion": "success",
+    "ios_completed_at": "2026-09-26T17:16:21Z",
+    "visual_artifact": 10911358074,
+    "visual_artifact_sha256": "fc74a30c41f439cdd0ec89c475ccd9c7f45096e2d53558e3294737778e49edac",
+    "visual_review_status": "Eight a6 screenshots previously reviewed; iOS source identical at105. Artifact105 listed, not newly reviewed.",
+    "physical_validation": false,
+    "ios_status": "completed"
+  },
+  "current_evaluator": {
+    "version": "bm-sol-quality-judge-v10-preparation-evidence",
+    "scope": "Completed v10 judgments on both66 and105; thresholds unchanged. All source report failures retained. Post-run lexical tool correction is separate evidence and cannot relabel these reports."
+  },
+  "draft": false,
+  "historical_runtime_ci": {
     "source_commit": "a6f9e501165979b7ef81377cd32ea23aaa023c5d",
     "ios_run": 36252850746,
     "ios_conclusion": "success",
@@ -189,8 +555,27 @@
     "visual_artifact_sha256": "946cc17bbdc2fc79e79ecc4a45f17af32b7374ad9fc526f38549d317523593ac",
     "physical_validation": false
   },
-  "current_evaluator": {
-    "version": "bm-sol-quality-judge-v10-preparation-evidence",
-    "scope": "Evaluation tooling only. Prepared planner actions do not prove queue persistence, notification delivery or physical execution. Independently reviewed; thresholds unchanged; no live evaluation run with v10."
+  "candidate_anchor": {
+    "historical_branch": "codex/backend-release-candidate-2026-09-26",
+    "historical_commit": "66d6d5288d897d40533a9bf0c6d63bb773c9fde5",
+    "historical_release_eligible": false,
+    "current_commit": "105cf120761594b75d5a0b47656ea903e4abac2f",
+    "current_branch": "codex/backend-release-candidate-canonical-2026-09-26",
+    "status": "Published exact105 anchor; rejected candidate, not production authorization",
+    "docs_commit_changes_candidate": false
+  },
+  "pending_evidence": [
+    "Successful model reliability gate:29 timed-out operations remain; no quota failure in latest run",
+    "Signed candidate artifact and20 physical iPhone cases; no verified native receipt"
+  ],
+  "post_evaluation_tool_correction": {
+    "files": [
+      "tools/bm_semantic_oracle.js",
+      "tools/bm_semantic_oracle_test.js"
+    ],
+    "purpose": "Only complete canonical recurrence-choice questions may require review instead of being false-positive contradictory assertions. Missing recurrence, expected ask and absent actions required; adjacent assertions still checked.",
+    "runtime_changed": false,
+    "original_reports_reclassified": false,
+    "tests": "34 added assertions;42 mutations;200 batch jobs;0 network"
   }
 }

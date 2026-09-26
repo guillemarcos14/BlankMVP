@@ -56,6 +56,9 @@ const runs = Array.from({ length: 200 }, (_, index) => ({
 }));
 const model = {
   revision: commit,
+  source_dirty: false, source_changed_during_replay: false,
+  source_capture: { version: 1, before_turns: true },
+  source_snapshot: { "netlify/functions/bm-contextual-response.js": "e".repeat(64) },
   dataset: { id: "fresh-release-holdout", sha256: "d".repeat(64) },
   execution: { model_requested: true, repeats: 1 },
   release_eligible: true,
@@ -164,6 +167,11 @@ function checkModel(name, modified, expectedCode, conversationEvidence = {}) {
 }
 
 const duplicatedIDs = structuredClone(model);
+checkModel("dirty-replay", { ...structuredClone(model), source_dirty: true }, "model_source_not_clean");
+checkModel("source-changed-mid-replay", { ...structuredClone(model), source_changed_during_replay: true }, "model_source_changed_during_replay");
+const legacySource = structuredClone(model);
+delete legacySource.source_dirty; delete legacySource.source_capture;
+checkModel("legacy-source-unknown", legacySource, "model_source_capture_missing");
 duplicatedIDs.runs = duplicatedIDs.runs.map((run, index) => ({ ...run, id: `new-id-${index}`, channel: index % 2 ? "sms" : "ios", turns: structuredClone(model.runs[0].turns) }));
 const duplicateReport = checkModel("duplicate-scripts-new-ids", duplicatedIDs, "conversation_coverage", { unique_conversations: 1, unique_turns: 2 });
 assert.strictEqual(duplicateReport.coverage.unique_conversations, 1);

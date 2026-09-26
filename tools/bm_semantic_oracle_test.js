@@ -2,7 +2,7 @@
 
 const assert = require("assert");
 const { digest, evaluateTurn, visibleSurfaces, surfaceContradictions } = require("./bm_semantic_oracle");
-const { mapConcurrent, replay, validateDataset } = require("./bm_semantic_replay");
+const { captureSource, mapConcurrent, replay, validateDataset } = require("./bm_semantic_replay");
 
 const input = "Block Instagram from 10 am to 11 am every day for 7 days, for 60 minutes per session.";
 const expected = {
@@ -179,6 +179,38 @@ async function main() {
   const failed = await replay(dataset, { repeats: 1, modes: ["bm_final"], concurrency: 2 }, async () => { throw new Error("intentional timeout"); });
   assert.equal(failed.summary.failed, 2, "batch preserves every failure turn");
   assert.equal(failed.release_eligible, false);
+  // Mock only Git and the provider; capture actual bytes, including a renderer
+  // dependency that the old seven-file snapshot omitted.
+  const fs = require("fs"), path = require("path");
+  const provenanceRoot = path.resolve(__dirname, "../tmp/bm-semantic/provenance-fixture");
+  fs.mkdirSync(path.join(provenanceRoot, "netlify/functions/nested"), { recursive: true });
+  fs.mkdirSync(path.join(provenanceRoot, "tools"), { recursive: true });
+  const renderer = "netlify/functions/bm-contextual-response.js";
+  fs.writeFileSync(path.join(provenanceRoot, renderer), "renderer-at-start");
+  fs.writeFileSync(path.join(provenanceRoot, "netlify/functions/nested/contract.json"), '{"native":true}');
+  fs.writeFileSync(path.join(provenanceRoot, "tools/oracle.js"), "oracle-at-start");
+  fs.writeFileSync(path.join(provenanceRoot, "package.json"), '{"name":"snapshot-fixture"}');
+  let gitHead = "a".repeat(40), gitDirty = "";
+  const capture = () => captureSource({ root: provenanceRoot, git: args => args[0] === "rev-parse" ? gitHead : gitDirty });
+  const oneTurn = { ...dataset, conversations: [{ ...dataset.conversations[0], turns: dataset.conversations[0].turns.slice(0, 1) }] };
+  const replayWithCapture = adapter => replay(oneTurn, { repeats: 1, modes: ["bm_final"], concurrency: 1 }, adapter, reviews, null, { captureSource: capture });
+  const cleanReport = await replayWithCapture(async () => fixture());
+  assert.equal(cleanReport.release_eligible, true);
+  assert.equal(cleanReport.source_snapshot[renderer], digest("renderer-at-start"));
+  assert.equal(cleanReport.source_snapshot["netlify/functions/nested/contract.json"], digest('{"native":true}'));
+  assert.equal(cleanReport.source_snapshot["package.json"], digest('{"name":"snapshot-fixture"}'));
+  const changedCommit = await replayWithCapture(async () => { gitHead = "b".repeat(40); return fixture(); });
+  assert.equal(changedCommit.revision, "a".repeat(40), "end-of-run commit must not replace the tested starting revision");
+  assert.equal(changedCommit.source_changed_during_replay, true);
+  assert.equal(changedCommit.release_eligible, false);
+  gitDirty = " M netlify/functions/bm-contextual-response.js";
+  const dirtyReport = await replayWithCapture(async () => { gitDirty = ""; return fixture(); });
+  assert.equal(dirtyReport.source_dirty, true, "a mid-run commit cannot make a dirty start clean evidence");
+  assert.equal(dirtyReport.release_eligible, false);
+  const changedBytes = await replayWithCapture(async () => { fs.writeFileSync(path.join(provenanceRoot, renderer), "renderer-changed"); return fixture(); });
+  assert.equal(changedBytes.source_snapshot[renderer], digest("renderer-at-start"));
+  assert.equal(changedBytes.source_changed_during_replay, true, "source bytes changing without a commit invalidate replay evidence");
+  assert.equal(changedBytes.release_eligible, false);
   const output = { evaluator: "bm-semantic-oracle-mutation-v1", mutations: outcomes.length, rejected: outcomes.filter(item => item.status === "failed").length, review_invalidated: outcomes.filter(item => item.status === "unverified").length, escaped: 0, outcomes, batch_concurrency_peak: peak, batch_jobs: 200 };
   const outAt = process.argv.indexOf("--out");
   if (outAt >= 0) {

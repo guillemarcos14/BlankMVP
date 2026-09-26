@@ -110,6 +110,10 @@ if (evidence) {
   const measuredUniqueTurns = conversationCoverage.unique_turns;
   if (modelReport) {
     requireCondition(modelReport.revision === candidate.commit, "model_report_commit_mismatch", modelReport.revision);
+    requireCondition(modelReport.source_capture?.version === 1 && modelReport.source_capture?.before_turns === true
+      && isSha(modelReport.source_snapshot?.["netlify/functions/bm-contextual-response.js"]), "model_source_capture_missing", modelReport.source_capture);
+    requireCondition(modelReport.source_dirty === false, "model_source_not_clean", modelReport.source_dirty);
+    requireCondition(modelReport.source_changed_during_replay === false, "model_source_changed_during_replay", modelReport.source_changed_during_replay);
     requireCondition(modelReport.execution?.model_requested === true, "model_not_requested", modelReport.execution?.model_requested);
     requireCondition(modelReport.release_eligible === true, "model_report_not_release_eligible", modelReport.release_eligible);
     requireCondition(modelReport.summary?.failed === 0, "model_hard_failures", modelReport.summary?.failed);

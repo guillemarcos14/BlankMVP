@@ -30,6 +30,12 @@ async function main() {
   assert(apply.indexOf("current.actionId == turn.actionId") < apply.indexOf("onApplyAction(current.actionId)"));
   assert.match(apply.slice(apply.indexOf("} catch")), /hasFreshSnapshot = false/,
     "failed status validation must disable all history actions until refreshed");
+  assert.match(history, /#if DEBUG\s+return AssistantAppPreview\.scenario == "history"\s+#else\s+return false/,
+    "history screenshots must use a fixture unavailable in release builds");
+  assert.match(history, /private func refresh\(\) async \{\s+if preview \{[\s\S]*?hasFreshSnapshot = true[\s\S]*?return/,
+    "history screenshots must not make authenticated network requests");
+  assert.match(apply, /guard !preview else \{ return \}/,
+    "the enabled-looking synthetic CTA must never invoke native actions");
   console.log("production app history: fresh snapshot, prior-turn CTA, exact action and owner gates passed");
   let installed = true;
   let connected = false;

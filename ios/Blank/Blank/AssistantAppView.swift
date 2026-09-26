@@ -898,6 +898,12 @@ struct AssistantAppView: View {
             composer.pending = .init(id: "preview_pending", text: "Bloquea ahora 45 minutos.")
             composer.draft = "Después quiero revisar mis horarios."
         }
+        if scenario == "history" {
+            turns.append(AssistantAppTurn(id: "preview_followup", userText: "Gracias.",
+                assistantText: "Aquí estoy cuando lo necesites.", status: "completed",
+                actionId: "", actionLabel: "", actionStatus: "", createdAt: "2026-09-26T12:01:00Z"))
+            showHistory = true
+        }
     }
     #endif
 }
@@ -931,6 +937,13 @@ private struct AssistantAppHistoryView: View {
     let onApplyAction: (String) -> Void
     private let owner: String?
     private var spanish: Bool { Locale.current.languageCode == "es" }
+    private var preview: Bool {
+        #if DEBUG
+        return AssistantAppPreview.scenario == "history"
+        #else
+        return false
+        #endif
+    }
 
     init(turns: [AssistantAppTurn], nextBefore: String?, foreground: Color, background: Color,
          onApplyAction: @escaping (String) -> Void) {
@@ -1051,6 +1064,11 @@ private struct AssistantAppHistoryView: View {
     }
 
     private func refresh() async {
+        if preview {
+            hasFreshSnapshot = true
+            loading = false
+            return
+        }
         guard validateOwner(), requestID == nil else { return }
         let id = UUID()
         requestID = id
@@ -1071,6 +1089,7 @@ private struct AssistantAppHistoryView: View {
     }
 
     private func apply(_ turn: AssistantAppTurn) async {
+        guard !preview else { return }
         guard validateOwner(), hasFreshSnapshot, !loading, error == nil, turn.canApply else { return }
         let id = UUID()
         requestID = id
@@ -1099,6 +1118,7 @@ private struct AssistantAppHistoryView: View {
     }
 
     private func loadEarlier() async {
+        guard !preview else { return }
         guard validateOwner(), hasFreshSnapshot, let cursor = nextBefore, !loading else { return }
         let id = UUID()
         requestID = id

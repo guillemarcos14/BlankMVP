@@ -686,7 +686,10 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     return `${knownFactLead(state,context)} ${limitation} ${question}`;
   }
   if (decision.type === "confirm") return `${semanticSummary(state,context)}. ${es ? "¿Lo confirmas?" : "Do you confirm?"}`;
-  if (decision.type === "ready") return `${semanticSummary(state,context)}. ${es ? "Lo estoy enviando a tu dispositivo vinculado. Pulsa la notificación de Blankmind para terminar; solo confirmaré el éxito cuando el dispositivo verifique el bloqueo." : "I'm sending it to your linked device. Tap the Blankmind notification to finish; I'll only report success after the device verifies the block."}`;
+  if (decision.type === "ready") {
+    const effect = value(state,"action_type") === "daily_limit" ? (es ? "el límite" : "the limit") : (es ? "el bloqueo" : "the block");
+    return `${semanticSummary(state,context)}. ${es ? `Lo estoy enviando a tu dispositivo vinculado. Pulsa la notificación de Blankmind para terminar; solo confirmaré el éxito cuando el dispositivo verifique ${effect}.` : `I'm sending it to your linked device. Tap the Blankmind notification to finish; I'll only report success after the device verifies ${effect}.`}`;
+  }
   if (decision.type === "setup" && decision.slot === "permissions") return es
     ? `${semanticSummary(state,context)}. Pulsa la notificación de Blankmind y concede el permiso de bloqueo; después dime cuando esté listo para continuar. La protección todavía no está verificada.`
     : `${semanticSummary(state,context)}. Tap the Blankmind notification and grant blocking permission, then tell me when it's ready to continue. Protection is not verified yet.`;
@@ -712,7 +715,10 @@ function renderSemanticResponse(state, decision, context = {}, prompt = "") {
     action_type:state.intent === "advice" ? (es ? "¿Quieres convertir estos detalles en una propuesta de bloqueo?" : "Would you like to turn these details into a blocking proposal?") : (es ? "¿Quieres bloquearlas durante una franja o fijar un límite diario?" : "Do you want a blocking window or a daily usage limit?"),
     start:value(state,"action_type") === "daily_limit"
       ? (es ? "Los límites diarios solo pueden empezar ahora. ¿Quieres que empiece ahora o prefieres un bloqueo programado?" : "Daily limits can only start now. Should it start now, or would you prefer a scheduled block?")
-      : state.intent === "advice" ? (es ? "¿A qué hora suele empezar ese uso del móvil? Indica mañana o tarde, o usa el formato de 24 horas." : "What time does that scrolling usually start? Include AM/PM or use a 24-hour time.") : (es ? "¿Cuándo debe empezar: ahora o a qué hora exacta? Indica mañana o tarde, o usa el formato de 24 horas." : "When should it start: now or at what exact time? Include AM/PM or use a 24-hour time."),
+      : state.intent === "advice" ? (es ? "¿A qué hora suele empezar ese uso del móvil? Indica mañana o tarde, o usa el formato de 24 horas." : "What time does that scrolling usually start? Include AM/PM or use a 24-hour time.")
+      : ["daily","weekly"].includes(value(state,"recurrence")?.type)
+        ? (es ? "Un horario recurrente necesita una hora fija. ¿A qué hora exacta debe empezar? Indica mañana o tarde, o usa el formato de 24 horas." : "A recurring schedule needs a fixed time. What exact time should it start? Include AM/PM or use a 24-hour time.")
+        : (es ? "¿Cuándo debe empezar: ahora o a qué hora exacta? Indica mañana o tarde, o usa el formato de 24 horas." : "When should it start: now or at what exact time? Include AM/PM or use a 24-hour time."),
     end:es ? "¿A qué hora exacta debe terminar? Indica mañana o tarde, o usa el formato de 24 horas." : "What exact time should it end? Include AM/PM or use a 24-hour time.",
     end_or_duration:es ? "¿Cuánto debe durar o a qué hora exacta debe terminar?" : "How long should it last, or what exact time should it end?",
     duration_minutes:es ? "¿Qué duración exacta quieres en minutos? El bloqueo inmediato admite de 5 a 240 minutos." : "What exact duration do you want in minutes? An immediate block supports 5 to 240 minutes.",

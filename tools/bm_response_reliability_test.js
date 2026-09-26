@@ -4,6 +4,7 @@ const { isGrounded, plannerAuthorityViolations } = require("../netlify/functions
 const { handler, enforceSemanticBoundary } = require("../netlify/functions/blanked-agent");
 const { whatsappReplyText } = require("../netlify/functions/whatsapp-agent");
 const { whatsappReplyText: smsReplyText } = require("../netlify/functions/sms-agent");
+const { evaluateTurn, projectState } = require("./bm_semantic_oracle");
 
 // Spanish live failure plus independent authority mutations. These assertions
 // test the receipt boundary even when the parser recognizes no action intent.
@@ -141,11 +142,12 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
   const oldURL=process.env.SUPABASE_URL, oldService=process.env.SUPABASE_SERVICE_ROLE_KEY;
   process.env.OPENAI_API_KEY="mock-key-not-sent";
   process.env.SUPABASE_URL=""; process.env.SUPABASE_SERVICE_ROLE_KEY="";
-  let rewrite=null, extractionFailure=false, failedExtractions=0; const calls=[];
+  let rewrite=null, rewriteFailure=null, extractionFailure=false, failedExtractions=0; const calls=[];
   global.fetch=async(url,options)=>{
     assert.equal(String(url),"https://api.openai.com/v1/responses");
     const request=JSON.parse(options.body); calls.push(request);
     const structured=Boolean(request.text?.format?.schema);
+    if (!structured && rewriteFailure) throw rewriteFailure;
     if(structured && extractionFailure) {
       failedExtractions++;
       if(failedExtractions===2) {const error=new Error("timeout");error.name="TimeoutError";throw error;}
@@ -164,8 +166,8 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
   const context={channel:"whatsapp",assistant_channel:"whatsapp",language:"en",has_selected_apps:true,selection_count:3,
     protection_target:"selected_distractions",screen_time_authorized:true,
     app_presence:{app_present:true,app_ready:true,last_seen_at:new Date().toISOString()},app_presence_recent:true,app_presence_state:"recently_seen"};
-  async function call(prompt,state,patch={}) {
-    const response=await handler({httpMethod:"POST",body:JSON.stringify({prompt,context:{...context,...patch,semantic_state:state}})});
+  async function call(prompt,state,patch={},runtime={}) {
+    const response=await handler({httpMethod:"POST",body:JSON.stringify({prompt,context:{...context,...patch,semantic_state:state}})},runtime);
     assert.equal(response.statusCode,200); const body=JSON.parse(response.body); assert.equal(body.ok,true); return body;
   }
   try {
@@ -247,11 +249,47 @@ assert.equal(isGrounded("A daily limit blocks the selected distractions after yo
     assert.deepEqual(unsupported.plan.actions,[]);
     const ordinary=await call("Can you read the contents of my private messages?");
     assert.deepEqual(ordinary.plan.bullets,[],"internal diagnostic bullets are absent from conversation surfaces");
+
+    // A rewrite timeout must retain the validated plan while explicitly failing
+    // model safety. Active extraction alone cannot mask a renderer outage.
+    rewriteFailure=Object.assign(new Error("request timed out"),{name:"TimeoutError"});
+    let timeoutTrace;
+    const prompt="Block selected apps now for 30 minutes once.";
+    const timedOut=await call(prompt,null,{}, {captureSemanticTrace:value=>{timeoutTrace=value;}});
+    assert.deepEqual(timedOut.plan.actions,first.plan.actions);
+    assert.deepEqual(projectState(timedOut.plan.semantic_state),projectState(first.plan.semantic_state));
+    assert.match(timedOut.source,/grounded_deterministic_after_model_error/);
+    assert.match(timedOut.plan.message_text,/30 minutes/);
+    assert.doesNotMatch(timedOut.plan.message_text,/already blocked|is active|has been applied/i);
+    assert.equal(timedOut.model_error,"contextual_response_timeout");
+    assert.deepEqual(timedOut.contextual_response_failure,{code:"contextual_response_timeout",name:"TimeoutError"});
+    assert.deepEqual(timeoutTrace.contextual_response_failure,timedOut.contextual_response_failure);
+    const assessment=evaluateTurn({body:timedOut,inputs:[prompt],context,expected:{
+      state:projectState(first.plan.semantic_state),decision:first.plan.semantic_decision,actions:first.plan.actions,language:"en",
+    }});
+    assert.equal(assessment.dimensions.actions,"passed");
+    assert.equal(assessment.dimensions.safety,"failed");
+    assert.ok(assessment.issues.some(issue=>issue.code==="model_failure_masked_by_fallback"&&issue.actual==="contextual_response_timeout"));
+    for(const [error,code] of [
+      [new Error("contextual_response_http_503"),"contextual_response_http_503"],
+      [Object.assign(new Error("fetch failed"),{name:"TypeError"}),"contextual_response_network_error"],
+      [new Error("Authorization: Bearer private-fixture-value"),"contextual_response_error"],
+    ]) {
+      rewriteFailure=error;
+      const failed=await call(prompt);
+      assert.equal(failed.model_error,code);
+      assert.equal(failed.contextual_response_failure.code,code);
+      assert.doesNotMatch(JSON.stringify(failed),/private-fixture-value|Authorization:/);
+      assert.deepEqual(failed.plan.actions,first.plan.actions);
+    }
+    rewriteFailure=Object.assign(new Error("request timed out"),{name:"TimeoutError"});
     extractionFailure=true;
     const degraded=await call("Block selected apps now for 30 minutes once.");
     assert.equal(degraded.model_error,"semantic_model_timeout","terminal degradation remains externally observable");
     assert.equal(degraded.extraction_failure.attempt_count,2);
     assert.deepEqual(degraded.extraction_failure.attempt_errors,["duplicate_semantic_extraction_slot","semantic_model_timeout"]);
+    assert.deepEqual(degraded.contextual_response_failure,{code:"contextual_response_timeout",name:"TimeoutError"});
+    assert.equal(degraded.model_error,"semantic_model_timeout","extraction failure takes precedence while both failures remain observable");
     assert.equal(degraded.plan.actions[0].minutes,30,"failed extraction cannot invent an action quantity");
     console.log("BM response reliability: historical live copy mutations rejected, cancellation stays closed, native setup order and daily-limit meaning preserved (mock model, real endpoint)");
   } finally {

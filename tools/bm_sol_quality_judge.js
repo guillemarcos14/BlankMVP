@@ -180,6 +180,18 @@ function functionalFailures(turns) {
   return turns.filter((turn) => FUNCTIONAL_DIMENSIONS.some((key) => turn.dimensions?.[key] !== "passed"));
 }
 
+function checkpointSummary(turns, reviews, infrastructureError = null) {
+  const reviewSummary = summarize(reviews);
+  const failures = functionalFailures(turns);
+  const complete = turns.length > 0 && reviews.length === turns.length
+    && reviewSummary.judged === turns.length && !infrastructureError;
+  return {
+    complete,
+    summary: { ...reviewSummary, functional_failures: failures.length,
+      release_eligible: complete && reviewSummary.release_eligible && failures.length === 0 },
+  };
+}
+
 function oracleReviews(reviews) {
   return reviews.filter(item => item.review && item.review_binding?.response_sha256 && item.review_binding?.expectation_sha256).map(item => ({
     response_sha256: item.review_binding.response_sha256,
@@ -272,13 +284,7 @@ async function main() {
   }
   fs.mkdirSync(path.dirname(out), { recursive: true });
   const checkpoint = (reviews, infrastructureError = null) => {
-    const failures = functionalFailures(turns);
-    const reviewSummary = summarize(reviews);
-    const summary = {
-      ...reviewSummary,
-      functional_failures: failures.length,
-      release_eligible: reviewSummary.release_eligible && failures.length === 0,
-    };
+    const { summary, complete } = checkpointSummary(turns, reviews, infrastructureError);
     const result = {
       evaluator: EVALUATOR_VERSION,
       generated_at: new Date().toISOString(),
@@ -286,7 +292,7 @@ async function main() {
       concurrency,
       reviews,
       summary,
-      complete: reviews.length === turns.length && !infrastructureError,
+      complete,
       infrastructure_error: infrastructureError,
     };
     fs.writeFileSync(out, `${JSON.stringify(result, null, 2)}\n`);
@@ -304,5 +310,5 @@ async function main() {
   process.exitCode = result.summary.release_eligible ? 0 : 1;
 }
 
-module.exports = { DEFAULT_MODEL, buildJudgeInput, digest, flattenReport, functionalFailures, judgeConcurrency, judgeSchema, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize };
+module.exports = { DEFAULT_MODEL, buildJudgeInput, checkpointSummary, digest, flattenReport, functionalFailures, judgeConcurrency, judgeSchema, judgeTurn, oracleReviews, reviewDigest, reviewTurns, summarize };
 if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 2; });

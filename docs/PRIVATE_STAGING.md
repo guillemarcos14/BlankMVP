@@ -46,6 +46,14 @@ node tools/backend_staging.js --deploy
 
 Al terminar, compara los cuatro digests remotos, ausencia de schedules, deploy activo y protección privada. El informe solo marca `private_deploy_verified` si todo coincide. Un fallo después de solicitar el despliegue queda como resultado desconocido o desplegado sin verificar; no se reintenta automáticamente. El script no aplica SQL, no ejecuta el modelo ni sustituye las pruebas físicas o el gate de producción.
 
+Si el proveedor publicó el candidato y falló la verificación posterior, se verifica el mismo deploy sin volver a empaquetar ni publicar:
+
+```powershell
+node tools/backend_staging.js --verify-report <ruta-al-package-report.json>
+```
+
+Esta modalidad solo realiza lecturas remotas. Exige que los cuatro ZIP originales sigan presentes y coincidan con sus hashes y tamaños; conserva el SHA de fuente, los hashes transitivos y el informe original sin modificarlo. Escribe un recibo `*.verification-*.json` ligado al hash del informe original, y comprueba de nuevo deploy activo, base aislada, privacidad, ausencia de transportes/schedules y los cuatro digests remotos. Acepta el inventario real de Netlify como objeto de grupo y el formato histórico como lista, rechazando formas desconocidas, grupos ambiguos, entradas duplicadas o hashes distintos. El runtime informado por Netlify se registra aparte del target de compilación del bundle. Ningún fallo provoca redeploy automático.
+
 La regresión local del empaquetador se ejecuta con `node tools/backend_staging_test.js` y comprueba allowlists, ausencia de llamadas remotas por defecto, fuente limpia, privacidad, base aislada y comparación de hashes.
 
 ## Recuperación
